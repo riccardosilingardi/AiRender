@@ -1,0 +1,13 @@
+# Una sola dipendenza, e sta in un file solo del motore (core/immagine.py).
+#
+# Pillow serve per aprire la vista salvata da Allplan e misurarla: senza,
+# il rifiuto dell'immagine inadatta non esiste, e senza quello si paga una
+# chiamata per ricevere un edificio diverso da quello disegnato.
+#
+# NON VERIFICATO: che Pillow sia installabile nell'interprete Python
+# incorporato di Allplan 2026. Vedi la sezione 9 del PRD. Se non lo fosse, si
+# riscrive core/immagine.py: il resto del motore parla solo di byte e numeri.
+#
+# Il trasporto HTTP usa urllib della libreria standard apposta: il PRD da'
+# `requests` per confermato solo sull'interprete del 2025.
+pillow>=10.0
