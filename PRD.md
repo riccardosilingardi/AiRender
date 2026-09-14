@@ -94,7 +94,32 @@ non sarà mai perfetto.
 
 ## 7 · Costruito e funzionante
 
-- Niente. Il repository è uno scaffold.
+Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
+senza Allplan. `pytest`: **67 test verdi**, nessuna chiamata di rete, nessuna
+chiave necessaria per farli girare.
+
+```bash
+python -m core.cli --image vista.png --preset base --testo "più caldo" --prova-a-secco
+```
+
+| Cosa | Dove | Stato |
+|---|---|---|
+| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. L'invio vero non è mai stato eseguito: manca la chiave (vedi sezione 9) |
+| Casa unica delle decisioni: 18 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Strato provider sostituibile: genera con riferimento strutturale e forza, modifica una regione con maschera, riesegue a parametri identici | `core/provider/` | Interfaccia + un solo provider (Magnific). Il secondo costa un file e una riga nel registro |
+| Rifiuto: vista inadatta (wireframe, senza ombre, troppo piccola), con il messaggio che dice cosa risalvare | `core/idoneita.py` | Funziona su immagini sintetiche. Mai provato su export veri di Allplan |
+| Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
+| Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
+| Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py` | Fatti per: chiave rifiutata, credito esaurito, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito |
+
+**Non c'è ancora:** nessuna palette, nessun pacchetto ALLEP, nessuna cartella
+sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
+espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
+al prompt del preset).
+
+Dipendenze: **una**, Pillow, usata in un file solo (`core/immagine.py`). Il
+trasporto HTTP usa `urllib` della libreria standard apposta, per non dipendere
+da `requests`.
 
 ## 8 · NON COSTRUITO
 
@@ -111,10 +136,44 @@ non sarà mai perfetto.
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Lasciato dalla sessione 1 (motore)
+
+- **L'API Magnific risponde alle chiamate che il motore fa** — non verificato:
+  in questa sessione non c'era nessuna chiave e la rete verso il dominio del
+  provider era chiusa. Endpoint (`POST /v1/ai/mystic`, `GET /v1/ai/mystic/{id}`,
+  `POST /v1/ai/ideogram-image-edit`), nome dell'intestazione della chiave e nomi
+  dei campi vengono dalla documentazione pubblica, non da una risposta vera. Per
+  verificare: `python -m core.cli --image vista.png --preset base` con una chiave
+  in `MAGNIFIC_API_KEY`. Se il nome di un campo è cambiato, si tocca un file solo,
+  `core/provider/magnific.py`.
 - **Il riferimento strutturale tiene la geometria di un edificio** — non
-  verificato: il connettore Magnific risponde in errore su ogni chiamata dal
-  2026-09-14. Per verificare: stessa vista shaded a forza 50, 70, 90 e confronto
-  di allineamento degli spigoli.
+  verificato, per la stessa ragione. Per verificare: stessa vista shaded a forza
+  50, 70 e 90, e confronto di allineamento degli spigoli. Fino ad allora
+  `FORZA_STRUTTURA_PREDEFINITA = 70` resta etichettata SCELTA, e l'interfaccia lo
+  scrive.
+- **`fixed_generation` basta a rifare la stessa immagine** — non verificato. La
+  ricetta salva anche modello e versione del preset proprio perché non ci
+  fidiamo; la riesecuzione avvisa che un'immagine identica non è garantita.
+- **Le soglie che scartano una vista inadatta reggono sugli export veri** — le
+  tre soglie (`QUOTA_SFONDO_MASSIMA`, `TONI_DISTINTI_MINIMI`,
+  `DEVIAZIONE_LUMINANZA_MINIMA`) sono state provate solo su immagini sintetiche
+  costruite dai test. Per verificare: dieci export veri da Allplan — cinque
+  shaded buone, tre wireframe, due senza ombre — e nessun falso rifiuto sulle
+  prime cinque. **È la verifica più urgente:** un falso rifiuto blocca un utente
+  che ha fatto tutto giusto.
+- **La grana corrisponde a `creative_detailing`** — i tre valori (20 / 45 / 75)
+  sono scelti, non misurati, e la corrispondenza fra quel parametro e la grana
+  percepita è un'ipotesi. Per verificare: stessa vista, tre livelli, e un occhio
+  su una facciata in mattoni.
+- **I formati accettati dal servizio sono quelli che il motore conosce** —
+  l'elenco in `core/provider/magnific.py` viene dalla documentazione. Se ne manca
+  uno, il motore chiede il più vicino e l'edificio si schiaccia un po'.
+- **Pillow è installabile nell'interprete Python incorporato di Allplan 2026** —
+  non verificato: serve la macchina. Se non lo fosse, si riscrive
+  `core/immagine.py` e basta: il resto del motore parla solo di byte e numeri.
+
+### Da prima
+
 - **L'API Magnific è accessibile a consumo senza piano enterprise** — le fonti si
   contraddicono. Per verificare: sezione API del cruscotto dell'account.
 - **`NemAll_Python_Utility.StartMenuFunction` può lanciare il salvataggio
@@ -123,7 +182,9 @@ la verifica si nomina qui.
 - **La rappresentazione a colori piatti si cambia senza muovere la camera** —
   serve solo se un giorno si torna alla multi-passata. Verifica manuale.
 - **`requests` è disponibile nell'interprete Python di Allplan 2026** —
-  confermato solo per la 2025.
+  confermato solo per la 2025. **Non è più un rischio per il motore:** il
+  trasporto usa `urllib` della libreria standard. Resta da verificare solo se
+  un giorno servirà `requests` dalla parte della palette.
 - **`PictureButtonList` regge una griglia di 12+ miniature senza rallentare la
   palette** — verifica su macchina.
 - **Le condizioni dei provider consentono la rivendita dell'accesso** — da
