@@ -1,7 +1,7 @@
 # AIRENDER — Product Requirements
 
 Documento vivo. Descrive quello che è vero **adesso**, non quello che è previsto.
-Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-09-14
+Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-18
 
 > Repository: `airender`. Nome fissato il 2026-09-14.
 
@@ -68,9 +68,10 @@ approvato.
 |---|---|---|---|
 | 2026-09-14 | Una sola immagine in ingresso: la vista shaded | Profondità e spigoli si stimano dall'immagine. Chiedere più passate all'utente uccide l'adozione | |
 | 2026-09-14 | Niente ID map esportata da Allplan in v1 | Sovra-ingegneria: la segmentazione a valle sul render dà una UX migliore e non richiede nulla all'utente | |
-| 2026-09-14 | Cartella sorvegliata invece di cattura programmatica | L'export nativo esiste e dà risoluzione impostabile. Elimina lo screenshot e la dipendenza da API incerte | |
+| 2026-09-14 | Cartella sorvegliata invece di cattura programmatica | L'export nativo esiste e dà risoluzione impostabile. Elimina lo screenshot e la dipendenza da API incerte || **In revisione 2026-10-18:** l'API c'è, `DrawingService.SaveWindowToImageFile(percorso, pixelWidth, pixelHeight)`, con esempio ufficiale nei PythonPartsExamples (ramo 2026). Si decide dopo la prova su macchina |
 | 2026-09-14 | Palette PythonPart, non nodo Visual Scripting | Il nodo VS non ha UI persistente né job asincroni; e gli utenti VS sono una minoranza. Il nodo resta possibile in v2 sullo stesso motore | |
-| 2026-09-14 | Allplan 2026 come minimo, 2027 a seguire | Plugin Manager e pacchetto ALLEP esistono solo da lì | |
+| 2026-09-14 | 2026-10-18 | La camera della finestra si salva accanto alla vista (`GetViewWorldProjection`: occhio, punto guardato, proiezione) | È il primo passo verso il legame diretto con la finestra Animazione che l'utente chiede | |
+| Allplan 2026 come minimo, 2027 a seguire | Plugin Manager e pacchetto ALLEP esistono solo da lì | |
 | 2026-09-14 | Motore immagine: Magnific come primo candidato | API a consumo senza abbonamento, `structure_reference` con forza regolabile, `fixed_generation`, editing per regione, 30+ modelli con una chiave | |
 | 2026-09-14 | ComfyUI come piano B | Controllo strutturale esplicito, ma richiede abbonamento attivo per eseguire, oppure hardware che l'utente non ha | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
@@ -95,7 +96,7 @@ non sarà mai perfetto.
 ## 7 · Costruito e funzionante
 
 Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **67 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **73 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -111,8 +112,9 @@ python -m core.cli --image vista.png --preset base --testo "più caldo" --prova-
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
 | Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py` | Fatti per: chiave rifiutata, credito esaurito, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito |
+| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Scritta, mai eseguita dentro Allplan (sezione 9). Il ponte è coperto da 6 test |
 
-**Non c'è ancora:** nessuna palette, nessun pacchetto ALLEP, nessuna cartella
+**Non c'è ancora:** nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
 espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
 al prompt del preset).
@@ -171,6 +173,30 @@ la verifica si nomina qui.
 - **Pillow è installabile nell'interprete Python incorporato di Allplan 2026** —
   non verificato: serve la macchina. Se non lo fosse, si riscrive
   `core/immagine.py` e basta: il resto del motore parla solo di byte e numeri.
+
+### Lasciato dalla sessione del 2026-10-18 (palette di prova)
+
+- **`SaveWindowToImageFile` cattura la finestra giusta quando si preme un
+  pulsante della palette** — l'esempio ufficiale dice "finestra attiva", e lo
+  script non sa quale sia. Per verificare: `allplan/README.md`, passo 5.
+- **La finestra Animazione si cattura come le altre** — non verificato. Se non
+  si cattura, il legame con l'Animazione passa dalla camera salvata, non
+  dall'immagine.
+- **I metodi della camera rispondono come ci aspettiamo** — `GetEyePoint`,
+  `GetViewPoint`, `IsCentralProjection`, `GetViewAngle`, `GetViewSize` sono
+  nell'elenco della documentazione 2026, ma senza firme. Ogni lettura che fallisce
+  finisce scritta come errore nel `.camera.json`, non blocca la cattura.
+- **Lo script trova `core/` e `ponte.py` accanto a sé** e Allplan carica i
+  PythonPart da `Usr\...\PythonPartsScripts` con la cartella dello script
+  importabile — non verificato. Se fallisce, lo dice la finestra Trace.
+- **Pillow installato con "Install Python Package" (destinazione USR) è visibile
+  ai PythonPart** — è lo scopo dichiarato dello strumento, ma non l'abbiamo visto.
+- **Percorso Usr predefinito di `installa.ps1`** —
+  `Documenti\Nemetschek\Allplan\2026\Usr\Local` è un'ipotesi; lo script si
+  ferma e lo dice se non esiste.
+- **PythonParts SDK 3.0.0 dichiara `min-allplan-version: 2027`** nel suo
+  `install-config.yml`, ma il Plugin Manager della 2026 lo ha installato.
+  Probabilmente serve una versione precedente: da guardare nel Plugin Manager.
 
 ### Da prima
 
