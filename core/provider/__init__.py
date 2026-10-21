@@ -1,20 +1,23 @@
 """Registro dei provider.
 
-Aggiungere un secondo motore immagine costa: un file accanto a magnific.py,
-una riga qui. Il resto del motore non cambia.
+Aggiungere un motore immagine costa: un file accanto a magnific.py e
+comfy.py, una riga qui. Il resto del motore non cambia.
 """
 
 from __future__ import annotations
 
 from ..errori import ProviderSconosciuto
 from .base import Provider, RichiestaGenerazione, RichiestaRegione, Risultato
+from .comfy import ProviderComfy
 from .magnific import ProviderMagnific
 
 REGISTRO: dict[str, type[Provider]] = {
+    ProviderComfy.nome: ProviderComfy,
     ProviderMagnific.nome: ProviderMagnific,
 }
 
-PREDEFINITO = ProviderMagnific.nome
+# Comfy Router dal 2026-10-21: Magnific non e' piu' a consumo (PRD, sezione 5).
+PREDEFINITO = ProviderComfy.nome
 
 
 def nomi() -> list[str]:
@@ -41,6 +44,7 @@ __all__ = [
     "RichiestaGenerazione",
     "RichiestaRegione",
     "Risultato",
+    "ProviderComfy",
     "ProviderMagnific",
     "REGISTRO",
     "PREDEFINITO",

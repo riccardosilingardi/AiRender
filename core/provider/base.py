@@ -75,6 +75,17 @@ class Provider(ABC):
     nome: str = ""
     #: cosa legge l'utente prima che l'immagine parta da casa sua
     destinazione: str = ""
+    #: se il servizio ha davvero una forza della struttura da 0 a 100. Se non
+    #: ce l'ha, l'interfaccia non deve stampare un numero che non parte.
+    usa_forza_struttura: bool = True
+
+    def destinazione_per(self, modello: str) -> str:
+        """La destinazione completa per questo modello, da mostrare prima dell'invio."""
+        return self.destinazione
+
+    def cosa_manca(self, modello: str) -> str | None:
+        """Cosa fermerebbe l'invio vero, detto gia' nella prova a secco. None se niente."""
+        return None
 
     @abstractmethod
     def genera(self, richiesta: RichiestaGenerazione) -> Risultato:

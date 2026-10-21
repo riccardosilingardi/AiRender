@@ -7,6 +7,7 @@ essere. Sono le prime a rompersi quando qualcuno ha fretta.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -103,8 +104,8 @@ def test_nessuna_chiave_nel_repository():
     La chiave e' del cliente e vive in una variabile d'ambiente. Qui dentro
     non ci sono nemmeno esempi che le somiglino.
     """
-    # Il nome si compone a pezzi, altrimenti questo file inciampa su se stesso.
-    marcatore = "MAGNIFIC" + "_API_KEY="
+    # I nomi si compongono a pezzi, altrimenti questo file inciampa su se stesso.
+    marcatori = ("MAGNIFIC" + "_API_KEY=", "COMFY" + "_API_KEY=")
     sospetti = []
     for percorso in sorted(RADICE.rglob("*")):
         if not percorso.is_file() or ".git/" in str(percorso):
@@ -114,11 +115,15 @@ def test_nessuna_chiave_nel_repository():
         testo = percorso.read_text(encoding="utf-8", errors="ignore")
         for riga in testo.splitlines():
             nuda = riga.strip()
-            if nuda.startswith("#") or marcatore not in nuda:
-                continue
-            valore = nuda.split(marcatore, 1)[1].strip().strip('"').strip("'")
-            if valore:
-                sospetti.append(f"{percorso.relative_to(RADICE)}: {nuda}")
+            for marcatore in marcatori:
+                if nuda.startswith("#") or marcatore not in nuda:
+                    continue
+                valore = nuda.split(marcatore, 1)[1].strip().strip('"').strip("'")
+                if valore:
+                    sospetti.append(f"{percorso.relative_to(RADICE)}: {nuda}")
+        # Le chiavi di Comfy hanno un prefisso riconoscibile: nessun file lo porta con un seguito.
+        for trovata in re.findall("comfy" + r"ui-[A-Za-z0-9_-]{8,}", testo):
+            sospetti.append(f"{percorso.relative_to(RADICE)}: {trovata[:12]}...")
     assert not sospetti, f"sembra esserci una chiave nel repository: {sospetti}"
 
 

@@ -35,7 +35,6 @@ def test_un_preset_che_promette_i_millimetri_non_si_lascia_costruire():
             identificativo="finto",
             nome="Mattone in scala 1:100",
             descrizione="corsi in millimetri",
-            modello="realism",
             prompt_tecnico="x",
         )
 

@@ -14,9 +14,14 @@ import pytest
 
 from conftest import (
     OrologioFinto,
+    TrasportoComfyFinto,
     TrasportoFinto,
     maschera_netta,
+    provider_comfy,
     risposta_lavoro,
+    router_in_coda,
+    router_risultato,
+    router_stato,
     vista_piatta,
     vista_shaded,
     vista_wireframe,
@@ -25,7 +30,7 @@ from core import config, grana, immagine, idoneita
 from core.errori import ErroreProvider
 from core.provider.base import RichiestaGenerazione, RichiestaRegione
 from core.provider.magnific import ProviderMagnific
-from core.provider.trasporto import TrasportoHTTP
+from core.provider.trasporto import ErroreRete, TrasportoHTTP
 
 
 def _richiesta(dati: bytes, **cambi) -> RichiestaGenerazione:
@@ -209,6 +214,43 @@ def test_invio_massimo_mb_ferma_l_immagine_troppo_pesante_prima_di_spedirla():
             RichiestaRegione(immagine=pesante, maschera=maschera_netta(), prompt="x")
         )
     assert trasporto.poste == []
+    assert "risoluzione piu' bassa" in errore.value.cosa_fare
+
+
+def test_tentativi_invio_massimi_ripetono_con_la_stessa_chiave_di_idempotenza(modello_verificato):
+    """Caso: la rete cade dopo l'invio. Ripetere con una chiave nuova farebbe pagare due volte."""
+    cadute = [ErroreRete("rete giu'", "riprova")] * (config.TENTATIVI_INVIO_MASSIMI - 1)
+    trasporto = TrasportoComfyFinto(
+        cadute + [router_in_coda(), router_stato("COMPLETED"), router_risultato()]
+    )
+    provider_comfy(trasporto).genera(
+        _richiesta(vista_shaded(512, 512), modello=modello_verificato)
+    )
+    poste = trasporto.poste()
+    assert len(poste) == config.TENTATIVI_INVIO_MASSIMI
+    assert {p[2]["Idempotency-Key"] for p in poste} == {"idem-1"}
+
+
+def test_tentativi_invio_massimi_poi_si_ferma_e_dice_di_guardare_i_crediti(modello_verificato):
+    """Caso: la rete non torna. Rilanciare a mano senza guardare puo' far pagare due volte."""
+    trasporto = TrasportoComfyFinto(
+        [ErroreRete("rete giu'", "riprova")] * config.TENTATIVI_INVIO_MASSIMI
+    )
+    with pytest.raises(ErroreProvider) as errore:
+        provider_comfy(trasporto).genera(
+            _richiesta(vista_shaded(512, 512), modello=modello_verificato)
+        )
+    assert len(trasporto.poste()) == config.TENTATIVI_INVIO_MASSIMI
+    assert "crediti del workspace" in errore.value.cosa_fare
+
+
+def test_comfy_invio_massimo_mb_ferma_la_vista_troppo_pesante_prima_di_spedirla(modello_verificato):
+    """Caso: una vista a 8k viaggia per un minuto e poi il modello la rifiuta."""
+    trasporto = TrasportoComfyFinto()
+    pesante = b"\x89PNG" + b"0" * int((config.COMFY_INVIO_MASSIMO_MB + 1) * 1024 * 1024)
+    with pytest.raises(ErroreProvider) as errore:
+        provider_comfy(trasporto).genera(_richiesta(pesante, modello=modello_verificato))
+    assert trasporto.chiamate == []
     assert "risoluzione piu' bassa" in errore.value.cosa_fare
 
 
