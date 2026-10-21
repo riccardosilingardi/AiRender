@@ -72,7 +72,7 @@ approvato.
 | 2026-09-14 | Palette PythonPart, non nodo Visual Scripting | Il nodo VS non ha UI persistente né job asincroni; e gli utenti VS sono una minoranza. Il nodo resta possibile in v2 sullo stesso motore | |
 | 2026-09-14 | 2026-10-18 | La camera della finestra si salva accanto alla vista (`GetViewWorldProjection`: occhio, punto guardato, proiezione) | È il primo passo verso il legame diretto con la finestra Animazione che l'utente chiede | |
 | Allplan 2026 come minimo, 2027 a seguire | Plugin Manager e pacchetto ALLEP esistono solo da lì | |
-| 2026-09-14 | Motore immagine: Magnific come primo candidato | API a consumo senza abbonamento, `structure_reference` con forza regolabile, `fixed_generation`, editing per regione, 30+ modelli con una chiave | |
+| 2026-09-14 | Motore immagine: Magnific come primo candidato | API a consumo senza abbonamento, `structure_reference` con forza regolabile, `fixed_generation`, editing per regione, 30+ modelli con una chiave | **Sì, 2026-10-21.** Il consumo senza abbonamento è chiuso dal 2026-06-30 (docs.magnific.com/pricing-payg): l'API ora scala i crediti di un piano prepagato. Cade la ragione principale della scelta. Magnific resta registrato come provider, non è più il predefinito |
 | 2026-09-14 | ComfyUI come piano B | Controllo strutturale esplicito, ma richiede abbonamento attivo per eseguire, oppure hardware che l'utente non ha | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -147,7 +147,9 @@ la verifica si nomina qui.
   dei campi vengono dalla documentazione pubblica, non da una risposta vera. Per
   verificare: `python -m core.cli --image vista.png --preset base` con una chiave
   in `MAGNIFIC_API_KEY`. Se il nome di un campo è cambiato, si tocca un file solo,
-  `core/provider/magnific.py`.
+  `core/provider/magnific.py`. Dal 2026-10-21 Magnific non è più il
+  predefinito e la verifica richiede un piano a crediti prepagati, non più una
+  chiave a consumo: va fatta solo se si decide di tenerlo.
 - **Il riferimento strutturale tiene la geometria di un edificio** — non
   verificato, per la stessa ragione. Per verificare: stessa vista shaded a forza
   50, 70 e 90, e confronto di allineamento degli spigoli. Fino ad allora
@@ -156,13 +158,31 @@ la verifica si nomina qui.
 - **`fixed_generation` basta a rifare la stessa immagine** — non verificato. La
   ricetta salva anche modello e versione del preset proprio perché non ci
   fidiamo; la riesecuzione avvisa che un'immagine identica non è garantita.
-- **Le soglie che scartano una vista inadatta reggono sugli export veri** — le
-  tre soglie (`QUOTA_SFONDO_MASSIMA`, `TONI_DISTINTI_MINIMI`,
-  `DEVIAZIONE_LUMINANZA_MINIMA`) sono state provate solo su immagini sintetiche
-  costruite dai test. Per verificare: dieci export veri da Allplan — cinque
-  shaded buone, tre wireframe, due senza ombre — e nessun falso rifiuto sulle
-  prime cinque. **È la verifica più urgente:** un falso rifiuto blocca un utente
-  che ha fatto tutto giusto.
+- **Le soglie che scartano una vista inadatta reggono sugli export veri** — per
+  verificare: dieci export veri da Allplan — cinque shaded buone, tre
+  wireframe, due senza ombre — e nessun falso rifiuto sulle prime cinque. **È
+  la verifica più urgente:** un falso rifiuto blocca un utente che ha fatto
+  tutto giusto. **Fatto 1 su 10** (2026-10-21): la cattura vera
+  `tests/dati/vista-20261021-093841.png` (shaded, finestra Animazione, 1536x857)
+  passa, ed è diventata un test di regressione in `tests/test_idoneita.py`:
+
+  | Misura | Valore misurato | Soglia | Margine |
+  |---|---|---|---|
+  | Sfondo uniforme (`QUOTA_SFONDO_MASSIMA`) | 10,1% | sotto 70% | ampio |
+  | Livelli di grigio (`TONI_DISTINTI_MINIMI`) | 67 | almeno 24 | ampio |
+  | Scarto di luminanza (`DEVIAZIONE_LUMINANZA_MINIMA`) | 35,4 | almeno 12 | ampio |
+
+  **Mancano 9 export veri:** quattro shaded buone, tre wireframe, due senza
+  ombre. Le tre soglie restano SCELTE. Un dubbio nuovo, da verificare con i
+  wireframe veri: lo sfondo di Allplan nella cattura **non è un tono unico ma un
+  gradiente** azzurro-grigio, per questo lo sfondo uniforme misura solo il 10%.
+  Il rilevamento del wireframe conta proprio su uno sfondo uniforme. Prova
+  sintetica, non un export: linee nere disegnate sul gradiente ricostruito dagli
+  angoli della cattura vera danno sfondo uniforme al 4,7%, 65 livelli di grigio,
+  scarto 36,0, e la vista **passa come idonea**. Se i tre wireframe veri fanno
+  lo stesso, il rifiuto del wireframe non funziona con lo sfondo predefinito di
+  Allplan. Un rifiuto che manca fa pagare una chiamata inutile, non blocca
+  nessuno: è meno grave di un falso rifiuto, ma va saputo.
 - **La grana corrisponde a `creative_detailing`** — i tre valori (20 / 45 / 75)
   sono scelti, non misurati, e la corrispondenza fra quel parametro e la grana
   percepita è un'ipotesi. Per verificare: stessa vista, tre livelli, e un occhio
@@ -170,9 +190,6 @@ la verifica si nomina qui.
 - **I formati accettati dal servizio sono quelli che il motore conosce** —
   l'elenco in `core/provider/magnific.py` viene dalla documentazione. Se ne manca
   uno, il motore chiede il più vicino e l'edificio si schiaccia un po'.
-- **Pillow è installabile nell'interprete Python incorporato di Allplan 2026** —
-  non verificato: serve la macchina. Se non lo fosse, si riscrive
-  `core/immagine.py` e basta: il resto del motore parla solo di byte e numeri.
 
 ### Lasciato dalla sessione del 2026-10-18 (palette di prova)
 
@@ -209,8 +226,6 @@ Resta non verificato:
 
 ### Da prima
 
-- **L'API Magnific è accessibile a consumo senza piano enterprise** — le fonti si
-  contraddicono. Per verificare: sezione API del cruscotto dell'account.
 - **`NemAll_Python_Utility.StartMenuFunction` può lanciare il salvataggio
   immagine** — l'API esiste, il nome dell'evento no. Per verificare: prova su
   macchina con Allplan 2026.
@@ -225,6 +240,22 @@ Resta non verificato:
 - **Le condizioni dei provider consentono la rivendita dell'accesso** — da
   leggere prima di emettere la prima fattura, non dopo.
 
+### Usciti da questa sezione, con la loro verifica
+
+- **Pillow è installabile nell'interprete Python incorporato di Allplan 2026** —
+  verificato il 2026-10-21 sul PC di Riccardo, Allplan 2026: installato da
+  PythonParts SDK › *Install Python Package* (pacchetto `pillow`, destinazione
+  USR); dentro la palette di prova `core/immagine.py` lo ha importato e la prova
+  a secco ha misurato la vista vera (67 livelli di grigio, sfondo uniforme al
+  10%). Vedi il blocco della sessione del 2026-10-18 qui sopra.
+- **L'API Magnific è accessibile a consumo senza piano enterprise** — risolto il
+  2026-10-21, con risposta **no**: il consumo senza abbonamento è chiuso dal
+  2026-06-30. Fonte: docs.magnific.com/pricing-payg, indicata da Riccardo. In
+  questa sessione la pagina non era raggiungibile dalla rete della macchina:
+  l'ho letta solo nell'estratto di una ricerca, che dice "API Pay-per-usage plan
+  will be discontinued on June 30. Switch to a credit based plan to keep using
+  the API."
+
 ## 10 · Tagliato
 
 - **ID map esportata da Allplan** — tagliata il 2026-09-14: chiede all'utente un
@@ -236,7 +267,9 @@ Resta non verificato:
 - **ComfyUI locale** — tagliato il 2026-09-14: la macchina disponibile ha 4 GB di
   VRAM contro i 12-16 necessari.
 - **Abbonamento Comfy Cloud per l'MVP** — tagliato il 2026-09-14: esiste
-  un'alternativa a consumo senza canone.
+  un'alternativa a consumo senza canone. Era Magnific, che dal 2026-06-30 non è
+  più a consumo; il taglio resta, perché l'alternativa a consumo adesso è Comfy
+  Router (sezione 5), che scala crediti del workspace e non è l'abbonamento.
 
 ## 11 · Target e limiti accettati
 
