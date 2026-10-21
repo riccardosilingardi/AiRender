@@ -197,9 +197,12 @@ Resta non verificato:
   un'apertura cambiata a mano.
 - **`GetViewSize` è in unità del modello, non in pixel** — ha restituito circa
   31539 x 17597 per una finestra di 1536x857 px.
-- **La vista catturata non ha ombre portate** e il motore l'ha accettata lo
-  stesso: le soglie di idoneità non distinguono "shaded senza ombre" da "shaded
-  con ombre". Va deciso se è un problema per il render.
+- **La cattura mostra le ombre portate quando sono attive** — nella prova le
+  ombre erano attive, ma nell'immagine non se ne vedono. Ipotesi, non verificata:
+  il modello BOSCO non ha solaio né terreno sotto i muri, quindi le ombre non
+  hanno dove cadere (sotto i muri si vede lo sfondo). Per verificare: cattura di
+  un modello con un solaio o un terreno, ombre attive. Il motore l'ha comunque
+  giudicata idonea: le soglie non distinguono una vista con ombre da una senza.
 - **PythonParts SDK 3.0.0 dichiara `min-allplan-version: 2027`** nel suo
   `install-config.yml`, ma il Plugin Manager della 2026 lo ha installato.
   Probabilmente serve una versione precedente: da guardare nel Plugin Manager.
