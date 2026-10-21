@@ -1,7 +1,7 @@
 # AIRENDER — Product Requirements
 
 Documento vivo. Descrive quello che è vero **adesso**, non quello che è previsto.
-Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-18
+Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-21
 
 > Repository: `airender`. Nome fissato il 2026-09-14.
 
@@ -112,7 +112,7 @@ python -m core.cli --image vista.png --preset base --testo "più caldo" --prova-
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
 | Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py` | Fatti per: chiave rifiutata, credito esaurito, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito |
-| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Scritta, mai eseguita dentro Allplan (sezione 9). Il ponte è coperto da 6 test |
+| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura e prova a secco funzionano in Allplan 2026 (prova del 2026-10-21). L'invio vero non è ancora partito |
 
 **Non c'è ancora:** nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
@@ -176,24 +176,33 @@ la verifica si nomina qui.
 
 ### Lasciato dalla sessione del 2026-10-18 (palette di prova)
 
-- **`SaveWindowToImageFile` cattura la finestra giusta quando si preme un
-  pulsante della palette** — l'esempio ufficiale dice "finestra attiva", e lo
-  script non sa quale sia. Per verificare: `allplan/README.md`, passo 5.
-- **La finestra Animazione si cattura come le altre** — non verificato. Se non
-  si cattura, il legame con l'Animazione passa dalla camera salvata, non
-  dall'immagine.
-- **I metodi della camera rispondono come ci aspettiamo** — `GetEyePoint`,
-  `GetViewPoint`, `IsCentralProjection`, `GetViewAngle`, `GetViewSize` sono
-  nell'elenco della documentazione 2026, ma senza firme. Ogni lettura che fallisce
-  finisce scritta come errore nel `.camera.json`, non blocca la cattura.
-- **Lo script trova `core/` e `ponte.py` accanto a sé** e Allplan carica i
-  PythonPart da `Usr\...\PythonPartsScripts` con la cartella dello script
-  importabile — non verificato. Se fallisce, lo dice la finestra Trace.
-- **Pillow installato con "Install Python Package" (destinazione USR) è visibile
-  ai PythonPart** — è lo scopo dichiarato dello strumento, ma non l'abbiamo visto.
-- **Percorso Usr predefinito di `installa.ps1`** —
-  `Documenti\Nemetschek\Allplan\2026\Usr\Local` è un'ipotesi; lo script si
-  ferma e lo dice se non esiste.
+Prova sul PC di Riccardo, Allplan 2026, modello BOSCO, 2026-10-21. **Verificato**:
+`installa.ps1` col percorso Usr predefinito; Pillow installato da "Install
+Python Package" visibile ai PythonPart; `core/` e `ponte.py` importati accanto
+allo script; `SaveWindowToImageFile` che salva la finestra in prospettiva
+centrale alla sua dimensione (1536x857); occhio, punto guardato e
+`IsCentralProjection` letti senza errori; prova a secco completa, con la vista
+giudicata idonea (67 livelli di grigio, sfondo uniforme al 10%) e la destinazione
+mostrata prima dell'invio.
+
+Resta non verificato:
+
+- **La finestra Animazione si cattura come le altre** — le due catture inviate
+  hanno la stessa camera e la stessa inquadratura: sono entrambe dalla finestra
+  Prospettiva centrale. Per verificare: aprire l'Animazione, cliccarci dentro,
+  Cattura vista, e confrontare la camera con quella della prospettiva.
+- **Quale finestra cattura quando ce ne sono due aperte** — provato con una
+  finestra sola. Per verificare: due finestre affiancate, clic nella seconda,
+  Cattura vista.
+- **`GetViewAngle` non è l'apertura della camera** — ha restituito `0.0` in una
+  vista prospettica, quindi è probabilmente la rotazione della vista, non il
+  campo visivo. Non usarlo come angolo di camera finché non lo si confronta con
+  un'apertura cambiata a mano.
+- **`GetViewSize` è in unità del modello, non in pixel** — ha restituito circa
+  31539 x 17597 per una finestra di 1536x857 px.
+- **La vista catturata non ha ombre portate** e il motore l'ha accettata lo
+  stesso: le soglie di idoneità non distinguono "shaded senza ombre" da "shaded
+  con ombre". Va deciso se è un problema per il render.
 - **PythonParts SDK 3.0.0 dichiara `min-allplan-version: 2027`** nel suo
   `install-config.yml`, ma il Plugin Manager della 2026 lo ha installato.
   Probabilmente serve una versione precedente: da guardare nel Plugin Manager.
