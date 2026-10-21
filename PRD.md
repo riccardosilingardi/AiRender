@@ -179,18 +179,15 @@ la verifica si nomina qui.
 Prova sul PC di Riccardo, Allplan 2026, modello BOSCO, 2026-10-21. **Verificato**:
 `installa.ps1` col percorso Usr predefinito; Pillow installato da "Install
 Python Package" visibile ai PythonPart; `core/` e `ponte.py` importati accanto
-allo script; `SaveWindowToImageFile` che salva la finestra in prospettiva
-centrale alla sua dimensione (1536x857); occhio, punto guardato e
+allo script; `SaveWindowToImageFile` che salva la **finestra Animazione** (in prospettiva
+centrale) alla sua dimensione (1536x857), in due catture a pochi minuti di
+distanza con la stessa camera; occhio, punto guardato e
 `IsCentralProjection` letti senza errori; prova a secco completa, con la vista
 giudicata idonea (67 livelli di grigio, sfondo uniforme al 10%) e la destinazione
 mostrata prima dell'invio.
 
 Resta non verificato:
 
-- **La finestra Animazione si cattura come le altre** — le due catture inviate
-  hanno la stessa camera e la stessa inquadratura: sono entrambe dalla finestra
-  Prospettiva centrale. Per verificare: aprire l'Animazione, cliccarci dentro,
-  Cattura vista, e confrontare la camera con quella della prospettiva.
 - **Quale finestra cattura quando ce ne sono due aperte** — provato con una
   finestra sola. Per verificare: due finestre affiancate, clic nella seconda,
   Cattura vista.
