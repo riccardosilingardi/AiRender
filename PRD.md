@@ -77,6 +77,7 @@ approvato.
 | 2026-10-21 | Motore immagine predefinito: **Comfy Router** (`api.comfy.org`) | A consumo dai crediti del workspace, senza abbonamento (docs.comfy.org, Comfy Router). Una chiave per più modelli di modifica d'immagine: FLUX.1 Kontext, Nano Banana, Seedream, GPT Image. Il modello si sceglie nel preset. Solo libreria standard, niente `comfy-sdk` | |
 | 2026-10-21 | Con Comfy Router **non c'è una forza della struttura** | I modelli di modifica del Router non hanno un `structure_strength` da 0 a 100: se tengono la geometria, la tengono per come sono fatti e per il prompt. Quindi l'interfaccia non stampa una forza, `--forza-struttura` viene rifiutata, la ricetta scrive la forza come assente. La sezione 2 ("propone di abbassare la libertà creativa") con Comfy non ha ancora una leva: la tenuta si giudica a occhio con `scripts/confronta_modelli.py`. La forza resta solo su Magnific | |
 | 2026-10-21 | `fallback_provider=false` su ogni invio a Comfy Router | Il Router, se il provider del modello fallisce, ripiega su un altro provider, e lo fa se non gli si dice di no. Sotto NDA la destinazione si annuncia prima dell'invio: un ripiego la renderebbe falsa. Se il Router dichiara comunque un altro provider, il risultato porta un avviso | |
+| 2026-10-21 | La **segmentazione resta in pipeline**: l'annotazione per aree le sta accanto, non la sostituisce | Decisione di Riccardo. Il riquadro copre un'area disegnata a mano; cliccare una superficie o nominarla a parole (sezione 4, passo 6) richiede ancora la segmentazione | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -147,9 +148,9 @@ da `requests`.
   o più riquadri numerati sul render e accanto a ciascuno scrive cosa cambiare
   ("balconi alla francese", "un piccolo caffè con la tenda verde"). Poi una sola
   generazione applica tutte le note. Per AIRENDER conta per tre ragioni:
-  1. **Toglie la segmentazione dal cambio di materiale.** L'area la disegna
-     l'utente, non la indovina un modello: l'anello debole della sezione 6 resta
-     per il clic su una superficie, non per il riquadro.
+  1. **Dà una strada che non dipende dalla segmentazione.** L'area la disegna
+     l'utente, non la indovina un modello. La segmentazione però **resta in
+     pipeline** (sezione 5): il riquadro le sta accanto, non la sostituisce.
   2. **Fuori dai riquadri l'immagine non cambia, e lo si può dimostrare.** Il
      motore rimette i pixel del render di partenza fuori dalle aree, con il
      bordo sfumato di `MASCHERA_SFUMATURA_PX`, qualunque modello abbia fatto la
@@ -169,9 +170,13 @@ da `requests`.
 
   Prima di scriverne il codice servono: uno schema di modello verificato dalla
   sonda; la risposta su come disegnare un riquadro dentro Allplan (sezione 9);
-  i quattro stati della schermata in `DESIGN.md`. Prende il posto del clic su
-  una superficie nella schermata Materiali, oppure gli sta accanto: è una
-  decisione di design, non ancora presa.
+  i quattro stati della schermata in `DESIGN.md`. Nella schermata Materiali sta
+  accanto al clic su una superficie e al nome scritto a parole, non al loro
+  posto.
+- **Segmentazione sul render** — in pipeline, non costruita. Serve a cliccare una
+  superficie o a nominarla a parole (sezione 4, passo 6; schermata Materiali in
+  `DESIGN.md`). Con i suoi limiti della sezione 6: segue l'apparenza, quindi
+  servono sempre aggiungi area e togli area.
 
 ## 9 · NON VERIFICATO
 

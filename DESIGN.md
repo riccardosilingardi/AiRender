@@ -86,6 +86,7 @@ Documento vivo, come il PRD. Si aggiorna ogni volta che una schermata cambia.
 - Qualunque cosa riguardi il video.
 - **Annotazione per aree** (PRD, sezione 8): riquadri numerati sul render, una
   nota per riquadro, un solo Applica. Riferimento: *Annotate Image* di
-  rendair.ai. Da progettare i quattro stati prima del codice, e da decidere se
-  sostituisce il clic su una superficie nella schermata 4 o gli sta accanto.
-  Dipende da come si disegna un riquadro dentro Allplan (PRD, sezione 9).
+  rendair.ai. Da progettare i quattro stati prima del codice. Sta accanto al
+  clic su una superficie della schermata 4, non al suo posto: la segmentazione
+  resta in pipeline (PRD, sezione 5). Dipende da come si disegna un riquadro
+  dentro Allplan (PRD, sezione 9).
