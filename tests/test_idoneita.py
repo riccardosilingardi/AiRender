@@ -6,10 +6,12 @@ messaggio glielo dica.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from conftest import vista_piatta, vista_shaded, vista_wireframe
-from core import immagine
+from core import config, immagine
 from core.errori import FileNonTrovato, ImmagineNonIdonea
 from core.idoneita import (
     SEMBRA_WIREFRAME,
@@ -18,6 +20,33 @@ from core.idoneita import (
     assicura_idonea,
     valuta,
 )
+
+# Export vero: Allplan 2026, modello BOSCO, finestra Animazione, 2026-10-21.
+# E' uno solo dei dieci che servono (PRD, sezione 9).
+VISTA_VERA = Path(__file__).parent / "dati" / "vista-20261021-093841.png"
+
+
+def test_la_vista_vera_di_allplan_passa_tutte_e_tre_le_soglie():
+    """Caso: un export vero, fatto giusto. Un falso rifiuto qui blocca chi non ha sbagliato."""
+    statistiche = immagine.misura(immagine.leggi(VISTA_VERA))
+    esito = valuta(statistiche)
+    assert esito.idonea and esito.motivo is None
+    assert statistiche.quota_sfondo < config.QUOTA_SFONDO_MASSIMA
+    assert statistiche.toni_distinti >= config.TONI_DISTINTI_MINIMI
+    assert statistiche.deviazione_luminanza >= config.DEVIAZIONE_LUMINANZA_MINIMA
+
+
+def test_la_vista_vera_di_allplan_misura_ancora_come_il_2026_10_21():
+    """Caso: si cambia il modo di misurare e le soglie non valgono piu' per gli export veri.
+
+    Se questo test si rompe, le tre soglie vanno riguardate su questa vista
+    prima di andare avanti, non ritoccate finche' il test torna verde.
+    """
+    statistiche = immagine.misura(immagine.leggi(VISTA_VERA))
+    assert (statistiche.larghezza, statistiche.altezza) == (1536, 857)
+    assert statistiche.quota_sfondo == pytest.approx(0.101, abs=0.001)
+    assert statistiche.toni_distinti == 67
+    assert statistiche.deviazione_luminanza == pytest.approx(35.4, abs=0.1)
 
 
 def test_una_vista_shaded_con_le_ombre_passa():

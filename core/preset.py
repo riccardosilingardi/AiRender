@@ -10,11 +10,23 @@ palette: qui ci sono solo i dati che le produrranno.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import config, grana
 from .errori import PresetSconosciuto
 from .lessico import controlla_etichetta
+
+# Il modello di ogni servizio. FLUX.1 Kontext Pro su Comfy Router e' una
+# scelta, non una misura: e' il primo modello di modifica che la sonda prova.
+# Lo confronto con un secondo modello (scripts/confronta_modelli.py) decide
+# se resta.
+MODELLI_PREDEFINITI = {
+    "comfy": "bfl/flux-kontext-pro",
+    "magnific": "realism",
+}
+
+# v2 (2026-10-21): oltre al prompt, il preset sceglie il modello di Comfy Router.
+_VERSIONE = "2"
 
 
 @dataclass(frozen=True)
@@ -24,13 +36,27 @@ class Preset:
     identificativo: str
     nome: str
     descrizione: str
-    modello: str
     prompt_tecnico: str
+    modelli: dict = field(default_factory=lambda: dict(MODELLI_PREDEFINITI))
     grana_predefinita: str = grana.MEDIA
     forza_struttura: int = config.FORZA_STRUTTURA_PREDEFINITA
     versione: str = "1"
 
+    def modello_per(self, provider: str) -> str:
+        """Il modello che questo preset usa con quel servizio."""
+        try:
+            return self.modelli[provider]
+        except KeyError:
+            raise PresetSconosciuto(
+                f"Il preset {self.identificativo} non dice quale modello usare "
+                f"con {provider}.",
+                "Scegli uno dei servizi per cui ha un modello: "
+                f"{', '.join(sorted(self.modelli))}.",
+            ) from None
+
     def __post_init__(self) -> None:
+        if not self.modelli:
+            raise ValueError(f"il preset {self.identificativo} non ha nessun modello")
         controlla_etichetta(self.nome, f"il nome del preset {self.identificativo}")
         controlla_etichetta(
             self.descrizione, f"la descrizione del preset {self.identificativo}"
@@ -62,12 +88,12 @@ PRESET = {
                 "Resa neutra e fedele. Materiali plausibili, luce diffusa, "
                 "nessuna interpretazione d'atmosfera."
             ),
-            modello="realism",
             prompt_tecnico=(
                 "architectural visualization of the reference building, "
                 "photographic realism, neutral overcast daylight, plausible "
                 "construction materials, " + _INVARIANZA
             ),
+            versione=_VERSIONE,
         ),
         Preset(
             identificativo="esterno-giorno",
@@ -76,12 +102,12 @@ PRESET = {
                 "Sole basso, ombre lunghe, cielo leggero. Per una facciata da "
                 "mostrare al cliente."
             ),
-            modello="realism",
             prompt_tecnico=(
                 "exterior architectural photograph of the reference building, "
                 "late afternoon sunlight, long soft shadows, clear sky, "
                 "context vegetation kept minimal, " + _INVARIANZA
             ),
+            versione=_VERSIONE,
         ),
         Preset(
             identificativo="interno-neutro",
@@ -90,13 +116,13 @@ PRESET = {
                 "Luce naturale da finestra, superfici opache, nessun arredo "
                 "aggiunto che non ci sia nel modello."
             ),
-            modello="realism",
             prompt_tecnico=(
                 "interior architectural photograph of the reference space, "
                 "natural window light, matte surfaces, no furniture that is "
                 "not present in the reference, " + _INVARIANZA
             ),
             grana_predefinita=grana.FINE,
+            versione=_VERSIONE,
         ),
     )
 }

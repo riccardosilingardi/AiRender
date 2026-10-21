@@ -17,6 +17,14 @@ from .. import config
 from ..errori import ErroreProvider
 
 
+class ErroreRete(ErroreProvider):
+    """La richiesta non e' arrivata, o la risposta non e' tornata.
+
+    Separato dagli altri errori perche' e' l'unico caso in cui ripetere la
+    stessa chiamata ha senso.
+    """
+
+
 class Trasporto(Protocol):
     """Il minimo che serve a un provider HTTP."""
 
@@ -25,6 +33,26 @@ class Trasporto(Protocol):
     def leggi(self, url: str, intestazioni: dict) -> tuple[int, object]: ...
 
     def scarica(self, url: str) -> bytes: ...
+
+
+class TrasportoConIntestazioni(Protocol):
+    """Per i servizi che parlano anche con le intestazioni (Retry-After, id di richiesta).
+
+    Le intestazioni tornano coi nomi in minuscolo: HTTP non distingue, il
+    codice che le legge non deve farlo.
+    """
+
+    def chiama(
+        self, metodo: str, url: str, intestazioni: dict, corpo: dict | None = None
+    ) -> tuple[int, dict, object]: ...
+
+    def scarica(self, url: str) -> bytes: ...
+
+
+def _minuscole(intestazioni) -> dict:
+    if intestazioni is None:
+        return {}
+    return {nome.lower(): valore for nome, valore in intestazioni.items()}
 
 
 def _decodifica(grezzo: bytes) -> object:
@@ -42,23 +70,37 @@ class TrasportoHTTP:
         self.timeout = config.TIMEOUT_RETE_SECONDI if timeout is None else timeout
 
     def _esegui(self, richiesta: urllib.request.Request) -> tuple[int, object]:
+        stato, _intestazioni, corpo = self._esegui_completo(richiesta)
+        return stato, corpo
+
+    def _esegui_completo(self, richiesta: urllib.request.Request) -> tuple[int, dict, object]:
         try:
             with urllib.request.urlopen(richiesta, timeout=self.timeout) as risposta:
-                return risposta.status, _decodifica(risposta.read())
+                return risposta.status, _minuscole(risposta.headers), _decodifica(risposta.read())
         except urllib.error.HTTPError as errore:
-            return errore.code, _decodifica(errore.read())
+            return errore.code, _minuscole(errore.headers), _decodifica(errore.read())
         except urllib.error.URLError as errore:
-            raise ErroreProvider(
+            raise ErroreRete(
                 f"Non sono riuscito a raggiungere il servizio: {errore.reason}.",
                 "Controlla la connessione. Se sei dietro un proxy aziendale, "
                 "serve che consenta il traffico verso il servizio indicato "
                 "sopra. La tua vista e' rimasta sul disco.",
             ) from None
         except TimeoutError:
-            raise ErroreProvider(
+            raise ErroreRete(
                 f"Il servizio non ha risposto entro {self.timeout} secondi.",
                 "Riprova fra qualche minuto. Niente e' andato perso.",
             ) from None
+
+    def chiama(
+        self, metodo: str, url: str, intestazioni: dict, corpo: dict | None = None
+    ) -> tuple[int, dict, object]:
+        dati = None if corpo is None else json.dumps(corpo).encode("utf-8")
+        tipo = {} if corpo is None else {"Content-Type": "application/json"}
+        richiesta = urllib.request.Request(
+            url, data=dati, method=metodo, headers={**tipo, **intestazioni}
+        )
+        return self._esegui_completo(richiesta)
 
     def posta(self, url: str, intestazioni: dict, corpo: dict) -> tuple[int, object]:
         dati = json.dumps(corpo).encode("utf-8")

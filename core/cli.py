@@ -13,7 +13,13 @@ import sys
 from pathlib import Path
 
 from . import config, grana as modulo_grana, immagine as modulo_immagine, provider as registro
-from .errori import ChiaveMancante, ErroreAirender, ErroreProvider, ImmagineNonIdonea
+from .errori import (
+    ChiaveMancante,
+    ErroreAirender,
+    ErroreProvider,
+    ImmagineNonIdonea,
+    ParametroVietato,
+)
 from .idoneita import valuta
 from .lessico import rifiuta_opzione_scala
 from .preset import elenco, preset as trova_preset
@@ -56,7 +62,8 @@ def costruisci_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--forza-struttura", type=int, dest="forza",
         help=(
-            "quanto il render resta attaccato alla vista "
+            "quanto il render resta attaccato alla vista, solo per i servizi "
+            "che ce l'hanno "
             f"(predefinito: {config.costante('FORZA_STRUTTURA_PREDEFINITA').etichetta()})"
         ),
     )
@@ -86,7 +93,8 @@ def _scrivi(testo: str = "", flusso=None) -> None:
 
 def _mostra_preset() -> int:
     for p in elenco():
-        _scrivi(f"{p.identificativo}  —  {p.nome} (v{p.versione}, modello {p.modello})")
+        modelli = ", ".join(f"{servizio} → {modello}" for servizio, modello in sorted(p.modelli.items()))
+        _scrivi(f"{p.identificativo}  —  {p.nome} (v{p.versione}; modelli: {modelli})")
         _scrivi(f"    {p.descrizione}")
         _scrivi(f"    grana predefinita: {p.grana_predefinita}")
     return USCITA_OK
@@ -116,12 +124,24 @@ def _racconta(risultato, destinazione: Path, ricetta: Path) -> None:
         _scrivi(f"Avviso: {avviso}")
 
 
-def _annuncia_destinazione(motore, quante: int = 1) -> None:
+def _annuncia_destinazione(motore, modello: str, dire, quante: int = 1) -> None:
     """Prima che qualcosa parta, si dice dove va. Sempre."""
-    _scrivi(
-        f"Destinazione dell'invio: {motore.destinazione}. "
+    dire(
+        f"Destinazione dell'invio: {motore.destinazione_per(modello)}. "
         f"{quante} immagine lascia questa macchina."
     )
+
+
+def _dici_forza(motore, modello: str, forza, dire) -> None:
+    """La forza si stampa solo se parte davvero. Un numero che non parte e' una bugia."""
+    if motore.usa_forza_struttura and forza is not None:
+        dire(f"Forza della struttura: {forza} — valore scelto, non ancora misurato.")
+    else:
+        dire(
+            f"Forza della struttura: non usata. {modello} non ha un controllo di "
+            "quanto il render resta attaccato alla vista: la tenuta della "
+            "geometria si giudica a occhio, affiancando le due immagini."
+        )
 
 
 def esegui(argomenti, uscita_standard=None) -> int:
@@ -156,6 +176,15 @@ def esegui(argomenti, uscita_standard=None) -> int:
 
     scelto = trova_preset(argomenti.preset)
     livello = modulo_grana.normalizza(argomenti.grana or scelto.grana_predefinita)
+    motore = registro.crea(argomenti.provider)
+    modello = scelto.modello_per(motore.nome)
+    if argomenti.forza is not None and not motore.usa_forza_struttura:
+        raise ParametroVietato(
+            f"--forza-struttura non vale per {motore.destinazione_per(modello)}: "
+            "quel modello non ha una forza della struttura.",
+            "Togli --forza-struttura, oppure usa --provider magnific, l'unico "
+            "servizio registrato che ce l'ha.",
+        )
     forza = scelto.forza_struttura if argomenti.forza is None else argomenti.forza
 
     richiesta = RichiestaGenerazione(
@@ -163,20 +192,22 @@ def esegui(argomenti, uscita_standard=None) -> int:
         prompt=componi(scelto, argomenti.testo, livello),
         preset=scelto.identificativo,
         preset_versione=scelto.versione,
-        modello=scelto.modello,
+        modello=modello,
         grana=livello,
         dettaglio_grana=modulo_grana.dettaglio(livello),
         testo_utente=argomenti.testo,
         forza_struttura=forza,
     )
 
-    motore = registro.crea(argomenti.provider)
     dire(f"Preset: {scelto.nome} (v{scelto.versione})  ·  {modulo_grana.etichetta(livello)}")
-    dire(f"Forza della struttura: {forza} — valore scelto, non ancora misurato.")
-    _annuncia_destinazione(motore)
+    _dici_forza(motore, modello, forza, dire)
+    _annuncia_destinazione(motore, modello, dire)
 
     if argomenti.secco:
         dire("Prova a secco: non ho inviato niente.")
+        mancante = motore.cosa_manca(modello)
+        if mancante:
+            dire(f"Attenzione: {mancante}")
         dire(f"Prompt che partirebbe: {richiesta.prompt}")
         return USCITA_OK
 
@@ -199,19 +230,23 @@ def _riesegui(argomenti, dire) -> int:
     dati = modulo_immagine.leggi(sorgente)
     motore = registro.crea(ricetta.provider)
 
+    forza = "non usata" if ricetta.forza_struttura is None else ricetta.forza_struttura
     dire(
         f"Rifaccio il livello: preset {ricetta.preset} v{ricetta.preset_versione}, "
-        f"modello {ricetta.modello}, forza {ricetta.forza_struttura}, "
+        f"modello {ricetta.modello}, forza {forza}, "
         f"grana {ricetta.grana}."
     )
     dire(
         "Il modello puo' essere cambiato sotto lo stesso nome: una riesecuzione "
         "identica nei parametri non garantisce un'immagine identica."
     )
-    _annuncia_destinazione(motore)
+    _annuncia_destinazione(motore, ricetta.modello, dire)
 
     if argomenti.secco:
         dire("Prova a secco: non ho inviato niente.")
+        mancante = motore.cosa_manca(ricetta.modello)
+        if mancante:
+            dire(f"Attenzione: {mancante}")
         return USCITA_OK
 
     risultato = motore.riesegui(ricetta, dati)

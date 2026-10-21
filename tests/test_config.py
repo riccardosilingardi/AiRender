@@ -7,16 +7,23 @@ il suo caso, la suite lo dice.
 
 from __future__ import annotations
 
+import io
 import re
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from conftest import (
     OrologioFinto,
+    TrasportoComfyFinto,
     TrasportoFinto,
     maschera_netta,
+    provider_comfy,
     risposta_lavoro,
+    router_in_coda,
+    router_risultato,
+    router_stato,
     vista_piatta,
     vista_shaded,
     vista_wireframe,
@@ -25,7 +32,7 @@ from core import config, grana, immagine, idoneita
 from core.errori import ErroreProvider
 from core.provider.base import RichiestaGenerazione, RichiestaRegione
 from core.provider.magnific import ProviderMagnific
-from core.provider.trasporto import TrasportoHTTP
+from core.provider.trasporto import ErroreRete, TrasportoHTTP
 
 
 def _richiesta(dati: bytes, **cambi) -> RichiestaGenerazione:
@@ -145,6 +152,19 @@ def test_maschera_sfumatura_px_toglie_la_cucitura_dal_bordo_della_regione():
     assert dopo.toni_distinti > prima.toni_distinti
 
 
+# --- confronto affiancato ----------------------------------------------------
+
+
+def test_confronto_didascalia_px_sta_sopra_e_non_copre_il_render():
+    """Caso: una didascalia sovrapposta copre proprio la gronda che si deve guardare."""
+    vista = vista_shaded(1600, 900)
+    largo = vista_shaded(1200, 600)
+    uscita = Image.open(io.BytesIO(immagine.affianca([("vista", vista), ("render", largo)])))
+    assert uscita.height == 900 + config.CONFRONTO_DIDASCALIA_PX
+    # Il render piu' largo resta piu' largo: le proporzioni non si toccano.
+    assert uscita.width == 1600 + 2 + 1800
+
+
 # --- grana -------------------------------------------------------------------
 
 
@@ -209,6 +229,43 @@ def test_invio_massimo_mb_ferma_l_immagine_troppo_pesante_prima_di_spedirla():
             RichiestaRegione(immagine=pesante, maschera=maschera_netta(), prompt="x")
         )
     assert trasporto.poste == []
+    assert "risoluzione piu' bassa" in errore.value.cosa_fare
+
+
+def test_tentativi_invio_massimi_ripetono_con_la_stessa_chiave_di_idempotenza(modello_verificato):
+    """Caso: la rete cade dopo l'invio. Ripetere con una chiave nuova farebbe pagare due volte."""
+    cadute = [ErroreRete("rete giu'", "riprova")] * (config.TENTATIVI_INVIO_MASSIMI - 1)
+    trasporto = TrasportoComfyFinto(
+        cadute + [router_in_coda(), router_stato("COMPLETED"), router_risultato()]
+    )
+    provider_comfy(trasporto).genera(
+        _richiesta(vista_shaded(512, 512), modello=modello_verificato)
+    )
+    poste = trasporto.poste()
+    assert len(poste) == config.TENTATIVI_INVIO_MASSIMI
+    assert {p[2]["Idempotency-Key"] for p in poste} == {"idem-1"}
+
+
+def test_tentativi_invio_massimi_poi_si_ferma_e_dice_di_guardare_i_crediti(modello_verificato):
+    """Caso: la rete non torna. Rilanciare a mano senza guardare puo' far pagare due volte."""
+    trasporto = TrasportoComfyFinto(
+        [ErroreRete("rete giu'", "riprova")] * config.TENTATIVI_INVIO_MASSIMI
+    )
+    with pytest.raises(ErroreProvider) as errore:
+        provider_comfy(trasporto).genera(
+            _richiesta(vista_shaded(512, 512), modello=modello_verificato)
+        )
+    assert len(trasporto.poste()) == config.TENTATIVI_INVIO_MASSIMI
+    assert "crediti del workspace" in errore.value.cosa_fare
+
+
+def test_comfy_invio_massimo_mb_ferma_la_vista_troppo_pesante_prima_di_spedirla(modello_verificato):
+    """Caso: una vista a 8k viaggia per un minuto e poi il modello la rifiuta."""
+    trasporto = TrasportoComfyFinto()
+    pesante = b"\x89PNG" + b"0" * int((config.COMFY_INVIO_MASSIMO_MB + 1) * 1024 * 1024)
+    with pytest.raises(ErroreProvider) as errore:
+        provider_comfy(trasporto).genera(_richiesta(pesante, modello=modello_verificato))
+    assert trasporto.chiamate == []
     assert "risoluzione piu' bassa" in errore.value.cosa_fare
 
 

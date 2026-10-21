@@ -13,6 +13,7 @@ import pytest
 
 from conftest import vista_shaded, vista_wireframe
 from core import provider as registro
+from core.preset import elenco, preset
 from core.cli import (
     USCITA_CONFIGURAZIONE,
     USCITA_OK,
@@ -72,6 +73,9 @@ class ProviderDiProva(Provider):
 def motore_di_prova(monkeypatch):
     ProviderDiProva.chiamate = []
     monkeypatch.setitem(registro.REGISTRO, ProviderDiProva.nome, ProviderDiProva)
+    # Come farebbe un motore vero: ogni preset dice quale modello usare con lui.
+    for p in elenco():
+        monkeypatch.setitem(p.modelli, ProviderDiProva.nome, "modello-di-prova")
     return ProviderDiProva
 
 
@@ -125,7 +129,8 @@ def test_una_generazione_lascia_il_render_e_la_sua_ricetta(motore_di_prova, vist
         (tmp_path / "render.png.ricetta.json").read_text(encoding="utf-8")
     )
     assert ricetta["preset"] == "base"
-    assert ricetta["preset_versione"] == "1"
+    assert ricetta["preset_versione"] == preset("base").versione
+    assert ricetta["modello"] == "modello-di-prova"
     assert ricetta["impronta_sorgente"] == impronta(vista.read_bytes())
     assert "Scostamento della geometria: non misurato." in capsys.readouterr().out
 
@@ -152,7 +157,39 @@ def test_senza_chiave_si_ferma_e_dice_dove_metterla(vista, capsys):
     """Caso: prima esecuzione, chiave non ancora configurata."""
     codice = main(["--immagine", str(vista)])
     assert codice == USCITA_CONFIGURAZIONE
-    assert "MAGNIFIC_API_KEY" in capsys.readouterr().err
+    assert "COMFY_API_KEY" in capsys.readouterr().err
+
+
+def test_la_prova_a_secco_predefinita_dice_comfy_router_e_il_modello(vista, capsys):
+    """Caso: il servizio predefinito e' cambiato. L'utente deve leggerlo prima, col modello."""
+    codice = main(["--immagine", str(vista), "--prova-a-secco"])
+    uscita = capsys.readouterr().out
+    assert codice == USCITA_OK
+    modello = preset("base").modello_per("comfy")
+    assert f"Destinazione dell'invio: Comfy Router (api.comfy.org) → {modello}." in uscita
+    assert uscita.index("Destinazione dell'invio") < uscita.index("non ho inviato niente")
+
+
+def test_la_prova_a_secco_avvisa_se_l_invio_vero_si_fermera(vista, capsys):
+    """Caso: la prova a secco dice "tutto bene" e l'invio vero poi si rifiuta."""
+    main(["--immagine", str(vista), "--prova-a-secco"])
+    assert "non e' ancora stato verificato" in capsys.readouterr().out
+
+
+def test_con_comfy_la_forza_non_si_stampa_come_un_numero(vista, capsys):
+    """Caso: 70 a schermo per un parametro che non parte e' un valore inventato."""
+    main(["--immagine", str(vista), "--prova-a-secco"])
+    uscita = capsys.readouterr().out
+    assert "Forza della struttura: non usata" in uscita
+    assert "Forza della struttura: 70" not in uscita
+
+
+def test_forza_struttura_chiesta_a_comfy_viene_rifiutata_con_la_ragione(vista, capsys):
+    """Caso: l'utente regola una forza che il modello ignorerebbe in silenzio."""
+    codice = main(["--immagine", str(vista), "--forza-struttura", "90", "--prova-a-secco"])
+    errore = capsys.readouterr().err
+    assert codice == USCITA_RIFIUTO
+    assert "--provider magnific" in errore
 
 
 def test_un_preset_che_non_esiste_elenca_quelli_che_esistono(vista, capsys):

@@ -51,6 +51,10 @@ Cresce col progetto. Dopo un mese sarà la sezione più preziosa del repository.
 - **Il seed da solo non basta a rendere riproducibile un livello.** Vanno
   salvati anche modello, versione del preset e tutti i parametri: i provider
   cambiano i modelli sotto lo stesso nome.
+- **Comfy Router ripiega su un altro provider se non glielo si vieta.** Il
+  fallback è acceso per default e qualunque valore diverso da `false` lo lascia
+  acceso. Senza `fallback_provider=false` la destinazione annunciata può essere
+  falsa.
 
 ## Come parla l'interfaccia
 

@@ -192,6 +192,20 @@ MASCHERA_SFUMATURA_PX = _registra(Costante(
     unita=" px",
 ))
 
+# --- Confronto affiancato ----------------------------------------------------
+
+CONFRONTO_DIDASCALIA_PX = _registra(Costante(
+    nome="CONFRONTO_DIDASCALIA_PX",
+    valore=28,
+    origine=SCELTA,
+    ragione=(
+        "Altezza della striscia col nome sopra ogni immagine del confronto. "
+        "Sta sopra, non sopra l'immagine: una didascalia sovrapposta coprirebbe "
+        "proprio gli spigoli alti che si devono guardare."
+    ),
+    unita=" px",
+))
+
 # --- Grana (mai 'scala': vedi core/lessico.py) -------------------------------
 
 GRANA_FINE = _registra(Costante(
@@ -264,6 +278,33 @@ INVIO_MASSIMO_MB = _registra(Costante(
     ragione=(
         "Dimensione massima per immagine accettata dagli endpoint Magnific "
         "(documentazione API, formati JPEG/PNG/WebP)."
+    ),
+    unita=" MB",
+))
+
+TENTATIVI_INVIO_MASSIMI = _registra(Costante(
+    nome="TENTATIVI_INVIO_MASSIMI",
+    valore=3,
+    origine=SCELTA,
+    ragione=(
+        "Quante volte si prova una chiamata a Comfy Router quando la rete cade "
+        "o il servizio risponde 429 o 5xx. Ogni tentativo porta la stessa "
+        "Idempotency-Key, cosi' il Router rende la risposta del primo invece "
+        "di far pagare una seconda generazione. Oltre tre il guasto non e' "
+        "passeggero, ed e' piu' utile dirlo all'utente che insistere."
+    ),
+))
+
+COMFY_INVIO_MASSIMO_MB = _registra(Costante(
+    nome="COMFY_INVIO_MASSIMO_MB",
+    valore=10,
+    origine=SCELTA,
+    ragione=(
+        "Peso massimo della vista mandata a Comfy Router. Il Router non "
+        "dichiara un limite unico: dipende dal modello (25 MiB per FLUX.1 "
+        "Kontext nella sua scheda su comfy.org). 10 MB sta sotto ogni limite "
+        "letto finche' la sonda non dice altro, e una vista di Allplan a 2k "
+        "pesa meno di 1 MB."
     ),
     unita=" MB",
 ))

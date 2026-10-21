@@ -1,0 +1,501 @@
+"""Comfy Router: il provider predefinito dal 2026-10-21.
+
+Scelto perche' e' a consumo dai crediti del workspace Comfy, senza
+abbonamento, e con una chiave sola arriva a piu' modelli di modifica
+d'immagine (FLUX.1 Kontext, Nano Banana, Seedream, GPT Image). Solo libreria
+standard, niente comfy-sdk, come magnific.py. La chiave e' del cliente: sta
+in una variabile d'ambiente, mai nel repository.
+
+Da dove viene quello che c'e' scritto qui:
+
+- il protocollo della coda (POST .../requests, GET .../status con
+  Retry-After, GET del risultato), le intestazioni X-API-Key e
+  Idempotency-Key, fallback_provider e il 402 insufficient_credits vengono
+  dalla documentazione di docs.comfy.org, letta il 2026-10-21 solo attraverso
+  una ricerca: la rete della sessione non raggiungeva il sito. MAI ESEGUITO.
+- lo schema di ogni modello (che campi vuole, dove rimette l'immagine) qui
+  NON c'e'. Si scrive in SCHEMI solo partendo dall'uscita di una chiamata
+  vera di scripts/sonda_comfy.py. Finche' un modello non ha il suo schema,
+  l'invio si ferma prima di partire e lo dice.
+
+Differenza che conta per il prodotto: i modelli di modifica del Router non
+hanno un riferimento strutturale con una forza da 0 a 100. Se tengono la
+geometria, la tengono per come sono fatti e per il prompt. Quindi
+`usa_forza_struttura` e' falso e la ricetta scrive la forza come assente, non
+come 70.
+"""
+
+from __future__ import annotations
+
+import base64
+import os
+import time
+import urllib.parse
+import uuid
+from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
+from typing import Callable
+
+from .. import config, immagine as modulo_immagine
+from ..errori import ChiaveMancante, ErroreProvider, errore_da_stato_http
+from ..ricetta import Ricetta, impronta
+from .base import Provider, RichiestaGenerazione, RichiestaRegione, Risultato
+from .trasporto import ErroreRete, TrasportoConIntestazioni, TrasportoHTTP
+
+BASE = "https://api.comfy.org/v2/models"
+INTESTAZIONE_CHIAVE = "X-API-Key"
+VARIABILI_CHIAVE = ("COMFY_API_KEY", "AIRENDER_COMFY_API_KEY")
+
+# Il fallback del Router e' acceso se non lo si spegne: se il provider del
+# modello fallisce, la stessa immagine riparte verso un altro provider. Il
+# pubblico lavora sotto NDA e la destinazione si annuncia prima dell'invio,
+# quindi si spegne. Il Router legge come "acceso" qualunque valore che non
+# sia esattamente "false".
+FALLBACK = "false"
+
+STATO_FINITO = "COMPLETED"
+STATI_IN_CORSO = ("IN_QUEUE", "IN_PROGRESS")
+# Risposte che vale la pena ripetere, con la stessa Idempotency-Key.
+STATI_PASSEGGERI = (429, 500, 502, 503, 504)  # numero-non-configurabile: codici HTTP
+ANCORA_IN_CORSO = 202  # numero-non-configurabile: codice HTTP del risultato non pronto
+
+
+@dataclass(frozen=True)
+class SchemaModello:
+    """Come parla un modello del Router. Si scrive dall'uscita della sonda, non dai documenti.
+
+    - `corpo` costruisce il JSON della richiesta da una RichiestaGenerazione;
+    - `immagine` trova l'immagine nel risultato e la restituisce come
+      ("url" | "base64" | "data-uri", valore);
+    - `verificato_il` e' la data della chiamata vera che lo ha confermato.
+    """
+
+    corpo: Callable[[RichiestaGenerazione], dict]
+    immagine: Callable[[object], tuple[str, str]]
+    verificato_il: str
+
+
+# Vuoto apposta, fino all'uscita di scripts/sonda_comfy.py. Vedi la docstring.
+SCHEMI: dict[str, SchemaModello] = {}
+
+
+def chiave_da_ambiente() -> str | None:
+    """La chiave dell'utente, presa dall'ambiente. Mai da un file del repo."""
+    for nome in VARIABILI_CHIAVE:
+        valore = os.environ.get(nome, "").strip()
+        if valore:
+            return valore
+    return None
+
+
+def tipo_mime(dati: bytes) -> str:
+    """Dai primi byte, senza aprire l'immagine."""
+    if dati.startswith(b"\x89PNG"):
+        return "image/png"
+    if dati.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if dati[:4] == b"RIFF" and dati[8:12] == b"WEBP":  # numero-non-configurabile: intestazione WebP
+        return "image/webp"
+    return "application/octet-stream"
+
+
+def immagine_data_uri(dati: bytes) -> str:
+    """La vista come la chiede il Router nei campi immagine: data:image/png;base64,..."""
+    return f"data:{tipo_mime(dati)};base64,{base64.b64encode(dati).decode('ascii')}"
+
+
+def secondi_retry_after(intestazioni: dict) -> float | None:
+    """Retry-After in secondi: puo' arrivare come numero o come data HTTP."""
+    valore = intestazioni.get("retry-after")
+    if valore is None:
+        return None
+    try:
+        return max(0.0, float(valore))
+    except ValueError:
+        pass
+    try:
+        return max(0.0, parsedate_to_datetime(valore).timestamp() - time.time())
+    except (TypeError, ValueError):
+        return None
+
+
+class ProviderComfy(Provider):
+    nome = "comfy"
+    destinazione = "Comfy Router (api.comfy.org)"
+    usa_forza_struttura = False
+
+    def __init__(
+        self,
+        chiave: str | None = None,
+        trasporto: TrasportoConIntestazioni | None = None,
+        attesa=time.sleep,
+        orologio=time.monotonic,
+        nuova_chiave_idempotenza=lambda: str(uuid.uuid4()),
+    ) -> None:
+        self.chiave = chiave or chiave_da_ambiente()
+        self.trasporto = trasporto or TrasportoHTTP()
+        self._attesa = attesa
+        self._orologio = orologio
+        self._nuova_chiave_idempotenza = nuova_chiave_idempotenza
+
+    def destinazione_per(self, modello: str) -> str:
+        return f"{self.destinazione} → {modello}"
+
+    def cosa_manca(self, modello: str) -> str | None:
+        if modello in SCHEMI:
+            return None
+        return (
+            f"lo schema del modello {modello} non e' ancora stato verificato con "
+            "una chiamata vera, quindi l'invio vero si fermera' prima di partire."
+        )
+
+    # --- cose che il prodotto chiede ----------------------------------------
+
+    def genera(self, richiesta: RichiestaGenerazione) -> Risultato:
+        return self._genera(richiesta, avvisi_in_piu=[])
+
+    def riesegui(self, ricetta: Ricetta, immagine: bytes) -> Risultato:
+        """Rifa' lo stesso livello dagli stessi parametri, con la stessa vista.
+
+        Con una Idempotency-Key nuova: riusare quella vecchia entro 24 ore
+        renderebbe l'immagine di allora senza rifarla, e chiamarlo
+        riesecuzione sarebbe falso.
+        """
+        if impronta(immagine) != ricetta.impronta_sorgente:
+            raise ErroreProvider(
+                "La vista di partenza non e' la stessa con cui era stato fatto "
+                "questo livello.",
+                "Ripesca la vista originale, oppure rigenera il livello da capo: "
+                "con un'altra vista gli stessi parametri danno un'altra immagine.",
+            )
+        richiesta = RichiestaGenerazione(
+            immagine=immagine,
+            prompt=ricetta.prompt,
+            preset=ricetta.preset,
+            preset_versione=ricetta.preset_versione,
+            modello=ricetta.modello,
+            grana=ricetta.grana,
+            dettaglio_grana=ricetta.dettaglio_grana or 0,
+            testo_utente=ricetta.testo_utente,
+            seme=ricetta.seme,
+        )
+        return self._genera(richiesta, avvisi_in_piu=[
+            "Comfy Router non ha una generazione fissa verificata: la stessa "
+            "ricetta puo' dare un'immagine diversa.",
+        ])
+
+    def modifica_regione(self, richiesta: RichiestaRegione) -> Risultato:
+        raise ErroreProvider(
+            "Il ritocco con una maschera non passa ancora da Comfy Router: "
+            "nessun modello con maschera e' stato verificato.",
+            "Per cambiare un materiale rigenera l'immagine col testo nuovo "
+            "(modalita' variante). Il ritocco con maschera c'e' solo con "
+            "--provider magnific, che pero' richiede un piano a crediti.",
+        )
+
+    # --- dentro ---------------------------------------------------------------
+
+    def _genera(self, richiesta: RichiestaGenerazione, avvisi_in_piu: list[str]) -> Risultato:
+        self._assicura_chiave()
+        self._assicura_peso(richiesta.immagine)
+        schema = self._schema(richiesta.modello)
+
+        corpo = schema.corpo(richiesta)
+        chiave_idempotenza = self._nuova_chiave_idempotenza()
+        uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
+        tipo, valore = schema.immagine(uscita)
+        dati = self._byte_immagine(tipo, valore)
+
+        ricetta = Ricetta(
+            provider=self.nome,
+            modello=richiesta.modello,
+            preset=richiesta.preset,
+            preset_versione=richiesta.preset_versione,
+            prompt=richiesta.prompt,
+            testo_utente=richiesta.testo_utente,
+            grana=richiesta.grana,
+            dettaglio_grana=None,
+            forza_struttura=None,
+            risoluzione="",
+            aspetto="",
+            generazione_fissa=False,
+            impronta_sorgente=impronta(richiesta.immagine),
+            seme=richiesta.seme,
+            parametri={
+                "corpo": _senza_immagine(corpo, richiesta.immagine),
+                "fallback_provider": FALLBACK,
+                "chiave_idempotenza": chiave_idempotenza,
+                "schema_verificato_il": schema.verificato_il,
+                **dettagli,
+            },
+        )
+        avvisi = [
+            "Scostamento della geometria non misurato: il motore non lo sa "
+            "ancora calcolare. Guarda gli spigoli a occhio.",
+            f"{richiesta.modello} non ha una forza della struttura: se la "
+            "geometria tiene, la tiene per come e' fatto il modello e per il "
+            "prompt. Confronta gli spigoli con la vista di partenza.",
+            *avvisi_in_piu,
+        ]
+        servito_da = dettagli.get("servito_da")
+        if servito_da:
+            avvisi.append(
+                f"Il Router dice di aver servito la chiamata con {servito_da}, "
+                "un provider diverso da quello annunciato, anche se il fallback "
+                "era spento. Segnalalo prima di mandare altre viste sotto NDA."
+            )
+        return Risultato(
+            immagine=dati,
+            formato=tipo_mime(dati).split("/")[-1].replace("jpeg", "jpg"),
+            ricetta=ricetta,
+            scostamento_geometria=None,
+            avvisi=avvisi,
+        )
+
+    def _schema(self, modello: str) -> SchemaModello:
+        try:
+            return SCHEMI[modello]
+        except KeyError:
+            raise ErroreProvider(
+                f"Il modello {modello} non ha ancora uno schema verificato con "
+                "una chiamata vera, quindi non parte niente.",
+                f"Lancia python scripts/sonda_comfy.py --modello {modello} "
+                "(costa una generazione) e porta la sua uscita nella sessione di "
+                "sviluppo: lo schema si scrive in core/provider/comfy.py da li'.",
+            ) from None
+
+    def _esegui(self, modello: str, corpo: dict, chiave_idempotenza: str) -> tuple[object, dict]:
+        """Coda del Router: invio, attesa rispettando Retry-After, risultato."""
+        query = urllib.parse.urlencode({"fallback_provider": FALLBACK})
+        intestazioni = {
+            INTESTAZIONE_CHIAVE: self.chiave,
+            "Idempotency-Key": chiave_idempotenza,
+            "Accept": "application/json",
+        }
+        stato, risposte, inviata = self._con_tentativi(
+            "POST", f"{BASE}/{modello}/requests?{query}", intestazioni, corpo
+        )
+        if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
+            raise self._errore(stato, risposte, inviata, modello)
+        richiesta_id = inviata.get("request_id") if isinstance(inviata, dict) else None
+        if not richiesta_id:
+            raise ErroreProvider(
+                f"{self.destinazione} non ha detto che lavoro ha aperto.",
+                "Riprova. Se si ripete, e' cambiata l'API del servizio e va "
+                "aggiornato il file core/provider/comfy.py.",
+                stato=stato,
+            )
+        dettagli = {
+            "richiesta_id": richiesta_id,
+            "id_router": risposte.get("x-comfy-request-id", ""),
+        }
+        servito_da = risposte.get("x-comfy-router-fallback-provider")
+        if servito_da:
+            dettagli["servito_da"] = servito_da
+
+        # Le letture portano la chiave ma non l'idempotenza: non spendono.
+        lettura = {INTESTAZIONE_CHIAVE: self.chiave, "Accept": "application/json"}
+        lavoro = f"{BASE}/{modello}/requests/{urllib.parse.quote(str(richiesta_id), safe='')}"
+        scadenza = self._orologio() + config.ATTESA_MASSIMA_SECONDI
+
+        corpo_stato = inviata
+        while self._stato_lavoro(corpo_stato, richiesta_id) != STATO_FINITO:
+            self._aspetta(risposte, scadenza, richiesta_id)
+            stato, risposte, corpo_stato = self._con_tentativi("GET", f"{lavoro}/status", lettura)
+            if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
+                raise self._errore(stato, risposte, corpo_stato, modello)
+        self._assicura_senza_errore(corpo_stato, richiesta_id)
+
+        while True:
+            stato, risposte, uscita = self._con_tentativi("GET", lavoro, lettura)
+            if stato == ANCORA_IN_CORSO:
+                self._aspetta(risposte, scadenza, richiesta_id)
+                continue
+            if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
+                raise self._errore(stato, risposte, uscita, modello)
+            return uscita, dettagli
+
+    def _con_tentativi(
+        self, metodo: str, url: str, intestazioni: dict, corpo: dict | None = None
+    ) -> tuple[int, dict, object]:
+        """La stessa chiamata, con le stesse intestazioni, fino a TENTATIVI_INVIO_MASSIMI volte.
+
+        Stesse intestazioni vuol dire stessa Idempotency-Key: se il primo
+        invio era arrivato, il Router rende quella risposta e non addebita
+        una seconda generazione.
+        """
+        for tentativo in range(1, config.TENTATIVI_INVIO_MASSIMI + 1):
+            ultimo = tentativo == config.TENTATIVI_INVIO_MASSIMI
+            try:
+                stato, risposte, corpo_risposta = self.trasporto.chiama(
+                    metodo, url, intestazioni, corpo
+                )
+            except ErroreRete as errore:
+                if ultimo:
+                    raise ErroreProvider(
+                        errore.fatto,
+                        errore.cosa_fare + " Prima di rilanciare guarda i crediti "
+                        "del workspace Comfy: se sono scesi, la generazione era "
+                        "partita e rilanciando la paghi due volte.",
+                    ) from None
+                self._attesa(config.INTERVALLO_ATTESA_SECONDI)
+                continue
+            if stato in STATI_PASSEGGERI and not ultimo:
+                attesa = secondi_retry_after(risposte)
+                attesa = config.INTERVALLO_ATTESA_SECONDI if attesa is None else attesa
+                if attesa <= config.ATTESA_MASSIMA_SECONDI:
+                    self._attesa(attesa)
+                    continue
+            return stato, risposte, corpo_risposta
+        raise AssertionError("non raggiungibile")  # il ciclo esce sempre con return o raise
+
+    def _aspetta(self, risposte: dict, scadenza: float, richiesta_id: str) -> None:
+        """Aspetta quanto chiede Retry-After. Se supera il tempo concesso, lo dice subito."""
+        attesa = secondi_retry_after(risposte)
+        attesa = config.INTERVALLO_ATTESA_SECONDI if attesa is None else attesa
+        if self._orologio() + attesa > scadenza:
+            raise ErroreProvider(
+                f"{self.destinazione} non ha finito entro "
+                f"{config.ATTESA_MASSIMA_SECONDI} secondi.",
+                "Il lavoro puo' essere ancora in corso sul Router, che conserva il "
+                f"risultato per 24 ore (richiesta {richiesta_id}): controlla i "
+                "crediti del workspace prima di rilanciare, cosi' non lo paghi "
+                "due volte.",
+            )
+        self._attesa(attesa)
+
+    def _stato_lavoro(self, corpo: object, richiesta_id: str) -> str:
+        stato = str(corpo.get("status", "")).upper() if isinstance(corpo, dict) else ""
+        if stato == STATO_FINITO or stato in STATI_IN_CORSO:
+            return stato
+        raise ErroreProvider(
+            f"{self.destinazione} ha risposto con uno stato che non conosco: "
+            f"{stato or 'nessuno'} (richiesta {richiesta_id}).",
+            "Riprova fra qualche minuto. Se si ripete, e' cambiata l'API del "
+            "servizio e va aggiornato il file core/provider/comfy.py.",
+        )
+
+    def _assicura_senza_errore(self, corpo: dict, richiesta_id: str) -> None:
+        """Il Router non ha uno stato "fallito": un lavoro finito male e' COMPLETED con un errore."""
+        tipo = _tipo_errore(corpo, {})
+        if tipo:
+            raise ErroreProvider(
+                f"{self.destinazione} ha chiuso il lavoro con un errore: {tipo} "
+                f"(richiesta {richiesta_id}).",
+                "Riprova, magari con un preset diverso. Se si ripete sempre "
+                "sulla stessa vista, e' la vista a non piacere al modello.",
+            )
+
+    def _errore(self, stato: int, risposte: dict, corpo: object, modello: str) -> ErroreProvider:
+        tipo = _tipo_errore(corpo, risposte)
+        dettaglio = _testo(corpo)
+        coda = f" Il servizio ha aggiunto: {dettaglio}" if dettaglio else ""
+        if stato == 402 or tipo == "insufficient_credits":  # numero-non-configurabile: HTTP
+            return ErroreProvider(
+                "Il credito del tuo workspace Comfy e' finito: la generazione non "
+                "e' partita.",
+                "Ricarica i crediti del workspace a cui appartiene la chiave, "
+                "dalla sua pagina di fatturazione su comfy.org, poi rilancia lo "
+                "stesso comando. AIRENDER non gestisce crediti: li paghi "
+                "direttamente a Comfy.",
+                stato=stato,
+            )
+        if stato == 401:  # numero-non-configurabile: codice HTTP
+            return ErroreProvider(
+                f"{self.destinazione} non ha accettato la chiave.{coda}",
+                f"Controlla la chiave nella variabile d'ambiente {VARIABILI_CHIAVE[0]} "
+                "(comincia con comfyui-), o creane una nuova nel tuo workspace "
+                "Comfy. La chiave e' tua e non sta dentro il plugin.",
+                stato=stato,
+            )
+        if stato == 403:  # numero-non-configurabile: codice HTTP
+            return ErroreProvider(
+                f"La chiave e' valida, ma il suo workspace non puo' usare il "
+                f"modello {modello}.{coda}",
+                "Controlla nel workspace Comfy che il modello sia abilitato, "
+                "oppure scegli un preset con un altro modello.",
+                stato=stato,
+            )
+        if stato == 404:  # numero-non-configurabile: codice HTTP
+            return ErroreProvider(
+                f"{self.destinazione} non conosce il modello {modello}.{coda}",
+                "Il modello sta scritto nel preset: confrontalo con il catalogo "
+                "del Router (python scripts/sonda_comfy.py --catalogo).",
+                stato=stato,
+            )
+        return errore_da_stato_http(self.destinazione_per(modello), stato, dettaglio)
+
+    def _byte_immagine(self, tipo: str, valore: str) -> bytes:
+        if tipo == "url":
+            # Il link e' firmato e sta su un altro dominio: si scarica senza chiave.
+            dati = self.trasporto.scarica(valore)
+        else:
+            if tipo == "data-uri":
+                valore = valore.split(",", 1)[-1]
+            try:
+                dati = base64.b64decode(valore, validate=True)
+            except ValueError:
+                dati = b""
+        if tipo_mime(dati) == "application/octet-stream":
+            raise ErroreProvider(
+                f"{self.destinazione} ha mandato un'immagine che non so decodificare.",
+                "Riprova. Se si ripete, e' cambiato lo schema del modello e va "
+                "rifatta la sonda.",
+            )
+        return dati
+
+    def _assicura_chiave(self) -> None:
+        if not self.chiave:
+            raise ChiaveMancante(
+                "Manca la chiave API di Comfy: senza, non parte niente.",
+                "Crea una chiave nel tuo workspace Comfy e mettila nella variabile "
+                f"d'ambiente {VARIABILI_CHIAVE[0]}. La chiave e' tua, resta sulla "
+                "tua macchina e non entra mai nel plugin.",
+            )
+
+    def _assicura_peso(self, dati: bytes) -> None:
+        peso = modulo_immagine.dimensione_mb(dati)
+        if peso > config.COMFY_INVIO_MASSIMO_MB:
+            raise ErroreProvider(
+                f"La vista di partenza pesa {peso:.1f} MB e ne mandiamo al massimo "
+                f"{config.COMFY_INVIO_MASSIMO_MB} a {self.destinazione}.",
+                "Salva di nuovo la vista da Allplan a una risoluzione piu' bassa.",
+            )
+
+
+def _senza_immagine(corpo: object, dati: bytes) -> object:
+    """Il corpo da salvare nella ricetta: tutto, tranne l'immagine, che diventa la sua impronta."""
+    codificata = base64.b64encode(dati).decode("ascii")
+    segnaposto = f"<vista sha256:{impronta(dati)}>"
+    if isinstance(corpo, dict):
+        return {k: _senza_immagine(v, dati) for k, v in corpo.items()}
+    if isinstance(corpo, list):
+        return [_senza_immagine(v, dati) for v in corpo]
+    if isinstance(corpo, str) and corpo.endswith(codificata):
+        return segnaposto
+    return corpo
+
+
+def _tipo_errore(corpo: object, risposte: dict) -> str:
+    """Il tipo d'errore del Router: dall'intestazione, o dal corpo."""
+    if risposte.get("x-comfy-error-type"):
+        return str(risposte["x-comfy-error-type"])
+    if not isinstance(corpo, dict):
+        return ""
+    errore = corpo.get("error") or corpo.get("error_type") or ""
+    if isinstance(errore, dict):
+        return str(errore.get("type") or errore.get("code") or "")
+    return str(errore)
+
+
+def _testo(risposta: object) -> str:
+    if isinstance(risposta, str):
+        return risposta
+    if isinstance(risposta, dict):
+        errore = risposta.get("error")
+        if isinstance(errore, dict) and errore.get("message"):
+            return str(errore["message"])
+        for chiave in ("message", "error", "detail", "title"):
+            if chiave in risposta and not isinstance(risposta[chiave], dict):
+                return str(risposta[chiave])
+    return ""

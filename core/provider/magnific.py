@@ -1,9 +1,11 @@
-"""Magnific: l'unico provider implementato.
+"""Magnific: il primo provider, non piu' il predefinito.
 
-Scelto nel PRD perche' e' a consumo senza abbonamento, ha un riferimento
-strutturale con forza regolabile, la generazione fissa e l'editing per
-regione. La chiave e' del cliente: sta in una variabile d'ambiente, mai nel
-repository.
+Scelto nel PRD il 2026-09-14 perche' era a consumo senza abbonamento, con un
+riferimento strutturale a forza regolabile, la generazione fissa e l'editing
+per regione. Dal 2026-06-30 il consumo senza abbonamento e' chiuso
+(docs.magnific.com/pricing-payg): l'API scala i crediti di un piano
+prepagato. Resta registrato; il predefinito e' Comfy Router (comfy.py). La
+chiave e' del cliente: sta in una variabile d'ambiente, mai nel repository.
 
 Endpoint e nomi dei campi vengono dalla documentazione pubblica dell'API
 (Mystic per la generazione, ideogram-image-edit per la modifica di una

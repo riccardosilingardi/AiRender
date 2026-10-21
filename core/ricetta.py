@@ -32,8 +32,10 @@ class Ricetta:
     prompt: str
     testo_utente: str
     grana: str
-    dettaglio_grana: int
-    forza_struttura: int
+    # None quando il servizio non ha quel parametro: un numero che non e'
+    # partito non si scrive nella ricetta come se fosse partito.
+    dettaglio_grana: int | None
+    forza_struttura: int | None
     risoluzione: str
     aspetto: str
     generazione_fissa: bool
@@ -43,6 +45,9 @@ class Ricetta:
     creata_il: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
     )
+    # Tutto il resto di quello che e' partito, immagine esclusa: corpo della
+    # richiesta, chiave di idempotenza, identificativi del servizio.
+    parametri: dict = field(default_factory=dict)
 
     def a_dizionario(self) -> dict:
         return asdict(self)

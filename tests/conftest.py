@@ -17,7 +17,7 @@ import urllib.request
 import pytest
 from PIL import Image, ImageDraw
 
-from core.provider.magnific import VARIABILI_CHIAVE
+from core.provider import comfy, magnific
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def niente_rete(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def niente_chiave_nell_ambiente(monkeypatch):
-    for nome in VARIABILI_CHIAVE:
+    for nome in magnific.VARIABILI_CHIAVE + comfy.VARIABILI_CHIAVE:
         monkeypatch.delenv(nome, raising=False)
 
 
@@ -121,6 +121,78 @@ class TrasportoFinto:
     def scarica(self, url):
         self.scaricati.append(url)
         return self.immagine
+
+
+class TrasportoComfyFinto:
+    """Il Router finto: risponde (stato, intestazioni, corpo) in ordine.
+
+    Una risposta puo' anche essere un'eccezione, per simulare la rete che cade.
+    """
+
+    def __init__(self, risposte=None, immagine: bytes = b"\x89PNG-finto"):
+        self.risposte = list(risposte or [])
+        self.immagine = immagine
+        self.chiamate: list[tuple[str, str, dict, object]] = []
+        self.scaricati: list[str] = []
+
+    def chiama(self, metodo, url, intestazioni, corpo=None):
+        self.chiamate.append((metodo, url, dict(intestazioni), corpo))
+        if not self.risposte:
+            raise AssertionError("il test non ha preparato abbastanza risposte")
+        risposta = self.risposte.pop(0)
+        if isinstance(risposta, Exception):
+            raise risposta
+        return risposta
+
+    def scarica(self, url):
+        self.scaricati.append(url)
+        return self.immagine
+
+    def poste(self):
+        return [c for c in self.chiamate if c[0] == "POST"]
+
+
+MODELLO_DI_PROVA = "prova/modello-di-modifica"
+
+
+def schema_di_prova() -> comfy.SchemaModello:
+    """Uno schema finto. Quelli veri arrivano solo dall'uscita della sonda."""
+    return comfy.SchemaModello(
+        corpo=lambda r: {"prompt": r.prompt, "input_image": comfy.immagine_data_uri(r.immagine)},
+        immagine=lambda uscita: ("url", uscita["result"]["sample"]),
+        verificato_il="mai: schema finto dei test",
+    )
+
+
+@pytest.fixture
+def modello_verificato(monkeypatch) -> str:
+    monkeypatch.setitem(comfy.SCHEMI, MODELLO_DI_PROVA, schema_di_prova())
+    return MODELLO_DI_PROVA
+
+
+def provider_comfy(trasporto, chiave="chiave-di-prova", orologio=None):
+    """Il provider vero, col Router finto, l'orologio finto e chiavi di idempotenza contate."""
+    orologio = orologio or OrologioFinto()
+    contatore = iter(range(1, 1000))
+    return comfy.ProviderComfy(
+        chiave=chiave,
+        trasporto=trasporto,
+        attesa=orologio.attendi,
+        orologio=orologio.leggi,
+        nuova_chiave_idempotenza=lambda: f"idem-{next(contatore)}",
+    )
+
+
+def router_in_coda(richiesta_id: str = "rq-1", intestazioni=None):
+    return 201, dict(intestazioni or {}), {"request_id": richiesta_id, "status": "IN_QUEUE"}
+
+
+def router_stato(stato: str, intestazioni=None, **altro):
+    return 200, dict(intestazioni or {}), {"status": stato, **altro}
+
+
+def router_risultato(indirizzo: str = "https://consegna.esempio/render.png?firma=x"):
+    return 200, {}, {"result": {"sample": indirizzo}}
 
 
 def risposta_lavoro(stato: str, identificativo: str = "lav-1", prodotti=None):
