@@ -7,10 +7,12 @@ il suo caso, la suite lo dice.
 
 from __future__ import annotations
 
+import io
 import re
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from conftest import (
     OrologioFinto,
@@ -148,6 +150,19 @@ def test_maschera_sfumatura_px_toglie_la_cucitura_dal_bordo_della_regione():
     dopo = immagine.misura(immagine.sfuma_maschera(maschera_netta()))
     assert config.MASCHERA_SFUMATURA_PX > 0
     assert dopo.toni_distinti > prima.toni_distinti
+
+
+# --- confronto affiancato ----------------------------------------------------
+
+
+def test_confronto_didascalia_px_sta_sopra_e_non_copre_il_render():
+    """Caso: una didascalia sovrapposta copre proprio la gronda che si deve guardare."""
+    vista = vista_shaded(1600, 900)
+    largo = vista_shaded(1200, 600)
+    uscita = Image.open(io.BytesIO(immagine.affianca([("vista", vista), ("render", largo)])))
+    assert uscita.height == 900 + config.CONFRONTO_DIDASCALIA_PX
+    # Il render piu' largo resta piu' largo: le proporzioni non si toccano.
+    assert uscita.width == 1600 + 2 + 1800
 
 
 # --- grana -------------------------------------------------------------------

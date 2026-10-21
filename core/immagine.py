@@ -12,7 +12,7 @@ import math
 import os
 from dataclasses import dataclass
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from . import config
 from .errori import FileNonTrovato
@@ -133,3 +133,41 @@ def dimensioni(dati: bytes) -> tuple[int, int]:
     """Larghezza e altezza, senza calcolare le statistiche."""
     immagine = _apri(dati)
     return immagine.size
+
+
+def affianca(pannelli: list[tuple[str, bytes]]) -> bytes:
+    """Le immagini una accanto all'altra, alla stessa altezza della prima, col nome sopra.
+
+    Ogni immagine si ridimensiona tenendo le sue proporzioni: deformarla per
+    farla combaciare nasconderebbe proprio l'edificio schiacciato che il
+    confronto deve far vedere. La didascalia sta in una striscia sopra e non
+    copre niente.
+    """
+    aperte = [(nome, _apri(dati).convert("RGB")) for nome, dati in pannelli]
+    altezza = aperte[0][1].height
+    ridotte = [
+        (nome, im.resize((max(1, round(im.width * altezza / im.height)), altezza),
+                         Image.Resampling.LANCZOS))
+        for nome, im in aperte
+    ]
+    striscia = config.CONFRONTO_DIDASCALIA_PX
+    fessura = 2  # px bianchi fra due pannelli, solo per separarli
+    larghezza = sum(im.width for _, im in ridotte) + fessura * (len(ridotte) - 1)
+    tela = Image.new("RGB", (larghezza, altezza + striscia), "white")
+    disegno = ImageDraw.Draw(tela)
+    try:
+        carattere = ImageFont.load_default(size=striscia // 2)
+    except TypeError:  # Pillow prima della 10.1: solo il carattere bitmap piccolo
+        carattere = ImageFont.load_default()
+    x = 0
+    for nome, im in ridotte:
+        tela.paste(im, (x, striscia))
+        sinistra, alto, destra, basso = disegno.textbbox((0, 0), nome, font=carattere)
+        disegno.text(
+            (x + (im.width - (destra - sinistra)) // 2, (striscia - (basso - alto)) // 2),
+            nome, fill="black", font=carattere,
+        )
+        x += im.width + fessura
+    uscita = io.BytesIO()
+    tela.save(uscita, format="PNG")
+    return uscita.getvalue()

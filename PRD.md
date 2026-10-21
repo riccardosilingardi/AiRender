@@ -73,7 +73,11 @@ approvato.
 | 2026-09-14 | 2026-10-18 | La camera della finestra si salva accanto alla vista (`GetViewWorldProjection`: occhio, punto guardato, proiezione) | È il primo passo verso il legame diretto con la finestra Animazione che l'utente chiede | |
 | Allplan 2026 come minimo, 2027 a seguire | Plugin Manager e pacchetto ALLEP esistono solo da lì | |
 | 2026-09-14 | Motore immagine: Magnific come primo candidato | API a consumo senza abbonamento, `structure_reference` con forza regolabile, `fixed_generation`, editing per regione, 30+ modelli con una chiave | **Sì, 2026-10-21.** Il consumo senza abbonamento è chiuso dal 2026-06-30 (docs.magnific.com/pricing-payg): l'API ora scala i crediti di un piano prepagato. Cade la ragione principale della scelta. Magnific resta registrato come provider, non è più il predefinito |
-| 2026-09-14 | ComfyUI come piano B | Controllo strutturale esplicito, ma richiede abbonamento attivo per eseguire, oppure hardware che l'utente non ha | |
+| 2026-09-14 | ComfyUI come piano B | Controllo strutturale esplicito, ma richiede abbonamento attivo per eseguire, oppure hardware che l'utente non ha | **Superata 2026-10-21:** Comfy Router esegue i modelli dei partner a consumo dai crediti del workspace, senza abbonamento e senza hardware. Vedi le righe del 2026-10-21 |
+| 2026-10-21 | Motore immagine predefinito: **Comfy Router** (`api.comfy.org`) | A consumo dai crediti del workspace, senza abbonamento (docs.comfy.org, Comfy Router). Una chiave per più modelli di modifica d'immagine: FLUX.1 Kontext, Nano Banana, Seedream, GPT Image. Il modello si sceglie nel preset. Solo libreria standard, niente `comfy-sdk` | |
+| 2026-10-21 | Con Comfy Router **non c'è una forza della struttura** | I modelli di modifica del Router non hanno un `structure_strength` da 0 a 100: se tengono la geometria, la tengono per come sono fatti e per il prompt. Quindi l'interfaccia non stampa una forza, `--forza-struttura` viene rifiutata, la ricetta scrive la forza come assente. La sezione 2 ("propone di abbassare la libertà creativa") con Comfy non ha ancora una leva: la tenuta si giudica a occhio con `scripts/confronta_modelli.py`. La forza resta solo su Magnific | |
+| 2026-10-21 | `fallback_provider=false` su ogni invio a Comfy Router | Il Router, se il provider del modello fallisce, ripiega su un altro provider, e lo fa se non gli si dice di no. Sotto NDA la destinazione si annuncia prima dell'invio: un ripiego la renderebbe falsa. Se il Router dichiara comunque un altro provider, il risultato porta un avviso | |
+| 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
 | 2026-09-14 | Due modalità: **ritocco** (maschera) e **variante** (rigenerazione a stesso seed) | Il riempimento mascherato non ricalcola riflessi e luce di rimbalzo. Un cambio radicale di materiale richiede di rilanciare la base | |
@@ -84,7 +88,7 @@ approvato.
 | Fonte | Cosa fornisce davvero | Quanto è buona |
 |---|---|---|
 | Export immagine Allplan | Contenuto finestra a risoluzione impostabile, anche superiore allo schermo | Ottima. Nativa, nessuna dipendenza |
-| Riferimento strutturale del provider | Aderenza alla composizione dell'immagine sorgente, con forza 0-100 | **Da misurare.** È l'unica cosa che decide se il prodotto esiste |
+| Riferimento strutturale del provider | Aderenza alla composizione dell'immagine sorgente, con forza 0-100 | **Da misurare.** È l'unica cosa che decide se il prodotto esiste. Con Comfy Router, il predefinito, la forza non c'è: l'aderenza dipende dal modello e dal prompt, e si guarda col confronto affiancato |
 | Stima di profondità | Mappa di profondità dedotta dall'immagine | Buona su viste shaded pulite, degrada su wireframe |
 | Segmentazione | Maschera della regione cliccata o nominata | Segue l'apparenza, non il modello |
 
@@ -96,25 +100,31 @@ non sarà mai perfetto.
 ## 7 · Costruito e funzionante
 
 Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **73 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **121 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
 python -m core.cli --image vista.png --preset base --testo "più caldo" --prova-a-secco
+python scripts/sonda_comfy.py --solo-schema          # gratis: schema vero del modello
+python scripts/sonda_comfy.py                        # una generazione vera, tutto stampato
+python scripts/confronta_modelli.py --immagine vista.png
 ```
 
 | Cosa | Dove | Stato |
 |---|---|---|
-| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. L'invio vero non è mai stato eseguito: manca la chiave (vedi sezione 9) |
-| Casa unica delle decisioni: 18 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
-| Strato provider sostituibile: genera con riferimento strutturale e forza, modifica una regione con maschera, riesegue a parametri identici | `core/provider/` | Interfaccia + un solo provider (Magnific). Il secondo costa un file e una riga nel registro |
-| Rifiuto: vista inadatta (wireframe, senza ombre, troppo piccola), con il messaggio che dice cosa risalvare | `core/idoneita.py` | Funziona su immagini sintetiche. Mai provato su export veri di Allplan |
+| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. L'invio vero non è mai stato eseguito: manca lo schema verificato del modello (vedi sezione 9) |
+| Casa unica delle decisioni: 21 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda, idempotenza, errori; nessuno schema di modello ancora, quindi l'invio vero si ferma prima di partire. **Magnific**: registrato, non più a consumo |
+| Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Scritta e provata senza rete. Mai lanciata contro il Router: la rete di questa sessione non arrivava a `api.comfy.org` |
+| Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. Parte davvero solo quando i due modelli hanno lo schema |
+| Rifiuto: vista inadatta (wireframe, senza ombre, troppo piccola), con il messaggio che dice cosa risalvare | `core/idoneita.py` | Funziona su immagini sintetiche e su **un** export vero di Allplan 2026, che passa (sezione 9). Un wireframe sintetico sul gradiente di Allplan passa anche lui |
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
-| Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py` | Fatti per: chiave rifiutata, credito esaurito, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito |
-| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura e prova a secco funzionano in Allplan 2026 (prova del 2026-10-21). L'invio vero non è ancora partito |
+| Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py`, `core/provider/comfy.py` | Fatti per: chiave rifiutata, credito esaurito (per Comfy: credito del workspace, con cosa fare), workspace che non può usare il modello, modello sconosciuto, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito, schema del modello non ancora verificato |
+| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura e prova a secco funzionano in Allplan 2026 (prova del 2026-10-21). L'invio vero non è ancora partito. Dal 2026-10-21 la palette parla con Comfy Router senza che l'adattatore sia cambiato: segue il predefinito del motore |
 
-**Non c'è ancora:** nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
+**Non c'è ancora:** nessuno schema di modello Comfy verificato (quindi nessun
+render vero), nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
 espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
 al prompt del preset).
@@ -223,6 +233,75 @@ Resta non verificato:
 - **PythonParts SDK 3.0.0 dichiara `min-allplan-version: 2027`** nel suo
   `install-config.yml`, ma il Plugin Manager della 2026 lo ha installato.
   Probabilmente serve una versione precedente: da guardare nel Plugin Manager.
+
+### Lasciato dalla sessione del 2026-10-21 (Comfy Router)
+
+In questa sessione la rete della macchina non raggiungeva né `docs.comfy.org`
+né `api.comfy.org`: la documentazione è stata letta **solo attraverso gli
+estratti di una ricerca**, e nessuna chiamata è partita. Tutto quello che segue
+si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
+
+- **Il protocollo della coda è quello scritto in `core/provider/comfy.py`** —
+  dalla documentazione, mai eseguito: `POST /v2/models/{provider}/{model}/requests`
+  che risponde 201 con `request_id`; `GET .../requests/{id}/status` con
+  `status` fra `IN_QUEUE`, `IN_PROGRESS`, `COMPLETED` e l'intestazione
+  `Retry-After`; `GET .../requests/{id}` che risponde 202 finché non è pronto,
+  poi 200 con l'uscita del modello; nessuno stato "fallito", ma un errore dentro
+  un `COMPLETED`, con un nome di campo che non conosco (cerco `error` ed
+  `error_type`). Una pagina vecchia della guida diceva che il Router non era
+  ancora attivo e rispondeva 404 sulle rotte `/v1/`: le pagine dei modelli usano
+  `/v2/`. Se qualcosa non torna, si tocca un file solo, `comfy.py`.
+- **Lo schema dei modelli di modifica** — `SCHEMI` è vuoto apposta. Dalla
+  documentazione, da confermare con la sonda: FLUX.1 Kontext
+  (`bfl/flux-kontext-pro`, `bfl/flux-kontext-max`) vuole `prompt`,
+  `input_image` in base64 e `aspect_ratio`, e restituisce un link in
+  `result.sample`; Nano Banana 2 (`vertexai/gemini-3.1-flash-image`) e Nano
+  Banana Pro (`vertexai/gemini-3-pro-image`) usano il corpo nativo di Gemini
+  (`contents` → `parts` → `inlineData` con `mimeType` e `data`) e rendono il
+  base64 in `candidates[0].content.parts[…].inlineData.data`. Nel catalogo ci
+  sono anche Seedream (`byteplus/seedream-4-5-251128`, poi 5.0) e GPT Image
+  (`openai/gpt-image-1.5`, `openai/gpt-image-2`), ma i loro schemi di modifica
+  non li ho trovati: non sono nella sonda. Una fonte non ufficiale dice Nano
+  Banana 2 deprecato in favore di `vertexai/gemini-nano-banana-2.1`.
+- **Il Router accetta l'immagine come `data:image/png;base64,…`** — la sonda la
+  manda così, come chiesto. Per Gemini il campo nativo `inlineData.data` di
+  solito vuole il base64 senza prefisso: se torna un 400, rilanciare con
+  `--base64-nudo`.
+- **`fallback_provider=false` vale anche sulla rotta della coda** — documentato
+  come parametro di query sulla rotta diretta (note di rilascio degli SDK). Per
+  verificare: nell'uscita della sonda non deve comparire
+  `X-Comfy-Router-Fallback-Provider`.
+- **Il 402 `insufficient_credits` non addebita niente** — dalla documentazione,
+  che dice anche che il controllo del credito viene prima della validazione del
+  corpo: un workspace vuoto risponde 402 anche a una richiesta sbagliata. Prima
+  la ricarica, poi lo schema.
+- **Il render torna con le proporzioni della vista** — la sonda chiede il
+  rapporto standard più vicino (16:9 per la cattura 1536x857) e stampa i due
+  rapporti a confronto. Se non coincidono, l'edificio è schiacciato.
+- **FLUX.1 Kontext o Nano Banana tengono la geometria di un edificio** — è la
+  domanda del prodotto, e senza una forza della struttura non c'è una leva per
+  aggiustarla. Per verificare: `scripts/confronta_modelli.py` sulla cattura vera,
+  e un occhio sugli spigoli.
+- **La grana passa solo come frase nel prompt** — con Comfy non esiste
+  `creative_detailing`; la ricetta scrive il dettaglio della grana come assente.
+  Che la frase basti a cambiare la grana percepita è un'ipotesi.
+- **Rifare una ricetta Comfy dà la stessa immagine** — no, quasi certamente: non
+  c'è una generazione fissa verificata e la riesecuzione lo dice. Si usa una
+  Idempotency-Key nuova apposta: quella vecchia, entro 24 ore, renderebbe
+  l'immagine di allora senza rifarla.
+- **Cosa si paga se il tempo scade** — le fonti si contraddicono: la guida dice
+  che un 504 per tempo scaduto non si paga, un esempio in coreano dice che una
+  generazione finita dal provider si paga comunque. Il motore usa la coda e,
+  quando smette di aspettare, dice di guardare i crediti prima di rilanciare.
+- **Il prezzo per immagine** — non letto. Va guardato nel catalogo del Router
+  (`billing` di ogni modello) prima di decidere la risoluzione e il numero di
+  miniature.
+- **La palette mostra la destinazione completa** — il campo Destinazione della
+  palette di prova legge `ponte.destinazione_predefinita()`, che dà "Comfy
+  Router (api.comfy.org)" senza il modello; il modello compare nel testo della
+  prova a secco. L'adattatore non si è toccato. Da vedere a video.
+- **`ImageFont.load_default(size=…)` esiste nel Pillow di Allplan** — serve solo
+  alle didascalie del confronto; se manca, si ripiega sul carattere piccolo.
 
 ### Da prima
 

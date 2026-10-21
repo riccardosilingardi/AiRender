@@ -192,6 +192,20 @@ MASCHERA_SFUMATURA_PX = _registra(Costante(
     unita=" px",
 ))
 
+# --- Confronto affiancato ----------------------------------------------------
+
+CONFRONTO_DIDASCALIA_PX = _registra(Costante(
+    nome="CONFRONTO_DIDASCALIA_PX",
+    valore=28,
+    origine=SCELTA,
+    ragione=(
+        "Altezza della striscia col nome sopra ogni immagine del confronto. "
+        "Sta sopra, non sopra l'immagine: una didascalia sovrapposta coprirebbe "
+        "proprio gli spigoli alti che si devono guardare."
+    ),
+    unita=" px",
+))
+
 # --- Grana (mai 'scala': vedi core/lessico.py) -------------------------------
 
 GRANA_FINE = _registra(Costante(

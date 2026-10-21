@@ -15,7 +15,7 @@ sessione può verificare da qui:
    di proiezione letti da `GetViewWorldProjection()`.
 2. **Prova a secco** passa la vista al motore, che la giudica (wireframe? piatta?)
    e dice cosa partirebbe e verso quale servizio, senza inviare niente.
-3. **Genera render** invia davvero, con la chiave in `MAGNIFIC_API_KEY`.
+3. **Genera render** invia davvero, con la chiave in `COMFY_API_KEY`.
 
 ## Come provarla (Allplan 2026)
 
@@ -31,7 +31,7 @@ sessione può verificare da qui:
 5. Clicca una volta nella finestra 3D, poi **Cattura vista**. Ripeti con la
    finestra *Animazione* aperta e attiva.
 6. **Prova a secco.**
-7. Solo se vuoi spendere: imposta `MAGNIFIC_API_KEY` come variabile d'ambiente
+7. Solo se vuoi spendere: imposta `COMFY_API_KEY` come variabile d'ambiente
    utente di Windows, riavvia Allplan, **Genera render**. Durante l'attesa
    Allplan resta bloccato: è voluto in questa prova, non nel prodotto.
 
