@@ -142,6 +142,36 @@ da `requests`.
 - Segmentazione derivata dalle superfici del modello Allplan — darebbe maschere
   esatte e scala vera. Aggiornamento di qualità, non prerequisito.
 - Proxy e licenza per la rivendita — fase 2, prima del primo cliente pagante.
+- **Annotazione per aree** — in pipeline dal 2026-10-21, richiesta di Riccardo.
+  Riferimento: lo strumento *Annotate Image* di rendair.ai. L'utente traccia uno
+  o più riquadri numerati sul render e accanto a ciascuno scrive cosa cambiare
+  ("balconi alla francese", "un piccolo caffè con la tenda verde"). Poi una sola
+  generazione applica tutte le note. Per AIRENDER conta per tre ragioni:
+  1. **Toglie la segmentazione dal cambio di materiale.** L'area la disegna
+     l'utente, non la indovina un modello: l'anello debole della sezione 6 resta
+     per il clic su una superficie, non per il riquadro.
+  2. **Fuori dai riquadri l'immagine non cambia, e lo si può dimostrare.** Il
+     motore rimette i pixel del render di partenza fuori dalle aree, con il
+     bordo sfumato di `MASCHERA_SFUMATURA_PX`, qualunque modello abbia fatto la
+     modifica. È l'unico modo di promettere "il resto non si tocca" con un
+     modello che rigenera tutta l'immagine, e si verifica con un confronto
+     pixel per pixel fuori dalle aree. Funziona solo se il modello rende
+     un'immagine della stessa dimensione di quella mandata.
+  3. **Una chiamata per tutte le note**, invece di una per area: costa meno, ma
+     le note si influenzano a vicenda. La trappola del riempimento mascherato
+     vale ancora: luce e riflessi del resto non si ricalcolano.
+
+  Due modi di dire al modello dove intervenire, da scegliere dopo la sonda:
+  una **maschera per area**, oppure il render con i **riquadri numerati
+  disegnati sopra** e un testo che li nomina ("nel riquadro 1…"). Il secondo
+  funziona con i modelli di modifica a istruzioni, se li capiscono: nessuno dei
+  due è verificato.
+
+  Prima di scriverne il codice servono: uno schema di modello verificato dalla
+  sonda; la risposta su come disegnare un riquadro dentro Allplan (sezione 9);
+  i quattro stati della schermata in `DESIGN.md`. Prende il posto del clic su
+  una superficie nella schermata Materiali, oppure gli sta accanto: è una
+  decisione di design, non ancora presa.
 
 ## 9 · NON VERIFICATO
 
@@ -302,6 +332,27 @@ si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
   prova a secco. L'adattatore non si è toccato. Da vedere a video.
 - **`ImageFont.load_default(size=…)` esiste nel Pillow di Allplan** — serve solo
   alle didascalie del confronto; se manca, si ripiega sul carattere piccolo.
+
+### Lasciato dalla richiesta del 2026-10-21 (annotazione per aree)
+
+- **Si può disegnare un riquadro su un'immagine dentro la palette di Allplan** —
+  non verificato, ed è la domanda che decide come si costruisce l'annotazione.
+  Gli elementi della palette elencati in `DESIGN.md` (immagini, griglia di
+  pulsanti-immagine, slider, testo, pulsanti) mostrano un'immagine. Non risulta
+  che nessuno restituisca un trascinamento del mouse su di essa. Lo stesso dubbio
+  vale già per "clicca una superficie del render" della schermata Materiali. Se
+  non si può, le strade sono tre: una finestra a parte aperta dalla palette; una
+  pagina locale nel browser; oppure riquadri ricavati dagli oggetti selezionati
+  nel modello Allplan, proiettati sulla vista con la camera salvata accanto.
+  L'ultima darebbe aree esatte, dal modello e non dall'apparenza. Per
+  verificare: cercare nei PythonPartsExamples del ramo 2026 un controllo della
+  palette che restituisca le coordinate di un clic su un'immagine. Se c'è, la
+  palette basta. Se non c'è, si sceglie fra le tre strade.
+- **I modelli di modifica del Router capiscono un render con riquadri numerati
+  disegnati sopra** — non verificato. Per verificare, dopo la sonda: lo stesso
+  render con due riquadri e due note, mandato a FLUX.1 Kontext e a Nano Banana
+  con `scripts/confronta_modelli.py`. Poi guardare se ciascuna nota è finita
+  nel suo riquadro e se i riquadri disegnati sono spariti dal risultato.
 
 ### Da prima
 

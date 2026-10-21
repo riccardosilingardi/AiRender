@@ -84,3 +84,8 @@ Documento vivo, come il PRD. Si aggiorna ogni volta che una schermata cambia.
 - Schermata di configurazione della chiave API e del tetto di spesa.
 - Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
+- **Annotazione per aree** (PRD, sezione 8): riquadri numerati sul render, una
+  nota per riquadro, un solo Applica. Riferimento: *Annotate Image* di
+  rendair.ai. Da progettare i quattro stati prima del codice, e da decidere se
+  sostituisce il clic su una superficie nella schermata 4 o gli sta accanto.
+  Dipende da come si disegna un riquadro dentro Allplan (PRD, sezione 9).
