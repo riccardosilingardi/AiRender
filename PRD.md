@@ -77,6 +77,7 @@ approvato.
 | 2026-10-21 | Motore immagine predefinito: **Comfy Router** (`api.comfy.org`) | A consumo dai crediti del workspace, senza abbonamento (docs.comfy.org, Comfy Router). Una chiave per più modelli di modifica d'immagine: FLUX.1 Kontext, Nano Banana, Seedream, GPT Image. Il modello si sceglie nel preset. Solo libreria standard, niente `comfy-sdk` | |
 | 2026-10-21 | Con Comfy Router **non c'è una forza della struttura** | I modelli di modifica del Router non hanno un `structure_strength` da 0 a 100: se tengono la geometria, la tengono per come sono fatti e per il prompt. Quindi l'interfaccia non stampa una forza, `--forza-struttura` viene rifiutata, la ricetta scrive la forza come assente. La sezione 2 ("propone di abbassare la libertà creativa") con Comfy non ha ancora una leva: la tenuta si giudica a occhio con `scripts/confronta_modelli.py`. La forza resta solo su Magnific | |
 | 2026-10-21 | `fallback_provider=false` su ogni invio a Comfy Router | Il Router, se il provider del modello fallisce, ripiega su un altro provider, e lo fa se non gli si dice di no. Sotto NDA la destinazione si annuncia prima dell'invio: un ripiego la renderebbe falsa. Se il Router dichiara comunque un altro provider, il risultato porta un avviso | |
+| 2026-10-21 | La **segmentazione resta in pipeline**: l'annotazione per aree le sta accanto, non la sostituisce | Decisione di Riccardo. Il riquadro copre un'area disegnata a mano; cliccare una superficie o nominarla a parole (sezione 4, passo 6) richiede ancora la segmentazione | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -142,6 +143,40 @@ da `requests`.
 - Segmentazione derivata dalle superfici del modello Allplan — darebbe maschere
   esatte e scala vera. Aggiornamento di qualità, non prerequisito.
 - Proxy e licenza per la rivendita — fase 2, prima del primo cliente pagante.
+- **Annotazione per aree** — in pipeline dal 2026-10-21, richiesta di Riccardo.
+  Riferimento: lo strumento *Annotate Image* di rendair.ai. L'utente traccia uno
+  o più riquadri numerati sul render e accanto a ciascuno scrive cosa cambiare
+  ("balconi alla francese", "un piccolo caffè con la tenda verde"). Poi una sola
+  generazione applica tutte le note. Per AIRENDER conta per tre ragioni:
+  1. **Dà una strada che non dipende dalla segmentazione.** L'area la disegna
+     l'utente, non la indovina un modello. La segmentazione però **resta in
+     pipeline** (sezione 5): il riquadro le sta accanto, non la sostituisce.
+  2. **Fuori dai riquadri l'immagine non cambia, e lo si può dimostrare.** Il
+     motore rimette i pixel del render di partenza fuori dalle aree, con il
+     bordo sfumato di `MASCHERA_SFUMATURA_PX`, qualunque modello abbia fatto la
+     modifica. È l'unico modo di promettere "il resto non si tocca" con un
+     modello che rigenera tutta l'immagine, e si verifica con un confronto
+     pixel per pixel fuori dalle aree. Funziona solo se il modello rende
+     un'immagine della stessa dimensione di quella mandata.
+  3. **Una chiamata per tutte le note**, invece di una per area: costa meno, ma
+     le note si influenzano a vicenda. La trappola del riempimento mascherato
+     vale ancora: luce e riflessi del resto non si ricalcolano.
+
+  Due modi di dire al modello dove intervenire, da scegliere dopo la sonda:
+  una **maschera per area**, oppure il render con i **riquadri numerati
+  disegnati sopra** e un testo che li nomina ("nel riquadro 1…"). Il secondo
+  funziona con i modelli di modifica a istruzioni, se li capiscono: nessuno dei
+  due è verificato.
+
+  Prima di scriverne il codice servono: uno schema di modello verificato dalla
+  sonda; la risposta su come disegnare un riquadro dentro Allplan (sezione 9);
+  i quattro stati della schermata in `DESIGN.md`. Nella schermata Materiali sta
+  accanto al clic su una superficie e al nome scritto a parole, non al loro
+  posto.
+- **Segmentazione sul render** — in pipeline, non costruita. Serve a cliccare una
+  superficie o a nominarla a parole (sezione 4, passo 6; schermata Materiali in
+  `DESIGN.md`). Con i suoi limiti della sezione 6: segue l'apparenza, quindi
+  servono sempre aggiungi area e togli area.
 
 ## 9 · NON VERIFICATO
 
@@ -302,6 +337,27 @@ si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
   prova a secco. L'adattatore non si è toccato. Da vedere a video.
 - **`ImageFont.load_default(size=…)` esiste nel Pillow di Allplan** — serve solo
   alle didascalie del confronto; se manca, si ripiega sul carattere piccolo.
+
+### Lasciato dalla richiesta del 2026-10-21 (annotazione per aree)
+
+- **Si può disegnare un riquadro su un'immagine dentro la palette di Allplan** —
+  non verificato, ed è la domanda che decide come si costruisce l'annotazione.
+  Gli elementi della palette elencati in `DESIGN.md` (immagini, griglia di
+  pulsanti-immagine, slider, testo, pulsanti) mostrano un'immagine. Non risulta
+  che nessuno restituisca un trascinamento del mouse su di essa. Lo stesso dubbio
+  vale già per "clicca una superficie del render" della schermata Materiali. Se
+  non si può, le strade sono tre: una finestra a parte aperta dalla palette; una
+  pagina locale nel browser; oppure riquadri ricavati dagli oggetti selezionati
+  nel modello Allplan, proiettati sulla vista con la camera salvata accanto.
+  L'ultima darebbe aree esatte, dal modello e non dall'apparenza. Per
+  verificare: cercare nei PythonPartsExamples del ramo 2026 un controllo della
+  palette che restituisca le coordinate di un clic su un'immagine. Se c'è, la
+  palette basta. Se non c'è, si sceglie fra le tre strade.
+- **I modelli di modifica del Router capiscono un render con riquadri numerati
+  disegnati sopra** — non verificato. Per verificare, dopo la sonda: lo stesso
+  render con due riquadri e due note, mandato a FLUX.1 Kontext e a Nano Banana
+  con `scripts/confronta_modelli.py`. Poi guardare se ciascuna nota è finita
+  nel suo riquadro e se i riquadri disegnati sono spariti dal risultato.
 
 ### Da prima
 
