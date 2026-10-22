@@ -1,7 +1,7 @@
 # AIRENDER — Product Requirements
 
 Documento vivo. Descrive quello che è vero **adesso**, non quello che è previsto.
-Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-21
+Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-22
 
 > Repository: `airender`. Nome fissato il 2026-09-14.
 
@@ -67,7 +67,7 @@ approvato.
 | Data | Decisione | Perché | Ribaltata? |
 |---|---|---|---|
 | 2026-09-14 | Una sola immagine in ingresso: la vista shaded | Profondità e spigoli si stimano dall'immagine. Chiedere più passate all'utente uccide l'adozione | |
-| 2026-09-14 | Niente ID map esportata da Allplan in v1 | Sovra-ingegneria: la segmentazione a valle sul render dà una UX migliore e non richiede nulla all'utente | |
+| 2026-09-14 | Niente ID map esportata da Allplan in v1 | Sovra-ingegneria: la segmentazione a valle sul render dà una UX migliore e non richiede nulla all'utente | **Sì, 2026-10-22.** La mappa la cattura la palette da sola, quindi all'utente non chiede niente: vedi la riga del 2026-10-22 |
 | 2026-09-14 | Cartella sorvegliata invece di cattura programmatica | L'export nativo esiste e dà risoluzione impostabile. Elimina lo screenshot e la dipendenza da API incerte || **In revisione 2026-10-18:** l'API c'è, `DrawingService.SaveWindowToImageFile(percorso, pixelWidth, pixelHeight)`, con esempio ufficiale nei PythonPartsExamples (ramo 2026). Si decide dopo la prova su macchina |
 | 2026-09-14 | Palette PythonPart, non nodo Visual Scripting | Il nodo VS non ha UI persistente né job asincroni; e gli utenti VS sono una minoranza. Il nodo resta possibile in v2 sullo stesso motore | |
 | 2026-09-14 | 2026-10-18 | La camera della finestra si salva accanto alla vista (`GetViewWorldProjection`: occhio, punto guardato, proiezione) | È il primo passo verso il legame diretto con la finestra Animazione che l'utente chiede | |
@@ -78,6 +78,7 @@ approvato.
 | 2026-10-21 | Con Comfy Router **non c'è una forza della struttura** | I modelli di modifica del Router non hanno un `structure_strength` da 0 a 100: se tengono la geometria, la tengono per come sono fatti e per il prompt. Quindi l'interfaccia non stampa una forza, `--forza-struttura` viene rifiutata, la ricetta scrive la forza come assente. La sezione 2 ("propone di abbassare la libertà creativa") con Comfy non ha ancora una leva: la tenuta si giudica a occhio con `scripts/confronta_modelli.py`. La forza resta solo su Magnific | |
 | 2026-10-21 | `fallback_provider=false` su ogni invio a Comfy Router | Il Router, se il provider del modello fallisce, ripiega su un altro provider, e lo fa se non gli si dice di no. Sotto NDA la destinazione si annuncia prima dell'invio: un ripiego la renderebbe falsa. Se il Router dichiara comunque un altro provider, il risultato porta un avviso | |
 | 2026-10-21 | La **segmentazione resta in pipeline**: l'annotazione per aree le sta accanto, non la sostituisce | Decisione di Riccardo. Il riquadro copre un'area disegnata a mano; cliccare una superficie o nominarla a parole (sezione 4, passo 6) richiede ancora la segmentazione | |
+| 2026-10-22 | **La mappa dei materiali viene da Allplan** quando il modello ha il materiale; la segmentazione sul render resta solo per quello che Allplan non sa | Decisione di Riccardo: usare al meglio quello che Allplan sa già. Una zona presa dal modello è esatta e porta il nome vero del materiale, senza correzioni. La ragione del taglio del 2026-09-14 (chiedere all'utente un secondo export) non vale più: `SaveWindowToImageFile` cattura la finestra da script, verificato il 2026-10-21 | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -91,12 +92,14 @@ approvato.
 | Export immagine Allplan | Contenuto finestra a risoluzione impostabile, anche superiore allo schermo | Ottima. Nativa, nessuna dipendenza |
 | Riferimento strutturale del provider | Aderenza alla composizione dell'immagine sorgente, con forza 0-100 | **Da misurare.** È l'unica cosa che decide se il prodotto esiste. Con Comfy Router, il predefinito, la forza non c'è: l'aderenza dipende dal modello e dal prompt, e si guarda col confronto affiancato |
 | Stima di profondità | Mappa di profondità dedotta dall'immagine | Buona su viste shaded pulite, degrada su wireframe |
+| Mappa dei materiali da Allplan | Per ogni zona della vista, quale materiale del modello c'è, col suo nome | **Mai provata.** Esatta, se Allplan sa produrla con la stessa camera (sezione 9). Non copre le superfici senza materiale |
 | Segmentazione | Maschera della regione cliccata o nominata | Segue l'apparenza, non il modello |
 
 **L'anello debole:** la segmentazione. Due materiali resi simili finiscono in una
 regione sola; una facciata metà in ombra si spezza in due. L'interfaccia deve
 prevedere aggiungi area / togli area fin dal primo giorno, perché il primo clic
-non sarà mai perfetto.
+non sarà mai perfetto. Con la mappa dei materiali da Allplan l'anello debole
+resta solo dove il modello non ha il materiale.
 
 ## 7 · Costruito e funzionante
 
@@ -140,8 +143,16 @@ da `requests`.
 - LoRA di stile addestrati sui render dello studio — è l'argomento di vendita
   forte della v2, non serve all'MVP.
 - Nodo Visual Scripting — possibile, chiamerà lo stesso motore.
-- Segmentazione derivata dalle superfici del modello Allplan — darebbe maschere
-  esatte e scala vera. Aggiornamento di qualità, non prerequisito.
+- **Mappa dei materiali da Allplan** — in pipeline dal 2026-10-22, prima strada
+  per la schermata Materiali (sezione 5). Accanto alla vista, la palette cattura
+  con la stessa camera una seconda immagine della finestra: ogni materiale un
+  colore pieno e diverso. A questa immagine si affianca l'elenco "colore →
+  materiale" letto dal modello. Il motore la legge come mappa: cliccando una
+  zona del render si sa quale materiale è e come si chiama in Allplan, e quel
+  nome entra nel prompt. Il motore deve assegnare al colore più vicino i pixel
+  di bordo, dove i colori si mescolano. Finché non si sa come produrla (sezione
+  9), resta un'ipotesi. Sostituisce la vecchia voce "segmentazione derivata dalle
+  superfici del modello", che la dava come aggiornamento di qualità.
 - Proxy e licenza per la rivendita — fase 2, prima del primo cliente pagante.
 - **Annotazione per aree** — in pipeline dal 2026-10-21, richiesta di Riccardo.
   Riferimento: lo strumento *Annotate Image* di rendair.ai. L'utente traccia uno
@@ -173,10 +184,13 @@ da `requests`.
   i quattro stati della schermata in `DESIGN.md`. Nella schermata Materiali sta
   accanto al clic su una superficie e al nome scritto a parole, non al loro
   posto.
-- **Segmentazione sul render** — in pipeline, non costruita. Serve a cliccare una
-  superficie o a nominarla a parole (sezione 4, passo 6; schermata Materiali in
-  `DESIGN.md`). Con i suoi limiti della sezione 6: segue l'apparenza, quindi
-  servono sempre aggiungi area e togli area.
+- **Segmentazione sul render** — in pipeline, non costruita. Serve dove Allplan
+  non sa: superfici senza materiale nel modello, e cose che il modello non ha e
+  il render aggiunge (cielo, vegetazione, contesto). Si mostra come mappa a
+  colori, una zona per superficie, e si corregge con due gesti: **unisci**
+  ("questo pezzo va con quel colore") e **separa** ("staccalo dal suo colore").
+  È l'idea di Riccardo del 2026-10-22 per rendere aggiungi area / togli area.
+  Ha i limiti della sezione 6: segue l'apparenza.
 
 ## 9 · NON VERIFICATO
 
@@ -365,7 +379,22 @@ si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
   immagine** — l'API esiste, il nome dell'evento no. Per verificare: prova su
   macchina con Allplan 2026.
 - **La rappresentazione a colori piatti si cambia senza muovere la camera** —
-  serve solo se un giorno si torna alla multi-passata. Verifica manuale.
+  dal 2026-10-22 **serve**: è la mappa dei materiali da Allplan (sezione 8).
+  Verifica manuale, poi da script. Le domande, in ordine:
+  1. esiste una rappresentazione della finestra in cui ogni materiale (o
+     superficie) ha un colore pieno, senza luci né texture?
+  2. si attiva e si toglie da Python, senza spostare la camera?
+  3. si riesce a sapere quale colore corrisponde a quale materiale?
+  4. tutto questo è possibile **senza modificare il modello dell'utente**? Se
+     per ottenerla bisogna cambiare gli attributi degli elementi, anche solo
+     per un momento, la strada è un'altra: un'interruzione a metà lascerebbe il
+     progetto del cliente alterato.
+
+  Per verificare: in Allplan 2026, sulla stessa finestra della cattura, cercare
+  una rappresentazione a colori per materiale. Poi rimandare indietro due
+  catture fatte una dopo l'altra, la vista shaded e quella a colori, con il
+  nome della rappresentazione usata. Se le due immagini combaciano al pixel, la
+  strada c'è.
 - **`requests` è disponibile nell'interprete Python di Allplan 2026** —
   confermato solo per la 2025. **Non è più un rischio per il motore:** il
   trasporto usa `urllib` della libreria standard. Resta da verificare solo se
@@ -394,7 +423,9 @@ si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
 ## 10 · Tagliato
 
 - **ID map esportata da Allplan** — tagliata il 2026-09-14: chiede all'utente un
-  lavoro che il modello sa già fare da solo.
+  lavoro che il modello sa già fare da solo. **Ripresa il 2026-10-22** come mappa
+  dei materiali (sezioni 5 e 8): la cattura la fa la palette, l'utente non fa
+  niente in più.
 - **Screenshot a schermo intero con Pillow** — tagliato il 2026-09-14: l'export
   nativo è migliore sotto ogni aspetto.
 - **Krea come motore** — tagliato il 2026-09-14: l'API è fatturata a parte dal
