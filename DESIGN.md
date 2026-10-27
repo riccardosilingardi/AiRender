@@ -55,6 +55,15 @@ Documento vivo, come il PRD. Si aggiorna ogni volta che una schermata cambia.
   Applica, che sceglie da sé fra ritocco e variante in base a quanto è radicale
   il cambio, e **dice quale delle due sta usando**.
 
+> **Direzione decisa il 2026-10-22 (PRD, sezione 5), stati sopra da riscrivere
+> prima del codice.** Le zone vengono dalla mappa dei materiali di Allplan
+> quando il modello ha il materiale: sono esatte, portano il nome vero e non si
+> correggono. Dove Allplan non sa, le zone vengono dalla segmentazione sul
+> render, mostrata come mappa a colori e corretta con **unisci** e **separa**
+> al posto di aggiungi area / togli area. L'utente deve vedere da dove viene
+> ogni zona, dal modello o stimata dall'immagine. Le due non hanno la stessa
+> affidabilità, e dirlo è la regola 3 di CLAUDE.md.
+
 ### 5 — Livelli
 
 - **Vuoto:** non compare finché non esiste un render.
