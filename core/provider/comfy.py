@@ -13,10 +13,12 @@ Da dove viene quello che c'e' scritto qui:
   Idempotency-Key, fallback_provider e il 402 insufficient_credits vengono
   dalla documentazione di docs.comfy.org, letta il 2026-10-21 solo attraverso
   una ricerca: la rete della sessione non raggiungeva il sito. MAI ESEGUITO.
-- lo schema di ogni modello (che campi vuole, dove rimette l'immagine) qui
-  NON c'e'. Si scrive in SCHEMI solo partendo dall'uscita di una chiamata
-  vera di scripts/sonda_comfy.py. Finche' un modello non ha il suo schema,
-  l'invio si ferma prima di partire e lo dice.
+- il 2026-10-27 la sonda e' girata davvero sul PC di Riccardo, con
+  FLUX.1 Kontext Pro e Nano Banana 2: invio, attesa fino a COMPLETED e
+  lettura del risultato sono andati a buon fine.
+- lo schema di ogni modello (che campi vuole, dove rimette l'immagine) sta
+  in SCHEMI e si scrive solo partendo dall'uscita di una chiamata vera di
+  scripts/sonda_comfy.py. Un modello senza schema non parte e lo dice.
 
 Differenza che conta per il prodotto: i modelli di modifica del Router non
 hanno un riferimento strutturale con una forza da 0 a 100. Se tengono la
@@ -75,8 +77,113 @@ class SchemaModello:
     verificato_il: str
 
 
-# Vuoto apposta, fino all'uscita di scripts/sonda_comfy.py. Vedi la docstring.
-SCHEMI: dict[str, SchemaModello] = {}
+# Rapporti che sia FLUX.1 Kontext sia Gemini accettano (schemi letti dalla
+# sonda il 2026-10-27). Si manda il piu' vicino alla vista: un rapporto
+# diverso schiaccia l'edificio.
+RAPPORTI = ("21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16")
+
+
+def rapporto_piu_vicino(dati: bytes) -> str:
+    larghezza, altezza = modulo_immagine.dimensioni(dati)
+    voluto = larghezza / altezza
+
+    def scarto(rapporto: str) -> float:
+        a, b = (int(x) for x in rapporto.split(":"))
+        return abs(a / b - voluto)
+
+    return min(RAPPORTI, key=scarto)
+
+
+def immagine_base64(dati: bytes) -> str:
+    """La vista in base64 senza prefisso: e' il formato con cui le due chiamate vere sono riuscite."""
+    return base64.b64encode(dati).decode("ascii")
+
+
+def _corpo_kontext(richiesta: RichiestaGenerazione) -> dict:
+    corpo = {
+        "prompt": richiesta.prompt,
+        "input_image": immagine_base64(richiesta.immagine),
+        "aspect_ratio": rapporto_piu_vicino(richiesta.immagine),
+        "output_format": "png",
+    }
+    if richiesta.seme is not None:
+        corpo["seed"] = richiesta.seme
+    return corpo
+
+
+def _immagine_kontext(uscita: object) -> tuple[str, str]:
+    """Il documento di BFL inoltrato dal Router: il link firmato sta in result.sample."""
+    try:
+        return "url", str(uscita["result"]["sample"])
+    except (KeyError, TypeError):
+        raise _risultato_senza_immagine() from None
+
+
+def _corpo_gemini(richiesta: RichiestaGenerazione) -> dict:
+    # Gemini non ha un campo per il seme: la ricetta lo salva comunque, ma
+    # rieseguire non ridà la stessa immagine (lo dice gia' l'avviso).
+    return {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": richiesta.prompt},
+                {"inlineData": {
+                    "mimeType": tipo_mime(richiesta.immagine),
+                    "data": immagine_base64(richiesta.immagine),
+                }},
+            ],
+        }],
+        "generationConfig": {
+            "responseModalities": ["IMAGE"],
+            "imageConfig": {"aspectRatio": rapporto_piu_vicino(richiesta.immagine)},
+        },
+    }
+
+
+def _immagine_gemini(uscita: object) -> tuple[str, str]:
+    """La risposta di Vertex AI: l'immagine e' una parte con inlineData (base64) o fileData (link).
+
+    Si sceglie la parte per il campo, non per posizione: accanto all'immagine
+    puo' esserci una parte di testo (schema del Router, 2026-10-27).
+    """
+    try:
+        parti = uscita["candidates"][0]["content"]["parts"]
+    except (KeyError, IndexError, TypeError):
+        raise _risultato_senza_immagine() from None
+    for parte in parti:
+        if not isinstance(parte, dict):
+            continue
+        if isinstance(parte.get("inlineData"), dict) and parte["inlineData"].get("data"):
+            return "base64", str(parte["inlineData"]["data"])
+        if isinstance(parte.get("fileData"), dict) and parte["fileData"].get("fileUri"):
+            return "url", str(parte["fileData"]["fileUri"])
+    raise _risultato_senza_immagine()
+
+
+def _risultato_senza_immagine() -> ErroreProvider:
+    return ErroreProvider(
+        "Comfy Router ha chiuso il lavoro senza un'immagine nel risultato.",
+        "Riprova. Se si ripete, e' cambiato lo schema del modello e va rifatta "
+        "la sonda (python scripts/sonda_comfy.py).",
+    )
+
+
+# Scritti dall'uscita di scripts/sonda_comfy.py sul PC di Riccardo, il
+# 2026-10-27: schema letto da /openapi.json e una generazione vera per
+# modello, con l'immagine in base64 senza prefisso (--base64-nudo). Un
+# modello che non e' qui non parte: va prima sondato.
+SCHEMI: dict[str, SchemaModello] = {
+    "bfl/flux-kontext-pro": SchemaModello(
+        corpo=_corpo_kontext,
+        immagine=_immagine_kontext,
+        verificato_il="2026-10-27",
+    ),
+    "vertexai/gemini-3.1-flash-image": SchemaModello(
+        corpo=_corpo_gemini,
+        immagine=_immagine_gemini,
+        verificato_il="2026-10-27",
+    ),
+}
 
 
 def chiave_da_ambiente() -> str | None:
@@ -313,6 +420,10 @@ class ProviderComfy(Provider):
                 continue
             if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
                 raise self._errore(stato, risposte, uscita, modello)
+            # Il Router dice quanto ha scalato sulla lettura del risultato
+            # (17.17 crediti per Nano Banana 2, sonda del 2026-10-27).
+            if risposte.get("x-comfy-credits-used"):
+                dettagli["crediti_usati"] = risposte["x-comfy-credits-used"]
             return uscita, dettagli
 
     def _con_tentativi(

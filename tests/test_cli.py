@@ -170,10 +170,19 @@ def test_la_prova_a_secco_predefinita_dice_comfy_router_e_il_modello(vista, caps
     assert uscita.index("Destinazione dell'invio") < uscita.index("non ho inviato niente")
 
 
-def test_la_prova_a_secco_avvisa_se_l_invio_vero_si_fermera(vista, capsys):
+def test_la_prova_a_secco_avvisa_se_l_invio_vero_si_fermera(vista, capsys, monkeypatch):
     """Caso: la prova a secco dice "tutto bene" e l'invio vero poi si rifiuta."""
+    from core.provider import comfy
+
+    monkeypatch.delitem(comfy.SCHEMI, preset("base").modello_per("comfy"))
     main(["--immagine", str(vista), "--prova-a-secco"])
     assert "non e' ancora stato verificato" in capsys.readouterr().out
+
+
+def test_col_modello_sondato_la_prova_a_secco_non_annuncia_un_blocco(vista, capsys):
+    """Caso: lo schema c'e' dal 2026-10-27, ma la prova a secco continua a dire che si fermera'."""
+    main(["--immagine", str(vista), "--prova-a-secco"])
+    assert "non e' ancora stato verificato" not in capsys.readouterr().out
 
 
 def test_con_comfy_la_forza_non_si_stampa_come_un_numero(vista, capsys):
