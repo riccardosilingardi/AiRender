@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Studio — Risultato</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141518}
+a{color:#8FBCFF}a:hover{color:#B9D4FF}
+.btn{font:inherit;font-size:13px;font-weight:500;border-radius:8px;padding:0 14px;min-height:36px;border:1px solid #34373E;background:#23252A;color:#EDEDEF;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:disabled{color:#8B8F97;border-style:dashed;background:transparent;cursor:not-allowed}
+.primary{background:#6EA8FE;border-color:#6EA8FE;color:#0B1220}
+.soon{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#A1A4AB;border:1px dashed #4A4D55;border-radius:999px;padding:2px 7px;white-space:nowrap}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#A1A4AB}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;width:64px;min-height:56px;justify-content:center;border-radius:10px;font:inherit;font-size:11px;background:transparent;border:0;color:#C9CBD0;cursor:pointer}
+.rail:disabled{color:#8B8F97;cursor:not-allowed}
+.seg{font:inherit;font-size:12px;min-height:30px;border-radius:7px;border:0;background:transparent;color:#C9CBD0;cursor:pointer;padding:0 10px}
+.on{background:#2B2F38;color:#EDEDEF}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #EDEDEF; background: #141518; min-height: 900px; display: flex; flex-direction: column">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid #2A2C31; background: #18191C">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6EA8FE" stroke-width="1.8" aria-hidden="true"><path d="M3 20 L12 4 L21 20 Z"/><path d="M7.5 12 H16.5"/></svg>
+<span style="font-weight: 600; font-size: 15px; letter-spacing: .02em">AIRENDER</span>
+<span style="color: #A1A4AB; font-size: 13px">Studio</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #C9CBD0">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #5CC28B"></span>
+<span>Collegato ad Allplan 2026 · BOSCO · Prospettiva centrale</span>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #C9CBD0; border: 1px solid #2E3036; border-radius: 8px; padding: 6px 10px">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8B04B" stroke-width="2" aria-hidden="true"><path d="M12 3 L21 19 H3 Z"/><path d="M12 10 V14"/><path d="M12 17 V17.5"/></svg>
+<span>Le immagini vanno a <b style="font-weight: 600; color: #EDEDEF">Comfy Router → Google (Nano Banana 2)</b></span>
+</div>
+<button class="btn" aria-label="Impostazioni" disabled="disabled"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Chiave e tetto di spesa<span class="soon">In arrivo</span></button>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; flex: 1; min-height: 0">
+
+<nav aria-label="Fasi" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-right: 1px solid #2A2C31; background: #18191C">
+<a href="Stile.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 L19 5"/><path d="M15 5h4v4"/><circle cx="7" cy="7" r="2"/></svg>Genera</a>
+<button class="rail" style="background: #262A33; color: #EDEDEF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg>Risultato</button>
+<a href="Ritocca.dc.html" class="rail" style="text-decoration: none; color: #8B8F97"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Ritocca</a>
+<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Livelli</button>
+<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10 L21 7 V17 L16 14"/></svg>Video</button>
+</nav>
+
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h1 style="margin: 0; font-size: 18px; font-weight: 600">È ancora il tuo edificio?</h1>
+<span style="color: #A1A4AB; font-size: 13px">{{ sottotitolo }}</span>
+<div style="flex: 1"></div>
+<div role="radiogroup" aria-label="Confronto" style="display: flex; gap: 4px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px">
+<sc-for list="{{ modi }}" as="m" hint-placeholder-count="3"><button class="{{ m.cls }}" role="radio" aria-checked="{{ m.sel }}" onClick="{{ m.pick }}">{{ m.nome }}</button></sc-for>
+</div>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #A1A4AB">Confronta con
+<select onChange="{{ cambiaA }}" style="font: inherit; font-size: 13px; min-height: 32px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 8px"><option value="vista">Vista di partenza</option><option value="kontext">Render FLUX.1 Kontext Pro</option></select></label>
+</div>
+
+<sc-if value="{{ scorri }}" hint-placeholder-val="{{ true }}">
+<figure style="margin: 0; display: flex; flex-direction: column; background: #1C1D21; border: 1px solid #3B5B8C; border-radius: 12px; overflow: hidden">
+<svg viewBox="0 0 1376 768" role="img" aria-label="Confronto prima e dopo: a sinistra della linea il prima, a destra il render" style="display: block; width: 100%; height: auto">
+<defs><clipPath id="taglio"><rect x="0" y="0" width="{{ xPx }}" height="768"/></clipPath></defs>
+<image href="/_blob/f31162d2b14f7460edbd003e3fac22db" x="0" y="0" width="1376" height="768" preserveAspectRatio="xMidYMid slice"/>
+<image href="{{ imgA }}" x="0" y="0" width="1376" height="768" preserveAspectRatio="xMidYMid slice" clip-path="url(#taglio)"/>
+<line x1="{{ xPx }}" y1="0" x2="{{ xPx }}" y2="768" stroke="#FFFFFF" stroke-width="4"/>
+<circle cx="{{ xPx }}" cy="384" r="26" fill="#141518" stroke="#FFFFFF" stroke-width="4"/>
+<path d="M-8 -10 L-16 0 L-8 10 M8 -10 L16 0 L8 10" transform="{{ frecce }}" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+<rect x="16" y="16" width="{{ larghA }}" height="40" rx="8" fill="rgba(20,21,24,.85)"/><text x="30" y="43" fill="#EDEDEF" font-size="20" font-family="Inter, sans-serif">{{ nomeA }}</text>
+<rect x="1180" y="16" width="180" height="40" rx="8" fill="rgba(20,21,24,.85)"/><text x="1194" y="43" fill="#EDEDEF" font-size="20" font-family="Inter, sans-serif">Nano Banana 2</text>
+</svg>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px">
+<label for="cursore" style="font-size: 12px; color: #A1A4AB; white-space: nowrap">Sposta la linea</label>
+<input id="cursore" type="range" min="0" max="100" value="{{ x }}" onInput="{{ muovi }}" style="flex: 1; accent-color: #6EA8FE">
+<span class="mono" style="color: #A1A4AB; width: 40px; text-align: right">{{ x }}%</span>
+</div>
+<figcaption style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 0 12px 10px; font-size: 12px; color: #8B8F97"><span>{{ nota }}</span><span>Tasti ← → per spostare · trascina la linea nell'app vera</span></figcaption>
+</figure>
+</sc-if>
+
+<sc-if value="{{ affiancati }}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<figure style="margin: 0; background: #1C1D21; border: 1px solid #2A2C31; border-radius: 12px; overflow: hidden">
+<img src="{{ imgA }}" alt="" style="display: block; width: 100%; aspect-ratio: 1376 / 768; object-fit: cover">
+<figcaption style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 12px; color: #A1A4AB"><span style="color: #EDEDEF; font-weight: 500">{{ nomeA }}</span><span class="mono">{{ infoA }}</span></figcaption>
+</figure>
+<figure style="margin: 0; background: #1C1D21; border: 1px solid #3B5B8C; border-radius: 12px; overflow: hidden">
+<img src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="Render generato da Nano Banana 2" style="display: block; width: 100%; aspect-ratio: 1376 / 768; object-fit: cover">
+<figcaption style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 12px; color: #A1A4AB"><span style="color: #EDEDEF; font-weight: 500">Render · Fotorealistico</span><span class="mono">Nano Banana 2 · 1376×768</span></figcaption>
+</figure>
+</div>
+</sc-if>
+
+<sc-if value="{{ solo }}" hint-placeholder-val="{{ false }}">
+<figure style="margin: 0; background: #1C1D21; border: 1px solid #3B5B8C; border-radius: 12px; overflow: hidden">
+<img src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="Render generato da Nano Banana 2" style="display: block; width: 100%; aspect-ratio: 1376 / 768; object-fit: cover">
+<figcaption style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 12px; color: #A1A4AB"><span style="color: #EDEDEF; font-weight: 500">Render · Fotorealistico</span><span class="mono">Nano Banana 2 · 1376×768</span></figcaption>
+</figure>
+</sc-if>
+
+<section aria-label="Render di questa vista" style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Render di questa vista</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button style="padding: 0; border: 2px solid #6EA8FE; border-radius: 10px; overflow: hidden; background: #1C1D21; cursor: pointer; width: 150px; text-align: left; color: #EDEDEF; font: inherit">
+<img src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="" style="display: block; width: 100%; height: 84px; object-fit: cover">
+<span style="display: block; padding: 6px 8px; font-size: 11px">Nano Banana 2 · 27/10</span>
+</button>
+<button style="padding: 0; border: 1px solid #2E3036; border-radius: 10px; overflow: hidden; background: #1C1D21; cursor: pointer; width: 150px; text-align: left; color: #C9CBD0; font: inherit">
+<img src="/_blob/bdafff7c31cd2e2010ea602bc538494d" alt="" style="display: block; width: 100%; height: 84px; object-fit: cover">
+<span style="display: block; padding: 6px 8px; font-size: 11px">FLUX.1 Kontext Pro · 27/10</span>
+</button>
+<a href="Stile.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 150px; min-height: 112px; border: 1px dashed #3A3D44; border-radius: 10px; color: #A1A4AB; font-size: 12px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Un altro render</a>
+</div>
+</section>
+</main>
+
+<aside aria-label="Dettagli del render" style="flex: 1 1 320px; max-width: 380px; display: flex; flex-direction: column; gap: 18px; padding: 18px; border-left: 1px solid #2A2C31; background: #18191C">
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div class="lbl">Tenuta della geometria</div>
+<div style="border: 1px dashed #4A4D55; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 14px; font-weight: 500">Non misurata</span><span class="soon">Misura in arrivo</span></div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #A1A4AB">Il controllo automatico degli spigoli non c'è ancora. Per ora giudica tu, confrontando le due immagini.</p>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Com'è stato fatto</div>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; font-size: 13px">
+<dt style="color: #A1A4AB">Stile</dt><dd style="margin: 0">Fotorealistico · Giorno · Sereno</dd>
+<dt style="color: #A1A4AB">Modello</dt><dd style="margin: 0">Nano Banana 2</dd>
+<dt style="color: #A1A4AB">Le tue parole</dt><dd style="margin: 0; color: #A1A4AB">nessuna</dd>
+<dt style="color: #A1A4AB">Intorno</dt><dd style="margin: 0">niente, sfondo neutro</dd>
+<dt style="color: #A1A4AB">Servizio</dt><dd style="margin: 0">Comfy Router, senza ripiego</dd>
+<dt style="color: #A1A4AB">Costo</dt><dd style="margin: 0">17,17 crediti</dd>
+<dt style="color: #A1A4AB">Seme</dt><dd style="margin: 0; color: #A1A4AB">salvato, il modello non lo usa</dd>
+</dl>
+<div class="mono" style="color: #A1A4AB; word-break: break-all; line-height: 1.5">Usr\Local\AIRENDER\viste\render-…png + ricetta.json</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Adesso</div>
+<button class="btn primary" style="justify-content: center">Rifai con la stessa ricetta</button>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<button class="btn" style="justify-content: center">Apri cartella</button>
+<button class="btn" style="justify-content: center">Copia immagine</button>
+</div>
+<button class="btn" disabled="disabled" style="justify-content: space-between">Esporta per il cliente<span class="soon">In arrivo</span></button>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Cambia una parte</div>
+<button class="btn" disabled="disabled" style="justify-content: space-between">Cambia un materiale<span class="soon">In arrivo</span></button>
+<button class="btn" disabled="disabled" style="justify-content: space-between">Annota per aree<span class="soon">In arrivo</span></button>
+<button class="btn" disabled="disabled" style="justify-content: space-between">Fai un video da qui<span class="soon">Dopo la v1</span></button>
+</section>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state || {};
+const modo = st.modo || 'scorri';
+const x = st.x == null ? 50 : st.x;
+const xPx = Math.round(1376 * x / 100);
+const kontext = st.a === 'kontext';
+const voci = [['scorri','Prima / dopo'],['affiancati','Affiancati'],['solo','Solo render']];
+return {
+modi: voci.map((v) => ({ nome: v[1], sel: modo === v[0], cls: modo === v[0] ? 'seg on' : 'seg', pick: () => this.setState({ modo: v[0] }) })),
+scorri: modo === 'scorri', affiancati: modo === 'affiancati', solo: modo === 'solo',
+sottotitolo: modo === 'scorri' ? 'Una sola immagine: a sinistra della linea il prima, a destra il render' : (modo === 'affiancati' ? 'Le due immagini una accanto all\'altra, stesso zoom' : 'Solo il render, grande'),
+x: x, xPx: xPx, frecce: 'translate(' + xPx + ' 384)',
+muovi: (e) => this.setState({ x: Number(e.target.value) }),
+cambiaA: (e) => this.setState({ a: e.target.value }),
+imgA: kontext ? '/_blob/bdafff7c31cd2e2010ea602bc538494d' : '/_blob/2bcb58f97f23f9ca72d72862d0952b4d',
+nomeA: kontext ? 'Kontext Pro' : 'Vista Allplan',
+larghA: kontext ? 150 : 160,
+infoA: kontext ? 'FLUX.1 Kontext Pro · 27/10' : 'vista-20261021-093841.png · 1536×857',
+nota: kontext ? 'A/B fra due render della stessa vista: quale tiene meglio spigoli e materiali.' : 'La vista è riportata a 1376×768, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.'
+};
+}
+}
+</script>
+</body>
+</html>
