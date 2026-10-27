@@ -144,6 +144,11 @@ def _dici_forza(motore, modello: str, forza, dire) -> None:
         )
 
 
+def _dici_attesa(dire) -> None:
+    """Il servizio risponde in decine di secondi: senza una riga sembra bloccata."""
+    dire("Invio partito: aspetto il render dal servizio.")
+
+
 def esegui(argomenti, uscita_standard=None) -> int:
     def dire(testo=""):
         _scrivi(testo, uscita_standard)
@@ -211,6 +216,7 @@ def esegui(argomenti, uscita_standard=None) -> int:
         dire(f"Prompt che partirebbe: {richiesta.prompt}")
         return USCITA_OK
 
+    _dici_attesa(dire)
     risultato = motore.genera(richiesta)
     destinazione = _percorso_uscita(argomenti.uscita, sorgente, risultato.formato)
     percorso_ricetta = _salva(risultato, destinazione)
@@ -249,6 +255,7 @@ def _riesegui(argomenti, dire) -> int:
             dire(f"Attenzione: {mancante}")
         return USCITA_OK
 
+    _dici_attesa(dire)
     risultato = motore.riesegui(ricetta, dati)
     destinazione = _percorso_uscita(argomenti.uscita, sorgente, risultato.formato)
     percorso_ricetta = _salva(risultato, destinazione)

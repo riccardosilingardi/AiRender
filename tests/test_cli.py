@@ -135,6 +135,17 @@ def test_una_generazione_lascia_il_render_e_la_sua_ricetta(motore_di_prova, vist
     assert "Scostamento della geometria: non misurato." in capsys.readouterr().out
 
 
+def test_durante_l_attesa_dice_che_l_invio_e_partito(motore_di_prova, vista, tmp_path, capsys):
+    """Caso: il servizio ci mette decine di secondi e la finestra sembrava bloccata."""
+    main([
+        "--immagine", str(vista), "--provider", "prova",
+        "--uscita", str(tmp_path / "render.png"),
+    ])
+    uscita = capsys.readouterr().out
+    assert uscita.index("Destinazione dell'invio") < uscita.index("Invio partito")
+    assert uscita.index("Invio partito") < uscita.index("Render salvato")
+
+
 def test_un_wireframe_viene_fermato_e_l_utente_sa_cosa_risalvare(vista, capsys, tmp_path):
     """Caso: si salva la vista di lavoro invece della shaded."""
     sbagliata = tmp_path / "linee.png"
