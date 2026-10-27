@@ -371,6 +371,30 @@ FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
   con `scripts/confronta_modelli.py`. Poi guardare se ciascuna nota è finita
   nel suo riquadro e se i riquadri disegnati sono spariti dal risultato.
 
+### Lasciato dalla sessione del 2026-10-27 (sonda della palette)
+
+La sonda `AIRENDER sonda` (`allplan/v2026/.../AirenderSonda.py`, logica in
+`allplan/comune/sonda_palette.py` e `sonda_figlio.py`) risponde alle cinque
+domande del piano UI (palette in Allplan + Studio in finestra propria). Da qui
+sono provati con `pytest` solo la scelta degli interpreti, il registro e il
+processo di prova che parte staccato, serve una pagina su `127.0.0.1` e batte.
+Tutto il resto aspetta il PC di Riccardo:
+
+- **Un'immagine `Picture` della palette si cambia da script** — due modi
+  provati: stesso file riscritto e valore cambiato con un percorso assoluto.
+  Nessuno dei due è garantito dalla documentazione, che dice solo che il file è
+  relativo al `.pyp`.
+- **`PictureButtonList` mostra PNG messi accanto al `.pyp`** — nomi in
+  `ValueList2`, come dice la documentazione 2022; la sintassi 2026 non è stata
+  letta (sito non raggiungibile da questa sessione).
+- **Un PythonPart lancia un processo a parte senza bloccare Allplan, e con quale
+  Python** — `sys.executable` dentro Allplan potrebbe essere Allplan stesso: la
+  sonda non lo lancia mai e prova prima il Python di Allplan, poi `py`.
+- **`msedge --app=` apre la pagina locale come finestra senza barra.**
+- **Allplan resta usabile mentre il processo lavora**, e il processo sopravvive
+  alla chiusura della palette.
+- **`Expander` e `Text` come `ValueType` nel `.pyp`** — usati per la prima volta.
+
 ### Da prima
 
 - **`NemAll_Python_Utility.StartMenuFunction` può lanciare il salvataggio

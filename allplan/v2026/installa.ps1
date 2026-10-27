@@ -1,4 +1,4 @@
-# Copia AIRENDER prova nella cartella utente (Usr) di Allplan 2026.
+# Copia AIRENDER prova e AIRENDER sonda nella cartella utente (Usr) di Allplan 2026.
 #
 # Uso, da PowerShell nella cartella del repository:
 #   powershell -ExecutionPolicy Bypass -File allplan\v2026\installa.ps1
@@ -35,7 +35,15 @@ Copy-Item (Join-Path $repo "allplan\comune\ponte.py") $script -Force
 Copy-Item (Join-Path $PSScriptRoot "PythonPartsScripts\airender\AirenderProva.py") $script -Force
 Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\AirenderProva.pyp") $libreria -Force
 
+# La sonda della palette (piano UI del 2026-10-27): script, processo di prova,
+# palette e le sue immagini, che devono stare accanto al .pyp.
+Copy-Item (Join-Path $repo "allplan\comune\sonda_palette.py") $script -Force
+Copy-Item (Join-Path $repo "allplan\comune\sonda_figlio.py") $script -Force
+Copy-Item (Join-Path $PSScriptRoot "PythonPartsScripts\airender\AirenderSonda.py") $script -Force
+Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\AirenderSonda.pyp") $libreria -Force
+Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\sonda_*.png") $libreria -Force
+
 Write-Host "Fatto."
 Write-Host "  script:   $script"
 Write-Host "  libreria: $libreria"
-Write-Host "In Allplan: Libreria > Privato > AIRENDER > AIRENDER prova."
+Write-Host "In Allplan: Libreria > Privato > AIRENDER > AIRENDER prova (oppure AIRENDER sonda)."

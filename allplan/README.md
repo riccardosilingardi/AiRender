@@ -41,3 +41,29 @@ sessione può verificare da qui:
 - I due `.camera.json`.
 - Il testo della finestra di messaggio di **Prova a secco**.
 - Qualunque errore della finestra *Trace* di Allplan.
+
+## La sonda: `AIRENDER sonda` (2026-10-27)
+
+Una seconda palette usa e getta, per sapere sul PC vero se la palette nuova e lo
+Studio si possono fare come nel piano UI. Si installa con lo stesso
+`installa.ps1` e compare accanto ad *AIRENDER prova*.
+
+1. Rilancia `installa.ps1`, riavvia Allplan.
+2. Libreria › Privato › AIRENDER › **AIRENDER sonda**.
+3. **1 · Cambia immagine**, due o tre volte. Guarda quali delle due immagini in
+   alto cambiano lettera (A/B): la prima, la seconda, nessuna.
+4. **2 · Miniature**: si vedono cinque immagini o caselle vuote? Clicca la terza,
+   poi **Registra la scelta**.
+5. **3 · Trova Python**, poi **Avvia processo**. Per mezzo minuto gira il
+   modello e zooma: Allplan risponde?
+6. **5 · Controlla processo**: deve dire *vivo* con un numero di battiti.
+7. **4 · Apri in Edge**: si apre una finestra senza barra degli indirizzi, con
+   un numero che sale?
+8. Chiudi la palette, riaprila, **Controlla processo** di nuovo: il processo è
+   ancora vivo?
+9. **Riepilogo**.
+
+Da rimandare: il file `Usr\Local\AIRENDER\sonda\risultati-sonda.txt`, uno
+screenshot della palette dopo il punto 4, uno della finestra di Edge, e a parole
+se Allplan rispondeva al punto 5. Il processo di prova si spegne da solo dopo
+tre minuti.
