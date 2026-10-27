@@ -79,6 +79,7 @@ approvato.
 | 2026-10-21 | `fallback_provider=false` su ogni invio a Comfy Router | Il Router, se il provider del modello fallisce, ripiega su un altro provider, e lo fa se non gli si dice di no. Sotto NDA la destinazione si annuncia prima dell'invio: un ripiego la renderebbe falsa. Se il Router dichiara comunque un altro provider, il risultato porta un avviso | |
 | 2026-10-21 | La **segmentazione resta in pipeline**: l'annotazione per aree le sta accanto, non la sostituisce | Decisione di Riccardo. Il riquadro copre un'area disegnata a mano; cliccare una superficie o nominarla a parole (sezione 4, passo 6) richiede ancora la segmentazione | |
 | 2026-10-22 | **La mappa dei materiali viene da Allplan** quando il modello ha il materiale; la segmentazione sul render resta solo per quello che Allplan non sa | Decisione di Riccardo: usare al meglio quello che Allplan sa già. Una zona presa dal modello è esatta e porta il nome vero del materiale, senza correzioni. La ragione del taglio del 2026-09-14 (chiedere all'utente un secondo export) non vale più: `SaveWindowToImageFile` cattura la finestra da script, verificato il 2026-10-21 | |
+| 2026-10-27 | Modello predefinito dei preset su Comfy Router: **Nano Banana 2** (`vertexai/gemini-3.1-flash-image`), al posto di FLUX.1 Kontext Pro | Decisione di Riccardo, a occhio, sulla stessa cattura vera passata dai due modelli: i tramezzi tengono in tutti e due, Nano Banana rende meglio ombre e grana. Tiene anche le proporzioni della vista (1376x768 per 1536x857), Kontext no (1392x752). Un'immagine sola: va ripetuto su altre viste. Preset alla versione 3 | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -104,7 +105,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **121 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **132 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -116,19 +117,19 @@ python scripts/confronta_modelli.py --immagine vista.png
 
 | Cosa | Dove | Stato |
 |---|---|---|
-| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. L'invio vero non è mai stato eseguito: manca lo schema verificato del modello (vedi sezione 9) |
+| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. Gli schemi dei due modelli sono verificati dalla sonda (2026-10-27), ma il motore stesso non ha ancora fatto un invio vero: l'hanno fatto la sonda e il suo codice gemello (sezione 9) |
 | Casa unica delle decisioni: 21 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
-| Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda, idempotenza, errori; nessuno schema di modello ancora, quindi l'invio vero si ferma prima di partire. **Magnific**: registrato, non più a consumo |
-| Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Scritta e provata senza rete. Mai lanciata contro il Router: la rete di questa sessione non arrivava a `api.comfy.org` |
-| Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. Parte davvero solo quando i due modelli hanno lo schema |
+| Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
+| Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
+| Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. I due modelli predefiniti hanno lo schema dal 2026-10-27: non è ancora stato lanciato davvero (il primo confronto è stato fatto a mano, con le immagini della sonda) |
 | Rifiuto: vista inadatta (wireframe, senza ombre, troppo piccola), con il messaggio che dice cosa risalvare | `core/idoneita.py` | Funziona su immagini sintetiche e su **un** export vero di Allplan 2026, che passa (sezione 9). Un wireframe sintetico sul gradiente di Allplan passa anche lui |
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
 | Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py`, `core/provider/comfy.py` | Fatti per: chiave rifiutata, credito esaurito (per Comfy: credito del workspace, con cosa fare), workspace che non può usare il modello, modello sconosciuto, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito, schema del modello non ancora verificato |
 | Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura e prova a secco funzionano in Allplan 2026 (prova del 2026-10-21). L'invio vero non è ancora partito. Dal 2026-10-21 la palette parla con Comfy Router senza che l'adattatore sia cambiato: segue il predefinito del motore |
 
-**Non c'è ancora:** nessuno schema di modello Comfy verificato (quindi nessun
-render vero), nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
+**Non c'è ancora:** nessun render vero partito dal motore o dalla palette (solo
+dalla sonda), nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
 espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
 al prompt del preset).
@@ -285,72 +286,75 @@ Resta non verificato:
 
 ### Lasciato dalla sessione del 2026-10-21 (Comfy Router)
 
-In questa sessione la rete della macchina non raggiungeva né `docs.comfy.org`
-né `api.comfy.org`: la documentazione è stata letta **solo attraverso gli
-estratti di una ricerca**, e nessuna chiamata è partita. Tutto quello che segue
-si verifica lanciando `scripts/sonda_comfy.py` e incollandone l'uscita.
+La sessione del 2026-10-21 non raggiungeva né `docs.comfy.org` né
+`api.comfy.org`. **Il 2026-10-27 Riccardo ha lanciato `scripts/sonda_comfy.py`
+sul suo PC** (Python 3.10.10, `--base64-nudo`): schema e una generazione per
+FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
+`tests/dati/vista-20261021-093841.png`.
 
-- **Il protocollo della coda è quello scritto in `core/provider/comfy.py`** —
-  dalla documentazione, mai eseguito: `POST /v2/models/{provider}/{model}/requests`
-  che risponde 201 con `request_id`; `GET .../requests/{id}/status` con
-  `status` fra `IN_QUEUE`, `IN_PROGRESS`, `COMPLETED` e l'intestazione
-  `Retry-After`; `GET .../requests/{id}` che risponde 202 finché non è pronto,
-  poi 200 con l'uscita del modello; nessuno stato "fallito", ma un errore dentro
-  un `COMPLETED`, con un nome di campo che non conosco (cerco `error` ed
-  `error_type`). Una pagina vecchia della guida diceva che il Router non era
-  ancora attivo e rispondeva 404 sulle rotte `/v1/`: le pagine dei modelli usano
-  `/v2/`. Se qualcosa non torna, si tocca un file solo, `comfy.py`.
-- **Lo schema dei modelli di modifica** — `SCHEMI` è vuoto apposta. Dalla
-  documentazione, da confermare con la sonda: FLUX.1 Kontext
-  (`bfl/flux-kontext-pro`, `bfl/flux-kontext-max`) vuole `prompt`,
-  `input_image` in base64 e `aspect_ratio`, e restituisce un link in
-  `result.sample`; Nano Banana 2 (`vertexai/gemini-3.1-flash-image`) e Nano
-  Banana Pro (`vertexai/gemini-3-pro-image`) usano il corpo nativo di Gemini
-  (`contents` → `parts` → `inlineData` con `mimeType` e `data`) e rendono il
-  base64 in `candidates[0].content.parts[…].inlineData.data`. Nel catalogo ci
-  sono anche Seedream (`byteplus/seedream-4-5-251128`, poi 5.0) e GPT Image
-  (`openai/gpt-image-1.5`, `openai/gpt-image-2`), ma i loro schemi di modifica
-  non li ho trovati: non sono nella sonda. Una fonte non ufficiale dice Nano
-  Banana 2 deprecato in favore di `vertexai/gemini-nano-banana-2.1`.
-- **Il Router accetta l'immagine come `data:image/png;base64,…`** — la sonda la
-  manda così, come chiesto. Per Gemini il campo nativo `inlineData.data` di
-  solito vuole il base64 senza prefisso: se torna un 400, rilanciare con
-  `--base64-nudo`.
-- **`fallback_provider=false` vale anche sulla rotta della coda** — documentato
-  come parametro di query sulla rotta diretta (note di rilascio degli SDK). Per
-  verificare: nell'uscita della sonda non deve comparire
-  `X-Comfy-Router-Fallback-Provider`.
-- **Il 402 `insufficient_credits` non addebita niente** — dalla documentazione,
-  che dice anche che il controllo del credito viene prima della validazione del
-  corpo: un workspace vuoto risponde 402 anche a una richiesta sbagliata. Prima
-  la ricarica, poi lo schema.
-- **Il render torna con le proporzioni della vista** — la sonda chiede il
-  rapporto standard più vicino (16:9 per la cattura 1536x857) e stampa i due
-  rapporti a confronto. Se non coincidono, l'edificio è schiacciato.
-- **FLUX.1 Kontext o Nano Banana tengono la geometria di un edificio** — è la
-  domanda del prodotto, e senza una forza della struttura non c'è una leva per
-  aggiustarla. Per verificare: `scripts/confronta_modelli.py` sulla cattura vera,
-  e un occhio sugli spigoli.
-- **La grana passa solo come frase nel prompt** — con Comfy non esiste
-  `creative_detailing`; la ricetta scrive il dettaglio della grana come assente.
-  Che la frase basti a cambiare la grana percepita è un'ipotesi.
-- **Rifare una ricetta Comfy dà la stessa immagine** — no, quasi certamente: non
-  c'è una generazione fissa verificata e la riesecuzione lo dice. Si usa una
-  Idempotency-Key nuova apposta: quella vecchia, entro 24 ore, renderebbe
-  l'immagine di allora senza rifarla.
-- **Cosa si paga se il tempo scade** — le fonti si contraddicono: la guida dice
-  che un 504 per tempo scaduto non si paga, un esempio in coreano dice che una
-  generazione finita dal provider si paga comunque. Il motore usa la coda e,
-  quando smette di aspettare, dice di guardare i crediti prima di rilanciare.
-- **Il prezzo per immagine** — non letto. Va guardato nel catalogo del Router
-  (`billing` di ogni modello) prima di decidere la risoluzione e il numero di
-  miniature.
-- **La palette mostra la destinazione completa** — il campo Destinazione della
-  palette di prova legge `ponte.destinazione_predefinita()`, che dà "Comfy
-  Router (api.comfy.org)" senza il modello; il modello compare nel testo della
-  prova a secco. L'adattatore non si è toccato. Da vedere a video.
-- **`ImageFont.load_default(size=…)` esiste nel Pillow di Allplan** — serve solo
-  alle didascalie del confronto; se manca, si ripiega sul carattere piccolo.
+**Verificato dalla sonda, e uscito da qui:**
+
+- **Il protocollo della coda.** `POST .../requests?fallback_provider=false`
+  risponde **201** con `request_id`, `status: IN_QUEUE`, `queue_position`,
+  `status_url`, `response_url`, `cancel_url`. `GET .../status` passa per
+  `IN_PROGRESS` con `Retry-After` in secondi (3, poi 7) e chiude con
+  `COMPLETED` senza `Retry-After`. `GET .../requests/{id}` risponde 200 con
+  l'uscita del modello e l'intestazione `x-comfy-credits-used`.
+- **Gli schemi dei due modelli**, letti da `/openapi.json` e confermati dalla
+  generazione. Kontext: obbligatorio solo `prompt`; `input_image` base64 o URL;
+  `aspect_ratio`, `seed`, `output_format`; il link firmato torna in
+  `result.sample`, valido fino a 24 ore. Nano Banana 2: corpo nativo di Gemini
+  (`contents` → `parts` → `inlineData`); l'immagine torna in base64 in
+  `candidates[0].content.parts[…].inlineData.data`, oppure come link in
+  `fileData.fileUri` se si chiede `uploadImagesToStorage`. Scritti in `SCHEMI`.
+- **L'immagine senza prefisso `data:` va bene** per tutti e due. Con il
+  prefisso non si è provato, quindi il motore manda il base64 senza prefisso.
+- **Il prezzo di una generazione** con Nano Banana 2: **17,17 crediti**
+  (`x-comfy-credits-used`), circa 0,08 $ secondo `x-litellm-response-cost`.
+  La generazione Kontext è durata 4,4 secondi lato BFL; il suo prezzo non è
+  stato copiato.
+- **Le proporzioni.** Nano Banana 2 ha reso 1376x768 (1,792, come la vista);
+  Kontext 1392x752 (1,851, circa il 3% più largo). In tutti e due i casi si era
+  chiesto 16:9.
+- **La tenuta dei tramezzi su questa vista.** Riccardo ha giudicato a occhio
+  che tengono in tutti e due i modelli. **Su una vista sola**, bianca e senza
+  ombre portate.
+
+**Resta non verificato:**
+
+- **Il motore stesso fa un invio vero.** L'hanno fatto la sonda e il suo
+  corpo; `core/provider/comfy.py` costruisce lo stesso corpo con gli stessi
+  campi, ma la palette e `core.cli` non hanno ancora mandato niente. Per
+  verificare: `python -m core.cli --immagine vista.png --preset base` con la
+  chiave in `COMFY_API_KEY`, e la ricetta salvata accanto al render.
+- **`aspect_ratio` assente dà le proporzioni della vista** — lo schema di
+  Kontext lo dice, ma il motore lo manda comunque (il rapporto standard più
+  vicino), come nelle chiamate vere.
+- **`fallback_provider=false` vale anche sulla rotta della coda** — nelle
+  risposte non è comparsa `X-Comfy-Router-Fallback-Provider`, il che è
+  coerente ma non prova che il parametro sia letto.
+- **Un errore dentro un `COMPLETED`** — mai visto: il nome del campo (`error`,
+  `error_type`) resta un'ipotesi.
+- **Il 402 `insufficient_credits` non addebita niente**, e **cosa si paga se il
+  tempo scade** — invariati, come scritti il 2026-10-21: il workspace aveva
+  credito e nessuna chiamata è scaduta.
+- **I modelli tengono la geometria su viste diverse** — una vista sola, con
+  pochi muri. Servono almeno una vista con solaio e ombre portate, e una con
+  aperture e più piani. Per verificare: `scripts/confronta_modelli.py` sulle
+  catture nuove, e un occhio sugli spigoli.
+- **Gli altri modelli del catalogo** (Kontext Max, Nano Banana Pro, Seedream,
+  GPT Image) non hanno schema: si fermano prima di partire finché non passano
+  dalla sonda. Una fonte non ufficiale dice Nano Banana 2 deprecato in favore di
+  `vertexai/gemini-nano-banana-2.1`: se il Router lo ritira, il preset va
+  cambiato e il nuovo modello va sondato.
+- **Il seme con Nano Banana** — lo schema di Gemini non ha un campo per il seme:
+  la ricetta lo salva, ma non arriva al modello. Rifare una ricetta dà
+  un'immagine diversa, e la riesecuzione lo dice già.
+- **La grana passa solo come frase nel prompt** — invariato. Riccardo ha
+  trovato la grana di Nano Banana migliore, ma una frase che cambia la grana
+  percepita resta un'ipotesi.
+- **La palette mostra la destinazione completa** e **`ImageFont.load_default(size=…)`
+  esiste nel Pillow di Allplan** — invariati, da vedere a video.
 
 ### Lasciato dalla richiesta del 2026-10-21 (annotazione per aree)
 

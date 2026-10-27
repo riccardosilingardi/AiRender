@@ -103,20 +103,22 @@ def test_un_modello_senza_schema_verificato_non_parte_e_dice_di_lanciare_la_sond
     """Caso: lo schema scritto dai documenti e mai provato. Si paga per scoprire che era sbagliato."""
     trasporto = TrasportoComfyFinto()
     with pytest.raises(ErroreProvider) as errore:
-        provider_comfy(trasporto).genera(richiesta(modello="bfl/flux-kontext-pro"))
+        provider_comfy(trasporto).genera(richiesta(modello="bfl/flux-kontext-max"))
     assert trasporto.chiamate == []
-    assert "sonda_comfy.py --modello bfl/flux-kontext-pro" in errore.value.cosa_fare
+    assert "sonda_comfy.py --modello bfl/flux-kontext-max" in errore.value.cosa_fare
 
 
-def test_nessun_modello_vero_ha_ancora_uno_schema():
-    """Caso: qualcuno riempie SCHEMI dai documenti prima che la sonda abbia parlato."""
-    assert comfy.SCHEMI == {}
+def test_solo_i_modelli_sondati_hanno_uno_schema_e_ognuno_dice_quando():
+    """Caso: qualcuno aggiunge uno schema dai documenti, senza una chiamata vera dietro."""
+    assert set(comfy.SCHEMI) == {"bfl/flux-kontext-pro", "vertexai/gemini-3.1-flash-image"}
+    assert all(schema.verificato_il == "2026-10-27" for schema in comfy.SCHEMI.values())
 
 
 def test_la_prova_a_secco_sa_gia_cosa_fermera_l_invio(modello_verificato):
     """Caso: la prova a secco promette un invio che poi si rifiuta."""
     motore = comfy.ProviderComfy()
-    assert "non e' ancora stato verificato" in motore.cosa_manca("bfl/flux-kontext-pro")
+    assert "non e' ancora stato verificato" in motore.cosa_manca("bfl/flux-kontext-max")
+    assert motore.cosa_manca("bfl/flux-kontext-pro") is None
     assert motore.cosa_manca(modello_verificato) is None
 
 
@@ -340,3 +342,86 @@ def test_il_trasporto_vero_rende_le_intestazioni_in_minuscolo(monkeypatch):
     stato, risposte, corpo = TrasportoHTTP().chiama("POST", "https://x/y", {"A": "b"}, {"k": 1})
     assert (stato, risposte, corpo) == (201, {"retry-after": "3"}, {"request_id": "rq-1"})
     assert viste[0].get_header("Content-type") == "application/json"
+
+
+# --- schemi veri, sulle forme che il Router ha reso il 2026-10-27 -------------
+
+
+VISTA_LARGA = vista_shaded(1536, 857)  # le proporzioni della cattura vera
+
+
+def test_kontext_manda_base64_nudo_rapporto_vicino_e_seme():
+    """Caso: con il prefisso data: la chiamata vera non e' mai stata provata."""
+    corpo = comfy.SCHEMI["bfl/flux-kontext-pro"].corpo(
+        richiesta(VISTA_LARGA, modello="bfl/flux-kontext-pro", seme=7))
+    assert corpo["input_image"] == comfy.immagine_base64(VISTA_LARGA)
+    assert not corpo["input_image"].startswith("data:")
+    assert corpo["aspect_ratio"] == "16:9" and corpo["seed"] == 7
+    assert corpo["output_format"] == "png"
+
+
+def test_kontext_senza_seme_non_manda_il_campo():
+    corpo = comfy.SCHEMI["bfl/flux-kontext-pro"].corpo(richiesta(modello="bfl/flux-kontext-pro"))
+    assert "seed" not in corpo
+
+
+def test_kontext_trova_il_link_dove_lo_ha_messo_la_chiamata_vera():
+    uscita = {"id": "x", "status": "Ready", "result": {
+        "sample": "https://storage.esempio/bfl.png?Expires=1", "seed": 1913500001}}
+    assert comfy.SCHEMI["bfl/flux-kontext-pro"].immagine(uscita) == (
+        "url", "https://storage.esempio/bfl.png?Expires=1")
+
+
+def test_gemini_manda_testo_e_immagine_e_chiede_solo_un_immagine():
+    corpo = comfy.SCHEMI["vertexai/gemini-3.1-flash-image"].corpo(
+        richiesta(VISTA_LARGA, modello="vertexai/gemini-3.1-flash-image"))
+    parti = corpo["contents"][0]["parts"]
+    assert parti[0] == {"text": "prompt tecnico"}
+    assert parti[1]["inlineData"] == {
+        "mimeType": "image/png", "data": comfy.immagine_base64(VISTA_LARGA)}
+    assert corpo["generationConfig"] == {
+        "responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": "16:9"}}
+
+
+def test_gemini_sceglie_la_parte_per_il_campo_non_per_la_posizione():
+    """Caso: lo schema dice che accanto all'immagine puo' esserci una parte di testo."""
+    schema = comfy.SCHEMI["vertexai/gemini-3.1-flash-image"]
+    in_linea = {"candidates": [{"content": {"parts": [
+        {"text": "ecco"}, {"inlineData": {"mimeType": "image/png", "data": "QUJD"}}]}}]}
+    assert schema.immagine(in_linea) == ("base64", "QUJD")
+    con_link = {"candidates": [{"content": {"parts": [
+        {"fileData": {"mimeType": "image/png", "fileUri": "https://storage.esempio/g.png"}}]}}]}
+    assert schema.immagine(con_link) == ("url", "https://storage.esempio/g.png")
+
+
+@pytest.mark.parametrize("uscita", [{}, {"candidates": []},
+                                    {"candidates": [{"content": {"parts": [{"text": "no"}]}}]}])
+def test_un_risultato_senza_immagine_lo_dice_invece_di_rompersi(uscita):
+    with pytest.raises(ErroreProvider):
+        comfy.SCHEMI["vertexai/gemini-3.1-flash-image"].immagine(uscita)
+    with pytest.raises(ErroreProvider):
+        comfy.SCHEMI["bfl/flux-kontext-pro"].immagine(uscita)
+
+
+def test_gemini_dall_invio_all_immagine_decodificata():
+    """Caso: tutta la strada, col Router finto che rende la forma vera di Vertex AI."""
+    risultato_vero = (200, {}, {"candidates": [{"content": {"role": "model", "parts": [
+        {"inlineData": {"mimeType": "image/png", "data": comfy.immagine_base64(PNG)}}]},
+        "finishReason": "STOP"}], "modelVersion": "gemini-3.1-flash-image"})
+    trasporto = TrasportoComfyFinto(
+        [router_in_coda(), router_stato("COMPLETED"), risultato_vero])
+    esito = provider_comfy(trasporto).genera(
+        richiesta(modello="vertexai/gemini-3.1-flash-image"))
+    assert esito.immagine == PNG and trasporto.scaricati == []
+    assert esito.ricetta.parametri["schema_verificato_il"] == "2026-10-27"
+    assert esito.ricetta.parametri["corpo"]["contents"][0]["parts"][1]["inlineData"]["data"] == (
+        f"<vista sha256:{impronta(PNG)}>")
+
+
+def test_i_crediti_scalati_finiscono_nella_ricetta():
+    """Caso: a fine mese si vuole sapere quanto e' costato ogni livello."""
+    risultato = (200, {"x-comfy-credits-used": "17.17"}, {"result": {"sample": "https://s.esempio/r.png"}})
+    trasporto = TrasportoComfyFinto(
+        [router_in_coda(), router_stato("COMPLETED"), risultato], immagine=PNG)
+    esito = provider_comfy(trasporto).genera(richiesta(modello="bfl/flux-kontext-pro"))
+    assert esito.ricetta.parametri["crediti_usati"] == "17.17"

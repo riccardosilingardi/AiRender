@@ -16,17 +16,21 @@ from . import config, grana
 from .errori import PresetSconosciuto
 from .lessico import controlla_etichetta
 
-# Il modello di ogni servizio. FLUX.1 Kontext Pro su Comfy Router e' una
-# scelta, non una misura: e' il primo modello di modifica che la sonda prova.
-# Lo confronto con un secondo modello (scripts/confronta_modelli.py) decide
-# se resta.
+# Il modello di ogni servizio. Nano Banana 2 su Comfy Router e' una scelta,
+# non una misura: il 2026-10-27 la stessa vista vera e' passata da FLUX.1
+# Kontext Pro e da Nano Banana 2. Riccardo ha giudicato a occhio che tutti e
+# due tengono i tramezzi, e che Nano Banana rende meglio ombre e grana; tiene
+# anche le proporzioni della vista (1376x768 contro 1392x752 di Kontext).
+# Un'immagine sola: il confronto va ripetuto su altre viste.
 MODELLI_PREDEFINITI = {
-    "comfy": "bfl/flux-kontext-pro",
+    "comfy": "vertexai/gemini-3.1-flash-image",
     "magnific": "realism",
 }
 
 # v2 (2026-10-21): oltre al prompt, il preset sceglie il modello di Comfy Router.
-_VERSIONE = "2"
+# v3 (2026-10-27): il modello di Comfy Router passa da FLUX.1 Kontext Pro a
+# Nano Banana 2. Una ricetta v2 si riesegue col modello che ha salvato.
+_VERSIONE = "3"
 
 
 @dataclass(frozen=True)
