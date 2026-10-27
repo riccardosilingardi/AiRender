@@ -105,7 +105,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **132 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **133 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -117,7 +117,7 @@ python scripts/confronta_modelli.py --immagine vista.png
 
 | Cosa | Dove | Stato |
 |---|---|---|
-| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Percorso completo fino all'invio. Gli schemi dei due modelli sono verificati dalla sonda (2026-10-27), ma il motore stesso non ha ancora fatto un invio vero: l'hanno fatto la sonda e il suo codice gemello (sezione 9) |
+| Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Funziona fino al render salvato: primo invio vero il 2026-10-27 sul PC di Riccardo (Nano Banana 2, 17,17 crediti, ricetta completa accanto al render). Durante l'attesa stampa una riga, per non sembrare bloccata |
 | Casa unica delle decisioni: 21 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
 | Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
@@ -126,10 +126,9 @@ python scripts/confronta_modelli.py --immagine vista.png
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
 | Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py`, `core/provider/comfy.py` | Fatti per: chiave rifiutata, credito esaurito (per Comfy: credito del workspace, con cosa fare), workspace che non può usare il modello, modello sconosciuto, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito, schema del modello non ancora verificato |
-| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura e prova a secco funzionano in Allplan 2026 (prova del 2026-10-21). L'invio vero non è ancora partito. Dal 2026-10-21 la palette parla con Comfy Router senza che l'adattatore sia cambiato: segue il predefinito del motore |
+| Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura, prova a secco e invio vero funzionano in Allplan 2026: primo render dalla palette il 2026-10-27, salvato in `Usr\Local\AIRENDER\viste` con la sua ricetta. La finestra di conferma tronca il percorso del render. Dal 2026-10-21 la palette parla con Comfy Router senza che l'adattatore sia cambiato: segue il predefinito del motore |
 
-**Non c'è ancora:** nessun render vero partito dal motore o dalla palette (solo
-dalla sonda), nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
+**Non c'è ancora:** nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
 espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
 al prompt del preset).
@@ -322,11 +321,6 @@ FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
 
 **Resta non verificato:**
 
-- **Il motore stesso fa un invio vero.** L'hanno fatto la sonda e il suo
-  corpo; `core/provider/comfy.py` costruisce lo stesso corpo con gli stessi
-  campi, ma la palette e `core.cli` non hanno ancora mandato niente. Per
-  verificare: `python -m core.cli --immagine vista.png --preset base` con la
-  chiave in `COMFY_API_KEY`, e la ricetta salvata accanto al render.
 - **`aspect_ratio` assente dà le proporzioni della vista** — lo schema di
   Kontext lo dice, ma il motore lo manda comunque (il rapporto standard più
   vicino), come nelle chiamate vere.
@@ -409,6 +403,19 @@ FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
   leggere prima di emettere la prima fattura, non dopo.
 
 ### Usciti da questa sezione, con la loro verifica
+
+- **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di
+  Riccardo, Windows, Allplan 2026, due volte: da `py -m core.cli --immagine
+  tests\dati\vista-20261021-093841.png --preset base` e dal pulsante *Genera
+  render* della palette di prova (vista 1550x857 del modello BOSCO). Tutte e due
+  con Nano Banana 2, preset Base v3, 17,17 crediti ciascuna; ricetta salvata
+  accanto al render con `fallback_provider` a `false`, l'id della richiesta, i
+  crediti e nessuna chiave. La chiave arriva alla palette da una variabile
+  d'ambiente utente permanente, letta da Allplan dopo il riavvio. Visto nei due
+  render: il modello aggiunge un contesto che nella vista non c'è (alberi,
+  cielo, prato, piazzale) e prende i colori di visualizzazione di Allplan per
+  materiali (una falda viola è diventata lamiera viola). Vedi le Trappole note
+  in `CLAUDE.md`.
 
 - **Pillow è installabile nell'interprete Python incorporato di Allplan 2026** —
   verificato il 2026-10-21 sul PC di Riccardo, Allplan 2026: installato da

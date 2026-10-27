@@ -55,6 +55,10 @@ Cresce col progetto. Dopo un mese sarà la sezione più preziosa del repository.
   fallback è acceso per default e qualunque valore diverso da `false` lo lascia
   acceso. Senza `fallback_provider=false` la destinazione annunciata può essere
   falsa.
+- **Il modello legge i colori della vista come materiali.** Allplan colora le
+  superfici per layer o per stile, non per materiale: una falda viola diventa
+  lamiera viola. Il prompt non basta a impedirlo; la vista va salvata con colori
+  neutri o con i materiali veri (verificato il 2026-10-27, un render solo).
 
 ## Come parla l'interfaccia
 
