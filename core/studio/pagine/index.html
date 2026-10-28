@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRENDER Studio</title>
+<link rel="stylesheet" href="/pagine/studio.css">
+</head>
+<body>
+<header class="testata">
+  <div class="marchio">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 20 L12 4 L21 20 Z"/><path d="M7.5 12 H16.5"/></svg>
+    <span class="nome">AIRENDER</span><span class="tenue">Studio</span>
+  </div>
+  <div class="collegamento" id="collegamento" aria-live="polite"></div>
+  <div class="spazio"></div>
+  <button class="btn" disabled>Chiave e tetto di spesa <span class="presto">In arrivo</span></button>
+</header>
+
+<div class="corpo">
+  <nav class="rotaia" aria-label="Schermate">
+    <a class="voce-rotaia" href="#genera" data-scheda="genera">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 L19 5"/><path d="M15 5h4v4"/><circle cx="7" cy="7" r="2"/></svg>Genera</a>
+    <a class="voce-rotaia" href="#risultato" data-scheda="risultato">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg>Risultato</a>
+    <a class="voce-rotaia grigia" href="#ritocca" data-scheda="ritocca">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Ritocca</a>
+    <button class="voce-rotaia" disabled title="In arrivo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Livelli</button>
+    <button class="voce-rotaia" disabled title="In arrivo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10 L21 7 V17 L16 14"/></svg>Video</button>
+  </nav>
+  <main id="principale" tabindex="-1">
+    <p class="tenue" id="caricamento">Apro lo Studio…</p>
+  </main>
+</div>
+<script src="/pagine/studio.js"></script>
+</body>
+</html>

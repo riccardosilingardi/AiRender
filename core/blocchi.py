@@ -340,6 +340,17 @@ def _blocco(asse: str, valore: str, scena: str) -> Blocco:
         ) from None
 
 
+def voci(asse: str, scena: str) -> dict[str, Blocco]:
+    """I blocchi possibili di un asse in una scena: quelli che lo Studio mostra."""
+    elenco, _scene = ASSI[asse]
+    return elenco if elenco is not None else _blocchi_luce(scena)
+
+
+def blocco(asse: str, valore: str, scena: str) -> Blocco:
+    """Il blocco di una scelta, o l'errore che dice perche' non esiste."""
+    return _blocco(asse, valore, scena)
+
+
 def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
     """I blocchi che partono, nell'ordine fisso. I materiali non sono un blocco: sono parole dell'utente."""
     if scelte.scena not in SCENE:

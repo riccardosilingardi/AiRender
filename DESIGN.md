@@ -224,6 +224,43 @@ schermate Materiali e Livelli, che qui diventano anteprime.
 Quando una di queste funzioni si accende, prima del codice si scrivono qui i
 suoi quattro stati veri.
 
+## Studio v1, costruito il 2026-10-28
+
+Codice in `core/studio/`, screenshot di ogni stato (anche a 1280×800) in
+`docs/ui/studio-v1/`: lì i «render» sono la vista colorata da un provider
+finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
+
+- **In testa non c'è «Collegato ad Allplan 2026 · BOSCO · …».** Lo Studio non
+  parla con Allplan: mostra se la coda dei lavori gira, la cartella delle
+  viste e, se la palette l'ha salvata, la camera (Prospettiva centrale o
+  Vista parallela). Dire «collegato» sarebbe un'informazione che non abbiamo.
+- **Resa**: solo Fotorealistico è attiva. Plastico bianco, Schizzo a matita,
+  Acquerello e Cinematografico sono in grigio: non hanno ancora un blocco di
+  prompt, e un comando che non cambia il prompt mentirebbe.
+- **Intorno** Città / Periferia / Campagna, **Verde** e **persone «Poche»**:
+  in grigio per la stessa ragione. Le voci attive sono quelle di
+  `core/blocchi.py`, e lo Studio le legge da lì: una voce nuova nei blocchi
+  compare da sola.
+- **Ora / Luce** degli esterni ha le sei voci dei blocchi (Mezzogiorno,
+  Estate luminosa, Giorno, Ora d'oro, Ora blu, Notte con luna), non le quattro
+  del mockup.
+- **I miei preset**: «Nessuno — scelte libere» e Salva in grigio. Salvare
+  serve un posto dove tenerli, non ancora deciso.
+- **Le miniature** sono disegnate dallo Studio (casa, cielo, luce), non
+  immagini: illustrazioni dichiarate tali, come chiede la decisione del
+  2026-10-27.
+- **Rifai con la stessa ricetta** chiede conferma, con destinazione e costo,
+  prima di rimettere il lavoro in coda: è un invio che si paga (regola 5).
+- **Genera è spento mentre un lavoro è in corso**, con la ragione accanto: due
+  invii di fila per un clic doppio si pagano due volte. Le scelte restano
+  modificabili.
+- **Confronto fra immagini di proporzioni diverse**: la linea del prima/dopo
+  sovrappone le due immagini alla misura del render; se le proporzioni
+  differiscono (Kontext rende circa il 3% più largo), lo dice sotto con la
+  percentuale, perché gli spigoli possono non coincidere per questo.
+- **Usa un'altra vista…** elenca le viste della cartella e accetta un file:
+  lo Studio ne mette una copia nella cartella con un nome nuovo.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
