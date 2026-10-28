@@ -109,6 +109,28 @@ def misura(dati: bytes) -> Statistiche:
     )
 
 
+def quota_colorata(dati: bytes) -> float:
+    """La parte della vista con colori pieni, da 0 a 1.
+
+    Serve all'avviso dei colori letti come materiali: Allplan colora le
+    superfici per layer, e il modello le rende di quel colore. Si misura su
+    una copia rimpicciolita, come le altre misure.
+    """
+    immagine = _apri(dati).convert("RGB")
+    lato = config.LATO_ANALISI_PX
+    if max(immagine.size) > lato:
+        rapporto = lato / max(immagine.size)
+        immagine = immagine.resize(
+            (max(1, int(immagine.width * rapporto)), max(1, int(immagine.height * rapporto))),
+            Image.Resampling.NEAREST,
+        )
+    saturazioni = immagine.convert("HSV").getchannel("S").histogram()
+    totale = sum(saturazioni)
+    if totale == 0:  # numero-non-configurabile: immagine senza pixel
+        return 0.0
+    return sum(saturazioni[config.SATURAZIONE_COLORE_MINIMA:]) / totale
+
+
 def dimensione_mb(dati: bytes) -> float:
     """Peso in megabyte, per confrontarlo col limite del servizio."""
     return len(dati) / (1024 * 1024)  # numero-non-configurabile: definizione di megabyte

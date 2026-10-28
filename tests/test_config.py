@@ -309,3 +309,57 @@ def test_coda_intervallo_secondi_e_l_attesa_quando_la_coda_e_vuota(tmp_path):
     with pytest.raises(Basta):
         Coda(tmp_path, dire=lambda _t: None, attesa=attendi).gira()
     assert attese == [config.CODA_INTERVALLO_SECONDI]
+
+
+# --- Studio ------------------------------------------------------------------
+
+
+def _png_tinta(colore, larghezza=64, altezza=64, colorati=1.0) -> bytes:
+    """Un'immagine grigia con una parte (da sinistra) del colore dato."""
+    img = Image.new("RGB", (larghezza, altezza), (128, 128, 128))
+    img.paste(colore, (0, 0, int(larghezza * colorati), altezza))
+    deposito = io.BytesIO()
+    img.save(deposito, format="PNG")
+    return deposito.getvalue()
+
+
+def test_costo_nano_banana_2_crediti_e_quello_scritto_prima_di_genera(tmp_path):
+    """Caso: lo Studio annuncia un costo diverso da quello misurato, o lo da' per certo."""
+    from core.studio.servizio import MODELLI, Studio
+
+    destinazione = Studio(tmp_path).destinazione(MODELLI[0].identificativo)
+    assert f"circa {round(config.COSTO_NANO_BANANA_2_CREDITI)} crediti" in destinazione["costo"]
+    assert config.costante("COSTO_NANO_BANANA_2_CREDITI").origine == config.MISURATA
+
+
+def test_saturazione_colore_minima_separa_il_grigio_dal_colore_pieno():
+    """Caso: una vista grigia appena tinta conta come colorata, o un viola pieno no."""
+    assert 0 < config.SATURAZIONE_COLORE_MINIMA < 255
+    assert immagine.quota_colorata(_png_tinta((128, 128, 128))) == 0.0
+    assert immagine.quota_colorata(_png_tinta((150, 60, 170))) == 1.0
+    # una tinta appena calda, sotto la soglia: una vista shaded con luce calda
+    assert immagine.quota_colorata(_png_tinta((140, 132, 124))) == 0.0
+
+
+def test_quota_colorata_avviso_lascia_passare_un_dettaglio_e_prende_una_facciata(tmp_path):
+    """Caso: l'avviso dei colori scatta per un cielo azzurro, o tace su una facciata viola."""
+    from core.studio.servizio import Studio
+
+    poco = config.QUOTA_COLORATA_AVVISO / 2
+    molto = config.QUOTA_COLORATA_AVVISO * 4
+    (tmp_path / "poco.png").write_bytes(_png_tinta((150, 60, 170), 600, 400, colorati=poco))
+    (tmp_path / "molto.png").write_bytes(_png_tinta((150, 60, 170), 600, 400, colorati=molto))
+    studio = Studio(tmp_path)
+    assert studio.descrivi_vista("poco.png")["colori_come_materiali"] is False
+    assert studio.descrivi_vista("molto.png")["colori_come_materiali"] is True
+
+
+def test_studio_caricamento_massimo_mb_ferma_un_file_enorme_trascinato_per_sbaglio(tmp_path, monkeypatch):
+    """Caso: Usa un'altra vista riceve un file da centinaia di MB e il server lo tiene in memoria."""
+    from core.studio.servizio import RichiestaStudioNonValida, Studio
+
+    studio = Studio(tmp_path)
+    assert studio.carica_vista(_png_tinta((128, 128, 128), 600, 400))["nome"]
+    monkeypatch.setattr(config, "STUDIO_CARICAMENTO_MASSIMO_MB", 0)
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.carica_vista(_png_tinta((128, 128, 128), 600, 400))

@@ -47,6 +47,16 @@ cp .env.example .env   # metti la tua chiave
 python -m core.cli --image prova.png --preset base --testo "più caldo"
 ```
 
+Lo Studio (la pagina per scegliere lo stile e confrontare i render) gira
+anche lui senza Allplan, sulla cartella delle viste:
+
+```bash
+python -m core.studio --cartella C:\AIRENDER\viste
+```
+
+Avvia il server locale su `127.0.0.1`, la coda dei lavori e la finestra.
+Ctrl+C chiude tutto.
+
 Il motore gira senza Allplan. È voluto: è l'unico modo per misurarlo.
 
 ## Cosa non è verificato

@@ -1,0 +1,694 @@
+"""Quello che lo Studio sa fare, senza HTTP.
+
+Ogni metodo pubblico prende e restituisce dizionari semplici, quelli che il
+server manda alla pagina come JSON. Un errore e' sempre un ErroreAirender,
+con il fatto e il gesto successivo: il server lo passa alla pagina com'e'.
+
+La cartella dello Studio e' la cartella delle viste: la palette ci salva le
+viste, la coda ci tiene `lavori/`. Lo Studio la legge e ci scrive lavori, e
+non tocca nient'altro.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
+
+from .. import blocchi, config, coda as modulo_coda, immagine as modulo_immagine
+from .. import provider as registro
+from ..errori import ErroreAirender, FileNonTrovato
+from ..idoneita import valuta
+from ..preset import MODELLI_PREDEFINITI
+from ..provider import comfy
+from ..provider.base import Provider
+from ..ricetta import Ricetta
+
+
+class RichiestaStudioNonValida(ErroreAirender):
+    """La pagina ha chiesto qualcosa che non esiste o non torna."""
+
+
+ESTENSIONI_VISTA = (".png", ".jpg", ".jpeg")
+_BYTE_PER_MB = 1024 * 1024  # numero-non-configurabile: definizione di MB
+SUFFISSO_CAMERA = ".camera.json"
+
+# Gli identificativi che nuovo_identificativo() di core/coda.py produce.
+# Tutto il resto si rifiuta prima di diventare un percorso.
+_ID_LAVORO = re.compile(r"^\d{8}-\d{6}-\d{6}-[0-9a-f]{4}$")
+
+# Le cartelle della coda nell'ordine in cui un lavoro le attraversa.
+_CARTELLE_LAVORO = (
+    modulo_coda.IN_ATTESA_DIR,
+    modulo_coda.IN_CORSO_DIR,
+    modulo_coda.FATTO_DIR,
+    modulo_coda.ERRORE_DIR,
+    modulo_coda.ANNULLATO_DIR,
+)
+STATI_ATTIVI = (modulo_coda.IN_CODA, modulo_coda.INVIATO, modulo_coda.IN_LAVORAZIONE)
+
+
+@dataclass(frozen=True)
+class Modello:
+    """Un modello del Router come lo vede l'utente."""
+
+    identificativo: str
+    nome: str
+    fornitore: str
+    # Il costo per generazione, se misurato. None si scrive "non misurato".
+    costo_crediti: float | None = None
+    costo_misurato_il: str = ""
+
+
+MODELLI = (
+    Modello(
+        MODELLI_PREDEFINITI["comfy"], "Nano Banana 2", "Google",
+        costo_crediti=config.COSTO_NANO_BANANA_2_CREDITI, costo_misurato_il="27/10/2026",
+    ),
+    Modello("bfl/flux-kontext-pro", "FLUX.1 Kontext Pro", "Black Forest Labs"),
+)
+# Scritti a schermo e non selezionabili: il loro schema non e' verificato.
+MODELLI_NON_PROVATI = ("Nano Banana Pro", "Seedream", "GPT Image")
+
+# Le voci del mockup che non hanno ancora un blocco di prompt. Si mostrano in
+# grigio con la ragione: un comando che non cambia il prompt e' una bugia.
+_SERVE_UN_BLOCCO = "serve prima il suo blocco di prompt, non ancora scritto"
+RESE = (
+    ("foto", "Fotorealistico", True, ""),
+    ("plastico", "Plastico bianco", False, _SERVE_UN_BLOCCO),
+    ("schizzo", "Schizzo a matita", False, _SERVE_UN_BLOCCO),
+    ("acquerello", "Acquerello", False, _SERVE_UN_BLOCCO),
+    ("cinema", "Cinematografico", False, _SERVE_UN_BLOCCO),
+)
+_IN_ARRIVO = {
+    (blocchi.ESTERNO, "intorno"): (("citta", "Città"), ("periferia", "Periferia"), ("campagna", "Campagna")),
+    (blocchi.ESTERNO, "persone"): (("poche", "Poche"),),
+}
+_VERDE = (("nessuno", "Nessuno"), ("poco", "Poco"), ("rigoglioso", "Rigoglioso"))
+
+_TITOLI_ASSI = {
+    "look": "Look fotografico",
+    "luce": "Ora / Luce",
+    "cielo": "Cielo e stagione",
+    "fuori": "Fuori dalle finestre",
+    "arredo": "Arredo",
+    "intorno": "Intorno all'edificio",
+    "persone": "Persone",
+    "qualita": "Qualità",
+}
+
+
+def _adesso() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _numero(valore: float, cifre: int = 2) -> str:
+    """Un numero con la virgola, come si scrive in italiano."""
+    return f"{valore:.{cifre}f}".replace(".", ",")
+
+
+def _errore_dict(errore: ErroreAirender) -> dict:
+    return {"fatto": errore.fatto, "cosa_fare": errore.cosa_fare}
+
+
+def apri_nel_sistema(percorso: Path) -> None:
+    """Apre una cartella con l'esplora file del sistema."""
+    if sys.platform.startswith("win"):
+        os.startfile(str(percorso))  # pylint: disable=no-member
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(percorso)])  # pylint: disable=consider-using-with
+    else:
+        subprocess.Popen(["xdg-open", str(percorso)])  # pylint: disable=consider-using-with
+
+
+class Studio:
+    """Lo Studio su una cartella delle viste."""
+
+    def __init__(
+        self,
+        cartella: Path,
+        provider: str = registro.PREDEFINITO,
+        crea_provider: Callable[[str], Provider] = registro.crea,
+        coda_attiva: Callable[[], bool] = lambda: False,
+        apri: Callable[[Path], None] = apri_nel_sistema,
+        adesso: Callable[[], datetime] = _adesso,
+    ) -> None:
+        self.cartella = Path(cartella).resolve()
+        self.cartella.mkdir(parents=True, exist_ok=True)
+        self.provider = provider
+        self._crea_provider = crea_provider
+        self._coda_attiva = coda_attiva
+        self._apri = apri
+        self._adesso = adesso
+        self.percorsi = modulo_coda.cartelle(self.cartella)
+
+    # --- in testa --------------------------------------------------------
+
+    def stato_studio(self) -> dict:
+        viste = self.elenco_viste()
+        return {
+            "cartella": str(self.cartella),
+            "coda_attiva": self._coda_attiva(),
+            "provider": self.provider,
+            "viste": viste,
+            "lavori_attivi": self.lavori_attivi(),
+            "modello_predefinito": MODELLI[0].identificativo,
+        }
+
+    # --- viste -----------------------------------------------------------
+
+    def elenco_viste(self) -> list[dict]:
+        """Le viste della cartella, la piu' recente per prima."""
+        viste = [
+            p for p in self.cartella.iterdir()
+            if p.is_file() and p.suffix.lower() in ESTENSIONI_VISTA
+            and not p.name.startswith(".")
+        ]
+        viste.sort(key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+        return [
+            {
+                "nome": p.name,
+                "modificata_il": datetime.fromtimestamp(p.stat().st_mtime).isoformat(timespec="seconds"),
+            }
+            for p in viste
+        ]
+
+    def percorso_vista(self, nome: str) -> Path:
+        """Il file di una vista della cartella. Solo un nome, mai un percorso."""
+        if (
+            not nome or "/" in nome or "\\" in nome or nome.startswith(".")
+            or Path(nome).suffix.lower() not in ESTENSIONI_VISTA
+        ):
+            raise RichiestaStudioNonValida(
+                f"\"{nome}\" non e' il nome di una vista.",
+                "Scegli una vista dall'elenco, o caricane una con Usa un'altra vista.",
+            )
+        percorso = self.cartella / nome
+        if not percorso.is_file():
+            raise FileNonTrovato(
+                f"Nella cartella {self.cartella} non c'e' piu' la vista {nome}.",
+                "Scegli un'altra vista dall'elenco, o catturala di nuovo dalla palette.",
+            )
+        return percorso
+
+    def descrivi_vista(self, nome: str) -> dict:
+        """La vista con il suo esito di idoneita', come la mostra Genera."""
+        percorso = self.percorso_vista(nome)
+        descrizione = {"nome": nome, "percorso": str(percorso), "camera": self._camera(percorso)}
+        try:
+            dati = modulo_immagine.leggi(percorso)
+            statistiche = modulo_immagine.misura(dati)
+            quota = modulo_immagine.quota_colorata(dati)
+        except ErroreAirender as errore:
+            return {**descrizione, "leggibile": False, "idonea": False, **_errore_dict(errore)}
+        esito = valuta(statistiche)
+        return {
+            **descrizione,
+            "leggibile": True,
+            "idonea": esito.idonea,
+            "motivo": esito.motivo,
+            "fatto": esito.fatto,
+            "cosa_fare": esito.cosa_fare,
+            "larghezza": statistiche.larghezza,
+            "altezza": statistiche.altezza,
+            "toni": statistiche.toni_distinti,
+            "quota_sfondo": round(statistiche.quota_sfondo, 3),  # numero-non-configurabile: cifre per la pagina
+            "quota_colorata": round(quota, 3),  # numero-non-configurabile: cifre per la pagina
+            "colori_come_materiali": quota >= config.QUOTA_COLORATA_AVVISO,
+        }
+
+    @staticmethod
+    def _camera(percorso: Path) -> str | None:
+        """Cosa dice il file della camera salvato dalla palette accanto alla vista."""
+        file_camera = percorso.with_name(percorso.stem + SUFFISSO_CAMERA)
+        try:
+            dati = json.loads(file_camera.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(dati, dict) or "prospettiva_centrale" not in dati:
+            return None
+        return "Prospettiva centrale" if dati["prospettiva_centrale"] else "Vista parallela"
+
+    def carica_vista(self, dati: bytes, nome_originale: str = "") -> dict:
+        """Salva nella cartella una vista scelta dall'utente, con un nome nuovo."""
+        massimo = config.STUDIO_CARICAMENTO_MASSIMO_MB
+        if len(dati) > massimo * _BYTE_PER_MB:
+            raise RichiestaStudioNonValida(
+                f"Il file pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, lo Studio ne accetta {massimo}.",
+                "Salva la vista da Allplan a una risoluzione piu' bassa.",
+            )
+        modulo_immagine.misura(dati)  # solleva se non e' un'immagine
+        estensione = ".jpg" if comfy.tipo_mime(dati) == "image/jpeg" else ".png"
+        if comfy.tipo_mime(dati) not in ("image/png", "image/jpeg"):
+            raise RichiestaStudioNonValida(
+                "Lo Studio accetta viste in PNG o JPEG.",
+                "Salva la vista da Allplan in PNG.",
+            )
+        istante = self._adesso().astimezone()
+        nome = f"vista-{istante:%Y%m%d-%H%M%S}{estensione}"
+        indice = 1
+        while (self.cartella / nome).exists():
+            indice += 1
+            nome = f"vista-{istante:%Y%m%d-%H%M%S}-{indice}{estensione}"
+        modulo_coda.scrivi_atomico(self.cartella / nome, dati)
+        return {"nome": nome, "da": nome_originale}
+
+    # --- stile -----------------------------------------------------------
+
+    def catalogo(self) -> dict:
+        """Preset, assi e modelli, con quello che e' attivo e quello in grigio."""
+        scene = {}
+        for scena in blocchi.SCENE:
+            scene[scena] = {
+                "preset": [
+                    {"id": p.identificativo, "nome": p.nome, "scelte": p.scelte.a_dizionario()}
+                    for p in blocchi.PRESET_STILE.values() if p.scelte.scena == scena
+                ],
+                "assi": self._assi(scena),
+            }
+        return {
+            "versione_blocchi": blocchi.VERSIONE,
+            "origine_blocchi": config.SCELTA,
+            "scene": scene,
+            "rese": [
+                {"id": i, "nome": n, "attivo": a, "nota": nota} for i, n, a, nota in RESE
+            ],
+            "verde": [{"id": i, "nome": n, "attivo": False, "nota": _SERVE_UN_BLOCCO} for i, n in _VERDE],
+            "modelli": [self._modello_dict(m) for m in MODELLI],
+            "modelli_non_provati": list(MODELLI_NON_PROVATI),
+        }
+
+    def _assi(self, scena: str) -> list[dict]:
+        assi = []
+        for asse, (_elenco, valide) in blocchi.ASSI.items():
+            if scena not in valide:
+                continue
+            voci = [
+                {"id": b.identificativo, "nome": b.nome, "attivo": True, "origine": b.origine}
+                for b in blocchi.voci(asse, scena).values()
+            ]
+            voci += [
+                {"id": i, "nome": n, "attivo": False, "nota": _SERVE_UN_BLOCCO}
+                for i, n in _IN_ARRIVO.get((scena, asse), ())
+            ]
+            titolo = _TITOLI_ASSI[asse]
+            if asse == "luce" and scena == blocchi.INTERNO:
+                titolo = "Luce"
+            assi.append({"id": asse, "titolo": titolo, "voci": voci})
+        return assi
+
+    def _scelte(self, dati: object) -> blocchi.Scelte:
+        if not isinstance(dati, dict):
+            raise RichiestaStudioNonValida(
+                "Le scelte di stile non sono arrivate.",
+                "Ricarica la pagina dello Studio.",
+            )
+        scelte = blocchi.Scelte.da_dizionario(dati)
+        blocchi.componi(scelte)  # solleva SceltaNonValida con la ragione
+        return scelte
+
+    def componi(self, dati: dict) -> dict:
+        """Il prompt vero, il riassunto in italiano e quanti caratteri."""
+        scelte = self._scelte(dati.get("scelte"))
+        prompt = blocchi.componi(scelte)
+        return {
+            "prompt": prompt,
+            "caratteri": len(prompt),
+            "riassunto": riassunto(scelte, dati.get("preset")),
+            "versione_blocchi": blocchi.VERSIONE,
+        }
+
+    # --- destinazione e costo --------------------------------------------
+
+    def _modello(self, identificativo: str) -> Modello:
+        for modello in MODELLI:
+            if modello.identificativo == identificativo:
+                return modello
+        raise RichiestaStudioNonValida(
+            f"Il modello {identificativo} non e' fra quelli che lo Studio sa usare.",
+            "Scegli Nano Banana 2 o FLUX.1 Kontext Pro.",
+        )
+
+    def _modello_dict(self, modello: Modello) -> dict:
+        motore = self._crea_provider(self.provider)
+        return {
+            "id": modello.identificativo,
+            "nome": modello.nome,
+            "fornitore": modello.fornitore,
+            "verificato": motore.cosa_manca(modello.identificativo) is None,
+        }
+
+    def destinazione(self, identificativo_modello: str) -> dict:
+        """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5)."""
+        modello = self._modello(identificativo_modello)
+        motore = self._crea_provider(self.provider)
+        senza_ripiego = self.provider == comfy.ProviderComfy.nome and comfy.FALLBACK == "false"
+        if modello.costo_crediti is not None:
+            costo = (
+                f"circa {round(modello.costo_crediti)} crediti per immagine · "
+                f"misurato il {modello.costo_misurato_il} "
+                f"({_numero(modello.costo_crediti)} crediti)"
+            )
+        else:
+            costo = "non misurato: nessuna generazione con questo modello ha copiato i crediti"
+        return {
+            "modello": modello.identificativo,
+            "modello_nome": modello.nome,
+            "fornitore": modello.fornitore,
+            "destinazione": motore.destinazione_per(modello.identificativo),
+            "senza_ripiego": senza_ripiego,
+            "costo": costo,
+            "costo_misurato": modello.costo_crediti is not None,
+            "cosa_manca": motore.cosa_manca(modello.identificativo),
+        }
+
+    # --- prova a secco e invio -------------------------------------------
+
+    def prova_a_secco(self, dati: dict) -> dict:
+        """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        scelte = self._scelte(dati.get("scelte"))
+        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        prompt = _prompt_a_mano(dati) or blocchi.componi(scelte)
+        problemi = []
+        descrizione = self.descrivi_vista(vista.name)
+        if not descrizione["idonea"]:
+            problemi.append({"fatto": descrizione["fatto"], "cosa_fare": descrizione["cosa_fare"]})
+        else:
+            try:
+                motore = self._crea_provider(self.provider)
+                motore.controlla_prima_dell_invio(destinazione["modello"], modulo_immagine.leggi(vista))
+            except ErroreAirender as errore:
+                problemi.append(_errore_dict(errore))
+        if not self._coda_attiva():
+            problemi.append(_CODA_FERMA)
+        return {
+            "inviato": False,
+            "prompt": prompt,
+            "caratteri": len(prompt),
+            "destinazione": destinazione,
+            "problemi": problemi,
+        }
+
+    def invia(self, dati: dict) -> dict:
+        """Scrive il lavoro in coda. Solo se la destinazione e' quella che la pagina ha mostrato."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        scelte = self._scelte(dati.get("scelte"))
+        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        return self._metti_in_coda(
+            vista, scelte, destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=dati.get("preset") or None,
+            prompt_a_mano=_prompt_a_mano(dati),
+        )
+
+    def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano) -> dict:
+        if mostrata != destinazione["destinazione"]:
+            raise RichiestaStudioNonValida(
+                f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
+                f"partirebbe verso {destinazione['destinazione']}. Non ho inviato niente.",
+                "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
+            )
+        if destinazione["cosa_manca"]:
+            raise RichiestaStudioNonValida(
+                f"Non mando: {destinazione['cosa_manca']}",
+                "Scegli Nano Banana 2, il modello predefinito, il cui schema e' verificato.",
+            )
+        descrizione = self.descrivi_vista(vista.name)
+        if not descrizione["idonea"]:
+            raise RichiestaStudioNonValida(descrizione["fatto"], descrizione["cosa_fare"])
+        lavoro = modulo_coda.metti_in_coda(
+            self.cartella, vista, scelte,
+            preset=preset,
+            provider=self.provider,
+            modello=destinazione["modello"],
+            prompt_a_mano=prompt_a_mano,
+            crea_provider=self._crea_provider,
+        )
+        return {
+            "identificativo": lavoro.identificativo,
+            "destinazione": lavoro.destinazione,
+            "coda_attiva": self._coda_attiva(),
+        }
+
+    def rifai(self, identificativo: str, dati: dict) -> dict:
+        """Rimette in coda un lavoro con la stessa ricetta: stesse scelte, stesso modello, stessa vista."""
+        lavoro, _cartella = self._lavoro(identificativo)
+        vista = Path(lavoro.vista)
+        if not vista.is_file():
+            raise FileNonTrovato(
+                f"La vista di questo lavoro non c'e' piu': {vista}.",
+                "Catturala di nuovo dalla palette, poi genera da Genera.",
+            )
+        if vista.parent.resolve() != self.cartella:
+            raise RichiestaStudioNonValida(
+                "La vista di questo lavoro non sta nella cartella dello Studio.",
+                "Riaprila con Usa un'altra vista, poi genera da Genera.",
+            )
+        destinazione = self.destinazione(lavoro.modello)
+        return self._metti_in_coda(
+            vista, lavoro.scelte, destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=lavoro.preset,
+            prompt_a_mano=lavoro.prompt_a_mano,
+        )
+
+    def annulla(self, identificativo: str) -> dict:
+        self._controlla_id(identificativo)
+        segnale = modulo_coda.chiedi_annullamento(self.cartella, identificativo)
+        return {"identificativo": identificativo, "segnale": str(segnale)}
+
+    # --- lavori ----------------------------------------------------------
+
+    def _controlla_id(self, identificativo: str) -> str:
+        if not _ID_LAVORO.match(identificativo or ""):
+            raise RichiestaStudioNonValida(
+                f"\"{identificativo}\" non e' l'identificativo di un lavoro.",
+                "Scegli il render dall'elenco Render di questa vista.",
+            )
+        return identificativo
+
+    def _lavoro(self, identificativo: str) -> tuple[modulo_coda.Lavoro, str]:
+        self._controlla_id(identificativo)
+        for nome in _CARTELLE_LAVORO:
+            percorso = self.percorsi[nome] / f"{identificativo}.json"
+            try:
+                return modulo_coda.Lavoro.da_dizionario(
+                    json.loads(percorso.read_text(encoding="utf-8"))
+                ), nome
+            except FileNotFoundError:
+                continue
+            except ValueError:
+                break
+        raise FileNonTrovato(
+            f"Non trovo il lavoro {identificativo} nella cartella {self.cartella / modulo_coda.CARTELLA_LAVORI}.",
+            "Forse la cartella e' stata pulita a mano. Genera di nuovo da Genera.",
+        )
+
+    def _lavori(self) -> list[tuple[dict, str]]:
+        """Tutti i lavori leggibili della cartella, con la cartella dove stanno."""
+        trovati = []
+        for nome in _CARTELLE_LAVORO:
+            for percorso in self.percorsi[nome].glob("*.json"):
+                if percorso.name.startswith(modulo_coda.PREFISSO_TEMPORANEO):
+                    continue
+                try:
+                    dati = json.loads(percorso.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue  # la coda lo mettera' fra gli errori con la ragione
+                if isinstance(dati, dict) and dati.get("identificativo") == percorso.stem:
+                    trovati.append((dati, nome))
+        return trovati
+
+    def lavoro(self, identificativo: str) -> dict:
+        """Un lavoro con il suo stato, quanto tempo e' passato e, se c'e', il render."""
+        lavoro, _cartella = self._lavoro(identificativo)
+        return self._riassunto_lavoro(lavoro.a_dizionario())
+
+    def _riassunto_lavoro(self, dati: dict) -> dict:
+        identificativo = dati["identificativo"]
+        stato = modulo_coda.leggi_stato(self.cartella, identificativo) or {
+            "identificativo": identificativo, "stato": modulo_coda.IN_CODA,
+        }
+        try:
+            creato = datetime.fromisoformat(dati.get("creato_il") or "")
+            secondi = max(0, int((self._adesso() - creato).total_seconds()))
+        except ValueError:
+            secondi = None
+        modello = next((m for m in MODELLI if m.identificativo == dati.get("modello")), None)
+        preset = blocchi.PRESET_STILE.get(dati.get("preset") or "")
+        render = self._render(identificativo, stato)
+        try:
+            scelte = blocchi.Scelte.da_dizionario(dati.get("scelte") or {})
+            testo_riassunto = riassunto(scelte, dati.get("preset"))
+        except ErroreAirender:
+            testo_riassunto = ""
+        return {
+            "identificativo": identificativo,
+            "stato": stato.get("stato"),
+            "attivo": stato.get("stato") in STATI_ATTIVI,
+            "aggiornato_il": stato.get("aggiornato_il"),
+            "fatto": stato.get("fatto"),
+            "cosa_fare": stato.get("cosa_fare"),
+            "avvisi": stato.get("avvisi") or [],
+            "secondi": secondi,
+            "creato_il": dati.get("creato_il"),
+            "vista": Path(dati.get("vista") or "").name,
+            "destinazione": dati.get("destinazione"),
+            "modello": dati.get("modello"),
+            "modello_nome": modello.nome if modello else dati.get("modello"),
+            "preset": dati.get("preset"),
+            "preset_nome": preset.nome if preset else "Scelte libere",
+            "scelte": dati.get("scelte"),
+            "riassunto": testo_riassunto,
+            "prompt_a_mano": bool(dati.get("prompt_a_mano")),
+            "render": render is not None,
+            "scostamento_geometria": stato.get("scostamento_geometria"),
+        }
+
+    def _render(self, identificativo: str, stato: dict | None = None) -> Path | None:
+        """Il file del render di un lavoro fatto, solo se sta in lavori/fatto."""
+        stato = stato if stato is not None else modulo_coda.leggi_stato(self.cartella, identificativo) or {}
+        if stato.get("stato") != modulo_coda.FATTO or not stato.get("render"):
+            return None
+        percorso = Path(stato["render"]).resolve()
+        if percorso.parent != self.percorsi[modulo_coda.FATTO_DIR].resolve() or not percorso.is_file():
+            return None
+        return percorso
+
+    def file_render(self, identificativo: str) -> Path:
+        self._controlla_id(identificativo)
+        percorso = self._render(identificativo)
+        if percorso is None:
+            raise FileNonTrovato(
+                f"Il lavoro {identificativo} non ha un render.",
+                "Guarda lo stato del lavoro in Risultato.",
+            )
+        return percorso
+
+    def ricetta(self, identificativo: str) -> dict:
+        """La ricetta salvata accanto al render, piu' i percorsi da mostrare."""
+        self._controlla_id(identificativo)
+        stato = modulo_coda.leggi_stato(self.cartella, identificativo) or {}
+        render = self._render(identificativo, stato)
+        if render is None:
+            raise FileNonTrovato(
+                f"Il lavoro {identificativo} non ha una ricetta: non e' finito con un render.",
+                "Guarda lo stato del lavoro in Risultato.",
+            )
+        percorso = render.with_name(render.name + ".ricetta.json")
+        try:
+            ricetta = Ricetta.da_json(percorso.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            raise FileNonTrovato(
+                f"La ricetta accanto al render non si legge: {percorso}.",
+                "Il render resta valido; per rifarlo usa Rifai, che riparte dal lavoro.",
+            ) from None
+        parametri = ricetta.parametri or {}
+        crediti = parametri.get("crediti_usati")
+        return {
+            "identificativo": identificativo,
+            "provider": ricetta.provider,
+            "modello": ricetta.modello,
+            "preset": ricetta.preset,
+            "preset_versione": ricetta.preset_versione,
+            "prompt": ricetta.prompt,
+            "testo_utente": ricetta.testo_utente,
+            "seme": ricetta.seme,
+            "fallback": parametri.get("fallback_provider"),
+            "crediti": f"{_numero(float(crediti))} crediti" if _e_numero(crediti) else None,
+            "creata_il": ricetta.creata_il,
+            "percorso_render": str(render),
+            "percorso_ricetta": str(percorso),
+        }
+
+    def lavori_attivi(self) -> list[dict]:
+        return [
+            r for r in (self._riassunto_lavoro(d) for d, cartella in self._lavori()
+                        if cartella in (modulo_coda.IN_ATTESA_DIR, modulo_coda.IN_CORSO_DIR))
+            if r["attivo"]
+        ]
+
+    def render_della_vista(self, nome: str) -> list[dict]:
+        """Tutti i lavori nati da questa vista, il piu' recente per primo."""
+        vista = self.percorso_vista(nome).resolve()
+        lavori = []
+        for dati, _cartella in self._lavori():
+            try:
+                stessa = Path(dati.get("vista") or "").resolve() == vista
+            except OSError:
+                stessa = False
+            if stessa:
+                lavori.append(self._riassunto_lavoro(dati))
+        lavori.sort(key=lambda r: (r.get("creato_il") or "", r["identificativo"]), reverse=True)
+        return lavori
+
+    # --- cartella --------------------------------------------------------
+
+    def apri_cartella(self, quale: str) -> dict:
+        percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
+        try:
+            self._apri(percorso)
+        except OSError as errore:
+            raise RichiestaStudioNonValida(
+                f"Il sistema non ha aperto la cartella {percorso}: {errore}.",
+                "Aprila a mano dall'esplora file.",
+            ) from None
+        return {"aperta": str(percorso)}
+
+
+_CODA_FERMA = {
+    "fatto": "La coda dei lavori non sta girando: il lavoro resterebbe in attesa.",
+    "cosa_fare": (
+        "Chiudi e riapri lo Studio, che la fa partire; oppure lanciala a mano "
+        "con python -m core.coda --cartella <la cartella delle viste>."
+    ),
+}
+
+
+def _e_numero(valore: object) -> bool:
+    try:
+        float(valore)  # type: ignore[arg-type]
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _prompt_a_mano(dati: dict) -> str | None:
+    testo = dati.get("prompt_a_mano")
+    if isinstance(testo, str) and testo.strip():
+        return testo.strip()
+    return None
+
+
+def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
+    """Le scelte in italiano, nell'ordine in cui partono i blocchi."""
+    pezzi = ["Regola fissa", scelte.scena]
+    if scelte.materiali.strip():
+        pezzi.append("i tuoi materiali")
+    origine = blocchi.PRESET_STILE.get(preset or "")
+    if origine is not None:
+        pezzi.append(f"preset {origine.nome}")
+    etichette = {
+        "look": "{}",
+        "luce": "{}",
+        "cielo": "cielo {}",
+        "fuori": "{}",
+        "arredo": "{}",
+        "intorno": "intorno: {}",
+        "persone": "persone: {}",
+        "qualita": "qualità {}",
+    }
+    for asse, forma in etichette.items():
+        valore = getattr(scelte, asse)
+        if valore:
+            nome = blocchi.blocco(asse, valore, scelte.scena).nome
+            pezzi.append(forma.format(nome if asse == "look" else nome.lower()))
+    pezzi.append("cosa evitare")
+    return " · ".join(pezzi) + "."

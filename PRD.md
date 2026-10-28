@@ -48,15 +48,24 @@ approvato.
 
 ## 4 · Il percorso dell'utente
 
-1. In Allplan salva la vista con **Salva contenuto finestra come immagine** nella
-   cartella sorvegliata dal plugin. Vista shaded, ombre attive, sfondo neutro.
-2. Apre la palette. Il plugin ha già trovato l'immagine e la mostra.
-3. Sceglie uno stile dalla griglia di miniature. Ogni miniatura è stata generata
-   eseguendo quel preset, quindi mostra il risultato reale.
-4. Se vuole, scrive due parole in linguaggio naturale ("più caldo, mattone
-   vecchio"). Il plugin le espande in un prompt tecnico coerente col preset.
-5. Genera. **Qui avviene la decisione**: davanti ha la vista di partenza e il
-   render, affiancati, e un indicatore di quanto la geometria si è mossa.
+Riscritto il 2026-10-28 con lo Studio v1 (sezione 5, riga del 2026-10-27).
+
+1. In Allplan cattura la vista dalla palette (o la salva con **Salva contenuto
+   finestra come immagine**) nella cartella delle viste. Vista shaded, ombre
+   attive, sfondo neutro.
+2. Apre lo **Studio**, la pagina locale nella sua finestra: la vista più
+   recente della cartella è già lì, con il suo esito di idoneità.
+3. Sceglie esterno o interno e un preset. Le miniature sono **illustrazioni**, e
+   lo dicono: non sono render del preset (DESIGN.md, Decisioni visive). I
+   dettagli del preset (look, luce, cielo, intorno, persone) si cambiano uno
+   per uno.
+4. Se vuole, scrive i materiali a parole ("intonaco a calce bianco, infissi in
+   rovere scuro"), che passano al modello come sono; chi vuole controllo
+   modifica il prompt inglese completo.
+5. Legge dove va la vista e quanto costa, poi Genera: il lavoro va in coda e
+   Allplan resta libero. **Qui avviene la decisione**: davanti ha la vista di
+   partenza e il render, prima/dopo con la linea da spostare, e la tenuta
+   della geometria, scritta «Non misurata» finché non c'è la misura.
 6. Se una superficie non gli piace: la clicca o la nomina a parole, sceglie un
    altro materiale o lo scrive, regola la grana. Il resto dell'immagine non si
    tocca.
@@ -107,8 +116,8 @@ resta solo dove il modello non ha il materiale.
 
 ## 7 · Costruito e funzionante
 
-Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **178 test verdi**, nessuna chiamata di rete, nessuna
+Il motore e lo Studio. Girano da riga di comando su qualunque macchina,
+senza Allplan. `pytest`: **226 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -118,14 +127,16 @@ python scripts/sonda_comfy.py                        # una generazione vera, tut
 python scripts/confronta_modelli.py --immagine vista.png
 python -m core.coda --cartella C:\AIRENDER --aggiungi vista.png --stile ora-blu   # mette un lavoro in coda
 python -m core.coda --cartella C:\AIRENDER                                       # il processo che lo fa
+python -m core.studio --cartella C:\AIRENDER                                     # lo Studio: server, coda e finestra
 ```
 
 | Cosa | Dove | Stato |
 |---|---|---|
 | Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Funziona fino al render salvato: primo invio vero il 2026-10-27 sul PC di Riccardo (Nano Banana 2, 17,17 crediti, ricetta completa accanto al render). Durante l'attesa stampa una riga, per non sembrare bloccata |
-| Coda dei lavori su cartella: il motore come processo a parte. Un lavoro è un JSON in `lavori/in-attesa`; il processo lo sposta in `in-corso`, poi in `fatto` (render e ricetta accanto), `errore` o `annullato`. Stato leggibile sempre in `lavori/stato/<id>.json` (in coda, inviato, in lavorazione, fatto, errore, annullato). Scrittura atomica, file `<id>.annulla` per fermare, recupero al riavvio dei lavori abbandonati. La destinazione si scrive nel lavoro quando nasce, e se al momento dell'invio non è più quella non parte niente | `core/coda.py` | Provata con `pytest` e con un giro vero da riga di comando senza chiave (si ferma con il messaggio della chiave mancante, senza scrivere «inviato»). **Mai girata con un invio vero**, mai su Windows. Né la palette né lo Studio la usano ancora |
+| Coda dei lavori su cartella: il motore come processo a parte. Un lavoro è un JSON in `lavori/in-attesa`; il processo lo sposta in `in-corso`, poi in `fatto` (render e ricetta accanto), `errore` o `annullato`. Stato leggibile sempre in `lavori/stato/<id>.json` (in coda, inviato, in lavorazione, fatto, errore, annullato). Scrittura atomica, file `<id>.annulla` per fermare, recupero al riavvio dei lavori abbandonati. La destinazione si scrive nel lavoro quando nasce, e se al momento dell'invio non è più quella non parte niente | `core/coda.py` | Provata con `pytest` e con un giro vero da riga di comando senza chiave (si ferma con il messaggio della chiave mancante, senza scrivere «inviato»). **Mai girata con un invio vero**, mai su Windows. La usa lo Studio v1; la palette non ancora |
 | Prompt a blocchi: regola fissa → scena → materiali → look → luce → cielo oppure fuori + arredo → intorno → persone → qualità → cosa evitare; 14 preset (8 esterni, 6 interni) | `core/blocchi.py` | Testi identici alla bozza 3 (`docs/ui/blocchi-stile-bozza.md`), controllato da un test che legge la bozza; l'esempio completo e le 14 lunghezze misurate nella bozza tornano al carattere. Tutti i blocchi sono **SCELTI**: nessuno è stato mandato a un modello |
-| Casa unica delle decisioni: 22 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Studio v1: `python -m core.studio` avvia il server locale (`http.server`, solo `127.0.0.1`, porta scelta dal sistema), la coda come processo figlio e la pagina (Edge `--app=` se c'è). Genera e Risultato come in `DESIGN.md`, Ritocca in grigio. Rotte JSON per viste, preset, composizione del prompt, destinazione e costo, prova a secco, invio, stato, render, ricetta, annulla, rifai. Niente CDN né font scaricati | `core/studio/` | Provato con `pytest` (rotte, prompt, stati, difese del server) e con Playwright su un provider finto: screenshot di ogni stato in `docs/ui/studio-v1/`. **Mai aperto su Windows né con Edge, mai con un invio vero** (sezione 9) |
+| Casa unica delle decisioni: 26 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
 | Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
 | Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. I due modelli predefiniti hanno lo schema dal 2026-10-27: non è ancora stato lanciato davvero (il primo confronto è stato fatto a mano, con le immagini della sonda) |
@@ -156,7 +167,7 @@ per PR (regola di `CLAUDE.md`).
    una cartella (`lavori/in-attesa`, `in-corso`, `fatto`, `errore`), con
    scrittura atomica, stato leggibile e annullamento; la composizione del
    prompt a blocchi. In `core/`, senza Allplan, senza Studio.
-3. **Studio v1** — Genera e Risultato, eseguibile senza Allplan
+3. **Studio v1** — fatto in questo PR (sezione 7). Genera e Risultato, eseguibile senza Allplan
    (`python -m core.studio`), sulla coda del PR 2. Ritocca resta in grigio.
 4. **Palette v1** — il telecomando. Si scrive solo dopo che la sonda della
    palette ha risposto sul PC di Riccardo (sezione 9): quali immagini si
@@ -505,6 +516,35 @@ poggiano su cose non ancora provate:
   i blocchi non hanno una grana e i modelli del Router non la usano
   (`dettaglio_grana` resta assente). Da rivedere se la grana tornerà nel
   cambio di materiale.
+
+### Lasciato dalla sessione del 2026-10-28 (Studio v1)
+
+- **Lo Studio non è mai stato aperto su Windows né con Edge.** Provato su Linux
+  con Chromium (Playwright) e un provider finto che colora la vista: i «render»
+  degli screenshot in `docs/ui/studio-v1/` non sono render. Per verificare sul
+  PC: `py -m core.studio --cartella C:\AIRENDER-prova` (con dentro
+  `tests\dati\vista-20261021-093841.png`), poi dire se si apre una finestra
+  di Edge senza barra, se la vista c'è, e mandare uno screenshot di Genera.
+  Un invio vero da lì costa una generazione (circa 17 crediti).
+- **La coda come processo figlio.** Lo Studio la lancia con lo stesso Python
+  (`sys.executable -m core.coda`) e la chiude con Ctrl+C. Se la palette o un
+  altro Studio ne hanno già una sulla stessa cartella, girano in due: il
+  lavoro si prende con una rinomina, ma due processi insieme non sono mai
+  stati provati (blocco della coda, qui sopra). Chiudere lo Studio durante un
+  invio lascia il lavoro a metà: al riavvio va fra gli errori.
+- **Il costo mostrato è quello di tre generazioni Nano Banana 2 a 2k** del
+  2026-10-27 (`COSTO_NANO_BANANA_2_CREDITI`, MISURATA). Per Kontext lo Studio
+  scrive «non misurato».
+- **L'avviso dei colori come materiali** scatta sopra il 5% di pixel saturi
+  (`QUOTA_COLORATA_AVVISO`, `SATURAZIONE_COLORE_MINIMA`, tutte e due SCELTE):
+  provate su immagini sintetiche, mai su una vista di Allplan colorata per
+  layer. Rimandare una vista colorata e dire se l'avviso compare.
+- **Copia immagine** usa gli appunti del browser: in Edge `--app=` su
+  `127.0.0.1` dovrebbe funzionare, non è stato provato. **Apri cartella** usa
+  `os.startfile` su Windows, mai provato.
+- **Le voci del mockup senza blocco di prompt sono in grigio**: rese diverse
+  da Fotorealistico, intorno Città/Periferia/Campagna, Verde, persone «Poche»,
+  I miei preset. Si accendono quando hanno il loro blocco o il loro salvataggio.
 
 ### Usciti da questa sezione, con la loro verifica
 

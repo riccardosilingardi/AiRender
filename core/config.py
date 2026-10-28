@@ -334,3 +334,61 @@ CODA_INTERVALLO_SECONDI = _registra(Costante(
     ),
     unita=" s",
 ))
+
+# --- Studio ------------------------------------------------------------------
+
+COSTO_NANO_BANANA_2_CREDITI = _registra(Costante(
+    nome="COSTO_NANO_BANANA_2_CREDITI",
+    valore=17.17,
+    origine=MISURATA,
+    ragione=(
+        "Crediti scalati da Comfy Router per una generazione con Nano Banana 2 "
+        "(vertexai/gemini-3.1-flash-image), letti nell'intestazione "
+        "x-comfy-credits-used della sonda del 2026-10-27 e dei due invii veri "
+        "dello stesso giorno (riga di comando e palette di prova): 17,17 tutte "
+        "le volte. Poche generazioni, a 2k: lo Studio lo scrive come "
+        "\"circa\" e con la data. Il costo di FLUX.1 "
+        "Kontext Pro non e' stato copiato, e lo Studio dice che non e' misurato."
+    ),
+    unita=" crediti",
+))
+
+SATURAZIONE_COLORE_MINIMA = _registra(Costante(
+    nome="SATURAZIONE_COLORE_MINIMA",
+    valore=60,
+    origine=SCELTA,
+    ragione=(
+        "Saturazione (0-255, come la S di HSV in Pillow) sopra la quale un "
+        "pixel della vista conta come colorato. Le viste shaded di Allplan in "
+        "colori neutri stanno sotto 20; i colori per layer (viola, verde, "
+        "rosso pieni) sopra 120. 60 sta in mezzo: provato solo sulla vista "
+        "dei test, non su viste vere colorate."
+    ),
+))
+
+QUOTA_COLORATA_AVVISO = _registra(Costante(
+    nome="QUOTA_COLORATA_AVVISO",
+    valore=0.05,
+    origine=SCELTA,
+    ragione=(
+        "Quota di pixel colorati sopra la quale lo Studio avvisa che il "
+        "modello leggera' i colori della vista come materiali (trappola nota "
+        "in CLAUDE.md, verificata il 2026-10-27 con una falda viola). Il 5% "
+        "lascia passare un cielo o un dettaglio colorato, e prende una "
+        "facciata intera colorata per layer. E' un avviso, non un rifiuto."
+    ),
+))
+
+STUDIO_CARICAMENTO_MASSIMO_MB = _registra(Costante(
+    nome="STUDIO_CARICAMENTO_MASSIMO_MB",
+    valore=50,
+    origine=SCELTA,
+    ragione=(
+        "Peso massimo di una vista caricata nello Studio con Usa un'altra "
+        "vista. Una vista di Allplan a 4k pesa pochi MB; 50 MB lascia passare "
+        "un PNG grande senza far tenere in memoria al server locale un file "
+        "qualunque trascinato per sbaglio. Il limite del servizio resta "
+        "COMFY_INVIO_MASSIMO_MB, controllato prima dell'invio."
+    ),
+    unita=" MB",
+))
