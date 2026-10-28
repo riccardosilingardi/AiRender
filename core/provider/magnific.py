@@ -81,6 +81,10 @@ class ProviderMagnific(Provider):
         self._attesa = attesa
         self._orologio = orologio
 
+    def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
+        self._assicura_chiave()
+        self._assicura_peso(immagine, "la vista di partenza")
+
     # --- cose che il prodotto chiede ----------------------------------------
 
     def genera(self, richiesta: RichiestaGenerazione) -> Risultato:

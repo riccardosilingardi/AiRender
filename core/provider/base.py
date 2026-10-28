@@ -14,9 +14,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Callable
 
 from .. import config
 from ..ricetta import Ricetta
+
+
+# Le due cose che un provider sa dire mentre aspetta. Le parole sono quelle
+# dello stato di un lavoro in core/coda.py: chi legge lo stato non traduce.
+INVIATO = "inviato"
+IN_LAVORAZIONE = "in lavorazione"
 
 
 @dataclass(frozen=True)
@@ -78,6 +85,15 @@ class Provider(ABC):
     #: se il servizio ha davvero una forza della struttura da 0 a 100. Se non
     #: ce l'ha, l'interfaccia non deve stampare un numero che non parte.
     usa_forza_struttura: bool = True
+    #: chi vuole sapere a che punto e' il lavoro (la coda) mette qui una
+    #: funzione che riceve INVIATO o IN_LAVORAZIONE. Viene chiamata a ogni
+    #: controllo dello stato, non solo ai cambi: e' anche il momento in cui
+    #: la coda puo' fermare l'attesa, sollevando un errore.
+    avanzamento: Callable[[str], None] | None = None
+
+    def _segnala(self, stato: str) -> None:
+        if self.avanzamento is not None:
+            self.avanzamento(stato)
 
     def destinazione_per(self, modello: str) -> str:
         """La destinazione completa per questo modello, da mostrare prima dell'invio."""
@@ -86,6 +102,13 @@ class Provider(ABC):
     def cosa_manca(self, modello: str) -> str | None:
         """Cosa fermerebbe l'invio vero, detto gia' nella prova a secco. None se niente."""
         return None
+
+    def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
+        """Solleva l'errore che fermerebbe l'invio (chiave, schema, peso), senza inviare.
+
+        La coda lo chiama prima di scrivere "inviato": uno stato che dice
+        partito per un'immagine rimasta a casa e' una bugia.
+        """
 
     @abstractmethod
     def genera(self, richiesta: RichiestaGenerazione) -> Risultato:
