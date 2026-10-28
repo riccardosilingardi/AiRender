@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Palette AIRENDER in Allplan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#1F5FAD}a:hover{color:#123E73}
+.exp{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12px;color:#1E1E1E;margin:10px 0 6px}
+.exp::after{content:"";flex:1;height:1px;background:#C8C8C8}
+.row{display:grid;grid-template-columns:42% 58%;align-items:center;gap:6px;min-height:28px;font-size:12px}
+.lab{text-align:right;color:#1E1E1E;padding-right:4px}
+.nb{font:inherit;font-size:12px;min-height:24px;background:#DCE6F4;border:1px solid #9DB9E0;border-radius:3px;color:#1E1E1E;padding:0 8px;cursor:pointer}
+.nb:disabled{background:#F0F0F0;border-color:#D0D0D0;color:#8A8A8A;cursor:not-allowed}
+.inp{font:inherit;font-size:12px;min-height:22px;border:1px solid #ABADB3;background:#FFFFFF;color:#1E1E1E;padding:0 4px;box-sizing:border-box;width:100%}
+.ro{background:#F0F0F0;color:#5A5A5A}
+.tsel{border:2px solid #2D7BD8;background:#E8F1FC}.tn{border:1px solid #C8C8C8;background:#FFFFFF}
+.pic{border:1px solid #C8C8C8;background:#F7F7F7}
+</style>
+</helmet>
+<div style="width: 380px; height: 1300px; box-sizing: border-box; display: flex; flex-direction: column; background: #FFFFFF; font-family: 'Segoe UI', Tahoma, sans-serif; color: #1E1E1E; border: 1px solid #BFC7D2">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: #EEF1F5; border-bottom: 1px solid #D5DAE1; font-size: 12px"><span>AIRENDER</span><span style="color: #5A5A5A">{{ statoTesto }}</span></div>
+
+<div style="flex: 1; padding: 4px 10px 10px; overflow: hidden">
+
+<div class="exp">▾ 1 · Vista</div>
+<sc-if value="{{ vuota }}" hint-placeholder-val="{{ false }}">
+<p style="margin: 4px 0 8px; font-size: 12px; line-height: 1.45; color: #3A3A3A">Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere (shaded, con ombre), poi Cattura.</p>
+</sc-if>
+<sc-if value="{{ haVista }}" hint-placeholder-val="{{ true }}">
+<img class="pic" src="/_blob/2bcb58f97f23f9ca72d72862d0952b4d" alt="Ultima vista catturata" style="display: block; width: 100%; height: 150px; object-fit: cover; box-sizing: border-box">
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: #5A5A5A; margin: 4px 0 6px"><span>vista-20261021-093841.png</span><span>1536×857</span></div>
+<div style="font-size: 12px; margin-bottom: 6px; color: #1B6B3A">Adatta: shaded, 67 toni, sfondo uniforme 10%</div>
+</sc-if>
+<div class="row"><span class="lab">Finestra attiva</span><button class="nb" style="font-weight: 600">Cattura vista</button></div>
+<div class="row"><span class="lab">Dimensione</span><select class="inp"><option>Come la finestra</option><option>1920 × 1080</option><option>3840 × 2160</option></select></div>
+
+<div class="exp">▾ 2 · Stile</div>
+<div class="row"><label class="lab" for="p-testo">Materiali</label><input id="p-testo" class="inp" placeholder="intonaco bianco, legno scuro…"></div>
+<div style="font-size: 11px; color: #5A5A5A; margin: 6px 0 4px">Resa · miniature illustrative</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px">
+<sc-for list="{{ rese }}" as="t" hint-placeholder-count="5">
+<button class="{{ t.cls }}" style="padding: 0; font: inherit; font-size: 11px; cursor: pointer; color: #1E1E1E"><sc-if value="{{ t.img }}" hint-placeholder-val="{{ false }}"><img src="{{ t.img }}" alt="" style="display: block; width: 100%; height: 56px; object-fit: cover"></sc-if><sc-if value="{{ t.vuota }}" hint-placeholder-val="{{ true }}"><span style="display: flex; align-items: center; justify-content: center; height: 56px; background: #F0F0F0; color: #6A6A6A; font-size: 10px">da generare</span></sc-if><span style="display: block; padding: 3px">{{ t.nome }}</span></button>
+</sc-for>
+</div>
+<div class="row"><label class="lab" for="p-ora">Ora</label><select id="p-ora" class="inp"><option>Giorno</option><option>Ora d'oro</option><option>Ora blu</option><option>Notte</option></select></div>
+<div class="row"><label class="lab" for="p-cielo">Cielo</label><select id="p-cielo" class="inp"><option>Sereno</option><option>Coperto</option><option>Nebbia</option><option>Neve</option></select></div>
+<div class="row"><label class="lab" for="p-int">Intorno</label><select id="p-int" class="inp"><option>Niente, sfondo neutro</option><option>Città</option><option>Periferia</option><option>Campagna</option></select></div>
+<div class="row"><label class="lab" for="p-mod">Modello</label><select id="p-mod" class="inp"><option>Nano Banana 2</option><option>FLUX.1 Kontext Pro</option></select></div>
+
+<div class="exp">▾ 3 · Invio</div>
+<div class="row"><span class="lab">La vista va a</span><span class="inp ro" style="display: flex; align-items: center; font-size: 11px">Comfy Router → Google</span></div>
+<div class="row"><span class="lab">Costo</span><span style="font-size: 12px">circa 17 crediti</span></div>
+<sc-if value="{{ inCorso }}" hint-placeholder-val="{{ false }}">
+<div style="margin: 6px 0; padding: 6px 8px; background: #FFF6E0; border: 1px solid #E8C773; font-size: 12px; line-height: 1.4">In corso da 0:12. Allplan resta libero; l'avanzamento è nello Studio.</div>
+</sc-if>
+<div class="row"><span></span><span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px"><button class="nb" disabled="{{ bloccaInvio }}">Prova a secco</button><button class="nb" disabled="{{ bloccaInvio }}" style="font-weight: 600">{{ genera }}</button></span></div>
+
+<sc-if value="{{ fatto }}" hint-placeholder-val="{{ true }}">
+<div class="exp">▾ 4 · Ultimo render</div>
+<img class="pic" src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="Ultimo render" style="display: block; width: 100%; height: 150px; object-fit: cover; box-sizing: border-box">
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: #5A5A5A; margin: 4px 0 6px"><span>Base v3 · Nano Banana 2</span><span>17,17 crediti</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px"><button class="nb" style="font-weight: 600">Apri nello Studio</button><button class="nb">Apri cartella</button></div>
+</sc-if>
+
+<div class="exp" style="color: #6A6A6A">▸ In arrivo</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px">
+<button class="nb" disabled="disabled">Cambia materiale</button>
+<button class="nb" disabled="disabled">Annota aree</button>
+<button class="nb" disabled="disabled">Livelli</button>
+<button class="nb" disabled="disabled">Video</button>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #E9ECF1; border-top: 1px solid #D5DAE1">
+<span style="font-size: 11px; color: #5A5A5A">Cartella: Usr\Local\AIRENDER\viste</span>
+<button class="nb" style="min-width: 70px">Chiudi</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"stato":{"editor":"enum","options":["vuota","pronta","in corso","fatto"],"default":"fatto"},"$preview":{"width":380,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.props.stato || 'fatto';
+const MINI = {'foto':'/_blob/ccfbb456101094d6497f81f8634dcb83','plastico':'/_blob/d5a5a7f3f71c67b2adc33b68f534e2be','schizzo':'/_blob/2eda871b365a016cca244ea5f89eb766','acquerello':'/_blob/8b8da585f99297c5bee4e9a295bc0f47','cinema':'/_blob/083cfa49f1c4d52cc75f1c033afd6bb1'};
+const testi = { 'vuota': 'nessuna vista', 'pronta': 'pronta', 'in corso': 'in corso…', 'fatto': 'render pronto' };
+return {
+vuota: s === 'vuota',
+haVista: s !== 'vuota',
+inCorso: s === 'in corso',
+fatto: s === 'fatto',
+bloccaInvio: s === 'vuota' || s === 'in corso',
+genera: s === 'in corso' ? 'In corso…' : 'Genera render',
+statoTesto: testi[s] || '',
+rese: [['foto','Fotorealistico'],['plastico','Plastico bianco'],['schizzo','Schizzo'],['acquerello','Acquerello'],['cinema','Cinematografico']].map((v, i) => { const img = MINI[v[0]] || ''; return { nome: v[1], img: img, vuota: !img, cls: i === 0 ? 'tsel' : 'tn' }; })
+};
+}
+}
+</script>
+</body>
+</html>

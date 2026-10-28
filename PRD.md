@@ -1,7 +1,7 @@
 # AIRENDER — Product Requirements
 
 Documento vivo. Descrive quello che è vero **adesso**, non quello che è previsto.
-Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-22
+Ogni sessione lo aggiorna. Ultimo aggiornamento: 2026-10-27
 
 > Repository: `airender`. Nome fissato il 2026-09-14.
 
@@ -80,6 +80,9 @@ approvato.
 | 2026-10-21 | La **segmentazione resta in pipeline**: l'annotazione per aree le sta accanto, non la sostituisce | Decisione di Riccardo. Il riquadro copre un'area disegnata a mano; cliccare una superficie o nominarla a parole (sezione 4, passo 6) richiede ancora la segmentazione | |
 | 2026-10-22 | **La mappa dei materiali viene da Allplan** quando il modello ha il materiale; la segmentazione sul render resta solo per quello che Allplan non sa | Decisione di Riccardo: usare al meglio quello che Allplan sa già. Una zona presa dal modello è esatta e porta il nome vero del materiale, senza correzioni. La ragione del taglio del 2026-09-14 (chiedere all'utente un secondo export) non vale più: `SaveWindowToImageFile` cattura la finestra da script, verificato il 2026-10-21 | |
 | 2026-10-27 | Modello predefinito dei preset su Comfy Router: **Nano Banana 2** (`vertexai/gemini-3.1-flash-image`), al posto di FLUX.1 Kontext Pro | Decisione di Riccardo, a occhio, sulla stessa cattura vera passata dai due modelli: i tramezzi tengono in tutti e due, Nano Banana rende meglio ombre e grana. Tiene anche le proporzioni della vista (1376x768 per 1536x857), Kontext no (1392x752). Un'immagine sola: va ripetuto su altre viste. Preset alla versione 3 | |
+| 2026-10-27 | **Due superfici: la palette fa da telecomando, lo Studio è una finestra propria.** La palette PythonParts dentro Allplan ha quattro sezioni: 1 Vista (cattura e idoneità), 2 Stile (preset, materiali a parole, modello), 3 Invio (destinazione e costo prima di Genera), 4 Ultimo render (Apri nello Studio), più «In arrivo» in grigio. Lo Studio è una pagina locale servita dal motore (`http.server` della libreria standard, solo `127.0.0.1`) e aperta con `msedge --app=`, in un processo separato. Palette e Studio si parlano con la cartella delle viste e una coda di lavori su file | Decisione di Riccardo, che trova la palette di prova pessima da usare. Tre ragioni: **spazio per il confronto** (prima/dopo con la linea, A/B fra modelli: nella palette stretta non ci sta); **il mouse sul render** (cliccare una superficie, disegnare un riquadro: la palette non ha un'immagine cliccabile); **Allplan libero durante la generazione** (oggi la palette chiama il motore dentro Allplan e Allplan resta bloccato fino al render). Costa un processo in più da lanciare e da chiudere, e uno stato in più da tenere coerente fra palette, coda e Studio. Ribalta la riga di sezione 11 che scartava un'applicazione web separata: la ragione di allora (caricare e scaricare file a mano) non vale, perché lo Studio legge la stessa cartella in cui la palette salva. Stati e testi in `DESIGN.md`, mockup in `docs/ui/mockup/` | |
+| 2026-10-27 | **Stile = preset curati + blocchi di prompt.** In alto 8 preset esterni e 6 interni; ogni preset compone blocchi di un asse solo, in ordine fisso: regola fissa → scena → materiali → look → luce → cielo (esterni) oppure fuori dalle finestre + arredo (interni) → intorno → persone → qualità → cosa evitare. Il prompt completo, in inglese, si vede e si modifica | Decisione di Riccardo (ibrido, fra solo preset e solo blocchi). Un blocco che tocca un asse solo si cambia senza disfare gli altri. I testi sono riscritti dalla prompt library di Riccardo, non copiati: `docs/ui/blocchi-stile-bozza.md`, bozza 3. **Nessun blocco è stato provato con il modello** | |
+| 2026-10-27 | Miniature dei preset **illustrative, dichiarate tali a schermo**, al posto di quelle generate | Decisione di Riccardo: niente generazioni a pagamento solo per le miniature, per ora. Si sostituiscono con render veri dei preset. Finché sono illustrazioni, l'etichetta resta (`DESIGN.md`, Decisioni visive) | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -138,6 +141,23 @@ trasporto HTTP usa `urllib` della libreria standard apposta, per non dipendere
 da `requests`.
 
 ## 8 · NON COSTRUITO
+
+**Piano in corso, dal 2026-10-27: quattro PR, in quest'ordine.** Una sessione
+per PR (regola di `CLAUDE.md`).
+
+1. **Lo Studio nei documenti** — questo PR: `DESIGN.md` con palette v1 e
+   Studio, questa sezione, mockup e bozza dei blocchi in `docs/ui/`. Niente
+   codice.
+2. **Coda di lavori** — il motore come processo a parte, che prende lavori da
+   una cartella (`lavori/in-attesa`, `in-corso`, `fatto`, `errore`), con
+   scrittura atomica, stato leggibile e annullamento; la composizione del
+   prompt a blocchi. In `core/`, senza Allplan, senza Studio.
+3. **Studio v1** — Genera e Risultato, eseguibile senza Allplan
+   (`python -m core.studio`), sulla coda del PR 2. Ritocca resta in grigio.
+4. **Palette v1** — il telecomando. Si scrive solo dopo che la sonda della
+   palette ha risposto sul PC di Riccardo (sezione 9): quali immagini si
+   aggiornano da script, quale Python lancia lo Studio, se Edge si apre come
+   finestra.
 
 - Video — rimandato, non annullato. Arriva come livello sopra un fermo immagine.
 - LoRA di stile addestrati sui render dello studio — è l'argomento di vendita
@@ -426,6 +446,32 @@ Tutto il resto aspetta il PC di Riccardo:
 - **Le condizioni dei provider consentono la rivendita dell'accesso** — da
   leggere prima di emettere la prima fattura, non dopo.
 
+### Lasciato dalla sessione del 2026-10-27 (lo Studio nei documenti)
+
+Questa sessione ha scritto solo documenti. Le decisioni dell'interfaccia
+poggiano su cose non ancora provate:
+
+- **Tutto quello che chiede la sonda della palette** (blocco qui sopra): senza
+  un processo a parte che parte da Allplan e lo lascia libero, lo Studio non
+  ha senso come finestra propria.
+- **I blocchi di prompt della bozza 3** non sono mai stati mandati a un
+  modello. In particolare: se la lunghezza (718-882 caratteri per i preset,
+  sopra i 500-600 indicati come ottimo) pesa; se «Altissima definizione (32k)»
+  cambia qualcosa rispetto a Base. Per verificare: la stessa vista con lo
+  stesso preset, Base e 32k, con `scripts/confronta_modelli.py`, e un occhio
+  sul microdettaglio.
+- **I materiali scritti in italiano** passano al modello come sono: non si sa
+  se Nano Banana 2 li capisce o se vanno tradotti prima.
+- **Nano Banana 2 accetta più immagini in una richiesta via Comfy Router** —
+  serve alla mappa materiali (vista + mappa a colori + immagine di
+  riferimento). Kontext Pro probabilmente ne prende una sola.
+- **La mappa a colori non finisce nei colori del render** — è la trappola dei
+  colori letti come materiali, al contrario. Da provare con un render solo
+  prima di costruire la mappa.
+- **I mockup in `docs/ui/mockup/` non si aprono da soli**: chiedono un
+  `support.js` dell'ambiente in cui sono stati disegnati, che non è nel
+  repository. Si leggono come sorgente (struttura e testi), non come pagine.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di
@@ -478,8 +524,13 @@ Tutto il resto aspetta il PC di Riccardo:
 successive, installato dal Plugin Manager.
 **Perché:** la palette è l'unico posto dentro Allplan con interfaccia
 persistente, pulsanti, avanzamento e immagini.
-**Scartati:** nodo Visual Scripting (nessuna UI persistente, pubblico ristretto);
-applicazione web separata (costringerebbe a caricare e scaricare file a mano).
+**Scartati:** nodo Visual Scripting (nessuna UI persistente, pubblico ristretto).
+~~Applicazione web separata (costringerebbe a caricare e scaricare file a mano).~~
+**Ribaltato il 2026-10-27** (sezione 5): accanto alla palette c'è lo **Studio**,
+una pagina locale servita dal motore su `127.0.0.1` e aperta in una finestra
+propria. Non è un'applicazione web in rete: non carica né scarica file a mano,
+legge la stessa cartella in cui la palette salva le viste. Resta scartata
+un'applicazione su un server nostro.
 
 **Accettiamo di non poter:**
 - girare su macOS o Linux — Allplan è solo Windows;
@@ -491,9 +542,13 @@ applicazione web separata (costringerebbe a caricare e scaricare file a mano).
 
 Dettaglio in `DESIGN.md`.
 
+Dal 2026-10-27 le schermate sono quelle della palette v1 e dello Studio
+(sezione 5). Le cinque della palette di prova sono sostituite: la tabella del
+cambio è in `DESIGN.md`.
+
 | Schermata | Lavoro che serve | Lo stato vuoto dice |
 |---|---|---|
-| Palette — Sorgente | Trovare e mostrare la vista salvata | "Salva una vista da Allplan nella cartella X. La cerco io." |
-| Palette — Stile | Scegliere il preset dalla griglia | Mai vuota: i preset sono inclusi nel pacchetto |
-| Palette — Risultato | Confrontare partenza e render, decidere | "Nessun render ancora. Scegli uno stile e premi Genera." |
-| Palette — Materiali | Cambiare una superficie | "Clicca una superficie del render, o scrivi come si chiama." |
+| Palette v1 | Catturare la vista, scegliere lo stile di base, mandare senza bloccare Allplan | "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere (shaded, con ombre), poi Cattura." |
+| Studio · Genera | Scegliere lo stile con calma, vedere il prompt vero, la destinazione e il costo | "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegli un file." |
+| Studio · Risultato | Decidere se è ancora il proprio edificio, confrontare render e modelli | "Nessun render ancora. Scegli uno stile in Genera e premi Genera." |
+| Studio · Ritocca | Anteprima, tutto in grigio: cambia materiale, annota per aree, livelli | "Prima serve un render." |

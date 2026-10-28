@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Studio — Genera</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141518}
+a{color:#8FBCFF}a:hover{color:#B9D4FF}
+.btn{font:inherit;font-size:13px;font-weight:500;border-radius:8px;padding:0 14px;min-height:36px;border:1px solid #34373E;background:#23252A;color:#EDEDEF;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:disabled{color:#8B8F97;border-style:dashed;background:transparent;cursor:not-allowed}
+.primary{background:#6EA8FE;border-color:#6EA8FE;color:#0B1220}
+.soon{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#A1A4AB;border:1px dashed #4A4D55;border-radius:999px;padding:2px 7px;white-space:nowrap}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#A1A4AB}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;width:64px;min-height:56px;justify-content:center;border-radius:10px;font:inherit;font-size:11px;background:transparent;border:0;color:#C9CBD0;cursor:pointer}
+.rail:disabled{color:#8B8F97;cursor:not-allowed}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px}
+.tile{padding:0;border-radius:10px;overflow:hidden;background:#1C1D21;cursor:pointer;text-align:left;font:inherit;color:#EDEDEF;width:128px;flex:0 0 auto}
+.ph{display:flex;align-items:center;justify-content:center;height:80px;background:repeating-linear-gradient(135deg,#202227 0 8px,#24262C 8px 16px);color:#8B8F97;font-size:10px;text-align:center;padding:0 8px}
+.tsel{border:2px solid #6EA8FE}.tn{border:1px solid #2E3036}
+.seg{font:inherit;font-size:12px;min-height:30px;border-radius:7px;border:0;background:transparent;color:#C9CBD0;cursor:pointer;padding:0 10px}
+.on{background:#2B2F38;color:#EDEDEF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #EDEDEF; background: #141518; min-height: 900px; display: flex; flex-direction: column">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid #2A2C31; background: #18191C">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6EA8FE" stroke-width="1.8" aria-hidden="true"><path d="M3 20 L12 4 L21 20 Z"/><path d="M7.5 12 H16.5"/></svg>
+<span style="font-weight: 600; font-size: 15px; letter-spacing: .02em">AIRENDER</span>
+<span style="color: #A1A4AB; font-size: 13px">Studio</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #C9CBD0">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #5CC28B"></span>
+<span>Collegato ad Allplan 2026 · BOSCO · Prospettiva centrale</span>
+</div>
+<div style="flex: 1"></div>
+<button class="btn" aria-label="Impostazioni" disabled="disabled"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Chiave e tetto di spesa<span class="soon">In arrivo</span></button>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; flex: 1; min-height: 0">
+
+<nav aria-label="Fasi" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-right: 1px solid #2A2C31; background: #18191C">
+<button class="rail" style="background: #262A33; color: #EDEDEF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 L19 5"/><path d="M15 5h4v4"/><circle cx="7" cy="7" r="2"/></svg>Genera</button>
+<a href="Main.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg>Risultato</a>
+<a href="Ritocca.dc.html" class="rail" style="text-decoration: none; color: #8B8F97"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Ritocca</a>
+<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Livelli</button>
+<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10 L21 7 V17 L16 14"/></svg>Video</button>
+</nav>
+
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 18px 20px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch">
+<figure style="margin: 0; position: relative; flex: 1 1 420px; min-width: 0; background: #1C1D21; border: 1px solid #2A2C31; border-radius: 12px; overflow: hidden">
+<img src="/_blob/2bcb58f97f23f9ca72d72862d0952b4d" alt="Vista catturata da Allplan" style="display: block; width: 100%; height: 300px; object-fit: cover; background: #9AA6BD">
+<sc-if value="{{ inCorso }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; background: rgba(20,21,24,.9); display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px"><span><b style="font-weight: 600">Comfy Router sta lavorando</b> · in lavorazione</span><span class="mono">0:12</span></div>
+<div style="height: 6px; border-radius: 3px; background: #2E3036; overflow: hidden"><div style="width: 38%; height: 100%; background: #6EA8FE"></div></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #A1A4AB"><span>Allplan resta libero.</span><button class="btn" style="min-height: 28px">Annulla</button></div>
+</div>
+</sc-if>
+</figure>
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 8px; border: 1px solid #2B4A3A; background: #17231D; border-radius: 9px; padding: 10px 12px; font-size: 13px; line-height: 1.45">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5CC28B" stroke-width="2.2" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M5 12 L10 17 L19 7"/></svg>
+<span><b style="font-weight: 600">Vista adatta</b> · shaded, 67 toni di grigio, sfondo uniforme al 10% · 1536×857</span>
+</div>
+<div style="display: flex; gap: 8px; border: 1px solid #4D4022; background: #231E14; border-radius: 9px; padding: 10px 12px; font-size: 13px; line-height: 1.45">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8B04B" stroke-width="2" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 3 L21 19 H3 Z"/><path d="M12 10 V14"/></svg>
+<span>Il modello legge i colori della vista come materiali. Per colori veri, salva la vista con colori neutri.</span>
+</div>
+<button class="btn" style="justify-content: center">Usa un'altra vista…</button>
+</div>
+</div>
+
+<div role="radiogroup" aria-label="Scena" style="display: flex; align-items: center; gap: 12px"><span class="lbl">Scena</span><div style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="{{ segEst }}" role="radio" aria-checked="{{ esterno }}" onClick="{{ vaiEst }}">Esterno</button><button class="{{ segInt }}" role="radio" aria-checked="{{ interno }}" onClick="{{ vaiInt }}">Interno</button></div><span style="font-size: 12px; color: #8B8F97">Miniature illustrative: rendono l'idea, non sono render del modello</span></div>
+
+<section aria-label="Preset" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px"><span class="lbl">Parti da un preset</span><span style="font-size: 12px; color: #8B8F97">Ogni preset ha un prompt curato e imposta i comandi qui sotto</span></div>
+<div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px">
+<sc-for list="{{ preset }}" as="t" hint-placeholder-count="8">
+<button class="{{ t.cls }}" onClick="{{ t.pick }}" aria-pressed="{{ t.sel }}">
+<img src="{{ t.img }}" alt="" style="display: block; width: 100%; height: 80px; object-fit: cover">
+<span style="display: block; padding: 6px 8px; font-size: 12px">{{ t.nome }}</span>
+</button>
+</sc-for>
+</div>
+</section>
+
+<button onClick="{{ apriDettagli }}" aria-expanded="{{ aperto }}" style="display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: #EDEDEF; background: #1C1D21; border: 1px solid #2E3036; border-radius: 10px; padding: 10px 14px; cursor: pointer">
+<span style="font-size: 14px; color: #A1A4AB">{{ freccia }}</span>
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1"><span style="font-size: 13px; font-weight: 600">Dettagli del preset</span><span style="font-size: 12px; color: #A1A4AB">{{ sintesi }}</span></span>
+<span style="font-size: 12px; color: #8B8F97">cambi un pezzo, il resto resta com'è</span>
+</button>
+<sc-if value="{{ aperto }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 16px; padding-left: 14px; border-left: 2px solid #2A2C31">
+<section aria-label="Resa" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px"><span class="lbl">1 · Resa</span><span style="font-size: 12px; color: #8B8F97">Miniature illustrative: si sostituiscono con i render veri dei preset</span></div>
+<div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px">
+<sc-for list="{{ rese }}" as="t" hint-placeholder-count="5">
+<button class="{{ t.cls }}" onClick="{{ t.pick }}" aria-pressed="{{ t.sel }}">
+<sc-if value="{{ t.img }}" hint-placeholder-val="{{ false }}"><img src="{{ t.img }}" alt="" style="display: block; width: 100%; height: 80px; object-fit: cover"></sc-if>
+<sc-if value="{{ t.vuota }}" hint-placeholder-val="{{ true }}"><span class="ph">miniatura da generare</span></sc-if>
+<span style="display: block; padding: 6px 8px; font-size: 12px">{{ t.nome }}</span>
+</button>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Look fotografico" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px"><label for="look" class="lbl">2 · Look fotografico</label><span style="font-size: 12px; color: #8B8F97">colore, contrasto, pellicola o digitale · solo per le rese fotografiche</span></div>
+<select id="look" style="font: inherit; font-size: 13px; min-height: 34px; max-width: 360px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 10px"><sc-for list="{{ looks }}" as="o" hint-placeholder-count="9"><option selected="{{ o.sel }}">{{ o.nome }}</option></sc-for></select>
+</section>
+
+<section aria-label="Ora del giorno" style="display: flex; flex-direction: column; gap: 8px">
+<span class="lbl">{{ titoloLuce }}</span>
+<div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px">
+<sc-for list="{{ ore }}" as="t" hint-placeholder-count="5">
+<button class="{{ t.cls }}" onClick="{{ t.pick }}" aria-pressed="{{ t.sel }}">
+<sc-if value="{{ t.img }}" hint-placeholder-val="{{ false }}"><img src="{{ t.img }}" alt="" style="display: block; width: 100%; height: 80px; object-fit: cover"></sc-if>
+<sc-if value="{{ t.vuota }}" hint-placeholder-val="{{ true }}"><span class="ph">{{ t.ph }}</span></sc-if>
+<span style="display: block; padding: 6px 8px; font-size: 12px">{{ t.nome }}</span>
+</button>
+</sc-for>
+</div>
+</section>
+
+<sc-if value="{{ esterno }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Cielo e stagione" style="display: flex; flex-direction: column; gap: 8px">
+<span class="lbl">4 · Cielo e stagione</span>
+<div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px">
+<sc-for list="{{ cieli }}" as="t" hint-placeholder-count="5">
+<button class="{{ t.cls }}" onClick="{{ t.pick }}" aria-pressed="{{ t.sel }}">
+<sc-if value="{{ t.img }}" hint-placeholder-val="{{ false }}"><img src="{{ t.img }}" alt="" style="display: block; width: 100%; height: 80px; object-fit: cover"></sc-if>
+<sc-if value="{{ t.vuota }}" hint-placeholder-val="{{ true }}"><span class="ph">{{ t.ph }}</span></sc-if>
+<span style="display: block; padding: 6px 8px; font-size: 12px">{{ t.nome }}</span>
+</button>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Contesto" style="display: flex; flex-direction: column; gap: 10px">
+<span class="lbl">5 · Cosa può aggiungere il modello</span>
+<div style="display: flex; flex-wrap: wrap; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Intorno all'edificio</span><div role="radiogroup" aria-label="Intorno" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Niente, sfondo neutro</button><button class="seg" role="radio" aria-checked="false">Città</button><button class="seg" role="radio" aria-checked="false">Periferia</button><button class="seg" role="radio" aria-checked="false">Campagna</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Verde</span><div role="radiogroup" aria-label="Verde" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Nessuno</button><button class="seg" role="radio" aria-checked="false">Poco</button><button class="seg" role="radio" aria-checked="false">Rigoglioso</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Persone</span><div role="radiogroup" aria-label="Persone" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Nessuna</button><button class="seg" role="radio" aria-checked="false">Poche</button><button class="seg" role="radio" aria-checked="false">In movimento</button></div></div>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{ interno }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Interno" style="display: flex; flex-direction: column; gap: 10px">
+<span class="lbl">4 · Fuori dalle finestre e arredo</span>
+<div style="display: flex; flex-wrap: wrap; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Fuori dalle finestre</span><div role="radiogroup" aria-label="Fuori" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Neutro</button><button class="seg" role="radio" aria-checked="false">Verde</button><button class="seg" role="radio" aria-checked="false">Città</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Arredo</span><div role="radiogroup" aria-label="Arredo" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Non aggiungere niente</button><button class="seg" role="radio" aria-checked="false">Qualche oggetto</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A1A4AB">Persone</span><div role="radiogroup" aria-label="Persone interno" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px"><button class="seg on" role="radio" aria-checked="true">Nessuna</button><button class="seg" role="radio" aria-checked="false">In movimento</button></div></div>
+</div>
+</section>
+</sc-if>
+</div>
+</sc-if>
+</main>
+
+<aside aria-label="Testo e invio" style="flex: 1 1 340px; max-width: 420px; display: flex; flex-direction: column; gap: 18px; padding: 18px; border-left: 1px solid #2A2C31; background: #18191C">
+
+<section aria-label="Materiali" style="display: flex; flex-direction: column; gap: 10px">
+<label for="materiali" class="lbl">Materiali</label>
+<textarea id="materiali" rows="2" placeholder="{{ phMateriali }}" style="font: inherit; font-size: 14px; line-height: 1.5; resize: vertical; background: #1C1D21; color: #EDEDEF; border: 1px solid #3B5B8C; border-radius: 10px; padding: 10px 12px"></textarea>
+
+<div style="display: flex; flex-direction: column; gap: 8px; border: 1px dashed #4A4D55; border-radius: 12px; padding: 10px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><span style="font-size: 13px; font-weight: 600; color: #C9CBD0">Dalla mappa materiali di Allplan</span><span class="soon">In arrivo</span></div>
+<svg viewBox="0 0 320 120" role="img" aria-label="Esempio di mappa materiali: ogni materiale Allplan ha un colore" style="display: block; width: 100%; height: auto; border-radius: 8px; background: #22252B; opacity: .8">
+<polygon points="40,52 150,14 260,52" fill="#C8553D"/>
+<rect x="56" y="52" width="188" height="50" fill="#E8C547"/>
+<rect x="56" y="98" width="188" height="10" fill="#9AA0A6"/>
+<rect x="76" y="62" width="34" height="26" fill="#8B5A2B"/><rect x="80" y="66" width="26" height="18" fill="#5DA9E9"/>
+<rect x="134" y="62" width="34" height="26" fill="#8B5A2B"/><rect x="138" y="66" width="26" height="18" fill="#5DA9E9"/>
+<rect x="192" y="62" width="34" height="36" fill="#8B5A2B"/><rect x="196" y="66" width="26" height="32" fill="#5DA9E9"/>
+<text x="8" y="114" fill="#A1A4AB" font-size="9" font-family="Inter, sans-serif">esempio, non calcolato</text>
+</svg>
+<div style="display: grid; grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1.3fr) 44px; gap: 6px 8px; align-items: center; font-size: 11px; color: #8B8F97">
+<span></span><span>Allplan</span><span>diventa</span><span style="text-align: center">rif.</span>
+<sc-for list="{{ mappa }}" as="m" hint-placeholder-count="5">
+<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="4" fill="{{ m.colore }}"/></svg>
+<span style="display: flex; flex-direction: column; min-width: 0"><span style="color: #C9CBD0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ m.nome }}</span><span class="mono" style="font-size: 10px">{{ m.id }} · {{ m.tinta }}</span></span>
+<input disabled="disabled" value="{{ m.diventa }}" aria-label="Materiale proposto" style="font: inherit; font-size: 12px; min-width: 0; min-height: 30px; background: transparent; border: 1px dashed #4A4D55; border-radius: 6px; color: #8B8F97; padding: 0 6px">
+<button disabled="disabled" aria-label="Immagine di riferimento del materiale (facoltativa)" style="height: 30px; border: 1px dashed #4A4D55; border-radius: 6px; background: transparent; color: #8B8F97; font: inherit; font-size: 14px; cursor: not-allowed">+</button>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #8B8F97">Ogni riga: materiale di Allplan, il suo colore nella mappa, cosa deve diventare a parole e, se vuoi, una foto del materiale. Serve prima: verificare che Allplan dia una vista colorata per materiale con la stessa camera (PRD §9).</p>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Cosa parte, in breve</div>
+<div style="font-size: 13px; line-height: 1.6; background: #1C1D21; border: 1px solid #2A2C31; border-radius: 10px; padding: 10px 12px">{{ riassunto }}</div>
+<button class="btn" style="justify-content: center" onClick="{{ togglePrompt }}" aria-expanded="{{ mostra }}">{{ etiPrompt }}</button>
+<sc-if value="{{ mostra }}" hint-placeholder-val="{{ false }}">
+<textarea aria-label="Prompt completo, modificabile" rows="12" value="{{ prompt }}" style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.55; resize: vertical; background: #1C1D21; color: #EDEDEF; border: 1px solid #3B5B8C; border-radius: 10px; padding: 10px 12px"></textarea>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #8B8F97"><span>Testo vero che parte al modello, in inglese. Se lo modifichi, i comandi a sinistra non lo toccano più finché non premi «Ricomponi».</span><span class="mono" style="white-space: nowrap">{{ nCaratteri }}</span></div>
+<button class="btn" style="justify-content: center">Ricomponi dalle scelte</button>
+</sc-if>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<label for="preset" class="lbl">I miei preset</label>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px">
+<select id="preset" style="font: inherit; font-size: 13px; min-height: 36px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 10px"><option>Nessuno — scelte libere</option></select>
+<button class="btn">Salva queste scelte</button>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<label for="modello" class="lbl">Modello</label>
+<select id="modello" style="font: inherit; font-size: 13px; min-height: 36px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 10px">
+<option>Nano Banana 2 — predefinito</option>
+<option>FLUX.1 Kontext Pro</option>
+<option disabled="disabled">Nano Banana Pro — non ancora provato</option>
+<option disabled="disabled">Seedream — non ancora provato</option>
+<option disabled="disabled">GPT Image — non ancora provato</option>
+</select>
+<label for="qualita" style="font-size: 12px; color: #A1A4AB; margin-top: 4px">Qualità</label>
+<select id="qualita" style="font: inherit; font-size: 13px; min-height: 34px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 10px"><option>Base</option><option>Altissima definizione (32k) — da confrontare</option></select>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: #8B8F97"><span>Fedeltà al disegno: rigida / bilanciata / libera</span><span class="soon">Da provare</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: #8B8F97"><span>Varianti per invio: 1</span><span class="soon">2–4 in arrivo</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: #8B8F97"><span>Immagine di riferimento per lo stile</span><span class="soon">In arrivo</span></div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px; margin-top: auto; border-top: 1px solid #2A2C31; padding-top: 16px">
+<div style="font-size: 13px; line-height: 1.5">La vista va a <b style="font-weight: 600">Comfy Router → Google (Nano Banana 2)</b>, senza ripiego su altri servizi.</div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: #A1A4AB"><span>Costo: circa 17 crediti</span><span>misurato il 27/10</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px">
+<button class="btn" style="justify-content: center">Prova a secco</button>
+<button class="btn primary" style="justify-content: center; font-weight: 600" onClick="{{ toggle }}">{{ etichetta }}</button>
+</div>
+</section>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"stato":{"editor":"enum","options":["pronto","in corso"],"default":"pronto"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state || {};
+const s = st.stato || this.props.stato || 'pronto';
+const inCorso = s === 'in corso';
+const interno = st.scena === 'interno';
+const B = (id) => '/_blob/' + id;
+const MINI = {
+'resa:foto': B('ccfbb456101094d6497f81f8634dcb83'), 'resa:plastico': B('d5a5a7f3f71c67b2adc33b68f534e2be'), 'resa:schizzo': B('2eda871b365a016cca244ea5f89eb766'), 'resa:acquerello': B('8b8da585f99297c5bee4e9a295bc0f47'), 'resa:cinema': B('083cfa49f1c4d52cc75f1c033afd6bb1'),
+'ora:giorno': B('da38d083867d31bf3c3d0a59ed5ca224'), 'ora:oro': B('2b211e8293e616afc80abd1ad20bc077'), 'ora:blu': B('7b363bb696c232ca3971b6bcfb69be02'), 'ora:notte': B('c2a5f51e89dac4bcc883e2a055776ce1'),
+'cielo:sereno': B('c42a4c86ce4eafc58dbbecff8e74d1e9'), 'cielo:coperto': B('ab9a9150fbff09be43ef0433493aceef'), 'cielo:pioggia': B('7898951b28920bd6ffe2431400568eb7'), 'cielo:nebbia': B('44f91a42962c53b021f7821206d92b66'), 'cielo:neve': B('c84183a1321a47fea80cb6f89682d3f4'),
+'luce:mattino': B('cfbac23d10bbdd4c551cbde0c9c65f60'), 'luce:pomeriggio': B('2cd2fb456a13045a2edd5b16224f770c'), 'luce:coperto': B('0c29e069921ee8811cdb806ac4ab5171'), 'luce:sera': B('b6703a10749361ab3f267fe6b13019d5'), 'luce:notte': B('3e6c471476be15bc3172d36dedca7daa')
+};
+const PRESET_EST = [
+['rivista',"Rivista d'architettura",'foto','giorno','sereno',B('4f9d1ddf42da7740e640ed60d5f24836')],
+['caldo','Luce naturale calda','foto','oro','sereno',B('0dbb18a024de50ea94aecff9c832c78d')],
+['portra','Pellicola morbida','foto','giorno','sereno',B('810bc844859c2483ccb9565da070864c')],
+['urbano','Urbano editoriale','cinema','giorno','coperto',B('74458c6608f7daeeba1013b20f55088d')],
+['orablu','Ora blu','foto','blu','sereno',B('f4b942ad492d5fb6c08041cef422c1ce')],
+['luna','Notte con luna','foto','notte','sereno',B('90f23d42e343c6e58eee0785445cd28b')],
+['pioggia','Giornata di pioggia','foto','giorno','pioggia',B('b92a9809d669e6a1bc8570851c4877c6')],
+['autunno','Autunno nebbioso','foto','giorno','nebbia',B('4ac9b0bbf6feedd7034a8825c8586616')]];
+const PRESET_INT = [
+['i_rivista','Interno rivista','foto','mattino','',B('cfbac23d10bbdd4c551cbde0c9c65f60')],
+['i_caldo','Interno caldo','foto','pomeriggio','',B('2cd2fb456a13045a2edd5b16224f770c')],
+['i_portra','Interno pellicola morbida','foto','coperto','',B('0c29e069921ee8811cdb806ac4ab5171')],
+['i_sera','Interno sera','foto','sera','',B('b6703a10749361ab3f267fe6b13019d5')],
+['i_notte','Interno notte, lampade','foto','notte','',B('3e6c471476be15bc3172d36dedca7daa')],
+['i_vissuto','Interno vissuto','foto','pomeriggio','',B('5143f603d8c91cdcd0a53bc8847e10ba')]];
+const PRESET = interno ? PRESET_INT : PRESET_EST;
+const LOOKS = [['canon','Canon decentrabile · rivista'],['gfx','Fujifilm GFX · caldo naturale'],['leica','Leica · neutro profondo'],['portra160','Kodak Portra 160 · morbido'],['portra400','Kodak Portra 400 · caldo vissuto'],['ektar','Kodak Ektar 100 · colori vividi'],['metropolis','LomoChrome Metropolis · urbano'],['x100v','Fujifilm X100V · analogico 35mm'],['mavic','DJI Mavic · drone']];
+const LOOK_DI = { rivista: 'canon', caldo: 'gfx', portra: 'portra160', urbano: 'metropolis', orablu: 'leica', luna: 'leica', pioggia: 'portra400', autunno: 'portra400', i_rivista: 'canon', i_caldo: 'gfx', i_portra: 'portra160', i_sera: 'leica', i_notte: 'leica', i_vissuto: 'x100v' };
+const pSel = st.preset && PRESET.find((x) => x[0] === st.preset) ? st.preset : PRESET[0][0];
+const gl = interno ? 'luce' : 'ora';
+const scelta = { resa: st.resa || 'foto', ora: st.ora || 'giorno', cielo: st.cielo || 'sereno', luce: st.luce || 'mattino' };
+const preset = PRESET.map((v) => ({ nome: v[1], img: v[5], sel: pSel === v[0], cls: pSel === v[0] ? 'tile tsel' : 'tile tn',
+pick: () => this.setState(interno ? { preset: v[0], resa: v[2], luce: v[3] } : { preset: v[0], resa: v[2], ora: v[3], cielo: v[4] }) }));
+const fai = (gruppo, voci) => voci.map((v) => {
+const sel = scelta[gruppo] === v[0];
+const img = MINI[gruppo + ':' + v[0]] || '';
+return { nome: v[1], img: img, vuota: !img, ph: 'miniatura da fare', sel: sel, cls: sel ? 'tile tsel' : 'tile tn',
+pick: () => this.setState({ [gruppo]: v[0] }) };
+});
+const rese = [['foto','Fotorealistico'],['plastico','Plastico bianco'],['schizzo','Schizzo a matita'],['acquerello','Acquerello'],['cinema','Cinematografico']];
+const ore = [['giorno','Giorno'],['oro',"Ora d'oro"],['blu','Ora blu'],['notte','Notte con luna']];
+const luci = [['mattino','Mattino da finestra'],['pomeriggio','Pomeriggio caldo'],['coperto','Giorno coperto'],['sera','Sera, luci accese'],['notte','Notte con lampade']];
+const cieli = [['sereno','Sereno'],['coperto','Coperto'],['pioggia','Pioggia'],['nebbia','Autunno nebbioso'],['neve','Neve']];
+const nome = (lista, id) => (lista.find((x) => x[0] === id) || ['', ''])[1];
+const pNome = (PRESET.find((x) => x[0] === pSel) || ['', ''])[1];
+const riassunto = 'Regola fissa · ' + (interno ? 'interno' : 'esterno') + ' · i tuoi materiali · preset ' + pNome + ': ' + nome(rese, scelta.resa) + ' · ' + (interno ? nome(luci, scelta.luce) + ' · fuori neutro · nessun arredo aggiunto' : nome(ore, scelta.ora) + ' · ' + nome(cieli, scelta.cielo) + ' · niente contesto') + ' · persone: nessuna · qualità base · cosa evitare.';
+const T = {"regola": "Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below.", "evita": "Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.", "scena": {"esterno": "The subject is a building exterior.", "interno": "The subject is an interior space."}, "look": {"canon": "Professional architectural photograph, Canon EOS R5 with 17mm tilt-shift lens: perfectly straight verticals, deep focus, crisp micro-contrast, clean polarized colour.", "gfx": "Fujifilm GFX100S photograph: warm natural colour, earthy muted tones, softly luminous highlights, deep but detailed shadows, gentle contrast, olive greens, pale blues.", "leica": "Leica SL2 full-frame photograph: rich tonal depth, refined micro-contrast, restrained warm colour, smooth highlight roll-off, detailed shadows, tactile textures.", "portra160": "Kodak Portra 160 film colour: soft and restrained, slightly warm neutrals, cream highlights, muted greens, moderate elegant contrast, fine grain, gentle pastel midtones.", "portra400": "Kodak Portra 400 film colour: warm, soft and lived-in, slightly warm whites, muted organic greens, open shadows, creamy rolled-off highlights, fine visible grain.", "ektar": "Kodak Ektar 100 film colour: bold, clean, saturated, strong well-separated contrast, bright clean highlights, deep but open shadows, ultra-fine grain, sharp edges.", "metropolis": "LomoChrome Metropolis film colour: desaturated and slightly cool, muted cyan skies, subdued greens, vivid red and orange accents, punchy contrast, dense blacks, visible grain.", "x100v": "Fujifilm X100V with Classic Negative: warm muted colour, olive greens, cream highlights, lifted blacks with teal shadows, moderate contrast, fine grain, light vignette.", "mavic": "Aerial photo look of a DJI Mavic 3 Pro Hasselblad camera: deep focus to the horizon, natural muted colour, slightly cool shadows, soft distant haze, wide dynamic range."}, "luce": {"mezzogiorno": "Midday sun high in the sky, crisp natural shadows, deep blue sky with thin cirrus.", "estate": "Bright summer daylight, soft-to-medium shadows, cool skylight filling the shade, windows reflecting sky and surroundings, faint warm glow inside.", "giorno": "Natural daylight, soft shadows.", "oro": "Golden hour: low warm sun, long soft shadows, warm light grazing the facades.", "blu": "Blue hour, about 20 minutes after sunset: no direct sun, no hard shadows, dark blue sky with a faint warm horizon glow, windows glowing warm amber from inside.", "notte": "Night: moonlight as the main light, soft rim light on edges, warm interior lights against cool moonlight, slight atmospheric haze, natural night white balance."}, "cielo": {"sereno": "Clear sky.", "coperto": "Overcast sky, soft diffused light, no hard shadows.", "pioggia": "Rainy day: overcast sky, wet surfaces with subtle reflections on the ground, light rain.", "autunno": "Autumn: light mist, damp ground with subtle reflections, scattered fallen leaves, muted orange and brown tones with cool grey shadows.", "neve": "Winter: snow on the ground and on horizontal surfaces, cold soft light."}, "luceInt": {"mattino": "Soft morning daylight entering through the windows, gentle shadows on floor and walls, bright airy interior.", "pomeriggio": "Warm low afternoon sun through the windows, long patches of light on the floor, warm bounce light.", "coperto_int": "Even overcast daylight from the windows, soft shadowless light, calm neutral tones.", "sera": "Early evening: dim blue light outside the windows, warm artificial lights switched on inside, cosy contrast.", "notte_int": "Night: dark windows, warm lamps and concealed lighting as the only light, deep soft shadows."}, "intorno": "Plain neutral background; do not add trees, cars or surroundings that are not in the view.", "fuori": "Keep the view outside the windows soft and neutral; do not invent a landscape.", "arredo": "Do not add furniture or objects that are not in the view.", "persone": "No people.", "qualita": "Professional architectural photography, natural detail.", "materiali": "Materials: white lime plaster walls, dark oak window frames, light grey stone base."};
+const ORA_B = { giorno: 'giorno', oro: 'oro', blu: 'blu', notte: 'notte' };
+const CIELO_B = { sereno: 'sereno', coperto: 'coperto', pioggia: 'pioggia', nebbia: 'autunno', neve: 'neve' };
+const LUCE_B = { mattino: 'mattino', pomeriggio: 'pomeriggio', coperto: 'coperto_int', sera: 'sera', notte: 'notte_int' };
+const lookId = LOOK_DI[pSel] || 'canon';
+const prompt = [T.regola, T.scena[interno ? 'interno' : 'esterno'], T.materiali, T.look[lookId]].concat(interno
+? [T.luceInt[LUCE_B[scelta.luce]], T.fuori, T.arredo]
+: [T.luce[ORA_B[scelta.ora]], T.cielo[CIELO_B[scelta.cielo]], T.intorno]).concat([T.persone, T.qualita, T.evita]).join(' ');
+const mostra = !!st.mostra;
+const aperto = st.aperto !== false;
+const sintesi = nome(rese, scelta.resa) + ' · ' + nome(LOOKS, lookId).split(' · ')[0] + ' · ' + (interno ? nome(luci, scelta.luce) + ' · fuori neutro · nessun arredo' : nome(ore, scelta.ora) + ' · ' + nome(cieli, scelta.cielo) + ' · niente intorno') + ' · persone: nessuna';
+return {
+aperto: aperto,
+freccia: aperto ? '▾' : '▸',
+apriDettagli: () => this.setState({ aperto: !aperto }),
+mostra: mostra, prompt: prompt, nCaratteri: prompt.length + ' caratteri',
+etiPrompt: mostra ? 'Nascondi il prompt' : 'Mostra e modifica il prompt completo',
+togglePrompt: () => this.setState({ mostra: !mostra }),
+sintesi: sintesi,
+looks: LOOKS.map((v) => ({ nome: v[1], sel: v[0] === lookId })),
+inCorso: inCorso,
+etichetta: inCorso ? 'In corso…' : 'Genera render',
+toggle: () => this.setState({ stato: inCorso ? 'pronto' : 'in corso' }),
+esterno: !interno, interno: interno,
+segEst: interno ? 'seg' : 'seg on', segInt: interno ? 'seg on' : 'seg',
+vaiEst: () => this.setState({ scena: 'esterno', preset: null }),
+vaiInt: () => this.setState({ scena: 'interno', preset: null }),
+titoloLuce: interno ? '3 · Luce' : '3 · Ora del giorno',
+phMateriali: interno ? 'es. pavimento in rovere chiaro, pareti in calce bianca, cucina in acciaio' : 'es. intonaco bianco, infissi in rovere scuro, zoccolo in pietra grigia',
+rese: fai('resa', rese),
+ore: interno ? fai('luce', luci) : fai('ora', ore),
+cieli: fai('cielo', cieli),
+mappa: interno ? [
+{ colore: '#E8C547', tinta: 'giallo', nome: 'Intonaco interno', id: 'mat 21', diventa: 'calce bianca opaca' },
+{ colore: '#8B5A2B', tinta: 'marrone', nome: 'Pavimento legno', id: 'mat 30', diventa: 'rovere chiaro a plance larghe' },
+{ colore: '#9AA0A6', tinta: 'grigio', nome: 'Calcestruzzo', id: 'mat 2', diventa: 'cemento lisciato' },
+{ colore: '#5DA9E9', tinta: 'azzurro', nome: 'Vetro', id: 'mat 7', diventa: 'vetro chiaro' }] : [
+{ colore: '#E8C547', tinta: 'giallo', nome: 'Intonaco esterno', id: 'mat 12', diventa: 'intonaco a calce bianco' },
+{ colore: '#C8553D', tinta: 'rosso', nome: 'Copertura', id: 'mat 4', diventa: 'lamiera aggraffata antracite' },
+{ colore: '#8B5A2B', tinta: 'marrone', nome: 'Infissi legno', id: 'mat 9', diventa: 'rovere scuro' },
+{ colore: '#5DA9E9', tinta: 'azzurro', nome: 'Vetro', id: 'mat 7', diventa: 'vetro chiaro, riflette il cielo' },
+{ colore: '#9AA0A6', tinta: 'grigio', nome: 'Calcestruzzo', id: 'mat 2', diventa: 'pietra grigia a spacco' }],
+riassunto: riassunto,
+preset: preset
+};
+}
+}
+</script>
+</body>
+</html>
