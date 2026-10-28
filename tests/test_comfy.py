@@ -425,3 +425,40 @@ def test_i_crediti_scalati_finiscono_nella_ricetta():
         [router_in_coda(), router_stato("COMPLETED"), risultato], immagine=PNG)
     esito = provider_comfy(trasporto).genera(richiesta(modello="bfl/flux-kontext-pro"))
     assert esito.ricetta.parametri["crediti_usati"] == "17.17"
+
+
+def test_durante_l_attesa_dice_a_chi_ascolta_se_il_lavoro_e_inviato_o_in_lavorazione(modello_verificato):
+    """Caso: la coda scrive "inviato" per tutta l'attesa e lo Studio non sa che il Router ci lavora."""
+    trasporto = TrasportoComfyFinto(
+        [router_in_coda(), router_stato("IN_QUEUE"), router_stato("IN_PROGRESS"),
+         router_stato("COMPLETED"), router_risultato()],
+        immagine=PNG,
+    )
+    motore = provider_comfy(trasporto)
+    sentiti = []
+    motore.avanzamento = sentiti.append
+    motore.genera(richiesta())
+    assert sentiti == ["inviato", "inviato", "in lavorazione"]
+
+
+def test_chi_ascolta_l_avanzamento_puo_fermare_l_attesa(modello_verificato):
+    """Caso: l'utente annulla mentre il Router lavora, e il motore continua ad aspettare."""
+
+    class Fermati(Exception):
+        pass
+
+    trasporto = TrasportoComfyFinto(
+        [router_in_coda(), router_stato("IN_PROGRESS"), router_stato("COMPLETED"),
+         router_risultato()],
+        immagine=PNG,
+    )
+    motore = provider_comfy(trasporto)
+
+    def ascolta(stato):
+        if stato == "in lavorazione":
+            raise Fermati()
+
+    motore.avanzamento = ascolta
+    with pytest.raises(Fermati):
+        motore.genera(richiesta())
+    assert trasporto.scaricati == []

@@ -319,3 +319,18 @@ RISOLUZIONE_PREDEFINITA = _registra(Costante(
         "rivedere quando si misurera' il costo per immagine."
     ),
 ))
+
+# --- Coda dei lavori ---------------------------------------------------------
+
+CODA_INTERVALLO_SECONDI = _registra(Costante(
+    nome="CODA_INTERVALLO_SECONDI",
+    valore=1,
+    origine=SCELTA,
+    ragione=(
+        "Ogni quanto il processo della coda guarda se in lavori/in-attesa e' "
+        "arrivato un lavoro. Un secondo e' meno del tempo che si impiega a "
+        "passare da Genera allo Studio, e leggere una cartella al secondo non "
+        "pesa sulla macchina. E' il WATCH_FOLDER_POLL_SECONDS di CLAUDE.md."
+    ),
+    unita=" s",
+))

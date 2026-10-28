@@ -33,7 +33,7 @@ diverge, e la divergenza non viene notata.
 |---|---|---|---|
 | `STRUCTURE_STRENGTH_DEFAULT` | da definire | **scelta**, in attesa del test | Sarà misurata confrontando 50/70/90 |
 | `GEOMETRY_DRIFT_WARN` | da definire | **scelta** | Sopra questa soglia l'interfaccia avvisa |
-| `WATCH_FOLDER_POLL_SECONDS` | da definire | scelta | Compromesso fra reattività e CPU |
+| `CODA_INTERVALLO_SECONDI` (era `WATCH_FOLDER_POLL_SECONDS`) | 1 s | **scelta** | Ogni quanto la coda dei lavori guarda `lavori/in-attesa`: compromesso fra reattività e CPU |
 | `MASK_FEATHER_PX` | da definire | scelta | Sfumatura del bordo maschera |
 
 Segna ogni costante onestamente. Un numero **scelto** è un giudizio e va

@@ -41,7 +41,14 @@ from typing import Callable
 from .. import config, immagine as modulo_immagine
 from ..errori import ChiaveMancante, ErroreProvider, errore_da_stato_http
 from ..ricetta import Ricetta, impronta
-from .base import Provider, RichiestaGenerazione, RichiestaRegione, Risultato
+from .base import (
+    IN_LAVORAZIONE,
+    INVIATO,
+    Provider,
+    RichiestaGenerazione,
+    RichiestaRegione,
+    Risultato,
+)
 from .trasporto import ErroreRete, TrasportoConIntestazioni, TrasportoHTTP
 
 BASE = "https://api.comfy.org/v2/models"
@@ -256,6 +263,11 @@ class ProviderComfy(Provider):
             "una chiamata vera, quindi l'invio vero si fermera' prima di partire."
         )
 
+    def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
+        self._assicura_chiave()
+        self._assicura_peso(immagine)
+        self._schema(modello)
+
     # --- cose che il prodotto chiede ----------------------------------------
 
     def genera(self, richiesta: RichiestaGenerazione) -> Risultato:
@@ -406,7 +418,8 @@ class ProviderComfy(Provider):
         scadenza = self._orologio() + config.ATTESA_MASSIMA_SECONDI
 
         corpo_stato = inviata
-        while self._stato_lavoro(corpo_stato, richiesta_id) != STATO_FINITO:
+        while (stato_router := self._stato_lavoro(corpo_stato, richiesta_id)) != STATO_FINITO:
+            self._segnala(IN_LAVORAZIONE if stato_router == "IN_PROGRESS" else INVIATO)
             self._aspetta(risposte, scadenza, richiesta_id)
             stato, risposte, corpo_stato = self._con_tentativi("GET", f"{lavoro}/status", lettura)
             if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore

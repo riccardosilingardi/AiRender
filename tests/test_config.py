@@ -288,3 +288,24 @@ def test_ogni_costante_dichiarata_ha_un_test_che_nomina_il_suo_caso():
     citate = set(re.findall(r"\b[A-Z][A-Z0-9_]{3,}\b", sorgente))
     mancanti = sorted(set(config.REGISTRO) - citate)
     assert not mancanti, f"costanti senza un test che le nomini: {mancanti}"
+
+
+# --- coda dei lavori ---------------------------------------------------------
+
+
+def test_coda_intervallo_secondi_e_l_attesa_quando_la_coda_e_vuota(tmp_path):
+    """Caso: il processo della coda gira a vuoto e tiene la CPU occupata."""
+    from core.coda import Coda
+
+    attese = []
+
+    class Basta(Exception):
+        pass
+
+    def attendi(secondi):
+        attese.append(secondi)
+        raise Basta()
+
+    with pytest.raises(Basta):
+        Coda(tmp_path, dire=lambda _t: None, attesa=attendi).gira()
+    assert attese == [config.CODA_INTERVALLO_SECONDI]

@@ -108,7 +108,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore, e solo il motore. Gira da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **133 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **178 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -116,12 +116,16 @@ python -m core.cli --image vista.png --preset base --testo "più caldo" --prova-
 python scripts/sonda_comfy.py --solo-schema          # gratis: schema vero del modello
 python scripts/sonda_comfy.py                        # una generazione vera, tutto stampato
 python scripts/confronta_modelli.py --immagine vista.png
+python -m core.coda --cartella C:\AIRENDER --aggiungi vista.png --stile ora-blu   # mette un lavoro in coda
+python -m core.coda --cartella C:\AIRENDER                                       # il processo che lo fa
 ```
 
 | Cosa | Dove | Stato |
 |---|---|---|
 | Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Funziona fino al render salvato: primo invio vero il 2026-10-27 sul PC di Riccardo (Nano Banana 2, 17,17 crediti, ricetta completa accanto al render). Durante l'attesa stampa una riga, per non sembrare bloccata |
-| Casa unica delle decisioni: 21 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Coda dei lavori su cartella: il motore come processo a parte. Un lavoro è un JSON in `lavori/in-attesa`; il processo lo sposta in `in-corso`, poi in `fatto` (render e ricetta accanto), `errore` o `annullato`. Stato leggibile sempre in `lavori/stato/<id>.json` (in coda, inviato, in lavorazione, fatto, errore, annullato). Scrittura atomica, file `<id>.annulla` per fermare, recupero al riavvio dei lavori abbandonati. La destinazione si scrive nel lavoro quando nasce, e se al momento dell'invio non è più quella non parte niente | `core/coda.py` | Provata con `pytest` e con un giro vero da riga di comando senza chiave (si ferma con il messaggio della chiave mancante, senza scrivere «inviato»). **Mai girata con un invio vero**, mai su Windows. Né la palette né lo Studio la usano ancora |
+| Prompt a blocchi: regola fissa → scena → materiali → look → luce → cielo oppure fuori + arredo → intorno → persone → qualità → cosa evitare; 14 preset (8 esterni, 6 interni) | `core/blocchi.py` | Testi identici alla bozza 3 (`docs/ui/blocchi-stile-bozza.md`), controllato da un test che legge la bozza; l'esempio completo e le 14 lunghezze misurate nella bozza tornano al carattere. Tutti i blocchi sono **SCELTI**: nessuno è stato mandato a un modello |
+| Casa unica delle decisioni: 22 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
 | Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
 | Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. I due modelli predefiniti hanno lo schema dal 2026-10-27: non è ancora stato lanciato davvero (il primo confronto è stato fatto a mano, con le immagini della sonda) |
@@ -145,10 +149,10 @@ da `requests`.
 **Piano in corso, dal 2026-10-27: quattro PR, in quest'ordine.** Una sessione
 per PR (regola di `CLAUDE.md`).
 
-1. **Lo Studio nei documenti** — questo PR: `DESIGN.md` con palette v1 e
+1. **Lo Studio nei documenti** — PR #11, unito il 2026-10-28: `DESIGN.md` con palette v1 e
    Studio, questa sezione, mockup e bozza dei blocchi in `docs/ui/`. Niente
    codice.
-2. **Coda di lavori** — il motore come processo a parte, che prende lavori da
+2. **Coda di lavori** — fatto in questo PR (sezione 7). Il motore come processo a parte, che prende lavori da
    una cartella (`lavori/in-attesa`, `in-corso`, `fatto`, `errore`), con
    scrittura atomica, stato leggibile e annullamento; la composizione del
    prompt a blocchi. In `core/`, senza Allplan, senza Studio.
@@ -471,6 +475,36 @@ poggiano su cose non ancora provate:
 - **I mockup in `docs/ui/mockup/` non si aprono da soli**: chiedono un
   `support.js` dell'ambiente in cui sono stati disegnati, che non è nel
   repository. Si leggono come sorgente (struttura e testi), non come pagine.
+
+### Lasciato dalla sessione del 2026-10-28 (coda dei lavori)
+
+- **Nessun lavoro della coda è mai partito davvero.** Provata con il provider
+  finto dei test e con un giro senza chiave. Per verificare sul PC: `py -m
+  core.coda --cartella C:\AIRENDER-prova --aggiungi
+  tests\dati\vista-20261021-093841.png --stile ora-blu`, poi `py -m core.coda
+  --cartella C:\AIRENDER-prova --una-volta`. Rimandare indietro il contenuto
+  di `lavori\stato\` e dire se in `lavori\fatto\` c'è il render con la sua
+  ricetta. Costa una generazione.
+- **Rinomina atomica su Windows.** `os.replace` è atomica anche lì, ma
+  fallisce se un altro processo ha il file aperto in quel momento (lo Studio
+  che legge lo stato). Non succede mai nei test, che girano su Linux. Se
+  capita, il lavoro finisce in errore con «errore imprevisto»: da guardare
+  quando lo Studio leggerà la coda.
+- **Lo stato «in lavorazione» viene dal Router** (`IN_PROGRESS` durante
+  l'attesa). Con Nano Banana 2 la sonda del 2026-10-27 ha visto la coda del
+  Router, ma non ha scritto se `IN_PROGRESS` compare davvero o se il lavoro
+  passa da `IN_QUEUE` a `COMPLETED`. Se non compare, lo stato resta «inviato»
+  fino alla fine.
+- **Annullare durante l'attesa smette di aspettare, non ferma il Router.** Il
+  Router non è stato interrogato su un'API di annullamento: la vista può
+  essere già stata fatta e addebitata, e lo stato lo dice.
+- **Due processi della coda sulla stessa cartella**: il lavoro si prende con
+  una rinomina, quindi uno solo dei due lo prende. Provato solo in un
+  processo; due processi insieme no.
+- **Nella ricetta di un lavoro della coda la grana è «media» per convenzione**:
+  i blocchi non hanno una grana e i modelli del Router non la usano
+  (`dettaglio_grana` resta assente). Da rivedere se la grana tornerà nel
+  cambio di materiale.
 
 ### Usciti da questa sezione, con la loro verifica
 
