@@ -76,12 +76,18 @@ class SchemaModello:
     - `corpo` costruisce il JSON della richiesta da una RichiestaGenerazione;
     - `immagine` trova l'immagine nel risultato e la restituisce come
       ("url" | "base64" | "data-uri", valore);
-    - `verificato_il` e' la data della chiamata vera che lo ha confermato.
+    - `verificato_il` e' la data della chiamata vera che lo ha confermato;
+    - `piu_immagini` dice se il corpo sa portare immagini dopo la vista, e
+      `piu_immagini_verificato_il` quando una chiamata vera lo ha confermato
+      (vuoto: mai). Un corpo che le porta senza verifica si usa solo dal banco
+      di prova, che lo dice prima dell'invio.
     """
 
     corpo: Callable[[RichiestaGenerazione], dict]
     immagine: Callable[[object], tuple[str, str]]
     verificato_il: str
+    piu_immagini: bool = False
+    piu_immagini_verificato_il: str = ""
 
 
 # Rapporti che sia FLUX.1 Kontext sia Gemini accettano (schemi letti dalla
@@ -129,15 +135,17 @@ def _immagine_kontext(uscita: object) -> tuple[str, str]:
 def _corpo_gemini(richiesta: RichiestaGenerazione) -> dict:
     # Gemini non ha un campo per il seme: la ricetta lo salva comunque, ma
     # rieseguire non ridà la stessa immagine (lo dice gia' l'avviso).
+    # Le immagini in piu' seguono la vista come altre parti inlineData, nello
+    # stesso ordine: e' la forma di Vertex AI per piu' immagini, mai provata
+    # attraverso il Router (PRD, sezione 9).
+    immagini = (richiesta.immagine, *richiesta.immagini_in_piu)
     return {
         "contents": [{
             "role": "user",
             "parts": [
                 {"text": richiesta.prompt},
-                {"inlineData": {
-                    "mimeType": tipo_mime(richiesta.immagine),
-                    "data": immagine_base64(richiesta.immagine),
-                }},
+                *({"inlineData": {"mimeType": tipo_mime(dati), "data": immagine_base64(dati)}}
+                  for dati in immagini),
             ],
         }],
         "generationConfig": {
@@ -189,6 +197,7 @@ SCHEMI: dict[str, SchemaModello] = {
         corpo=_corpo_gemini,
         immagine=_immagine_gemini,
         verificato_il="2026-10-27",
+        piu_immagini=True,
     ),
 }
 
@@ -316,8 +325,15 @@ class ProviderComfy(Provider):
 
     def _genera(self, richiesta: RichiestaGenerazione, avvisi_in_piu: list[str]) -> Risultato:
         self._assicura_chiave()
-        self._assicura_peso(richiesta.immagine)
+        for dati in (richiesta.immagine, *richiesta.immagini_in_piu):
+            self._assicura_peso(dati)
         schema = self._schema(richiesta.modello)
+        if richiesta.immagini_in_piu and not schema.piu_immagini:
+            raise ErroreProvider(
+                f"{richiesta.modello} riceve una sola immagine per invio: la "
+                f"richiesta ne porta {1 + len(richiesta.immagini_in_piu)}. Non ho inviato niente.",
+                "Togli le immagini in piu' (maschera, mappa), oppure usa Nano Banana 2.",
+            )
 
         corpo = schema.corpo(richiesta)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
@@ -341,7 +357,8 @@ class ProviderComfy(Provider):
             impronta_sorgente=impronta(richiesta.immagine),
             seme=richiesta.seme,
             parametri={
-                "corpo": _senza_immagine(corpo, richiesta.immagine),
+                "corpo": _senza_immagini(corpo, (richiesta.immagine, *richiesta.immagini_in_piu)),
+                "immagini_in_piu": [impronta(d) for d in richiesta.immagini_in_piu],
                 "fallback_provider": FALLBACK,
                 "chiave_idempotenza": chiave_idempotenza,
                 "schema_verificato_il": schema.verificato_il,
@@ -587,16 +604,23 @@ class ProviderComfy(Provider):
             )
 
 
-def _senza_immagine(corpo: object, dati: bytes) -> object:
+def _senza_immagine(corpo: object, dati: bytes, nome: str = "vista") -> object:
     """Il corpo da salvare nella ricetta: tutto, tranne l'immagine, che diventa la sua impronta."""
     codificata = base64.b64encode(dati).decode("ascii")
-    segnaposto = f"<vista sha256:{impronta(dati)}>"
+    segnaposto = f"<{nome} sha256:{impronta(dati)}>"
     if isinstance(corpo, dict):
-        return {k: _senza_immagine(v, dati) for k, v in corpo.items()}
+        return {k: _senza_immagine(v, dati, nome) for k, v in corpo.items()}
     if isinstance(corpo, list):
-        return [_senza_immagine(v, dati) for v in corpo]
+        return [_senza_immagine(v, dati, nome) for v in corpo]
     if isinstance(corpo, str) and corpo.endswith(codificata):
         return segnaposto
+    return corpo
+
+
+def _senza_immagini(corpo: object, immagini: tuple[bytes, ...]) -> object:
+    """Come _senza_immagine, per la vista e ogni immagine in piu'."""
+    for indice, dati in enumerate(immagini):
+        corpo = _senza_immagine(corpo, dati, "vista" if indice == 0 else f"immagine {indice + 1}")
     return corpo
 
 

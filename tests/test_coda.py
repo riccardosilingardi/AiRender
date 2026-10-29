@@ -13,7 +13,7 @@ import pytest
 
 from conftest import vista_shaded, vista_wireframe
 from core import coda as modulo_coda
-from core.blocchi import da_preset
+from core.blocchi import VERSIONE, da_preset
 from core.coda import Coda, chiedi_annullamento, leggi_stato, metti_in_coda
 from core.errori import ErroreProvider
 from core.provider.base import IN_LAVORAZIONE, INVIATO, Provider, Risultato
@@ -129,7 +129,7 @@ def test_un_lavoro_arriva_e_lascia_render_ricetta_e_stato_fatto(radice, vista, c
     assert render.read_bytes() == b"render-finto"
     assert render.parent == radice / "lavori" / "fatto"
     ricetta = json.loads(Path(stato["ricetta"]).read_text("utf-8"))
-    assert ricetta["preset"] == "ora-blu" and ricetta["preset_versione"] == "bozza-3"
+    assert ricetta["preset"] == "ora-blu" and ricetta["preset_versione"] == VERSIONE
     assert ricetta["prompt"].startswith("Edit this exact image.")
     assert "Materials: intonaco a calce bianco." in ricetta["prompt"]
     assert stato["scostamento_geometria"] is None

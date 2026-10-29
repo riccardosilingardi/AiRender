@@ -29,6 +29,7 @@ from ..preset import MODELLI_PREDEFINITI
 from ..provider import comfy
 from ..provider.base import Provider
 from ..ricetta import Ricetta
+from . import miniature as modulo_miniature
 
 
 class RichiestaStudioNonValida(ErroreAirender):
@@ -86,11 +87,6 @@ RESE = (
     ("acquerello", "Acquerello", False, _SERVE_UN_BLOCCO),
     ("cinema", "Cinematografico", False, _SERVE_UN_BLOCCO),
 )
-_IN_ARRIVO = {
-    (blocchi.ESTERNO, "intorno"): (("citta", "Città"), ("periferia", "Periferia"), ("campagna", "Campagna")),
-    (blocchi.ESTERNO, "persone"): (("poche", "Poche"),),
-}
-_VERDE = (("nessuno", "Nessuno"), ("poco", "Poco"), ("rigoglioso", "Rigoglioso"))
 
 _TITOLI_ASSI = {
     "look": "Look fotografico",
@@ -99,6 +95,7 @@ _TITOLI_ASSI = {
     "fuori": "Fuori dalle finestre",
     "arredo": "Arredo",
     "intorno": "Intorno all'edificio",
+    "verde": "Verde",
     "persone": "Persone",
     "qualita": "Qualità",
 }
@@ -138,6 +135,7 @@ class Studio:
         coda_attiva: Callable[[], bool] = lambda: False,
         apri: Callable[[Path], None] = apri_nel_sistema,
         adesso: Callable[[], datetime] = _adesso,
+        cartella_miniature: Path = modulo_miniature.CARTELLA,
     ) -> None:
         self.cartella = Path(cartella).resolve()
         self.cartella.mkdir(parents=True, exist_ok=True)
@@ -146,6 +144,7 @@ class Studio:
         self._coda_attiva = coda_attiva
         self._apri = apri
         self._adesso = adesso
+        self.cartella_miniature = Path(cartella_miniature)
         self.percorsi = modulo_coda.cartelle(self.cartella)
 
     # --- in testa --------------------------------------------------------
@@ -264,10 +263,12 @@ class Studio:
     def catalogo(self) -> dict:
         """Preset, assi e modelli, con quello che e' attivo e quello in grigio."""
         scene = {}
+        vere = modulo_miniature.leggi(self.cartella_miniature)
         for scena in blocchi.SCENE:
             scene[scena] = {
                 "preset": [
-                    {"id": p.identificativo, "nome": p.nome, "scelte": p.scelte.a_dizionario()}
+                    {"id": p.identificativo, "nome": p.nome, "scelte": p.scelte.a_dizionario(),
+                     "miniatura": _miniatura_dict(p.identificativo, vere.get(p.identificativo))}
                     for p in blocchi.PRESET_STILE.values() if p.scelte.scena == scena
                 ],
                 "assi": self._assi(scena),
@@ -279,7 +280,7 @@ class Studio:
             "rese": [
                 {"id": i, "nome": n, "attivo": a, "nota": nota} for i, n, a, nota in RESE
             ],
-            "verde": [{"id": i, "nome": n, "attivo": False, "nota": _SERVE_UN_BLOCCO} for i, n in _VERDE],
+            "varianti_massime": config.VARIANTI_MASSIME,
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
         }
@@ -292,10 +293,6 @@ class Studio:
             voci = [
                 {"id": b.identificativo, "nome": b.nome, "attivo": True, "origine": b.origine}
                 for b in blocchi.voci(asse, scena).values()
-            ]
-            voci += [
-                {"id": i, "nome": n, "attivo": False, "nota": _SERVE_UN_BLOCCO}
-                for i, n in _IN_ARRIVO.get((scena, asse), ())
             ]
             titolo = _TITOLI_ASSI[asse]
             if asse == "luce" and scena == blocchi.INTERNO:
@@ -324,6 +321,17 @@ class Studio:
             "versione_blocchi": blocchi.VERSIONE,
         }
 
+    def file_miniatura(self, preset: str) -> Path:
+        """La miniatura vera di un preset. Solo un preset che esiste, solo dalla sua cartella."""
+        percorso = modulo_miniature.file_di(preset, self.cartella_miniature) \
+            if preset in blocchi.PRESET_STILE else None
+        if percorso is None:
+            raise FileNonTrovato(
+                f"Il preset {preset} non ha una miniatura vera.",
+                "Lo Studio mostra la sua illustrazione.",
+            )
+        return percorso
+
     # --- destinazione e costo --------------------------------------------
 
     def _modello(self, identificativo: str) -> Modello:
@@ -344,26 +352,24 @@ class Studio:
             "verificato": motore.cosa_manca(modello.identificativo) is None,
         }
 
-    def destinazione(self, identificativo_modello: str) -> dict:
-        """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5)."""
+    def destinazione(self, identificativo_modello: str, varianti: object = 1) -> dict:
+        """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
+
+        Con N varianti il costo e' N volte quello di un render, e lo si dice
+        cosi'. Se il costo del modello non e' misurato resta "non misurato".
+        """
         modello = self._modello(identificativo_modello)
+        quante = numero_varianti(varianti)
         motore = self._crea_provider(self.provider)
         senza_ripiego = self.provider == comfy.ProviderComfy.nome and comfy.FALLBACK == "false"
-        if modello.costo_crediti is not None:
-            costo = (
-                f"circa {round(modello.costo_crediti)} crediti per immagine · "
-                f"misurato il {modello.costo_misurato_il} "
-                f"({_numero(modello.costo_crediti)} crediti)"
-            )
-        else:
-            costo = "non misurato: nessuna generazione con questo modello ha copiato i crediti"
         return {
             "modello": modello.identificativo,
             "modello_nome": modello.nome,
             "fornitore": modello.fornitore,
             "destinazione": motore.destinazione_per(modello.identificativo),
             "senza_ripiego": senza_ripiego,
-            "costo": costo,
+            "varianti": quante,
+            "costo": testo_costo(modello, quante),
             "costo_misurato": modello.costo_crediti is not None,
             "cosa_manca": motore.cosa_manca(modello.identificativo),
         }
@@ -374,7 +380,7 @@ class Studio:
         """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
         prompt = _prompt_a_mano(dati) or blocchi.componi(scelte)
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
@@ -390,6 +396,7 @@ class Studio:
             problemi.append(_CODA_FERMA)
         return {
             "inviato": False,
+            "varianti": destinazione["varianti"],
             "prompt": prompt,
             "caratteri": len(prompt),
             "destinazione": destinazione,
@@ -397,18 +404,25 @@ class Studio:
         }
 
     def invia(self, dati: dict) -> dict:
-        """Scrive il lavoro in coda. Solo se la destinazione e' quella che la pagina ha mostrato."""
+        """Scrive in coda un lavoro per variante. Solo se la destinazione e' quella che la pagina ha mostrato.
+
+        Le varianti sono lavori con le stesse scelte: la coda li fa uno dopo
+        l'altro, e ognuno e' un invio pagato. Il costo per N l'ha mostrato
+        destinazione() prima del clic.
+        """
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
             preset=dati.get("preset") or None,
             prompt_a_mano=_prompt_a_mano(dati),
+            varianti=destinazione["varianti"],
         )
 
-    def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano) -> dict:
+    def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
+                       varianti: int = 1) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -423,17 +437,21 @@ class Studio:
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
             raise RichiestaStudioNonValida(descrizione["fatto"], descrizione["cosa_fare"])
-        lavoro = modulo_coda.metti_in_coda(
-            self.cartella, vista, scelte,
-            preset=preset,
-            provider=self.provider,
-            modello=destinazione["modello"],
-            prompt_a_mano=prompt_a_mano,
-            crea_provider=self._crea_provider,
-        )
+        lavori = [
+            modulo_coda.metti_in_coda(
+                self.cartella, vista, scelte,
+                preset=preset,
+                provider=self.provider,
+                modello=destinazione["modello"],
+                prompt_a_mano=prompt_a_mano,
+                crea_provider=self._crea_provider,
+            )
+            for _ in range(varianti)
+        ]
         return {
-            "identificativo": lavoro.identificativo,
-            "destinazione": lavoro.destinazione,
+            "identificativo": lavori[0].identificativo,
+            "identificativi": [l.identificativo for l in lavori],
+            "destinazione": lavori[0].destinazione,
             "coda_attiva": self._coda_attiva(),
         }
 
@@ -643,6 +661,45 @@ class Studio:
         return {"aperta": str(percorso)}
 
 
+def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:
+    """Cosa la pagina sa di una miniatura vera: dove prenderla e da quando e' un render vero."""
+    if voce is None:
+        return None
+    try:
+        quando = datetime.fromisoformat(str(voce.get("data"))).strftime("%d/%m/%Y")
+    except ValueError:
+        quando = str(voce.get("data") or "")
+    return {"url": f"/file/miniatura/{preset}", "data": quando, "modello": voce.get("modello")}
+
+
+def numero_varianti(valore: object) -> int:
+    """Quante varianti: un intero da 1 a VARIANTI_MASSIME, altrimenti si rifiuta."""
+    massimo = config.VARIANTI_MASSIME
+    try:
+        quante = int(valore)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        quante = 0
+    if isinstance(valore, bool) or str(valore).strip() != str(quante) or not 1 <= quante <= massimo:
+        raise RichiestaStudioNonValida(
+            f"\"{valore}\" non e' un numero di varianti: lo Studio ne fa da 1 a {massimo} per invio.",
+            f"Scegli 1, 2, 3 o {massimo} varianti.",
+        )
+    return quante
+
+
+def testo_costo(modello: Modello, varianti: int = 1) -> str:
+    """Il costo da scrivere prima di Genera: per uno, o N volte uno, mai un numero non misurato."""
+    if modello.costo_crediti is None:
+        return "non misurato: nessuna generazione con questo modello ha copiato i crediti"
+    data = f"misurato il {modello.costo_misurato_il}"
+    if varianti == 1:
+        return (f"circa {round(modello.costo_crediti)} crediti per immagine · {data} "
+                f"({_numero(modello.costo_crediti)} crediti)")
+    totale = modello.costo_crediti * varianti
+    return (f"circa {round(totale)} crediti per {varianti} immagini "
+            f"({varianti} × {_numero(modello.costo_crediti)}) · {data}")
+
+
 _CODA_FERMA = {
     "fatto": "La coda dei lavori non sta girando: il lavoro resterebbe in attesa.",
     "cosa_fare": (
@@ -682,6 +739,7 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
         "fuori": "{}",
         "arredo": "{}",
         "intorno": "intorno: {}",
+        "verde": "verde: {}",
         "persone": "persone: {}",
         "qualita": "qualità {}",
     }

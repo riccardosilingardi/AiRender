@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Studio — Passi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141518}
+a{color:#8FBCFF}a:hover{color:#B9D4FF}
+.btn{font:inherit;font-size:13px;font-weight:500;border-radius:8px;padding:0 14px;min-height:36px;border:1px solid #34373E;background:#23252A;color:#EDEDEF;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:disabled{color:#8B8F97;border-style:dashed;background:transparent;cursor:not-allowed}
+.primary{background:#6EA8FE;border-color:#6EA8FE;color:#0B1220}
+.soon{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#A1A4AB;border:1px dashed #4A4D55;border-radius:999px;padding:2px 7px;white-space:nowrap}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#A1A4AB}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;width:64px;min-height:56px;justify-content:center;border-radius:10px;font:inherit;font-size:11px;background:transparent;border:0;color:#C9CBD0;cursor:pointer}
+.rail:disabled{color:#8B8F97;cursor:not-allowed}
+.seg{font:inherit;font-size:12px;min-height:30px;border-radius:7px;border:0;background:transparent;color:#C9CBD0;cursor:pointer;padding:0 10px}
+.on{background:#2B2F38;color:#EDEDEF}
+.seg{font:inherit;font-size:12px;min-height:30px;border-radius:7px;border:0;background:transparent;color:#C9CBD0;cursor:pointer;padding:0 10px}
+.on{background:#2B2F38;color:#EDEDEF}
+.passo{display:grid;grid-template-columns:22px 56px minmax(0,1fr);gap:10px;align-items:center;width:100%;text-align:left;font:inherit;color:#EDEDEF;background:transparent;border:1px solid transparent;border-radius:10px;padding:6px;cursor:pointer}
+.psel{background:#1F2633;border-color:#3B5B8C}
+.ramo{position:relative}
+.d1{margin-left:14px}.d2{margin-left:28px}.d3{margin-left:42px}
+.d1::before,.d2::before,.d3::before{content:"";position:absolute;left:-8px;top:-2px;bottom:50%;width:8px;border-left:1px solid #3A3D44;border-bottom:1px solid #3A3D44;border-bottom-left-radius:6px}
+.num{width:22px;height:22px;border-radius:50%;background:#2B2F38;color:#C9CBD0;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #EDEDEF; background: #141518; min-height: 900px; display: flex; flex-direction: column">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid #2A2C31; background: #18191C">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6EA8FE" stroke-width="1.8" aria-hidden="true"><path d="M3 20 L12 4 L21 20 Z"/><path d="M7.5 12 H16.5"/></svg>
+<span style="font-weight: 600; font-size: 15px; letter-spacing: .02em">AIRENDER</span>
+<span style="color: #A1A4AB; font-size: 13px">Studio</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #C9CBD0">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #5CC28B"></span>
+<span>Collegato ad Allplan 2026 · BOSCO · Prospettiva centrale</span>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #C9CBD0; border: 1px solid #2E3036; border-radius: 8px; padding: 6px 10px">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8B04B" stroke-width="2" aria-hidden="true"><path d="M12 3 L21 19 H3 Z"/><path d="M12 10 V14"/><path d="M12 17 V17.5"/></svg>
+<span>Le immagini vanno a <b style="font-weight: 600; color: #EDEDEF">Comfy Router → Google (Nano Banana 2)</b></span>
+</div>
+<button class="btn" aria-label="Impostazioni" disabled="disabled"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Chiave e tetto di spesa<span class="soon">In arrivo</span></button>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; flex: 1; min-height: 0">
+
+<nav aria-label="Fasi" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; border-right: 1px solid #2A2C31; background: #18191C">
+<a href="Stile.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 L19 5"/><path d="M15 5h4v4"/><circle cx="7" cy="7" r="2"/></svg>Genera</a>
+<a href="Main.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg>Risultato</a>
+<a href="Ritocca.dc.html" class="rail" style="text-decoration: none; color: #8B8F97"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Ritocca</a>
+<button class="rail" style="background: #262A33; color: #EDEDEF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Passi</button>
+<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10 L21 7 V17 L16 14"/></svg>Video</button>
+</nav>
+
+<section aria-label="Passi di questa vista" style="flex: 0 0 300px; display: flex; flex-direction: column; gap: 12px; padding: 16px 12px; border-right: 1px solid #2A2C31; background: #16171A">
+<div style="display: flex; justify-content: space-between; align-items: baseline"><span class="lbl">Passi di questa vista</span><span style="font-size: 11px; color: #8B8F97">BOSCO · prospettiva</span></div>
+<ol role="tree" aria-label="Albero dei passi" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+<sc-for list="{{ passi }}" as="p" hint-placeholder-count="6">
+<li role="treeitem" aria-selected="{{ p.sel }}" class="{{ p.ramo }}"><button class="{{ p.cls }}" onClick="{{ p.pick }}">
+<span class="num">{{ p.n }}</span>
+<img src="{{ p.img }}" alt="" style="width: 56px; height: 36px; object-fit: cover; border-radius: 6px; display: block">
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ p.titolo }}</span><span style="font-size: 11px; color: #8B8F97">{{ p.sotto }}</span></span>
+</button></li>
+</sc-for>
+</ol>
+<div style="font-size: 12px; line-height: 1.5; color: #8B8F97">Ogni passo parte da quello sopra di lui. Un passo nuovo fatto da un punto qualsiasi apre un ramo lì sotto.</div>
+<div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #2A2C31; padding-top: 12px">
+<label for="nuovo" class="lbl">Nuovo passo da qui</label>
+<input id="nuovo" placeholder="es. aggiungi due alberi davanti all'ingresso" style="font: inherit; font-size: 13px; min-height: 36px; background: #1C1D21; color: #EDEDEF; border: 1px solid #3B5B8C; border-radius: 8px; padding: 0 10px">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px">
+<button class="btn primary" style="justify-content: center">Applica</button>
+<button class="btn" disabled="disabled" style="justify-content: center">Su un'area <span class="soon">In arrivo</span></button>
+</div>
+<span style="font-size: 12px; color: #8B8F97">{{ notaNuovo }}</span>
+</div>
+</section>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h1 style="margin: 0; font-size: 18px; font-weight: 600">{{ titoloSel }}</h1>
+<div style="flex: 1"></div>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #A1A4AB">Confronta con
+<select onChange="{{ cambiaConfronto }}" style="font: inherit; font-size: 13px; min-height: 32px; background: #1C1D21; color: #EDEDEF; border: 1px solid #34373E; border-radius: 8px; padding: 0 8px"><option value="vista">Vista Allplan (passo 0)</option><option value="prec">Passo prima</option></select></label>
+</div>
+<figure style="margin: 0; display: flex; flex-direction: column; background: #1C1D21; border: 1px solid #3B5B8C; border-radius: 12px; overflow: hidden">
+<svg viewBox="0 0 1376 768" role="img" aria-label="Confronto prima e dopo fra due passi" style="display: block; width: 100%; height: auto">
+<defs><clipPath id="taglioP"><rect x="0" y="0" width="{{ xPx }}" height="768"/></clipPath></defs>
+<image href="{{ imgDopo }}" x="0" y="0" width="1376" height="768" preserveAspectRatio="xMidYMid slice"/>
+<image href="{{ imgPrima }}" x="0" y="0" width="1376" height="768" preserveAspectRatio="xMidYMid slice" clip-path="url(#taglioP)"/>
+<line x1="{{ xPx }}" y1="0" x2="{{ xPx }}" y2="768" stroke="#FFFFFF" stroke-width="4"/>
+<circle cx="{{ xPx }}" cy="384" r="26" fill="#141518" stroke="#FFFFFF" stroke-width="4"/>
+<rect x="16" y="16" width="260" height="40" rx="8" fill="rgba(20,21,24,.85)"/><text x="30" y="43" fill="#EDEDEF" font-size="20" font-family="Inter, sans-serif">{{ nomePrima }}</text>
+<rect x="1100" y="16" width="260" height="40" rx="8" fill="rgba(20,21,24,.85)"/><text x="1114" y="43" fill="#EDEDEF" font-size="20" font-family="Inter, sans-serif">{{ nomeDopo }}</text>
+</svg>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px">
+<label for="cursoreP" style="font-size: 12px; color: #A1A4AB; white-space: nowrap">Sposta la linea</label>
+<input id="cursoreP" type="range" min="0" max="100" value="{{ x }}" onInput="{{ muovi }}" style="flex: 1; accent-color: #6EA8FE">
+</div>
+<figcaption style="padding: 0 12px 10px; font-size: 12px; color: #8B8F97">Immagini d'esempio: i passi 2, 3 e 4 riusano il render vero del 27/10, non sono generati.</figcaption>
+</figure>
+</main>
+
+<aside aria-label="Il passo scelto" style="flex: 1 1 300px; max-width: 360px; display: flex; flex-direction: column; gap: 16px; padding: 18px; border-left: 1px solid #2A2C31; background: #18191C">
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Tenuta della geometria</div>
+<div style="border: 1px dashed #4A4D55; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 14px; font-weight: 500">Non misurata</span><span class="soon">Misura in arrivo</span></div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #A1A4AB">Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto.</p>
+</div>
+<sc-if value="{{ avviso }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 8px; border: 1px solid #4D4022; background: #231E14; border-radius: 9px; padding: 10px 12px; font-size: 13px; line-height: 1.45">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8B04B" stroke-width="2" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 3 L21 19 H3 Z"/><path d="M12 10 V14"/></svg>
+<span>{{ testoAvviso }}</span>
+</div>
+</sc-if>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div class="lbl">Com'è stato fatto</div>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; font-size: 13px">
+<dt style="color: #A1A4AB">Strada</dt><dd style="margin: 0">{{ parteDa }}</dd>
+<dt style="color: #A1A4AB">Richiesta</dt><dd style="margin: 0">{{ richiesta }}</dd>
+<dt style="color: #A1A4AB">Modello</dt><dd style="margin: 0">{{ modello }}</dd>
+<dt style="color: #A1A4AB">Costo</dt><dd style="margin: 0">{{ costo }}</dd>
+</dl>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px; margin-top: auto">
+<button class="btn primary" style="justify-content: center">Rifai pulito dalla vista</button>
+<span style="font-size: 12px; line-height: 1.5; color: #8B8F97">{{ notaPulito }}</span>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px">
+<button class="btn" style="justify-content: center">Rifai questo passo</button>
+<button class="btn" style="justify-content: center">Apri cartella</button>
+</div>
+</section>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state || {};
+const VISTA = '/_blob/2bcb58f97f23f9ca72d72862d0952b4d';
+const RENDER = '/_blob/f31162d2b14f7460edbd003e3fac22db';
+const NODI = [
+{ id: 0, n: '0', d: 0, titolo: 'Vista Allplan', sotto: 'cattura del 21/10', img: VISTA, richiesta: '—', modello: '—', costo: '—', da: null, gen: 0 },
+{ id: 1, n: '1', d: 1, titolo: "Rivista d'architettura", sotto: 'Nano Banana 2', img: RENDER, richiesta: "preset Rivista d'architettura", modello: 'Nano Banana 2', costo: '17,17 crediti', da: 0, gen: 1 },
+{ id: 2, n: '2', d: 2, titolo: 'Alberi sul fronte', sotto: 'dal passo 1', img: RENDER, richiesta: 'aggiungi due alberi davanti al fronte, non coprire le finestre', modello: 'Nano Banana 2', costo: 'circa 17 crediti', da: 1, gen: 2 },
+{ id: 3, n: '3', d: 3, titolo: 'Persone in movimento', sotto: 'dal passo 2', img: RENDER, richiesta: 'qualche persona che cammina, leggermente mossa', modello: 'Nano Banana 2', costo: 'circa 17 crediti', da: 2, gen: 3 },
+{ id: 4, n: '4', d: 3, titolo: 'Cielo al tramonto', sotto: 'dal passo 2 · altro ramo', img: RENDER, richiesta: 'cielo al tramonto, luce calda radente', modello: 'Nano Banana 2', costo: 'circa 17 crediti', da: 2, gen: 3 },
+{ id: 5, n: '5', d: 1, titolo: 'Stesso stile, Kontext Pro', sotto: 'dalla vista · altro modello', img: '/_blob/bdafff7c31cd2e2010ea602bc538494d', richiesta: "preset Rivista d'architettura", modello: 'FLUX.1 Kontext Pro', costo: 'non misurato', da: 0, gen: 1 }];
+const per = (id) => NODI.find((p) => p.id === id);
+const selId = st.sel == null ? 3 : st.sel;
+const sel = per(selId) || NODI[3];
+const confronto = st.confronto || 'vista';
+const prima = confronto === 'prec' && sel.da != null ? per(sel.da) : NODI[0];
+const x = st.x == null ? 50 : st.x;
+const generazioni = sel.gen;
+const catena = [];
+for (let q = sel; q; q = q.da == null ? null : per(q.da)) catena.unshift(q.n);
+return {
+passi: NODI.map((p) => ({ n: p.n, titolo: p.titolo, sotto: p.sotto, img: p.img, sel: p.id === sel.id, ramo: 'ramo d' + p.d, cls: p.id === sel.id ? 'passo psel' : 'passo', pick: () => this.setState({ sel: p.id }) })),
+notaNuovo: NODI.some((p) => p.da === sel.id) ? 'Parte dal passo ' + sel.n + ': si apre un ramo nuovo accanto a quelli che ci sono già.' : 'Parte dal passo ' + sel.n + ' e continua il suo ramo.',
+titoloSel: 'Passo ' + sel.n + ' · ' + sel.titolo,
+cambiaConfronto: (e) => this.setState({ confronto: e.target.value }),
+imgPrima: prima.img, imgDopo: sel.img,
+nomePrima: prima.id === 0 ? 'Vista Allplan' : 'Passo ' + prima.n,
+nomeDopo: 'Passo ' + sel.n,
+x: x, xPx: Math.round(1376 * x / 100), muovi: (e) => this.setState({ x: Number(e.target.value) }),
+avviso: generazioni >= 2,
+testoAvviso: 'Questa immagine è passata da ' + generazioni + ' generazioni di fila. Ogni giro ridisegna tutto: controlla gli spigoli contro la vista, o rifai pulito.',
+parteDa: catena.join(' › '),
+richiesta: sel.richiesta, modello: sel.modello, costo: sel.costo,
+notaPulito: generazioni <= 1 ? 'Un passo solo: niente da unire.' : 'Unisce le richieste dei passi ' + catena.slice(1).join(', ') + ' in un solo invio dalla vista Allplan. Un render, circa 17 crediti, una generazione invece di ' + generazioni + '.'
+};
+}
+}
+</script>
+</body>
+</html>

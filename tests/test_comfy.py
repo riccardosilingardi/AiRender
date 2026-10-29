@@ -418,6 +418,33 @@ def test_gemini_dall_invio_all_immagine_decodificata():
         f"<vista sha256:{impronta(PNG)}>")
 
 
+def test_gemini_mette_le_immagini_in_piu_dopo_la_vista_e_la_ricetta_non_le_tiene():
+    """Caso: la maschera del banco di prova parte prima della vista, o finisce in chiaro nella ricetta."""
+    maschera = vista_shaded(64, 64, seme=3)
+    risultato_vero = (200, {}, {"candidates": [{"content": {"parts": [
+        {"inlineData": {"mimeType": "image/png", "data": comfy.immagine_base64(PNG)}}]}}]})
+    trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), risultato_vero])
+    esito = provider_comfy(trasporto).genera(
+        richiesta(modello="vertexai/gemini-3.1-flash-image", immagini_in_piu=(maschera,)))
+    parti = trasporto.poste()[0][3]["contents"][0]["parts"]
+    assert [p.get("text") for p in parti[:1]] == ["prompt tecnico"]
+    assert parti[2]["inlineData"]["data"] == comfy.immagine_base64(maschera)
+    salvate = esito.ricetta.parametri["corpo"]["contents"][0]["parts"]
+    assert salvate[2]["inlineData"]["data"] == f"<immagine 2 sha256:{impronta(maschera)}>"
+    assert esito.ricetta.parametri["immagini_in_piu"] == [impronta(maschera)]
+    assert comfy.SCHEMI["vertexai/gemini-3.1-flash-image"].piu_immagini_verificato_il == ""
+
+
+def test_kontext_con_due_immagini_si_ferma_prima_di_partire():
+    """Caso: Kontext riceve la maschera, la ignora in silenzio, e il confronto del banco non vale."""
+    trasporto = TrasportoComfyFinto([])
+    with pytest.raises(ErroreProvider) as errore:
+        provider_comfy(trasporto).genera(
+            richiesta(modello="bfl/flux-kontext-pro", immagini_in_piu=(PNG,)))
+    assert "una sola immagine" in errore.value.fatto and "Non ho inviato niente" in errore.value.fatto
+    assert trasporto.chiamate == []
+
+
 def test_i_crediti_scalati_finiscono_nella_ricetta():
     """Caso: a fine mese si vuole sapere quanto e' costato ogni livello."""
     risultato = (200, {"x-comfy-credits-used": "17.17"}, {"result": {"sample": "https://s.esempio/r.png"}})
