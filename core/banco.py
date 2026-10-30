@@ -35,7 +35,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
 
-from . import blocchi, grana as modulo_grana, immagine as modulo_immagine
+from . import aree as modulo_aree, blocchi, grana as modulo_grana, immagine as modulo_immagine
+from .aree import FORME, Area  # noqa: F401  (Area e FORME stavano qui fino al prompt 6)
 from .cli import _salva
 from .errori import ErroreAirender
 from .provider.base import Provider, RichiestaGenerazione
@@ -59,65 +60,9 @@ NON_INVIATO = "non inviato"
 SPIGOLI = "spigoli"
 FUORI_AREE = "fuori-aree"
 
-FORME = ("rettangolo", "libera")
-
 
 class PianoNonValido(ErroreAirender):
     """Un piano che non esiste o che non si puo' preparare."""
-
-
-@dataclass(frozen=True)
-class Area:
-    """Un'area del piano aree, in coordinate da 0 a 1 sull'immagine.
-
-    Un rettangolo ha due punti (due angoli opposti); una selezione libera ne
-    ha almeno tre, nell'ordine del lazo.
-    """
-
-    forma: str
-    punti: tuple[tuple[float, float], ...]
-    nota: str
-
-    def __post_init__(self) -> None:
-        if self.forma not in FORME:
-            raise PianoNonValido(
-                f"\"{self.forma}\" non e' una forma di area.",
-                "Le forme sono rettangolo e libera.",
-            )
-        minimo = 2 if self.forma == "rettangolo" else 3  # numero-non-configurabile: punti di un poligono
-        if len(self.punti) < minimo or not all(
-            len(p) == 2 and all(0 <= c <= 1 for c in p) for p in self.punti
-        ):
-            raise PianoNonValido(
-                f"Un'area {self.forma} ha punti che non tornano: {list(self.punti)}.",
-                "Un rettangolo ha due punti, una selezione libera almeno tre; "
-                "ogni punto e' [x, y] fra 0 e 1.",
-            )
-        if not " ".join(self.nota.split()):
-            raise PianoNonValido(
-                "Un'area senza nota non dice al modello cosa fare.",
-                "Scrivi la nota dell'area.",
-            )
-
-    def in_pixel(self, larghezza: int, altezza: int) -> list[tuple[float, float]]:
-        punti = [(x * larghezza, y * altezza) for x, y in self.punti]
-        if self.forma == "rettangolo":
-            (x0, y0), (x1, y1) = punti[0], punti[1]
-            return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-        return punti
-
-    @classmethod
-    def da_dizionario(cls, dati: object) -> "Area":
-        if not isinstance(dati, dict):
-            raise PianoNonValido("Un'area del file non e' un oggetto.", "Ogni area e' {forma, punti, nota}.")
-        try:
-            punti = tuple(tuple(float(c) for c in p) for p in dati.get("punti") or ())
-        except (TypeError, ValueError):
-            punti = ()
-        return cls(str(dati.get("forma") or ""), punti, str(dati.get("nota") or ""))
-
-    def a_dizionario(self) -> dict:
-        return {"forma": self.forma, "punti": [list(p) for p in self.punti], "nota": self.nota}
 
 
 @dataclass(frozen=True)
@@ -441,15 +386,7 @@ def testo_misura(voce: dict | None, misura: str) -> str:
         return (f"Spigoli della vista ritrovati: {_percento(valore)} · misura grezza con soglie "
                 "scelte, non validata: serve a confrontare le generazioni di questo banco, "
                 "giudica con l'occhio.")
-    if not valore or valore.get("differenza_media") is None:
-        return "Fuori dalle aree: non misurato."
-    testo = (f"Fuori dalle aree: differenza media {_numero(valore['differenza_media'])} su 255 · "
-             f"{_percento(valore['quota_cambiata'])} dei pixel cambiati in modo visibile.")
-    if valore.get("ridimensionata"):
-        larghezza, altezza = valore.get("dimensioni_render") or ("?", "?")
-        testo += (f" Il render e' {larghezza}x{altezza}, non della dimensione di partenza: "
-                  "la misura conta anche il ricampionamento.")
-    return testo
+    return modulo_aree.testo_misura(valore)
 
 
 def _figura(banco: dict, nome: str) -> str:

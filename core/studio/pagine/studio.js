@@ -1,4 +1,4 @@
-// Lo Studio: Genera, Risultato, Passi, Ritocca (in grigio).
+// Lo Studio: Genera, Risultato, Passi, Ritocca.
 // Niente framework e niente CDN: deve funzionare offline. Lo stato sta in S,
 // render() ridisegna la schermata, le richieste passano da api().
 // Gli stati di ogni schermata sono quelli di DESIGN.md: vuoto, in corso,
@@ -32,6 +32,11 @@ const S = {
   // vista), il confronto e i tre pannelli che si aprono a destra.
   passi: { dati: null, errore: null, caricato: false, scelto: null, confronto: "vista", modo: "scorri", x: 50,
            nuovo: null, pulito: null, rifai: false, dest: {} },
+  // Studio · Ritocca: il passo il cui render si ritocca, lo strumento, le
+  // aree con le loro note (coordinate da 0 a 1), il lavoro mandato e,
+  // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
+  ritocca: { da: null, strumento: "rettangolo", aree: [], modello: null, composto: null, errore: null,
+             inviato: null, esito: null, x: 50 },
 };
 
 // --- attrezzi ---------------------------------------------------------------
@@ -242,8 +247,14 @@ function seguiLavoro(lavoro) {
       const cambiato = ora.stato !== S.lavoroAttivo.stato;
       S.lavoroAttivo = ora;
       // In Passi il passo che nasce e' gia' nell'albero: il suo stato si aggiorna li'.
-      if (cambiato && S.scheda === "passi") await caricaPassi();
-      if (!ora.attivo && S.inFila.length) {
+      if (cambiato && (S.scheda === "passi" || S.scheda === "ritocca")) await caricaPassi();
+      if (!ora.attivo && S.ritocca.inviato === ora.identificativo) {
+        // Un ritocco: si resta in Ritocca, sul passo appena nato o sulle aree da rifare.
+        clearInterval(giroStato);
+        S.lavoroAttivo = null;
+        S.risultato.scelto = ora.identificativo;
+        await Promise.all([caricaRender(), fineRitocco(ora)]);
+      } else if (!ora.attivo && S.inFila.length) {
         // Un'altra variante dello stesso Genera aspetta: si segue quella.
         S.lavoroAttivo = await get(`/api/lavori/${S.inFila.shift()}`);
         await caricaRender();
@@ -864,27 +875,448 @@ function schermataRisultato() {
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }
 
-// --- Ritocca (tutto in grigio) -------------------------------------------------
+// --- Ritocca -------------------------------------------------------------------
+// Aree e note su un render (DESIGN.md, Studio · Ritocca). Si disegna con il
+// rettangolo o con la selezione libera; a ogni area si attacca una nota
+// adesiva numerata. Tutte le note partono in un invio solo, e il risultato e'
+// un passo nuovo nell'albero, figlio del render ritoccato. Le coordinate
+// vanno da 0 a 1 sull'immagine, come in core/aree.py.
+
+// Un punto del lazo entra solo se dista almeno questo dal precedente (in
+// frazione del lato): un contorno di poche decine di punti basta, e la
+// richiesta resta piccola.
+const LAZO_PASSO_MINIMO = 0.004;
+// Sotto questa misura (frazione del lato) un trascinamento e' un clic sbagliato, non un'area.
+const AREA_MINIMA = 0.01;
+
+function passoRitoccabile(id) {
+  const x = passoDa(id);
+  return x && x.si_parte ? x : null;
+}
+
+// Il render su cui si ritocca: quello scelto prima, o il passo scelto nei
+// Passi, o il render piu' recente.
+function baseRitocco() {
+  const r = S.ritocca;
+  if (!S.passi.dati) return null;
+  if (r.da && passoRitoccabile(r.da)) return passoDa(r.da);
+  const scelto = passoRitoccabile(S.passi.scelto);
+  const fatti = S.passi.dati.passi.filter((x) => x.si_parte).sort((a, b) => (b.creato_il || "").localeCompare(a.creato_il || ""));
+  const base = scelto || fatti[0] || null;
+  r.da = base ? base.identificativo : null;
+  return base;
+}
+
+// Entrando in Ritocca: il render da ritoccare, il modello e la sua destinazione, da mostrare prima di Applica.
+async function prontoRitocca() {
+  const base = baseRitocco();
+  if (!base) return;
+  if (!S.ritocca.modello) S.ritocca.modello = modelloVerificato(base.modello);
+  await destinazioneDi(S.ritocca.modello);
+  componiRitocco();
+}
+
+function cambiaBaseRitocco(id) {
+  const r = S.ritocca;
+  if (r.da === id) return;
+  r.da = id; r.aree = []; r.composto = null; r.errore = null; r.esito = null;
+  render();
+}
+
+function ritoccoBloccato() {
+  return !!(S.lavoroAttivo && S.ritocca.inviato && S.lavoroAttivo.identificativo === S.ritocca.inviato);
+}
+
+function areePerIlServer() {
+  return S.ritocca.aree.map((a) => ({ forma: a.forma, punti: a.punti, nota: a.nota }));
+}
+
+function noteVuote() { return S.ritocca.aree.map((a, i) => (a.nota.trim() ? null : i + 1)).filter(Boolean); }
+
+function motivoApplicaRitoccoSpento() {
+  const r = S.ritocca;
+  if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
+  if (!r.aree.length) return "Disegna un'area, poi scrivi cosa cambiare nella sua nota.";
+  const vuote = noteVuote();
+  if (vuote.length) return `${vuote.length === 1 ? "L'area" : "Le aree"} ${vuote.join(", ")} ${vuote.length === 1 ? "non ha" : "non hanno"} una nota: scrivila, oppure togli l'area.`;
+  const d = S.passi.dest[r.modello];
+  if (d && d.cosa_manca) return d.cosa_manca;
+  return "";
+}
+
+let attesaRitocco = null;
+function componiRitocco() {
+  const r = S.ritocca;
+  clearTimeout(attesaRitocco);
+  if (!r.aree.length || noteVuote().length) { r.composto = null; disegnaApplicaRitocco(); return; }
+  attesaRitocco = setTimeout(async () => {
+    try { r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, aree: areePerIlServer() }); r.errore = null; }
+    catch (e) { r.composto = null; r.errore = e; }
+    disegnaApplicaRitocco();
+  }, 250);
+}
+
+// Aggiorna Applica, il prompt e gli avvisi delle note mentre si scrive,
+// senza ridisegnare: la nota non perde il cursore.
+function disegnaApplicaRitocco() {
+  const r = S.ritocca;
+  const n = r.aree.length;
+  const bottone = document.getElementById("applica-ritocco");
+  if (bottone) {
+    bottone.disabled = !!motivoApplicaRitoccoSpento();
+    bottone.textContent = n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`} · un invio` : "Applica · un invio";
+  }
+  const motivo = document.getElementById("motivo-ritocco");
+  if (motivo) motivo.textContent = motivoApplicaRitoccoSpento();
+  const prompt = document.getElementById("prompt-ritocco");
+  if (prompt) prompt.value = r.composto ? r.composto.prompt : "";
+  const car = document.getElementById("caratteri-ritocco");
+  if (car) car.textContent = r.composto ? `${r.composto.caratteri} caratteri` : "";
+  const err = document.getElementById("errore-ritocco");
+  if (err) err.replaceChildren(r.errore ? avviso("errore", r.errore.fatto, r.errore.cosa_fare) : "");
+  r.aree.forEach((a, i) => {
+    for (const id of [`manca-nota-${i}`, `manca-elenco-${i}`]) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = !!a.nota.trim();
+    }
+  });
+}
+
+function scriviNota(i, testo, da) {
+  const a = S.ritocca.aree[i];
+  if (!a) return;
+  a.nota = testo;
+  // La stessa nota sta sull'immagine e nell'elenco: si tengono uguali.
+  const altro = document.getElementById(da === "foglietto" ? `elenco-nota-${i}` : `foglietto-nota-${i}`);
+  if (altro && altro.value !== testo) altro.value = testo;
+  componiRitocco();
+  disegnaApplicaRitocco();
+}
+
+function togliArea(i) {
+  S.ritocca.aree.splice(i, 1);
+  S.ritocca.composto = null;
+  render();
+  componiRitocco();
+}
+
+function puntiSvg(a) {
+  if (a.forma === "rettangolo") {
+    const [[x0, y0], [x1, y1]] = a.punti;
+    return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  }
+  return a.punti;
+}
+function attributoPunti(punti) { return punti.map(([x, y]) => `${(x * 1000).toFixed(1)},${(y * 1000).toFixed(1)}`).join(" "); }
+
+// Dove si attacca la nota di un'area appena chiusa: a destra dell'area se
+// c'e' posto, altrimenti a sinistra; mai fuori dall'immagine.
+function posizioneNota(punti) {
+  const xs = punti.map((p) => p[0]), ys = punti.map((p) => p[1]);
+  const destra = Math.max(...xs), sinistra = Math.min(...xs), alto = Math.min(...ys);
+  const x = destra + 0.02 < 0.72 ? destra + 0.02 : Math.max(0, sinistra - 0.27);
+  return { x, y: Math.min(Math.max(0, alto), 0.8) };
+}
+
+function telaRitocco(base) {
+  const r = S.ritocca;
+  const bloccato = ritoccoBloccato();
+  const img = h("img", { src: `/file/render/${base.identificativo}`, alt: `Render del passo ${base.numero}`, draggable: "false" });
+  // L'SVG si scrive come testo: il parser HTML lo mette da solo nel suo
+  // spazio dei nomi, e i punti sono solo numeri.
+  const contenitore = h("div");
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${
+    r.aree.map((a) => `<polygon class="contorno-area" points="${attributoPunti(puntiSvg(a))}"></polygon>`).join("")
+  }<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline");
+  const numeri = r.aree.map((a, i) => {
+    const [x, y] = puntiSvg(a)[0];
+    return h("span", { classe: "numero-area", stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
+  });
+  const note = r.aree.map((a, i) => foglietto(a, i, bloccato));
+  const tela = h("div", { classe: `tela-ritocco${bloccato ? " bloccata" : ""}`, "data-strumento": r.strumento },
+    img, disegno, ...numeri, ...note);
+  if (bloccato) return tela;
+
+  // Il disegno: rettangolo da un angolo all'altro, o lazo che si chiude da solo al rilascio.
+  let tratto = null;
+  const punto = (ev) => {
+    const b = img.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
+  };
+  tela.addEventListener("pointerdown", (ev) => {
+    if (ev.target.closest(".foglietto") || ev.button !== 0) return;
+    ev.preventDefault();
+    tela.setPointerCapture(ev.pointerId);
+    tratto = { inizio: punto(ev), punti: [punto(ev)] };
+  });
+  tela.addEventListener("pointermove", (ev) => {
+    if (!tratto || !tela.hasPointerCapture(ev.pointerId)) return;
+    const p = punto(ev);
+    if (r.strumento === "rettangolo") {
+      tratto.punti = [tratto.inizio, p];
+      traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: tratto.punti })) + " " + attributoPunti([tratto.inizio]));
+    } else {
+      const ultimo = tratto.punti[tratto.punti.length - 1];
+      if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) >= LAZO_PASSO_MINIMO) tratto.punti.push(p);
+      traccia.setAttribute("points", attributoPunti(tratto.punti));
+    }
+  });
+  const chiudi = () => {
+    if (!tratto) return;
+    const t = tratto; tratto = null;
+    traccia.setAttribute("points", "");
+    let area = null;
+    if (r.strumento === "rettangolo" && t.punti.length === 2) {
+      const [[ax, ay], [bx, by]] = t.punti;
+      if (Math.abs(bx - ax) >= AREA_MINIMA && Math.abs(by - ay) >= AREA_MINIMA) {
+        area = { forma: "rettangolo", punti: [[Math.min(ax, bx), Math.min(ay, by)], [Math.max(ax, bx), Math.max(ay, by)]] };
+      }
+    } else if (r.strumento === "libera" && t.punti.length >= 3) {
+      const xs = t.punti.map((p) => p[0]), ys = t.punti.map((p) => p[1]);
+      if (Math.max(...xs) - Math.min(...xs) >= AREA_MINIMA && Math.max(...ys) - Math.min(...ys) >= AREA_MINIMA) {
+        area = { forma: "libera", punti: t.punti };
+      }
+    }
+    if (!area) return;
+    area.punti = area.punti.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
+    area.nota = "";
+    area.posNota = posizioneNota(puntiSvg(area));
+    r.aree.push(area);
+    r.composto = null;
+    r.esito = null;
+    render();
+    const campo = document.getElementById(`foglietto-nota-${r.aree.length - 1}`);
+    if (campo) campo.focus();
+    disegnaApplicaRitocco();
+  };
+  tela.addEventListener("pointerup", chiudi);
+  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); });
+  return tela;
+}
+
+// La nota adesiva di un'area: si sposta trascinando la sua testata, l'area no.
+function foglietto(a, i, bloccato) {
+  const campo = h("textarea", {
+    id: `foglietto-nota-${i}`, rows: "2", "aria-label": `Nota dell'area ${i + 1}`,
+    placeholder: "Cosa cambiare qui", readonly: bloccato || null,
+  });
+  campo.value = a.nota;
+  campo.addEventListener("input", () => scriviNota(i, campo.value, "foglietto"));
+  const testata = h("div", { classe: "testata-foglietto", title: "Trascina per spostare la nota" },
+    h("b", {}, `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}`),
+    bloccato ? null : h("button", { classe: "togli", "aria-label": `Togli l'area ${i + 1} e la sua nota`, onclick: () => togliArea(i) }, "×"));
+  const nota = h("div", { classe: "foglietto", stile: `left:${a.posNota.x * 100}%;top:${a.posNota.y * 100}%` },
+    testata, campo,
+    h("span", { classe: "manca-nota", id: `manca-nota-${i}`, hidden: !!a.nota.trim() }, "Scrivi la nota, oppure togli l'area."));
+  if (!bloccato) {
+    testata.addEventListener("pointerdown", (ev) => {
+      if (ev.target.closest("button")) return;
+      ev.preventDefault();
+      testata.setPointerCapture(ev.pointerId);
+      const tela = nota.parentElement.getBoundingClientRect();
+      const b = nota.getBoundingClientRect();
+      const presa = [ev.clientX - b.left, ev.clientY - b.top];
+      const muovi = (e) => {
+        a.posNota = {
+          x: Math.min(1 - b.width / tela.width, Math.max(0, (e.clientX - presa[0] - tela.left) / tela.width)),
+          y: Math.min(1 - b.height / tela.height, Math.max(0, (e.clientY - presa[1] - tela.top) / tela.height)),
+        };
+        nota.style.left = `${a.posNota.x * 100}%`;
+        nota.style.top = `${a.posNota.y * 100}%`;
+      };
+      const lascia = () => { testata.removeEventListener("pointermove", muovi); testata.removeEventListener("pointerup", lascia); };
+      testata.addEventListener("pointermove", muovi);
+      testata.addEventListener("pointerup", lascia);
+    });
+  }
+  return nota;
+}
+
+function strumentiRitocco(spenti, ragione) {
+  const r = S.ritocca;
+  const voci = [["rettangolo", "Rettangolo"], ["libera", "Selezione libera"]];
+  const aiuti = {
+    rettangolo: "Rettangolo: trascina da un angolo all'altro. Quando lasci, si attacca una nota.",
+    libera: "Selezione libera, come il lazo di Photoshop: disegna il contorno tenendo premuto. Quando lasci, la forma si chiude da sola e si attacca una nota.",
+  };
+  return h("div", { classe: "strumenti-ritocco" },
+    h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
+      voci.map(([id, nome]) => h("button", {
+        classe: "seg", "aria-pressed": String(r.strumento === id), disabled: spenti || null,
+        onclick: () => { r.strumento = id; render(); },
+      }, nome)),
+      h("button", { classe: "seg", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto())),
+    h("span", { classe: "tenue piccolo" }, spenti ? ragione : aiuti[r.strumento]));
+}
+
+function elencoNote(bloccato) {
+  const r = S.ritocca;
+  if (!r.aree.length) {
+    return h("p", { classe: "tenue piccolo" }, "Le note che scrivi sui foglietti attaccati alle aree le ritrovi qui in elenco, per rileggerle e correggerle.");
+  }
+  return h("ol", { classe: "elenco-note" }, r.aree.map((a, i) => {
+    const campo = h("textarea", { id: `elenco-nota-${i}`, rows: "2", "aria-label": `Nota ${i + 1}`, readonly: bloccato || null });
+    campo.value = a.nota;
+    campo.addEventListener("input", () => scriviNota(i, campo.value, "elenco"));
+    return h("li", {},
+      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, h("b", { classe: "numero-elenco" }, String(i + 1)), a.forma === "rettangolo" ? " rettangolo" : " selezione libera"),
+        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
+      campo,
+      h("span", { classe: "manca-nota", id: `manca-elenco-${i}`, hidden: !!a.nota.trim() }, "Un'area senza nota non dice al modello cosa fare."));
+  }));
+}
+
+function daVerificare() {
+  const modo = S.studio.ritocco;
+  return h("section", { classe: "pannello", "aria-label": "Da verificare prima" },
+    h("span", { classe: "etichetta" }, "Da verificare prima"),
+    h("ol", { classe: "piccolo elenco-verifiche" },
+      h("li", {}, "Che Nano Banana 2 rispetti le aree e lasci uguale il resto: lo dice il piano «aree» del banco di prova, non ancora lanciato. Per ogni ritocco lo Studio misura quanto è cambiato fuori dalle aree."),
+      h("li", {}, `Le aree partono come ${modo.modo_nome}`, modo.origine === "SCELTA" ? ": scelta provvisoria, la fissa il piano «aree»." : "."),
+      h("li", {}, "Il modello rifà tutta l'immagine anche con le aree: per un cambio di materiale grande conviene rifare il render da Genera."),
+      h("li", {}, "«Clicca una superficie» arriva con la mappa dei materiali da Allplan.")));
+}
+
+function pannelloApplica(base, bloccato) {
+  const r = S.ritocca;
+  const n = r.aree.length;
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Applica le note" },
+    h("span", { classe: "etichetta" }, `Note sull'immagine · dal passo ${base.numero}`),
+    elencoNote(bloccato),
+    h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-ritocco" })),
+      h("textarea", { classe: "prompt", id: "prompt-ritocco", readonly: true, "aria-label": "Prompt del ritocco" })),
+    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(r, render))),
+    rigaDestinazione(r.modello, S.studio.ritocco.modo === "maschera" ? "Il render, con la maschera delle aree," : "Il render, con le aree disegnate sopra,"),
+    h("div", { id: "errore-ritocco" }),
+    bloccato ? null : h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", id: "applica-ritocco", onclick: applicaRitocco, disabled: true },
+        n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`} · un invio` : "Applica · un invio"),
+      h("span", { classe: "tenue piccolo", id: "motivo-ritocco" })),
+    h("p", { classe: "tenue piccolo" }, base.figli
+      ? `Il risultato è un passo nuovo nell'albero, figlio del passo ${base.numero}, accanto ai rami che ha già.`
+      : `Il risultato è un passo nuovo nell'albero, figlio del passo ${base.numero}.`));
+}
+
+async function applicaRitocco() {
+  const r = S.ritocca;
+  r.errore = null;
+  try {
+    const dest = await destinazioneDi(r.modello);
+    const risposta = await post("/api/ritocca/invia", {
+      vista: S.vista, da: r.da, aree: areePerIlServer(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione,
+    });
+    r.inviato = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+  } catch (e) { r.errore = e; }
+  render();
+}
+
+// Quando il lavoro finisce: riuscito, il passo nuovo e' scelto e le aree si
+// svuotano; non riuscito, aree e note restano come erano per rifare.
+async function fineRitocco(ora) {
+  const r = S.ritocca;
+  r.inviato = null;
+  await caricaPassi();
+  if (ora.stato === "fatto") {
+    S.passi.scelto = ora.identificativo;
+    r.esito = ora.identificativo;
+    r.aree = []; r.composto = null; r.errore = null;
+  } else {
+    r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
+      cosa_fare: ora.stato === "annullato" ? "Aree e note sono rimaste: puoi applicarle di nuovo." : `${ora.cosa_fare || ""} Aree e note sono rimaste come erano: Applica le rimanda.`.trim() };
+  }
+}
+
+function esitoRitocco() {
+  const r = S.ritocca;
+  const passo = r.esito && passoDa(r.esito);
+  if (!passo || !passo.render) return null;
+  const padre = passoDa(passo.da);
+  const { palco, nota } = primaDopo(r, padre ? `/file/render/${padre.identificativo}` : `/file/vista/${enc(S.vista)}`,
+    padre ? `Passo ${padre.numero}` : "Vista Allplan", `/file/render/${passo.identificativo}`, `Passo ${passo.numero}`);
+  return h("div", { classe: "layout-ritocca" },
+    h("div", { classe: "palco" },
+      h("h1", {}, `Ritocco fatto · passo ${passo.numero}`),
+      palco,
+      h("div", { classe: "riga tra" }, h("span", { classe: "tenue piccolo" }, "Trascina la linea, oppure tasti ← →"), h("span", { classe: "mono", id: "valore-linea" }, `${Math.round(r.x)}%`)),
+      nota),
+    h("div", { classe: "lato" },
+      pannelloFuoriAree(passo),
+      h("section", { classe: "pannello" },
+        h("span", { classe: "etichetta" }, "Le note applicate"),
+        h("ol", { classe: "piccolo" }, (passo.aree || []).map((a) => h("li", {}, a.nota)))),
+      h("section", { classe: "pannello", "aria-label": "Adesso" },
+        h("span", { classe: "etichetta" }, "Adesso"),
+        h("div", { classe: "azioni" },
+          h("button", { classe: "btn primario", onclick: () => { r.esito = null; cambiaBaseRitocco(passo.identificativo); } }, "Ritocca questo render"),
+          h("button", { classe: "btn", onclick: () => { r.esito = null; r.da = padre ? padre.identificativo : null; render(); } }, "Torna al render di prima"),
+          h("a", { classe: "btn", href: "#passi" }, "Vedi nei Passi"))),
+      passo.avviso ? h("div", { classe: "avviso attenzione", role: "note" },
+        h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
+        h("span", {}, "Se vedi l'edificio cambiare, rifai pulito dalla vista dai Passi.")) : null));
+}
+
+// La misura fuori dalle aree, accanto al risultato: si legge dallo stato del
+// lavoro, «non misurato» se il motore non l'ha potuta fare.
+function pannelloFuoriAree(passo) {
+  const m = passo.fuori_aree;
+  return h("section", { classe: "pannello", "aria-label": "Fuori dalle aree" },
+    h("span", { classe: "etichetta" }, "Fuori dalle aree"),
+    h("span", { classe: m && m.differenza_media !== null && m.differenza_media !== undefined ? "" : "misura" }, passo.fuori_aree_testo || "Fuori dalle aree: non misurato."),
+    h("p", { classe: "tenue piccolo" }, "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
+    passo.modo_aree_nome ? h("p", { classe: "tenue piccolo" }, `Aree mandate come ${passo.modo_aree_nome}.`) : null);
+}
+
+function ritoccaDa(passo) {
+  const r = S.ritocca;
+  if (r.da !== passo.identificativo) { r.aree = []; r.composto = null; r.errore = null; }
+  r.da = passo.identificativo; r.esito = null;
+  location.hash = "#ritocca";
+}
 
 function schermataRitocca() {
-  const fatto = S.risultato.lavori.find((l) => l.render);
-  const descrizioni = [
-    ["Annota per aree", "Rettangolo o selezione libera, come in Photoshop. A ogni area una nota adesiva numerata con la modifica, le note anche in elenco, un solo Applica; il risultato è un passo nuovo.", "Serve prima: il piano «aree» del banco di prova, per sapere se Nano Banana 2 rispetta aree e note."],
-    ["Clicca una superficie", "Clic su una superficie: lo Studio dice qual è il materiale di Allplan e scrivi cosa deve diventare. Le zone si correggono con unisci e separa.", "Serve prima: la vista a colori per materiale da Allplan (PRD §9)."],
-  ];
-  const anteprime = h("div", { classe: "anteprime" }, descrizioni.map(([t, d, serve], i) => h("section", { classe: "pannello grigio", "aria-disabled": "true" },
-    h("div", { classe: "riga tra" }, h("h2", {}, t), presto()),
-    fatto ? h("div", { stile: "position:relative" },
-      h("img", { src: `/file/render/${fatto.identificativo}`, alt: "", stile: "width:100%;display:block;border-radius:8px;opacity:.45;filter:grayscale(.6)" }),
-      i === 0 ? h("span", { stile: "position:absolute;left:18%;top:22%;width:28%;height:34%;border:2px dashed var(--accento);border-radius:6px" }) : null) : null,
-    h("p", { classe: "piccolo" }, d), h("p", { classe: "piccolo tenue" }, serve))));
-  return [
-    h("h1", {}, "Ritocca"),
-    h("p", { classe: "tenue" }, "Anteprima delle funzioni in arrivo · niente qui è attivabile"),
-    fatto ? h("p", { classe: "piccolo tenue" }, "Esempio dimostrativo: riquadri e zone non sono calcolati.")
-      : h("p", {}, "Prima serve un render."),
-    anteprime,
-  ];
+  const r = S.ritocca;
+  const sopra = S.errore ? [avviso("errore", S.errore.fatto, S.errore.cosa_fare)] : [];
+  if (!S.vista) {
+    return [...sopra, h("section", { classe: "pannello" }, h("h1", {}, "Ritocca"),
+      h("p", {}, "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegline una in Genera con Usa un'altra vista…"),
+      h("div", { classe: "azioni" }, h("a", { classe: "btn", href: "#genera" }, "Vai a Genera")))];
+  }
+  if (S.passi.errore) return [...sopra, h("h1", {}, "Ritocca"), avviso("errore", S.passi.errore.fatto, S.passi.errore.cosa_fare)];
+  if (!S.passi.dati) return [...sopra, h("p", { classe: "tenue" }, "Leggo i render di questa vista…")];
+  if (r.esito && passoDa(r.esito) && passoDa(r.esito).render) return [...sopra, esitoRitocco()];
+  const base = baseRitocco();
+  if (!base) {
+    return [...sopra, h("h1", {}, "Ritocca"),
+      strumentiRitocco(true, "Spenti: non c'è un render da ritoccare."),
+      h("section", { classe: "pannello vuoto-ritocco" },
+        h("p", {}, "Prima serve un render. Generane uno da Genera."),
+        h("div", { classe: "azioni" }, h("a", { classe: "btn primario", href: "#genera" }, "Vai a Genera"))),
+      daVerificare()];
+  }
+  if (!r.modello) r.modello = modelloVerificato(base.modello);
+  const bloccato = ritoccoBloccato();
+  const ritoccabili = S.passi.dati.passi.filter((x) => x.si_parte);
+  const scegliBase = h("select", { "aria-label": "Render da ritoccare", disabled: bloccato || null },
+    ritoccabili.map((x) => h("option", { value: x.identificativo, selected: x.identificativo === base.identificativo }, `Passo ${x.numero} · ${x.nome}`)));
+  scegliBase.addEventListener("change", () => cambiaBaseRitocco(scegliBase.value));
+  const attivo = bloccato ? S.lavoroAttivo : null;
+  return [...sopra, h("div", { classe: "layout-ritocca" },
+    h("div", { classe: "palco" },
+      h("div", { classe: "riga tra" }, h("h1", {}, `Ritocca · passo ${base.numero}`),
+        h("div", { stile: "min-width:260px" }, scegliBase)),
+      strumentiRitocco(bloccato, "Bloccati mentre il ritocco è in corso: aree e note restano come le hai mandate."),
+      attivo ? h("div", { classe: "striscia in-riga", role: "status" },
+        h("div", { classe: "riga tra" }, h("span", {}, h("b", {}, (attivo.destinazione || "").split(" (")[0]), ` · ${attivo.stato}`), h("span", { classe: "mono" }, tempo(attivo.secondi))),
+        h("div", { classe: "barra" }, h("span")),
+        h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan e il resto dello Studio restano liberi."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
+      telaRitocco(base),
+      r.aree.length ? null : h("p", { classe: "tenue" }, "Disegna un'area, poi scrivi cosa cambiare nella sua nota.")),
+    h("div", { classe: "lato" }, pannelloApplica(base, bloccato), daVerificare()))];
 }
 
 // --- Passi ---------------------------------------------------------------------
@@ -1137,10 +1569,10 @@ function palcoPassi(passo) {
     nota);
 }
 
-function rigaDestinazione(modello) {
+function rigaDestinazione(modello, cosaParte) {
   const d = S.passi.dest[modello];
   if (!d) return h("p", { classe: "tenue piccolo" }, "Leggo la destinazione…");
-  return h("p", { classe: "destinazione" }, "La vista va a ", h("b", {}, d.destinazione),
+  return h("p", { classe: "destinazione" }, `${cosaParte || "La vista"} va a `, h("b", {}, d.destinazione),
     d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`);
 }
 
@@ -1165,7 +1597,7 @@ function pannelloNuovoPasso() {
       ? `Parte dal passo ${da.numero}: si apre un ramo nuovo accanto a quelli che ci sono già.`
       : `Parte dal passo ${da.numero} e continua il suo ramo.`),
     campo,
-    h("div", { classe: "riga" }, h("button", { classe: "chip", disabled: true }, "Su un'area"), presto(), h("span", { classe: "tenue piccolo" }, "arriva con Ritocca")),
+    h("div", { classe: "riga" }, h("button", { classe: "chip", onclick: () => ritoccaDa(da) }, "Su un'area…"), h("span", { classe: "tenue piccolo" }, "apre Ritocca su questo render: aree e note")),
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
@@ -1192,6 +1624,9 @@ function pannelloPulito(passo) {
     h("dl", { classe: "ricetta" },
       h("dt", {}, "Stile"), h("dd", {}, c.riassunto),
       h("dt", {}, "Richieste"), h("dd", {}, c.richieste.join(" · "))),
+    c.senza_aree && c.senza_aree.length ? avviso("attenzione",
+      `Le note del ritocco ${c.senza_aree.length === 1 ? "al passo" : "ai passi"} ${c.senza_aree.join(", ")} entrano come richieste a parole, senza le loro aree.`,
+      "Dalla vista le aree non valgono più: erano disegnate su un render. Il modello non sa più dove fare quelle modifiche; se servono lì, ritocca dopo.") : null,
     h("span", { classe: "piccolo tenue" }, `Il prompt che parte, in inglese · ${c.caratteri} caratteri`),
     prompt,
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(q, render))),
@@ -1215,7 +1650,10 @@ function ricettaPasso(passo) {
     ["Costo", passo.costo],
     ["Data", data(passo.creato_il)],
     ["Blocchi", passo.versione_blocchi ? `${passo.versione_blocchi} · testi scelti, non ancora provati` : "—"],
-    ["Aree", "nessuna"],
+    ["Aree", passo.aree && passo.aree.length
+      ? h("span", {}, passo.aree.map((a, i) => `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}: ${a.nota}`).join(" — "),
+        passo.modo_aree_nome ? h("span", { classe: "tenue" }, ` (mandate come ${passo.modo_aree_nome})`) : null)
+      : "nessuna"],
   ];
   if (passo.percorso_render) righe.push(["Render", h("span", { classe: "mono" }, passo.percorso_render)]);
   if (passo.percorso_ricetta) righe.push(["Ricetta", h("span", { classe: "mono" }, passo.percorso_ricetta)]);
@@ -1252,6 +1690,7 @@ function latoPassi(passo) {
     h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Tenuta della geometria"), presto("Misura in arrivo")),
     h("span", { classe: "misura" }, "Non misurata"),
     h("p", { classe: "tenue piccolo" }, "Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto. Per ora giudica tu, con la linea del prima/dopo.")));
+  if (passo.aree && passo.aree.length && passo.render) blocchi.push(pannelloFuoriAree(passo));
   if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
   const dest = S.passi.dest[passo.modello];
   const conferma = p.rifai ? h("div", { classe: "avviso" },
@@ -1269,6 +1708,7 @@ function latoPassi(passo) {
     h("div", { classe: "azioni" },
       h("button", { classe: passo.avviso || passo.partenza_mancante ? "btn primario" : "btn", disabled: passo.generazioni <= 1 || !!S.lavoroAttivo, onclick: () => apriPulito(passo) }, "Rifai pulito dalla vista"),
       h("button", { classe: "btn", disabled: passo.partenza_mancante || passo.attivo || !!S.lavoroAttivo, onclick: async () => { p.rifai = true; p.pulito = null; await destinazioneDi(passo.modello); render(); } }, "Rifai questo passo"),
+      h("button", { classe: "btn", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null, onclick: () => ritoccaDa(passo) }, "Ritocca da qui"),
       h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella")),
     h("p", { classe: "tenue piccolo" }, notaPulito),
     conferma));
@@ -1312,6 +1752,7 @@ function render() {
   main.replaceChildren(...[contenuto].flat(2).filter(Boolean));
   if (attivo && document.getElementById(attivo)) document.getElementById(attivo).focus();
   if (S.scheda === "passi") { disegnaNuovoPasso(); }
+  if (S.scheda === "ritocca") { disegnaApplicaRitocco(); }
   window.scrollTo(0, scorrimento);
 }
 
@@ -1323,7 +1764,8 @@ function leggiScheda() {
 window.addEventListener("hashchange", async () => {
   leggiScheda();
   if (S.scheda !== "genera" && S.vista) await caricaRender();
-  if (S.scheda === "passi" && S.vista) await caricaPassi();
+  if ((S.scheda === "passi" || S.scheda === "ritocca") && S.vista) await caricaPassi();
+  if (S.scheda === "ritocca") await prontoRitocca();
   render();
   window.scrollTo(0, 0);
 });
@@ -1352,6 +1794,7 @@ async function avvia() {
     const vistaAttiva = attivo && S.studio.viste.find((v) => v.nome === attivo.vista);
     await caricaVista(vistaAttiva ? vistaAttiva.nome : (S.studio.viste[0] ? S.studio.viste[0].nome : null));
     if (attivo) seguiLavoro(attivo);
+    if (S.scheda === "ritocca") { await caricaPassi(); await prontoRitocca(); }
     if (S.scheda === "passi") {
       const modelli = [...new Set((S.passi.dati ? S.passi.dati.passi : []).map((x) => x.modello).filter(Boolean))];
       await Promise.all(modelli.map(destinazioneDi));

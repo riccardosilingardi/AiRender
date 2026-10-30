@@ -33,6 +33,7 @@ RADICE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RADICE))
 
 from core import banco, blocchi, immagine as modulo_immagine  # noqa: E402
+from core.aree import AreaNonValida  # noqa: E402
 from core.cli import USCITA_OK, USCITA_PROVIDER, USCITA_RIFIUTO  # noqa: E402
 from core.errori import ErroreAirender, ImmagineNonIdonea  # noqa: E402
 from core.idoneita import valuta  # noqa: E402
@@ -80,7 +81,10 @@ def leggi_aree(percorso: str | None) -> tuple[banco.Area, ...]:
         ) from None
     if not isinstance(dati, list):
         raise banco.PianoNonValido(f"Il file delle aree {percorso} non e' un elenco.", "Mettici un elenco di aree.")
-    return tuple(banco.Area.da_dizionario(a) for a in dati)
+    try:
+        return tuple(banco.Area.da_dizionario(a) for a in dati)
+    except AreaNonValida as errore:
+        raise banco.PianoNonValido(f"Nel file delle aree {percorso}: {errore.fatto}", errore.cosa_fare) from None
 
 
 def _modello(identificativo: str):

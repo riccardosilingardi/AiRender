@@ -420,6 +420,22 @@ PASSI_AVVISO_DA_GENERAZIONE = _registra(Costante(
     ),
 ))
 
+RITOCCO_MODO_AREE = _registra(Costante(
+    nome="RITOCCO_MODO_AREE",
+    valore="contorni",
+    origine=SCELTA,
+    ragione=(
+        "Come Studio · Ritocca manda le aree: «contorni» (contorni numerati "
+        "disegnati sull'immagine) o «maschera» (l'immagine com'e' piu' una "
+        "maschera come seconda immagine). Decide il piano «aree» del banco di "
+        "prova: quale dei due tiene fermi i pixel fuori dalle aree. Al "
+        "2026-10-30 il piano non e' ancora stato lanciato; «contorni» per ora "
+        "solo perche' parte con un'immagine sola, quindi va anche con i "
+        "modelli che non ne accettano due. Cambiare questo valore cambia solo i ritocchi "
+        "nuovi: ognuno scrive il suo modo nel lavoro e nel passo."
+    ),
+))
+
 # --- Banco di prova ----------------------------------------------------------
 
 DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(
