@@ -19,7 +19,7 @@ I mockup stanno in `docs/ui/mockup/` (copiati dal progetto il 2026-10-27,
 aggiornati il 2026-10-29): `Palette.dc.html` è la palette v1, `Stile.dc.html`
 è Studio · Genera, `Main.dc.html` è Studio · Risultato, `Passi.dc.html` è
 Studio · Passi, `Ritocca.dc.html` è Studio · Ritocca. I testi dei blocchi di
-prompt sono in `docs/ui/blocchi-stile-bozza.md` (bozza 4).
+prompt sono in `docs/ui/blocchi-stile-bozza.md` (bozza 5).
 Dove questo documento e un mockup non dicono la stessa cosa, vale questo
 documento.
 
@@ -98,9 +98,9 @@ grigio. In fondo il percorso della cartella delle viste e Chiudi.
 
 Mockup: `Stile.dc.html`. In alto la barra comune dello Studio: a cosa è
 collegato («Collegato ad Allplan 2026 · BOSCO · Prospettiva centrale»), le
-schede **Genera · Risultato · Ritocca** e, in grigio, **Passi · Video** e
+schede **Genera · Risultato · Passi · Ritocca** e, in grigio, **Video** e
 **Chiave e tetto di spesa** (fino al 2026-10-28 la voce Passi si chiamava
-Livelli). Sotto, la vista con il suo esito di idoneità e
+Livelli; attiva dal 2026-10-30). Sotto, la vista con il suo esito di idoneità e
 Usa un'altra vista…; se la vista ha colori di visualizzazione, l'avviso «Il
 modello legge i colori della vista come materiali. Per colori veri, salva la
 vista con colori neutri.»
@@ -210,9 +210,9 @@ decisione che questa schermata deve far prendere.
 Mockup: `Passi.dc.html`. Decisione di Riccardo del 2026-10-28 (PRD, sezione
 5): si lavora su un render dopo l'altro (prima lo stile, poi gli alberi, poi
 le persone) e ogni passo deve restare ritrovabile, senza diventare un grafo a
-nodi alla Comfy o Weavy. **Non costruita**: arriva con il PR dell'albero dei
-passi (PRD, sezione 8). Nella barra laterale la voce si chiama **Passi** (era
-Livelli).
+nodi alla Comfy o Weavy. **Costruita il 2026-10-30** (sotto, «Studio · Passi,
+costruito il 2026-10-30», dove si scosta). Nella barra laterale la voce si
+chiama **Passi** (era Livelli).
 
 **Colonna sinistra — l'albero dei passi di una vista**
 - Un albero solo, in una colonna. La riga **0 è la vista Allplan**. Ogni passo
@@ -240,7 +240,7 @@ Livelli).
   confronto col passo prima nasconderebbe lo spostamento accumulato. Finché
   la misura non c'è: «Non misurata».
 - **Dalla seconda generazione di fila**, un avviso: «Questo passo è la 2ª
-  generazione su un render: gli spigoli possono spostarsi un poco a ogni
+  generazione di fila: gli spigoli possono spostarsi un poco a ogni
   giro. Se vedi l'edificio cambiare, rifai pulito dalla vista.» Quanto si
   spostino davvero lo misura il piano «catena» del banco di prova (sezione 9
   del PRD).
@@ -361,6 +361,59 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
 - **Usa un'altra vista…** elenca le viste della cartella e accetta un file:
   lo Studio ne mette una copia nella cartella con un nome nuovo.
 
+## Studio · Passi, costruito il 2026-10-30
+
+Codice in `core/passi.py` (l'albero), `core/coda.py` (lavori che partono da
+un passo), `core/studio/` (rotte e pagina). Screenshot di ogni stato, anche a
+1280×800, in `docs/ui/studio-passi/`: lì i render sono la vista tinta da un
+provider finto. Dove la schermata si scosta da quello che c'è sopra, e perché:
+
+- **L'albero sta in un file accanto alla vista**, `<nome della vista>.passi.json`,
+  scritto atomico e leggibile a mano (un esempio in
+  `docs/ui/studio-passi/esempio-vista.passi.json`). Lo Studio lo allinea ai
+  lavori della cartella ogni volta che lo legge: un render che l'albero non
+  ha ancora (fatto prima di questo file, dalla palette o da riga di comando)
+  diventa un figlio della vista. Un passo non si cancella mai: se la cartella
+  dei lavori viene pulita, resta con l'ultimo stato noto e «render tolto». Un
+  file dell'albero che non si legge non si riscrive: lo Studio lo dice e si
+  ferma.
+- **«Nuovo passo da qui» sulla riga 0 porta a Genera.** Dalla vista si parte
+  scegliendo uno stile, e lo stile si sceglie in Genera: un secondo posto per
+  farlo direbbe la stessa cosa in due modi.
+- **Un passo nuovo è una richiesta a parole**, una sola per invio, con il
+  modello (predefinito: quello del passo da cui parte), il prompt che parte
+  (in sola lettura), destinazione e costo, e **Applica**. «Su un'area» c'è,
+  in grigio: arriva con Ritocca. Il prompt di un passo non si scrive a mano:
+  quello si fa in Genera, dove i comandi sanno che il testo è stato toccato.
+- **Da un render non si controlla l'idoneità**: giudica una vista di Allplan
+  (shaded, toni, sfondo), e un render non lo è. Si controlla che il render ci
+  sia e che sia un'immagine; se non c'è più, la coda non manda niente e dice
+  di rifare pulito dalla vista.
+- **Rifai questo passo** e **Rifai pulito dalla vista** chiedono conferma con
+  destinazione e costo, come Rifai in Risultato. Rifai pulito mostra la
+  strada, lo stile del primo passo, le richieste in fila e il prompt intero
+  prima di Conferma e invia; il risultato è un ramo sotto lo 0 che si chiama
+  «Pulito dalla vista · <preset>». È spento su un passo partito dalla vista:
+  non c'è niente da unire.
+- **L'avviso parte da `PASSI_AVVISO_DA_GENERAZIONE` generazioni** (2,
+  SCELTA in `core/config.py`) e lo dice sotto il testo: la soglia si tara
+  con il piano «catena» del banco di prova.
+- **In corso:** la striscia sta sotto la riga del passo che nasce, nella
+  colonna; il passo scelto resta quello che era. Quando il lavoro finisce, lo
+  Studio resta in Passi e sceglie il passo nuovo (da Genera, invece, va a
+  Risultato come prima).
+- **Errore:** il passo fallito ha l'etichetta «non riuscito», la frase del
+  motore al centro sopra l'immagine da cui era partito, e Nuovo passo da qui
+  spento con la ragione; Rifai questo passo resta acceso. Un passo il cui
+  passo di partenza ha perso il render ha l'avviso «Il punto di partenza non
+  c'è più», Rifai questo passo spento e Rifai pulito dalla vista in evidenza.
+- **Il passo 0 si può scegliere**: al centro c'è la vista da sola, e niente
+  ricetta.
+- **Un lavoro della coda è nel formato 2**: in più ha il passo di partenza,
+  il file del suo render e le richieste. La coda legge ancora il formato 1;
+  un motore vecchio rifiuta il 2 invece di mandare la vista al posto del
+  render.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -373,7 +426,7 @@ contraddicono le nuove, valgono le nuove:
 | 2 — Stile | Palette · 2 Stile; Studio · Genera | Miniature **illustrative** e dichiarate tali, non generate dal preset (vedi Decisioni visive). Niente slider della grana nella scelta dello stile; dal 2026-10-28 neanche nel ritocco (Studio · Ritocca). Il testo libero non è una riga sotto la griglia ma il prompt completo modificabile |
 | 3 — Risultato | Studio · Risultato | Prima/dopo con la linea come vista predefinita, affiancati come seconda scelta |
 | 4 — Materiali | Studio · Ritocca, in grigio; Materiali a parole in Genera | La direzione del 2026-10-22 (zone dalla mappa di Allplan, unisci e separa) resta, dentro Ritocca |
-| 5 — Livelli | Studio · Passi (dal 2026-10-28) | Non più livelli sopra un render ma un albero di passi, ognuno con la sua ricetta; non ancora costruito |
+| 5 — Livelli | Studio · Passi (dal 2026-10-28) | Non più livelli sopra un render ma un albero di passi, ognuno con la sua ricetta; costruito il 2026-10-30 |
 
 ## Decisioni visive
 
@@ -415,5 +468,5 @@ contraddicono le nuove, valgono le nuove:
 - Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
-  stati si scrivono quando la mappa esiste. Passi e Ritocca hanno i loro
-  stati qui sopra, ma non sono costruiti.
+  stati si scrivono quando la mappa esiste. Ritocca ha i suoi stati qui
+  sopra, ma non è costruita.

@@ -1,7 +1,8 @@
 """I blocchi di stile e i preset che li combinano.
 
-Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 4 del
-2026-10-29 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche»). Sono **riscritti** dalla prompt library di Riccardo (Notion,
+Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 5 del
+2026-10-30 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche» nella
+4, piu' la regola dei passi e le richieste a parole nella 5). Sono **riscritti** dalla prompt library di Riccardo (Notion,
 ispirata a Visoid), non copiati: un blocco tocca un asse solo, cosi' cambiarne
 uno non disfa gli altri. Testo per il modello in inglese, nomi per l'utente in
 italiano.
@@ -34,7 +35,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-4"
+VERSIONE = "bozza-5"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -448,6 +449,71 @@ def componi(scelte: Scelte) -> str:
 
 # L'ordine degli assi nel prompt, per chi compone solo una parte (un passo).
 ORDINE_ASSI = ("look", "luce", "cielo", "fuori", "arredo", "intorno", "verde", "persone", "qualita")
+
+
+# --- passi: richieste a parole su un render (Studio · Passi) ---------------
+
+# Su un render gia' fatto lo stile c'e': la regola di un passo non dice
+# "cambia solo il look" ma "cambia solo quello che ti chiedo". Come ogni
+# blocco, non provata con il modello.
+REGOLA_PASSO = Blocco(
+    "regola-passo",
+    "Regola fissa di un passo",
+    "Edit this exact image. Keep the camera, framing, proportions, light and "
+    "every building element exactly as they are; do not add, remove or "
+    "reshape any architecture. Make only the change described below and "
+    "leave everything else as it is.",
+)
+
+
+def _pulisci_richieste(richieste) -> list[str]:
+    pulite = [" ".join((r or "").split()).rstrip(".") for r in (richieste or ())]
+    if not pulite or not all(pulite):
+        raise SceltaNonValida(
+            "Un passo senza richiesta non cambia niente.",
+            "Scrivi cosa cambiare, per esempio «due alberi davanti al fronte».",
+        )
+    return pulite
+
+
+def _frase_richieste(pulite: list[str], apertura: str) -> str:
+    """Le richieste dell'utente come le ha scritte, poi cosa non toccare.
+
+    Una richiesta a parole di solito aggiunge qualcosa (alberi, persone,
+    un cielo): finisce con NON_COPRIRE come i blocchi che aggiungono.
+    """
+    return f"{apertura} {'; '.join(pulite)}; {NON_COPRIRE}."
+
+
+def componi_richieste(scena: str, richieste) -> str:
+    """Il prompt di un passo fatto su un render: regola del passo, scena, le richieste, cosa evitare.
+
+    Le richieste passano come le scrive l'utente, anche in italiano, come i
+    materiali: qui non c'e' nessun modello linguistico che le traduca.
+    """
+    if scena not in SCENE:
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno o interno.")
+    pulite = _pulisci_richieste(richieste)
+    apertura = "Change:" if len(pulite) == 1 else "Changes:"
+    return " ".join([REGOLA_PASSO.testo, SCENA[scena].testo,
+                     _frase_richieste(pulite, apertura), COSA_EVITARE.testo])
+
+
+def aggiungi_richieste(base: str, richieste) -> str:
+    """Un prompt dalla vista con in piu' le richieste dei passi: «Rifai pulito dalla vista».
+
+    Le richieste entrano prima di «cosa evitare», che resta in coda come
+    sempre. Se il testo di partenza e' stato scritto a mano e non finisce con
+    «cosa evitare», le richieste vanno in fondo.
+    """
+    if not richieste:
+        return base
+    frase = _frase_richieste(_pulisci_richieste(richieste), "Also make these changes:")
+    base = base.strip()
+    if base.endswith(COSA_EVITARE.testo):
+        testa = base[: -len(COSA_EVITARE.testo)].rstrip()
+        return f"{testa} {frase} {COSA_EVITARE.testo}"
+    return f"{base} {frase}"
 
 
 def componi_passo(scena: str, cambi: dict[str, str]) -> str:

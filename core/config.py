@@ -406,6 +406,20 @@ VARIANTI_MASSIME = _registra(Costante(
     ),
 ))
 
+PASSI_AVVISO_DA_GENERAZIONE = _registra(Costante(
+    nome="PASSI_AVVISO_DA_GENERAZIONE",
+    valore=2,
+    origine=SCELTA,
+    ragione=(
+        "Da quante generazioni di fila Studio · Passi avvisa che gli spigoli "
+        "possono essersi spostati. 2 viene dalla decisione del 2026-10-28 "
+        "(DESIGN.md, Studio · Passi): ogni giro ridisegna tutta l'immagine, "
+        "quindi gia' il primo passo su un render puo' muovere l'edificio. "
+        "Quanto si spostino davvero lo dira' il piano «catena» del banco di "
+        "prova, e la soglia si tara li'."
+    ),
+))
+
 # --- Banco di prova ----------------------------------------------------------
 
 DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(

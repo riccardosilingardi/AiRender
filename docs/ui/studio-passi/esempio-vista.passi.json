@@ -1,0 +1,196 @@
+{
+  "formato": 1,
+  "vista": "vista-20261021-093841.png",
+  "passi": [
+    {
+      "identificativo": "20261030-073623-361285-5f82",
+      "numero": 1,
+      "da": "0",
+      "creato_il": "2026-10-30T07:36:23+00:00",
+      "scena": "esterno",
+      "scelte": {
+        "scena": "esterno",
+        "materiali": "intonaco a calce bianco, infissi in rovere scuro",
+        "look": "canon",
+        "luce": "mezzogiorno",
+        "cielo": "sereno",
+        "fuori": null,
+        "arredo": null,
+        "intorno": "niente",
+        "verde": "nessuno",
+        "persone": "nessuna",
+        "qualita": "base"
+      },
+      "preset": "rivista",
+      "prompt_a_mano": null,
+      "richieste": [],
+      "aree": null,
+      "partenza": {
+        "passo": "0",
+        "file": "/tmp/tmp54rybhpx/viste/vista-20261021-093841.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. The subject is a building exterior. Materials: intonaco a calce bianco, infissi in rovere scuro. Professional architectural photograph, Canon EOS R5 with 17mm tilt-shift lens: perfectly straight verticals, deep focus, crisp micro-contrast, clean polarized colour. Midday sun high in the sky, crisp natural shadows, deep blue sky with thin cirrus. Clear sky. Plain neutral background; do not add buildings, cars or surroundings that are not in the view. Do not add trees, grass or planting that are not in the view. No people. Professional architectural photography, natural detail. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router → Google (Nano Banana 2)",
+      "stato": "fatto",
+      "render": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-361285-5f82.png",
+      "ricetta": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-361285-5f82.png.ricetta.json",
+      "costo_crediti": 17.17,
+      "impronta_partenza": "2737f67293230640fcc80aaf3efdd0662ba446fb59a7945333bf7d17ec93cd59",
+      "fatto_il": "2026-10-30T07:36:23+00:00"
+    },
+    {
+      "identificativo": "20261030-073623-559172-ec05",
+      "numero": 2,
+      "da": "20261030-073623-361285-5f82",
+      "creato_il": "2026-10-30T07:36:23+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [
+        "due alberi davanti al fronte, non coprire le finestre"
+      ],
+      "aree": null,
+      "partenza": {
+        "passo": "20261030-073623-361285-5f82",
+        "file": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-361285-5f82.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is. The subject is a building exterior. Change: due alberi davanti al fronte, non coprire le finestre; do not cover or hide any building element. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router → Google (Nano Banana 2)",
+      "stato": "fatto",
+      "render": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-559172-ec05.png",
+      "ricetta": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-559172-ec05.png.ricetta.json",
+      "costo_crediti": 17.17,
+      "impronta_partenza": "808cde439db5f148af6e5e2025148c43477947f20049c1f4ca05334d1ab1c8bf",
+      "fatto_il": "2026-10-30T07:36:27+00:00"
+    },
+    {
+      "identificativo": "20261030-073627-591343-693c",
+      "numero": 3,
+      "da": "20261030-073623-559172-ec05",
+      "creato_il": "2026-10-30T07:36:27+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [
+        "qualche persona che cammina, leggermente mossa"
+      ],
+      "aree": null,
+      "partenza": {
+        "passo": "20261030-073623-559172-ec05",
+        "file": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-559172-ec05.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is. The subject is a building exterior. Change: qualche persona che cammina, leggermente mossa; do not cover or hide any building element. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router → Google (Nano Banana 2)",
+      "stato": "fatto",
+      "render": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-591343-693c.png",
+      "ricetta": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-591343-693c.png.ricetta.json",
+      "costo_crediti": 17.17,
+      "impronta_partenza": "d2f05c454ee493822522b5439daf19eb510f39a0b1d38f799b0bfcdeb26dce86",
+      "fatto_il": "2026-10-30T07:36:27+00:00"
+    },
+    {
+      "identificativo": "20261030-073627-707146-194a",
+      "numero": 4,
+      "da": "20261030-073623-559172-ec05",
+      "creato_il": "2026-10-30T07:36:27+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [
+        "cielo al tramonto, luce calda radente"
+      ],
+      "aree": null,
+      "partenza": {
+        "passo": "20261030-073623-559172-ec05",
+        "file": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073623-559172-ec05.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is. The subject is a building exterior. Change: cielo al tramonto, luce calda radente; do not cover or hide any building element. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router → Google (Nano Banana 2)",
+      "stato": "fatto",
+      "render": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-707146-194a.png",
+      "ricetta": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-707146-194a.png.ricetta.json",
+      "costo_crediti": 17.17,
+      "impronta_partenza": "d2f05c454ee493822522b5439daf19eb510f39a0b1d38f799b0bfcdeb26dce86",
+      "fatto_il": "2026-10-30T07:36:27+00:00"
+    },
+    {
+      "identificativo": "20261030-073627-858567-ca80",
+      "numero": 5,
+      "da": "0",
+      "creato_il": "2026-10-30T07:36:27+00:00",
+      "scena": "esterno",
+      "scelte": {
+        "scena": "esterno",
+        "materiali": "intonaco a calce bianco, infissi in rovere scuro",
+        "look": "canon",
+        "luce": "mezzogiorno",
+        "cielo": "sereno",
+        "fuori": null,
+        "arredo": null,
+        "intorno": "niente",
+        "verde": "nessuno",
+        "persone": "nessuna",
+        "qualita": "base"
+      },
+      "preset": "rivista",
+      "prompt_a_mano": null,
+      "richieste": [],
+      "aree": null,
+      "partenza": {
+        "passo": "0",
+        "file": "/tmp/tmp54rybhpx/viste/vista-20261021-093841.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. The subject is a building exterior. Materials: intonaco a calce bianco, infissi in rovere scuro. Professional architectural photograph, Canon EOS R5 with 17mm tilt-shift lens: perfectly straight verticals, deep focus, crisp micro-contrast, clean polarized colour. Midday sun high in the sky, crisp natural shadows, deep blue sky with thin cirrus. Clear sky. Plain neutral background; do not add buildings, cars or surroundings that are not in the view. Do not add trees, grass or planting that are not in the view. No people. Professional architectural photography, natural detail. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "bfl/flux-kontext-pro",
+      "destinazione": "Comfy Router → Black Forest Labs (FLUX.1 Kontext Pro)",
+      "stato": "fatto",
+      "render": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-858567-ca80.png",
+      "ricetta": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-858567-ca80.png.ricetta.json",
+      "impronta_partenza": "2737f67293230640fcc80aaf3efdd0662ba446fb59a7945333bf7d17ec93cd59",
+      "fatto_il": "2026-10-30T07:36:28+00:00"
+    },
+    {
+      "identificativo": "20261030-073639-120945-86ac",
+      "numero": 6,
+      "da": "20261030-073627-591343-693c",
+      "creato_il": "2026-10-30T07:36:39+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [
+        "una bicicletta appoggiata al muro"
+      ],
+      "aree": null,
+      "partenza": {
+        "passo": "20261030-073627-591343-693c",
+        "file": "/tmp/tmp54rybhpx/viste/lavori/fatto/20261030-073627-591343-693c.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is. The subject is a building exterior. Change: una bicicletta appoggiata al muro; do not cover or hide any building element. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "prova",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router → Google (Nano Banana 2)",
+      "stato": "errore",
+      "fatto": "Comfy Router ha rifiutato l'invio: crediti del workspace finiti.",
+      "cosa_fare": "Ricarica i crediti su comfy.org, poi Rifai questo passo."
+    }
+  ]
+}

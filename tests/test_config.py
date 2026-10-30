@@ -279,6 +279,12 @@ def test_risoluzione_predefinita_e_quella_che_parte_davvero():
     assert corpo["resolution"] == config.RISOLUZIONE_PREDEFINITA
 
 
+def test_passi_avviso_da_generazione_avvisa_gia_dal_primo_passo_su_un_render():
+    """Caso: un passo fatto su un render, gia' la 2a generazione, non avvisa che gli spigoli si muovono."""
+    assert config.PASSI_AVVISO_DA_GENERAZIONE == 2
+    assert config.costante("PASSI_AVVISO_DA_GENERAZIONE").origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 

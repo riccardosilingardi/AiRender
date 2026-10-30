@@ -16,6 +16,7 @@ Rotte:
     GET  /api/catalogo                     preset, assi, modelli
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
+    GET  /api/viste/<nome>/passi           l'albero dei passi della vista
     GET  /api/destinazione?modello=<id>&varianti=<n>   dove va la vista e quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
@@ -27,7 +28,11 @@ Rotte:
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
     POST /api/lavori/<id>/annulla          file .annulla accanto al lavoro
-    POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda
+    POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
+    POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
+    POST /api/passi/invia                  un passo nuovo dal render di un passo
+    POST /api/passi/pulito/componi         il prompt di «Rifai pulito dalla vista»
+    POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
     POST /api/apri-cartella                apre viste o render nel sistema
 """
 
@@ -135,6 +140,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.descrivi_vista(nome))
             case ["api", "viste", nome, "render"]:
                 self._json(studio.render_della_vista(nome))
+            case ["api", "viste", nome, "passi"]:
+                self._json(studio.passi(nome))
             case ["api", "destinazione"]:
                 self._json(studio.destinazione((domanda.get("modello") or [""])[0],
                                                (domanda.get("varianti") or ["1"])[0]))
@@ -180,6 +187,14 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.annulla(identificativo))
             case ["api", "lavori", identificativo, "rifai"]:
                 self._json(studio.rifai(identificativo, self._corpo_json()))
+            case ["api", "passi", "componi"]:
+                self._json(studio.componi_passo(self._corpo_json()))
+            case ["api", "passi", "invia"]:
+                self._json(studio.invia_passo(self._corpo_json()))
+            case ["api", "passi", "pulito", "componi"]:
+                self._json(studio.componi_pulito(self._corpo_json()))
+            case ["api", "passi", "pulito", "invia"]:
+                self._json(studio.invia_pulito(self._corpo_json()))
             case ["api", "apri-cartella"]:
                 self._json(studio.apri_cartella(str(self._corpo_json().get("quale", ""))))
             case _:
