@@ -44,12 +44,17 @@ from typing import Callable
 
 from . import blocchi, config, grana as modulo_grana, immagine as modulo_immagine
 from . import provider as registro
-from .errori import ErroreAirender, ImmagineNonIdonea
+from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
 from .preset import MODELLI_PREDEFINITI
 from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
 
-FORMATO = 1  # numero-non-configurabile: versione del formato del file di lavoro
+FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
+# Il formato 2 (2026-10-30) aggiunge il passo di partenza e le richieste a
+# parole. Un lavoro del formato 1 si legge ancora: parte dalla vista, senza
+# richieste. Un motore vecchio rifiuta il 2 invece di mandare la vista al
+# posto del render da cui il passo doveva partire.
+FORMATI_LETTI = (1, 2)
 
 # Gli stati, nelle parole che lo Studio e la palette mostrano.
 IN_CODA = "in coda"
@@ -135,14 +140,32 @@ class Lavoro:
     destinazione: str
     preset: str | None = None
     prompt_a_mano: str | None = None
+    # Studio · Passi. `parte_da` e' il passo da cui parte (l'id del suo
+    # lavoro), `partenza` il file del suo render: l'immagine che parte al
+    # posto della vista. Senza, il lavoro parte dalla vista. `vista` resta
+    # sempre la vista Allplan: e' contro di lei che si giudica l'edificio.
+    parte_da: str | None = None
+    partenza: str | None = None
+    # Le richieste a parole dei passi: una per un passo nuovo, quelle della
+    # strada per «Rifai pulito dalla vista».
+    richieste: tuple[str, ...] = ()
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def prompt(self) -> str:
-        """Il testo che parte: quello scritto a mano se c'e', altrimenti i blocchi."""
+        """Il testo che parte.
+
+        Da un render: solo le richieste, con la regola del passo (lo stile
+        c'e' gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti
+        i blocchi, piu' le richieste se ce ne sono.
+        """
+        if self.partenza:
+            return blocchi.componi_richieste(self.scelte.scena, self.richieste)
         if self.prompt_a_mano and self.prompt_a_mano.strip():
-            return self.prompt_a_mano.strip()
-        return blocchi.componi(self.scelte)
+            base = self.prompt_a_mano.strip()
+        else:
+            base = blocchi.componi(self.scelte)
+        return blocchi.aggiungi_richieste(base, self.richieste)
 
     def a_dizionario(self) -> dict:
         return {
@@ -156,6 +179,9 @@ class Lavoro:
             "provider": self.provider,
             "modello": self.modello,
             "destinazione": self.destinazione,
+            "parte_da": self.parte_da,
+            "partenza": self.partenza,
+            "richieste": list(self.richieste),
         }
 
     @classmethod
@@ -165,7 +191,7 @@ class Lavoro:
                 "Il file del lavoro non contiene un lavoro.",
                 "Rimetti il lavoro in coda dalla palette o dallo Studio.",
             )
-        if dati.get("formato") != FORMATO:
+        if dati.get("formato") not in FORMATI_LETTI:
             raise LavoroNonValido(
                 f"Il file del lavoro e' nel formato {dati.get('formato')!r}, "
                 f"questo motore legge il formato {FORMATO}.",
@@ -181,6 +207,19 @@ class Lavoro:
                 f"Nel file del lavoro manca: {', '.join(mancanti)}.",
                 "Rimetti il lavoro in coda dalla palette o dallo Studio.",
             )
+        parte_da, partenza = dati.get("parte_da"), dati.get("partenza")
+        if bool(parte_da) != bool(partenza):
+            raise LavoroNonValido(
+                "Il file del lavoro dice da quale passo parte ma non con quale "
+                "immagine, o il contrario.",
+                "Rimetti il passo in coda dallo Studio · Passi.",
+            )
+        richieste = dati.get("richieste") or []
+        if not isinstance(richieste, list) or not all(isinstance(r, str) for r in richieste):
+            raise LavoroNonValido(
+                "Nel file del lavoro le richieste non sono un elenco di frasi.",
+                "Rimetti il passo in coda dallo Studio · Passi.",
+            )
         return cls(
             identificativo=str(dati["identificativo"]),
             vista=str(dati["vista"]),
@@ -190,6 +229,9 @@ class Lavoro:
             destinazione=str(dati["destinazione"]),
             preset=dati.get("preset"),
             prompt_a_mano=dati.get("prompt_a_mano"),
+            parte_da=str(parte_da) if parte_da else None,
+            partenza=str(partenza) if partenza else None,
+            richieste=tuple(richieste),
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -235,6 +277,9 @@ def metti_in_coda(
     provider: str = registro.PREDEFINITO,
     modello: str | None = None,
     prompt_a_mano: str | None = None,
+    parte_da: str | None = None,
+    partenza: Path | None = None,
+    richieste: tuple[str, ...] | list[str] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -242,7 +287,11 @@ def metti_in_coda(
     Compone il prompt subito: una scelta sbagliata si dice a chi la fa, non
     al processo della coda minuti dopo.
     """
-    blocchi.componi(scelte)
+    if bool(parte_da) != bool(partenza):
+        raise LavoroNonValido(
+            "Un passo ha bisogno sia del passo da cui parte sia del suo render.",
+            "Scegli il passo di partenza nell'albero dello Studio · Passi.",
+        )
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -261,7 +310,11 @@ def metti_in_coda(
         destinazione=destinazione,
         preset=preset,
         prompt_a_mano=prompt_a_mano,
+        parte_da=parte_da,
+        partenza=str(Path(partenza).resolve()) if partenza else None,
+        richieste=tuple(richieste),
     )
+    lavoro.prompt()  # solleva SceltaNonValida con la ragione, prima di scrivere
     percorsi = cartelle(radice)
     # Prima lo stato, poi il lavoro: chi trova il lavoro trova anche lo stato.
     scrivi_stato(radice, lavoro.identificativo, IN_CODA, destinazione=destinazione)
@@ -443,11 +496,13 @@ class Coda:
         return lavoro
 
     def _prepara(self, lavoro: Lavoro) -> tuple[RichiestaGenerazione, Provider]:
-        vista = Path(lavoro.vista)
-        dati = modulo_immagine.leggi(vista)
-        giudizio = valuta(modulo_immagine.misura(dati))
-        if not giudizio.idonea:
-            raise ImmagineNonIdonea(giudizio.fatto, giudizio.cosa_fare, giudizio.motivo or "")
+        if lavoro.partenza:
+            dati = self._leggi_partenza(Path(lavoro.partenza))
+        else:
+            dati = modulo_immagine.leggi(Path(lavoro.vista))
+            giudizio = valuta(modulo_immagine.misura(dati))
+            if not giudizio.idonea:
+                raise ImmagineNonIdonea(giudizio.fatto, giudizio.cosa_fare, giudizio.motivo or "")
         motore = self._crea_provider(lavoro.provider)
         annunciata = motore.destinazione_per(lavoro.modello)
         if annunciata != lavoro.destinazione:
@@ -474,6 +529,24 @@ class Coda:
             testo_utente=lavoro.scelte.materiali,
         )
         return richiesta, motore
+
+    @staticmethod
+    def _leggi_partenza(partenza: Path) -> bytes:
+        """Il render da cui parte un passo.
+
+        Non passa dall'idoneita': quella giudica una vista di Allplan
+        (shaded, toni, sfondo), e un render non e' una vista. Si controlla
+        solo che ci sia e che sia un'immagine.
+        """
+        if not partenza.is_file():
+            raise FileNonTrovato(
+                f"Il punto di partenza non c'e' piu': {partenza}. Non ho inviato niente.",
+                "Nello Studio · Passi usa «Rifai pulito dalla vista», che riparte "
+                "dalla vista Allplan con le stesse richieste.",
+            )
+        dati = partenza.read_bytes()
+        modulo_immagine.misura(dati)  # solleva se non e' un'immagine
+        return dati
 
     # --- annullamento ------------------------------------------------------
 

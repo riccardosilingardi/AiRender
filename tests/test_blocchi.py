@@ -1,4 +1,4 @@
-"""La composizione del prompt a blocchi, dalla bozza 4 (docs/ui/blocchi-stile-bozza.md)."""
+"""La composizione del prompt a blocchi, dalla bozza 5 (docs/ui/blocchi-stile-bozza.md)."""
 
 from __future__ import annotations
 

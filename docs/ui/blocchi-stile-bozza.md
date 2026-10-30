@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 4 (2026-10-29)
+# Blocchi di stile — bozza 5 (2026-10-30)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -17,6 +17,18 @@ Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campa
 Regola fissa → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
 
 Un **passo** fatto su un render già generato (albero dei passi, piano «catena» del banco di prova) non rimanda tutto: regola fissa → scena → solo gli assi che cambiano → cosa evitare.
+
+## Passi: richieste a parole (bozza 5, 2026-10-30)
+
+Cosa cambia dalla bozza 4: Studio · Passi manda **richieste a parole** («due alberi davanti al fronte»), non assi. Le richieste passano come le scrive l'utente, anche in italiano, come i materiali. I testi dei blocchi della bozza 4 non cambiano.
+
+Un passo su un render parte con la sua regola fissa, che non dice «cambia solo il look» ma «cambia solo quello che ti chiedo» (SCELTA, non provata):
+
+> Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is.
+
+Ordine: regola del passo → scena → `Change: <richiesta>; do not cover or hide any building element.` → cosa evitare. Con più richieste, `Changes: <prima>; <seconda>; …`.
+
+**Rifai pulito dalla vista** riparte dalla vista con il prompt del primo passo della strada (i blocchi, o il testo scritto a mano) e ci aggiunge prima di «cosa evitare» le richieste di tutti i passi della strada: `Also make these changes: <prima>; <seconda>; do not cover or hide any building element.` La regola fissa resta quella dei preset («Change only the look described below»): dice una cosa diversa dalle richieste che seguono, e se il modello le ignora per questo lo dirà il piano «catena» del banco di prova.
 
 Tolti su richiesta di Riccardo (27/10, 19:20) l'elenco «Cosa c'è nella vista» e il campo «Altro da dire». Il soggetto si riduce a esterno/interno dallo switch. Chi vuole scrivere il proprio testo lo fa con «Mostra e modifica il prompt completo», sotto il riassunto.
 

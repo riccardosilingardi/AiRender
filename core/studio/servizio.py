@@ -16,12 +16,14 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from .. import blocchi, config, coda as modulo_coda, immagine as modulo_immagine
+from .. import passi as modulo_passi
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
@@ -146,6 +148,9 @@ class Studio:
         self._adesso = adesso
         self.cartella_miniature = Path(cartella_miniature)
         self.percorsi = modulo_coda.cartelle(self.cartella)
+        # Il server risponde a piu' richieste insieme: l'albero dei passi lo
+        # allinea e lo scrive una richiesta alla volta.
+        self._blocco_albero = threading.Lock()
 
     # --- in testa --------------------------------------------------------
 
@@ -422,7 +427,8 @@ class Studio:
         )
 
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
-                       varianti: int = 1) -> dict:
+                       varianti: int = 1, parte_da: str | None = None,
+                       partenza: Path | None = None, richieste=()) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -434,9 +440,12 @@ class Studio:
                 f"Non mando: {destinazione['cosa_manca']}",
                 "Scegli Nano Banana 2, il modello predefinito, il cui schema e' verificato.",
             )
-        descrizione = self.descrivi_vista(vista.name)
-        if not descrizione["idonea"]:
-            raise RichiestaStudioNonValida(descrizione["fatto"], descrizione["cosa_fare"])
+        if partenza is None:
+            # Da un render l'idoneita' non conta: giudica una vista di
+            # Allplan, e quello che parte e' il render del passo.
+            descrizione = self.descrivi_vista(vista.name)
+            if not descrizione["idonea"]:
+                raise RichiestaStudioNonValida(descrizione["fatto"], descrizione["cosa_fare"])
         lavori = [
             modulo_coda.metti_in_coda(
                 self.cartella, vista, scelte,
@@ -444,6 +453,9 @@ class Studio:
                 provider=self.provider,
                 modello=destinazione["modello"],
                 prompt_a_mano=prompt_a_mano,
+                parte_da=parte_da,
+                partenza=partenza,
+                richieste=tuple(richieste),
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -456,8 +468,20 @@ class Studio:
         }
 
     def rifai(self, identificativo: str, dati: dict) -> dict:
-        """Rimette in coda un lavoro con la stessa ricetta: stesse scelte, stesso modello, stessa vista."""
+        """Rimette in coda un lavoro con la stessa ricetta: stesse scelte, stesso modello, stessa partenza.
+
+        Per un passo e' «Rifai questo passo»: stesso passo di partenza, stessa
+        richiesta, e nell'albero un ramo nuovo accanto.
+        """
         lavoro, _cartella = self._lavoro(identificativo)
+        partenza = Path(lavoro.partenza) if lavoro.partenza else None
+        if partenza is not None and not self._render_valido(partenza):
+            raise FileNonTrovato(
+                "Il punto di partenza di questo passo non c'e' piu': il suo render e' "
+                "stato tolto dalla cartella dei lavori.",
+                "Usa «Rifai pulito dalla vista»: riparte dalla vista Allplan con le "
+                "stesse richieste.",
+            )
         vista = Path(lavoro.vista)
         if not vista.is_file():
             raise FileNonTrovato(
@@ -475,6 +499,9 @@ class Studio:
             mostrata=dati.get("destinazione_mostrata"),
             preset=lavoro.preset,
             prompt_a_mano=lavoro.prompt_a_mano,
+            parte_da=lavoro.parte_da,
+            partenza=partenza,
+            richieste=lavoro.richieste,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -542,11 +569,17 @@ class Studio:
         modello = next((m for m in MODELLI if m.identificativo == dati.get("modello")), None)
         preset = blocchi.PRESET_STILE.get(dati.get("preset") or "")
         render = self._render(identificativo, stato)
+        richieste = [r for r in (dati.get("richieste") or []) if isinstance(r, str)]
         try:
             scelte = blocchi.Scelte.da_dizionario(dati.get("scelte") or {})
             testo_riassunto = riassunto(scelte, dati.get("preset"))
         except ErroreAirender:
             testo_riassunto = ""
+        if dati.get("partenza"):
+            # Un passo su un render: lo stile non riparte, solo la richiesta.
+            testo_riassunto = "Passo sul render di prima: " + "; ".join(richieste) + "."
+        elif richieste:
+            testo_riassunto += " Più: " + "; ".join(richieste) + "."
         return {
             "identificativo": identificativo,
             "stato": stato.get("stato"),
@@ -562,13 +595,25 @@ class Studio:
             "modello": dati.get("modello"),
             "modello_nome": modello.nome if modello else dati.get("modello"),
             "preset": dati.get("preset"),
-            "preset_nome": preset.nome if preset else "Scelte libere",
+            "preset_nome": (
+                "Passo: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
+                else preset.nome if preset else "Scelte libere"
+            ),
+            "parte_da": dati.get("parte_da"),
             "scelte": dati.get("scelte"),
             "riassunto": testo_riassunto,
             "prompt_a_mano": bool(dati.get("prompt_a_mano")),
             "render": render is not None,
             "scostamento_geometria": stato.get("scostamento_geometria"),
         }
+
+    def _render_valido(self, percorso: Path) -> bool:
+        """Un render si usa come partenza solo se sta in lavori/fatto e c'e' ancora."""
+        try:
+            percorso = Path(percorso).resolve()
+        except OSError:
+            return False
+        return percorso.parent == self.percorsi[modulo_coda.FATTO_DIR].resolve() and percorso.is_file()
 
     def _render(self, identificativo: str, stato: dict | None = None) -> Path | None:
         """Il file del render di un lavoro fatto, solo se sta in lavori/fatto."""
@@ -633,19 +678,234 @@ class Studio:
             if r["attivo"]
         ]
 
-    def render_della_vista(self, nome: str) -> list[dict]:
-        """Tutti i lavori nati da questa vista, il piu' recente per primo."""
-        vista = self.percorso_vista(nome).resolve()
-        lavori = []
+    def _lavori_della_vista(self, vista: Path) -> list[dict]:
+        """I file dei lavori nati da questa vista, anche quelli partiti da un suo passo."""
+        vista = Path(vista).resolve()
+        trovati = []
         for dati, _cartella in self._lavori():
             try:
                 stessa = Path(dati.get("vista") or "").resolve() == vista
             except OSError:
                 stessa = False
             if stessa:
-                lavori.append(self._riassunto_lavoro(dati))
+                trovati.append(dati)
+        return trovati
+
+    def render_della_vista(self, nome: str) -> list[dict]:
+        """Tutti i lavori nati da questa vista, il piu' recente per primo."""
+        vista = self.percorso_vista(nome)
+        lavori = [self._riassunto_lavoro(d) for d in self._lavori_della_vista(vista)]
         lavori.sort(key=lambda r: (r.get("creato_il") or "", r["identificativo"]), reverse=True)
         return lavori
+
+    # --- passi -----------------------------------------------------------
+
+    def _albero(self, vista: Path) -> modulo_passi.Albero:
+        """L'albero della vista, allineato ai lavori della cartella e scritto se e' cambiato."""
+        with self._blocco_albero:
+            albero = modulo_passi.Albero.leggi(vista)
+            lavori = self._lavori_della_vista(vista)
+            stati, ricette = {}, {}
+            for dati in lavori:
+                identificativo = dati["identificativo"]
+                stato = modulo_coda.leggi_stato(self.cartella, identificativo) or {}
+                stati[identificativo] = stato
+                render = self._render(identificativo, stato)
+                if render is not None:
+                    try:
+                        ricette[identificativo] = json.loads(
+                            render.with_name(render.name + ".ricetta.json").read_text(encoding="utf-8"))
+                    except (OSError, ValueError):
+                        pass  # il passo resta senza costo: "non letto dal servizio"
+            if albero.allinea(lavori, stati, ricette):
+                albero.scrivi(vista)
+            return albero
+
+    def passi(self, nome: str) -> dict:
+        """L'albero dei passi di una vista, come lo disegna Studio · Passi."""
+        vista = self.percorso_vista(nome)
+        albero = self._albero(vista)
+        righe = [self._passo_dict(albero, passo, profondita) for passo, profondita in albero.in_ordine()]
+        return {
+            "vista": nome,
+            "file": str(modulo_passi.percorso(vista)),
+            "catturata_il": datetime.fromtimestamp(vista.stat().st_mtime).isoformat(timespec="seconds"),
+            "avviso_da_generazione": config.PASSI_AVVISO_DA_GENERAZIONE,
+            "passi": righe,
+        }
+
+    def _passo_dict(self, albero: modulo_passi.Albero, passo: dict, profondita: int) -> dict:
+        identificativo = passo["identificativo"]
+        strada = albero.strada(identificativo)
+        generazioni = len(strada)
+        padre = albero.padre(passo)
+        padre_passo = albero.passo(padre) if padre != modulo_passi.VISTA else None
+        render = Path(passo["render"]) if passo.get("render") else None
+        ha_render = render is not None and self._render_valido(render)
+        stato = passo.get("stato")
+        modello = next((m for m in MODELLI if m.identificativo == passo.get("modello")), None)
+        # Da un passo si parte solo se ha un render che c'e' ancora.
+        if stato in STATI_ATTIVI:
+            motivo = "il passo non e' ancora finito"
+        elif stato != modulo_coda.FATTO:
+            motivo = "il passo non e' riuscito: non ha un render da cui partire"
+        elif not ha_render:
+            motivo = "il render di questo passo non c'e' piu' nella cartella dei lavori"
+        else:
+            motivo = None
+        partenza = passo.get("partenza") or {}
+        # Un passo fatto su un render il cui render non c'e' piu': non si
+        # puo' rifare uguale, si propone di rifarlo pulito dalla vista.
+        partenza_mancante = _tipo_passo(passo) == "passo" and (
+            padre_passo is None
+            or not (padre_passo.get("render") and self._render_valido(Path(padre_passo["render"])))
+        )
+        return {
+            "identificativo": identificativo,
+            "numero": str(passo.get("numero")),
+            "da": padre,
+            "da_numero": "0" if padre_passo is None else str(padre_passo.get("numero")),
+            "profondita": profondita,
+            "generazioni": generazioni,
+            "avviso": generazioni >= config.PASSI_AVVISO_DA_GENERAZIONE,
+            "strada": ["0"] + [str(p.get("numero")) for p in strada],
+            "nome": _nome_passo(passo),
+            "tipo": _tipo_passo(passo),
+            "modello": passo.get("modello"),
+            "modello_nome": modello.nome if modello else passo.get("modello"),
+            "creato_il": passo.get("creato_il"),
+            "stato": stato,
+            "attivo": stato in STATI_ATTIVI,
+            "render": ha_render,
+            "si_parte": motivo is None,
+            "motivo_non_si_parte": motivo,
+            "figli": len(albero.figli(identificativo)),
+            "richieste": passo.get("richieste") or [],
+            "riassunto": _riassunto_passo(passo, padre_passo),
+            "prompt": passo.get("prompt"),
+            "prompt_a_mano": bool(passo.get("prompt_a_mano")),
+            "versione_blocchi": passo.get("versione_blocchi"),
+            "destinazione": passo.get("destinazione"),
+            "costo": _costo_passo(passo, modello),
+            "fatto": passo.get("fatto"),
+            "cosa_fare": passo.get("cosa_fare"),
+            "partenza_file": partenza.get("file"),
+            "partenza_mancante": bool(partenza_mancante),
+            "percorso_render": passo.get("render"),
+            "percorso_ricetta": passo.get("ricetta"),
+            "aree": passo.get("aree"),
+        }
+
+    def _passo_di_partenza(self, albero: modulo_passi.Albero, identificativo: str) -> tuple[dict, Path]:
+        """Il passo da cui ne parte uno nuovo, e il file del suo render."""
+        passo = albero.passo(str(identificativo or ""))
+        if passo is None:
+            raise RichiestaStudioNonValida(
+                f"Nell'albero di questa vista non c'e' il passo {identificativo!r}.",
+                "Scegli il passo di partenza nell'albero. Dalla vista (passo 0) si parte da Genera.",
+            )
+        render = Path(passo["render"]) if passo.get("render") else None
+        if passo.get("stato") != modulo_coda.FATTO or render is None or not self._render_valido(render):
+            raise RichiestaStudioNonValida(
+                f"Dal passo {passo.get('numero')} non si puo' partire: non ha un render "
+                "nella cartella dei lavori.",
+                "Scegli un passo riuscito, oppure rifallo.",
+            )
+        return passo, render
+
+    def _scena(self, albero: modulo_passi.Albero, passo: dict) -> str:
+        for p in [passo, *reversed(albero.strada(passo["identificativo"]))]:
+            if p.get("scena") in blocchi.SCENE:
+                return p["scena"]
+        return blocchi.ESTERNO
+
+    def componi_passo(self, dati: dict) -> dict:
+        """Il prompt di un passo nuovo, da mostrare prima dell'invio."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        albero = self._albero(vista)
+        passo, _render = self._passo_di_partenza(albero, dati.get("da"))
+        prompt = blocchi.componi_richieste(self._scena(albero, passo), [str(dati.get("testo") or "")])
+        return {
+            "prompt": prompt,
+            "caratteri": len(prompt),
+            "da_numero": str(passo.get("numero")),
+            "ramo_nuovo": bool(albero.figli(passo["identificativo"])),
+            "generazioni": albero.generazioni(passo["identificativo"]) + 1,
+        }
+
+    def invia_passo(self, dati: dict) -> dict:
+        """Un passo nuovo dal render di un passo: la richiesta a parole, sul suo render."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        albero = self._albero(vista)
+        passo, render = self._passo_di_partenza(albero, dati.get("da"))
+        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        return self._metti_in_coda(
+            vista, blocchi.Scelte(scena=self._scena(albero, passo)), destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=None, prompt_a_mano=None,
+            parte_da=passo["identificativo"], partenza=render,
+            richieste=[str(dati.get("testo") or "")],
+        )
+
+    def _unione(self, albero: modulo_passi.Albero, identificativo: str) -> dict:
+        """Le richieste della strada di un passo, unite per un invio solo dalla vista."""
+        strada = albero.strada(str(identificativo or ""))
+        if not strada:
+            raise RichiestaStudioNonValida(
+                f"Nell'albero di questa vista non c'e' il passo {identificativo!r}.",
+                "Scegli un passo nell'albero.",
+            )
+        if len(strada) < 2:
+            raise RichiestaStudioNonValida(
+                "Questo passo e' partito dalla vista: non ci sono richieste da unire.",
+                "Per rifarlo uguale usa «Rifai questo passo».",
+            )
+        base = strada[0]
+        if not base.get("scelte"):
+            raise RichiestaStudioNonValida(
+                f"Il primo passo della strada, il {base.get('numero')}, non e' partito dalla "
+                "vista: il suo punto di partenza non c'e' piu', e non so con quale stile.",
+                "Genera di nuovo dalla vista in Genera, poi rifai i passi.",
+            )
+        scelte = blocchi.Scelte.da_dizionario(base["scelte"])
+        richieste = [r for p in strada for r in (p.get("richieste") or [])]
+        testo_base = (base.get("prompt_a_mano") or "").strip() or blocchi.componi(scelte)
+        prompt = blocchi.aggiungi_richieste(testo_base, richieste)
+        return {
+            "scelte": scelte,
+            "preset": base.get("preset"),
+            "prompt_a_mano": base.get("prompt_a_mano"),
+            "richieste": richieste,
+            "prompt": prompt,
+            "strada": ["0"] + [str(p.get("numero")) for p in strada],
+            "generazioni": len(strada),
+        }
+
+    def componi_pulito(self, dati: dict) -> dict:
+        """Il prompt di «Rifai pulito dalla vista», da mostrare prima dell'invio."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        unione = self._unione(self._albero(vista), dati.get("passo"))
+        return {
+            "prompt": unione["prompt"],
+            "caratteri": len(unione["prompt"]),
+            "richieste": unione["richieste"],
+            "strada": unione["strada"],
+            "generazioni": unione["generazioni"],
+            "riassunto": riassunto(unione["scelte"], unione["preset"]),
+        }
+
+    def invia_pulito(self, dati: dict) -> dict:
+        """«Rifai pulito dalla vista»: le richieste della strada in un solo invio dalla vista Allplan."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        unione = self._unione(self._albero(vista), dati.get("passo"))
+        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        return self._metti_in_coda(
+            vista, unione["scelte"], destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=unione["preset"] or None,
+            prompt_a_mano=unione["prompt_a_mano"],
+            richieste=unione["richieste"],
+        )
 
     # --- cartella --------------------------------------------------------
 
@@ -670,6 +930,57 @@ def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:
     except ValueError:
         quando = str(voce.get("data") or "")
     return {"url": f"/file/miniatura/{preset}", "data": quando, "modello": voce.get("modello")}
+
+
+def _tipo_passo(passo: dict) -> str:
+    """stile (dalla vista), passo (da un render), pulito (dalla vista con le richieste di una strada)."""
+    if (passo.get("partenza") or {}).get("passo", modulo_passi.VISTA) != modulo_passi.VISTA:
+        return "passo"
+    return "pulito" if passo.get("richieste") else "stile"
+
+
+def _nome_stile(passo: dict) -> str:
+    preset = blocchi.PRESET_STILE.get(passo.get("preset") or "")
+    return preset.nome if preset else "Scelte libere"
+
+
+def _nome_passo(passo: dict) -> str:
+    """Il nome breve della riga: dalle scelte, o dalla richiesta."""
+    tipo = _tipo_passo(passo)
+    if tipo == "passo":
+        breve = modulo_passi.nome_breve((passo.get("richieste") or [""])[0])
+        return breve[:1].upper() + breve[1:] if breve else "Passo senza richiesta"
+    if tipo == "pulito":
+        return f"Pulito dalla vista · {_nome_stile(passo)}"
+    return _nome_stile(passo)
+
+
+def _riassunto_passo(passo: dict, padre: dict | None) -> str:
+    """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
+    tipo = _tipo_passo(passo)
+    richieste = passo.get("richieste") or []
+    if tipo == "passo":
+        numero = padre.get("numero") if padre else "?"
+        return f"Dal passo {numero}: " + "; ".join(richieste)
+    try:
+        testo = riassunto(blocchi.Scelte.da_dizionario(passo.get("scelte") or {}), passo.get("preset"))
+    except ErroreAirender:
+        testo = _nome_stile(passo)
+    if tipo == "pulito":
+        testo += " Più le richieste della strada: " + "; ".join(richieste) + "."
+    return testo
+
+
+def _costo_passo(passo: dict, modello: Modello | None) -> str:
+    """Il costo letto dal servizio, se c'e'; altrimenti la stima del modello, detta come stima."""
+    crediti = passo.get("costo_crediti")
+    if isinstance(crediti, (int, float)):
+        return f"{_numero(float(crediti))} crediti"
+    if passo.get("stato") in STATI_ATTIVI:
+        if modello is None or modello.costo_crediti is None:
+            return "non misurato"
+        return f"circa {round(modello.costo_crediti)} crediti (stima, il servizio non l'ha ancora detto)"
+    return "non letto dal servizio"
 
 
 def numero_varianti(valore: object) -> int:

@@ -1,4 +1,4 @@
-// Lo Studio: Genera, Risultato, Ritocca (in grigio).
+// Lo Studio: Genera, Risultato, Passi, Ritocca (in grigio).
 // Niente framework e niente CDN: deve funzionare offline. Lo stato sta in S,
 // render() ridisegna la schermata, le richieste passano da api().
 // Gli stati di ogni schermata sono quelli di DESIGN.md: vuoto, in corso,
@@ -28,6 +28,10 @@ const S = {
   secco: null,            // risposta della prova a secco
   viste_viste: new Set(),
   risultato: { lavori: [], scelto: null, confronto: "vista", modo: "scorri", x: 50, ricetta: null, rifai: false, caricato: false },
+  // Studio · Passi: l'albero letto dal server, il passo scelto ("0" e' la
+  // vista), il confronto e i tre pannelli che si aprono a destra.
+  passi: { dati: null, errore: null, caricato: false, scelto: null, confronto: "vista", modo: "scorri", x: 50,
+           nuovo: null, pulito: null, rifai: false, dest: {} },
 };
 
 // --- attrezzi ---------------------------------------------------------------
@@ -189,9 +193,11 @@ async function caricaVista(nome) {
   S.descrizione = null;
   S.secco = null;
   S.risultato = { ...S.risultato, lavori: [], scelto: null, ricetta: null, caricato: false, confronto: "vista", rifai: false };
+  S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
   if (!nome) { render(); return; }
   try { S.descrizione = await get(`/api/viste/${enc(nome)}`); } catch (e) { S.errore = e; }
   await caricaRender();
+  if (S.scheda === "passi") await caricaPassi();
   render();
 }
 
@@ -233,7 +239,10 @@ function seguiLavoro(lavoro) {
   giroStato = setInterval(async () => {
     try {
       const ora = await get(`/api/lavori/${S.lavoroAttivo.identificativo}`);
+      const cambiato = ora.stato !== S.lavoroAttivo.stato;
       S.lavoroAttivo = ora;
+      // In Passi il passo che nasce e' gia' nell'albero: il suo stato si aggiorna li'.
+      if (cambiato && S.scheda === "passi") await caricaPassi();
       if (!ora.attivo && S.inFila.length) {
         // Un'altra variante dello stesso Genera aspetta: si segue quella.
         S.lavoroAttivo = await get(`/api/lavori/${S.inFila.shift()}`);
@@ -242,7 +251,12 @@ function seguiLavoro(lavoro) {
         clearInterval(giroStato);
         S.lavoroAttivo = null;
         S.risultato.scelto = ora.identificativo;
-        if (ora.stato === "fatto") {
+        if (S.scheda === "passi") {
+          // Chi lavora per passi resta nell'albero, sul passo appena nato.
+          S.passi.scelto = ora.identificativo;
+          S.ultimoEsito = ora.stato === "fatto" ? null : ora;
+          await Promise.all([caricaRender(), caricaPassi()]);
+        } else if (ora.stato === "fatto") {
           S.ultimoEsito = null;
           await caricaRender();
           location.hash = "#risultato";
@@ -634,6 +648,50 @@ function disegnaComposto() {
 
 function nomeRender(l) { return `${l.modello_nome} · ${l.preset_nome} · ${data(l.creato_il)}`; }
 
+// La linea del prima/dopo, uguale in Risultato e in Passi. `st` tiene la
+// posizione della linea (st.x, da 0 a 100) fra un disegno e l'altro.
+function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
+  const nota = h("p", { classe: "tenue piccolo", id: "nota-proporzioni" });
+  const imgA = h("img", { src: srcA, alt: nomeA, draggable: "false" });
+  const imgB = h("img", { src: srcB, alt: altB || nomeB, classe: "sopra", draggable: "false" });
+  const linea = h("div", {
+    classe: "linea", role: "slider", tabindex: "0", "aria-label": "Sposta la linea fra prima e dopo",
+    "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(st.x)),
+  }, h("span", { classe: "maniglia", "aria-hidden": "true" }, "⇔"));
+  const palco = h("div", { classe: "confronto", stile: `--x:${st.x}%; aspect-ratio:16/9` },
+    imgA, imgB, linea,
+    h("span", { classe: "nome-lato sinistra" }, nomeA), h("span", { classe: "nome-lato destra" }, nomeB));
+  const sposta = (x) => {
+    st.x = Math.max(0, Math.min(100, x));
+    palco.style.setProperty("--x", `${st.x}%`);
+    linea.setAttribute("aria-valuenow", String(Math.round(st.x)));
+    const valore = document.getElementById("valore-linea");
+    if (valore) valore.textContent = `${Math.round(st.x)}%`;
+  };
+  const daPuntatore = (ev) => { const b = palco.getBoundingClientRect(); sposta(((ev.clientX - b.left) / b.width) * 100); };
+  palco.addEventListener("pointerdown", (ev) => { palco.setPointerCapture(ev.pointerId); daPuntatore(ev); linea.focus(); });
+  palco.addEventListener("pointermove", (ev) => { if (palco.hasPointerCapture(ev.pointerId)) daPuntatore(ev); });
+  linea.addEventListener("keydown", (ev) => {
+    const passo = ev.shiftKey ? 10 : 2;
+    if (ev.key === "ArrowLeft") { sposta(st.x - passo); ev.preventDefault(); }
+    if (ev.key === "ArrowRight") { sposta(st.x + passo); ev.preventDefault(); }
+    if (ev.key === "Home") { sposta(0); ev.preventDefault(); }
+    if (ev.key === "End") { sposta(100); ev.preventDefault(); }
+  });
+  const proporzioni = () => {
+    if (!imgA.naturalWidth || !imgB.naturalWidth) return;
+    palco.style.aspectRatio = `${imgB.naturalWidth} / ${imgB.naturalHeight}`;
+    const ra = imgA.naturalWidth / imgA.naturalHeight, rb = imgB.naturalWidth / imgB.naturalHeight;
+    const scarto = Math.abs(ra - rb) / rb;
+    nota.textContent = scarto < 0.005
+      ? `${nomeA} riportata a ${imgB.naturalWidth}×${imgB.naturalHeight}, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.`
+      : `${nomeA} (${imgA.naturalWidth}×${imgA.naturalHeight}) stirata a ${imgB.naturalWidth}×${imgB.naturalHeight} per sovrapporla: le proporzioni differiscono del ${(scarto * 100).toFixed(1).replace(".", ",")}%, gli spigoli possono non coincidere per questo.`;
+  };
+  imgA.addEventListener("load", proporzioni);
+  imgB.addEventListener("load", proporzioni);
+  return { palco, nota };
+}
+
 function confronto(l) {
   const r = S.risultato;
   const altro = r.confronto !== "vista" && r.lavori.find((x) => x.identificativo === r.confronto && x.render);
@@ -654,45 +712,9 @@ function confronto(l) {
     altri.map((x) => h("option", { value: x.identificativo, selected: r.confronto === x.identificativo }, `Render ${nomeRender(x)}`)));
   scegliA.addEventListener("change", () => { r.confronto = scegliA.value; render(); });
 
-  let palco;
-  const nota = h("p", { classe: "tenue piccolo", id: "nota-proporzioni" });
+  let palco, nota;
   if (r.modo === "scorri") {
-    const imgA = h("img", { src: srcA, alt: nomeA, draggable: "false" });
-    const imgB = h("img", { src: srcB, alt: `Render ${l.modello_nome}`, classe: "sopra", draggable: "false" });
-    const linea = h("div", {
-      classe: "linea", role: "slider", tabindex: "0", "aria-label": "Sposta la linea fra prima e dopo",
-      "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(r.x)),
-    }, h("span", { classe: "maniglia", "aria-hidden": "true" }, "⇔"));
-    palco = h("div", { classe: "confronto", stile: `--x:${r.x}%; aspect-ratio:16/9` },
-      imgA, imgB, linea,
-      h("span", { classe: "nome-lato sinistra" }, nomeA), h("span", { classe: "nome-lato destra" }, l.modello_nome));
-    const sposta = (x) => {
-      r.x = Math.max(0, Math.min(100, x));
-      palco.style.setProperty("--x", `${r.x}%`);
-      linea.setAttribute("aria-valuenow", String(Math.round(r.x)));
-      document.getElementById("valore-linea").textContent = `${Math.round(r.x)}%`;
-    };
-    const daPuntatore = (ev) => { const b = palco.getBoundingClientRect(); sposta(((ev.clientX - b.left) / b.width) * 100); };
-    palco.addEventListener("pointerdown", (ev) => { palco.setPointerCapture(ev.pointerId); daPuntatore(ev); linea.focus(); });
-    palco.addEventListener("pointermove", (ev) => { if (palco.hasPointerCapture(ev.pointerId)) daPuntatore(ev); });
-    linea.addEventListener("keydown", (ev) => {
-      const passo = ev.shiftKey ? 10 : 2;
-      if (ev.key === "ArrowLeft") { sposta(r.x - passo); ev.preventDefault(); }
-      if (ev.key === "ArrowRight") { sposta(r.x + passo); ev.preventDefault(); }
-      if (ev.key === "Home") { sposta(0); ev.preventDefault(); }
-      if (ev.key === "End") { sposta(100); ev.preventDefault(); }
-    });
-    const proporzioni = () => {
-      if (!imgA.naturalWidth || !imgB.naturalWidth) return;
-      palco.style.aspectRatio = `${imgB.naturalWidth} / ${imgB.naturalHeight}`;
-      const ra = imgA.naturalWidth / imgA.naturalHeight, rb = imgB.naturalWidth / imgB.naturalHeight;
-      const scarto = Math.abs(ra - rb) / rb;
-      nota.textContent = scarto < 0.005
-        ? `${nomeA} riportata a ${imgB.naturalWidth}×${imgB.naturalHeight}, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.`
-        : `${nomeA} (${imgA.naturalWidth}×${imgA.naturalHeight}) stirata a ${imgB.naturalWidth}×${imgB.naturalHeight} per sovrapporla: le proporzioni differiscono del ${(scarto * 100).toFixed(1).replace(".", ",")}%, gli spigoli possono non coincidere per questo.`;
-    };
-    imgA.addEventListener("load", proporzioni);
-    imgB.addEventListener("load", proporzioni);
+    ({ palco, nota } = primaDopo(r, srcA, nomeA, srcB, l.modello_nome, `Render ${l.modello_nome}`));
   } else if (r.modo === "affiancati") {
     palco = h("div", { classe: "affiancati" },
       h("figure", {}, h("img", { src: srcA, alt: nomeA }), h("figcaption", { classe: "tenue piccolo" }, nomeA)),
@@ -740,7 +762,7 @@ function ricettaPannello(l) {
     ["Modello", l.modello_nome],
     ["Le tue parole", scelte.materiali ? scelte.materiali : "nessuna"],
   ];
-  if (scelte.scena === "esterno") righe.push(["Intorno", scelte.intorno ? (nomeVoceScena("esterno", "intorno", scelte.intorno) || scelte.intorno).toLowerCase() : "non indicato"]);
+  if (scelte.scena === "esterno" && !l.parte_da) righe.push(["Intorno", scelte.intorno ? (nomeVoceScena("esterno", "intorno", scelte.intorno) || scelte.intorno).toLowerCase() : "non indicato"]);
   righe.push(["Servizio", `${l.destinazione}${ric && ric.fallback === "false" ? ", senza ripiego" : ""}`]);
   if (ric && !ric.errore) {
     righe.push(["Costo", ric.crediti || "non letto dal servizio"]);
@@ -849,7 +871,6 @@ function schermataRitocca() {
   const descrizioni = [
     ["Annota per aree", "Rettangolo o selezione libera, come in Photoshop. A ogni area una nota adesiva numerata con la modifica, le note anche in elenco, un solo Applica; il risultato è un passo nuovo.", "Serve prima: il piano «aree» del banco di prova, per sapere se Nano Banana 2 rispetta aree e note."],
     ["Clicca una superficie", "Clic su una superficie: lo Studio dice qual è il materiale di Allplan e scrivi cosa deve diventare. Le zone si correggono con unisci e separa.", "Serve prima: la vista a colori per materiale da Allplan (PRD §9)."],
-    ["Passi", "Ogni render è un passo in un albero: 0 è la vista Allplan, ogni passo parte da quello sopra; si confronta, si rifà, o si rifà pulito dalla vista.", "Serve prima: il PR dell'albero dei passi."],
   ];
   const anteprime = h("div", { classe: "anteprime" }, descrizioni.map(([t, d, serve], i) => h("section", { classe: "pannello grigio", "aria-disabled": "true" },
     h("div", { classe: "riga tra" }, h("h2", {}, t), presto()),
@@ -866,6 +887,414 @@ function schermataRitocca() {
   ];
 }
 
+// --- Passi ---------------------------------------------------------------------
+// L'albero dei passi di una vista (DESIGN.md, Studio · Passi). Lo 0 e' la
+// vista Allplan; ogni passo parte da quello sopra di lui. Lo Studio non
+// inventa passi: li legge da /api/viste/<vista>/passi, che li allinea ai
+// lavori della cartella.
+
+function passoScelto() {
+  const p = S.passi;
+  return (p.dati && p.dati.passi.find((x) => x.identificativo === p.scelto)) || null;
+}
+function passoDa(id) { return (S.passi.dati && S.passi.dati.passi.find((x) => x.identificativo === id)) || null; }
+
+async function caricaPassi() {
+  if (!S.vista) return;
+  const p = S.passi;
+  try {
+    p.dati = await get(`/api/viste/${enc(S.vista)}/passi`);
+    p.errore = null;
+  } catch (e) { p.dati = null; p.errore = e; }
+  p.caricato = true;
+  if (p.dati && !passoScelto()) {
+    // Il piu' recente con un render; se non ce n'e', la vista.
+    const fatti = p.dati.passi.filter((x) => x.render).sort((a, b) => (b.creato_il || "").localeCompare(a.creato_il || ""));
+    p.scelto = fatti.length ? fatti[0].identificativo : (p.dati.passi[0] ? p.dati.passi[0].identificativo : "0");
+  }
+}
+
+async function destinazioneDi(modello) {
+  const p = S.passi;
+  if (!p.dest[modello]) {
+    try { p.dest[modello] = await get(`/api/destinazione?modello=${enc(modello)}`); } catch (e) { S.errore = e; }
+  }
+  return p.dest[modello];
+}
+
+function modelloVerificato(id) { const m = S.catalogo.modelli.find((x) => x.id === id); return m && m.verificato ? m.id : S.studio.modello_predefinito; }
+
+async function apriNuovoPasso(passo) {
+  const p = S.passi;
+  p.scelto = passo.identificativo;
+  p.rifai = false; p.pulito = null;
+  p.nuovo = { da: passo.identificativo, testo: "", modello: modelloVerificato(passo.modello), composto: null, errore: null };
+  await destinazioneDi(p.nuovo.modello);
+  render();
+  const campo = document.getElementById("testo-passo");
+  if (campo) campo.focus();
+}
+
+let attesaPasso = null;
+function componiNuovoPasso() {
+  const n = S.passi.nuovo;
+  clearTimeout(attesaPasso);
+  if (!n || !n.testo.trim()) { if (n) { n.composto = null; disegnaNuovoPasso(); } return; }
+  attesaPasso = setTimeout(async () => {
+    try { n.composto = await post("/api/passi/componi", { vista: S.vista, da: n.da, testo: n.testo }); n.errore = null; }
+    catch (e) { n.composto = null; n.errore = e; }
+    disegnaNuovoPasso();
+  }, 250);
+}
+
+// Aggiorna solo il prompt e il pulsante mentre si scrive, senza ridisegnare
+// la pagina: il campo di testo non perde il cursore.
+function disegnaNuovoPasso() {
+  const n = S.passi.nuovo;
+  if (!n) return;
+  const prompt = document.getElementById("prompt-passo");
+  if (prompt) prompt.value = n.composto ? n.composto.prompt : "";
+  const car = document.getElementById("caratteri-passo");
+  if (car) car.textContent = n.composto ? `${n.composto.caratteri} caratteri` : "";
+  const err = document.getElementById("errore-passo");
+  if (err) err.replaceChildren(n.errore ? avviso("errore", n.errore.fatto, n.errore.cosa_fare) : "");
+  const bottone = document.getElementById("applica-passo");
+  if (bottone) bottone.disabled = !n.testo.trim() || !!S.lavoroAttivo;
+  const motivo = document.getElementById("motivo-applica");
+  if (motivo) motivo.textContent = motivoApplicaSpento();
+}
+
+function motivoApplicaSpento() {
+  const n = S.passi.nuovo;
+  if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
+  if (!n || !n.testo.trim()) return "Scrivi cosa cambiare: un passo senza richiesta non cambia niente.";
+  return "";
+}
+
+async function applicaPasso() {
+  const n = S.passi.nuovo;
+  S.errore = null;
+  try {
+    const dest = await destinazioneDi(n.modello);
+    const risposta = await post("/api/passi/invia", {
+      vista: S.vista, da: n.da, testo: n.testo, modello: n.modello, destinazione_mostrata: dest && dest.destinazione,
+    });
+    S.passi.nuovo = null;
+    S.passi.scelto = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+  } catch (e) { n.errore = e; }
+  render();
+}
+
+async function apriPulito(passo) {
+  const p = S.passi;
+  p.nuovo = null; p.rifai = false;
+  p.pulito = { passo: passo.identificativo, modello: modelloVerificato(passo.modello), composto: null, errore: null };
+  try { p.pulito.composto = await post("/api/passi/pulito/componi", { vista: S.vista, passo: passo.identificativo }); }
+  catch (e) { p.pulito.errore = e; }
+  await destinazioneDi(p.pulito.modello);
+  render();
+}
+
+async function inviaPulito() {
+  const q = S.passi.pulito;
+  S.errore = null;
+  try {
+    const dest = await destinazioneDi(q.modello);
+    const risposta = await post("/api/passi/pulito/invia", {
+      vista: S.vista, passo: q.passo, modello: q.modello, destinazione_mostrata: dest && dest.destinazione,
+    });
+    S.passi.pulito = null;
+    S.passi.scelto = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+async function rifaiPasso(passo) {
+  S.errore = null;
+  try {
+    const dest = await destinazioneDi(passo.modello);
+    const risposta = await post(`/api/lavori/${passo.identificativo}/rifai`, { destinazione_mostrata: dest && dest.destinazione });
+    S.passi.rifai = false;
+    S.passi.scelto = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+  } catch (e) { S.errore = e; }
+  render();
+}
+
+function etichettaStato(passo) {
+  if (passo.attivo) return h("span", { classe: "tag-stato attivo" }, passo.stato);
+  if (passo.stato === "errore") return h("span", { classe: "tag-stato errore" }, "non riuscito");
+  if (passo.stato === "annullato") return h("span", { classe: "tag-stato" }, "annullato");
+  if (!passo.render) return h("span", { classe: "tag-stato" }, "render tolto");
+  return null;
+}
+
+function rigaPasso(passo) {
+  const p = S.passi;
+  const scelto = p.scelto === passo.identificativo;
+  const attivo = S.lavoroAttivo && S.lavoroAttivo.identificativo === passo.identificativo ? S.lavoroAttivo : null;
+  return h("li", { classe: "riga-passo", stile: `--d:${passo.profondita}` },
+    h("button", {
+      classe: "scegli-passo", "aria-current": String(scelto),
+      onclick: () => { p.scelto = passo.identificativo; p.rifai = false; p.pulito = null; if (p.nuovo && p.nuovo.da !== passo.identificativo) p.nuovo = null; render(); },
+    },
+      passo.render ? h("img", { src: `/file/render/${passo.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto" }),
+      h("span", { classe: "testo-passo" },
+        h("span", { title: passo.nome }, h("b", { classe: "numero" }, passo.numero), " ", passo.nome),
+        h("small", {}, `${passo.modello_nome} · ${data(passo.creato_il)}`, " ", etichettaStato(passo)))),
+    attivo ? h("div", { classe: "striscia in-riga", role: "status" },
+      h("div", { classe: "riga tra" }, h("span", {}, h("b", {}, (attivo.destinazione || "").split(" (")[0]), ` · ${attivo.stato}`), h("span", { classe: "mono" }, tempo(attivo.secondi))),
+      h("div", { classe: "barra" }, h("span")),
+      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan resta libero."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
+    h("button", {
+      classe: "btn link piccolo", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null,
+      onclick: () => apriNuovoPasso(passo),
+    }, "Nuovo passo da qui"));
+}
+
+function colonnaAlbero() {
+  const p = S.passi;
+  const dati = p.dati;
+  const passi = dati ? dati.passi : [];
+  const zeroScelto = p.scelto === "0";
+  return h("section", { classe: "pannello albero-passi", "aria-label": "Passi di questa vista" },
+    h("span", { classe: "etichetta" }, "Passi di questa vista"),
+    h("span", { classe: "mono piccolo tenue", title: S.vista }, S.vista),
+    h("ol", { classe: "albero" },
+      h("li", { classe: "riga-passo", stile: "--d:0" },
+        h("button", { classe: "scegli-passo", "aria-current": String(zeroScelto), onclick: () => { p.scelto = "0"; p.nuovo = null; p.pulito = null; p.rifai = false; render(); } },
+          h("img", { src: `/file/vista/${enc(S.vista)}`, alt: "" }),
+          h("span", { classe: "testo-passo" }, h("span", {}, h("b", { classe: "numero" }, "0"), " Vista Allplan"),
+            h("small", {}, dati ? `cattura del ${data(dati.catturata_il)}` : ""))),
+        h("a", { classe: "btn link piccolo", href: "#genera", title: "Dalla vista si parte da Genera: lì scegli lo stile." }, "Nuovo passo da qui")),
+      passi.map(rigaPasso)),
+    passi.length
+      ? h("p", { classe: "tenue piccolo" }, "Ogni passo parte da quello sopra di lui. Un passo nuovo fatto da un punto qualsiasi apre un ramo lì sotto.")
+      : h("div", { classe: "vuoto-passi" },
+        h("p", {}, "Nessun passo ancora. Genera un render da Genera: sarà il passo 1."),
+        h("a", { classe: "btn", href: "#genera" }, "Vai a Genera")));
+}
+
+function palcoPassi(passo) {
+  const p = S.passi;
+  if (!passo) {
+    return h("div", { classe: "palco" },
+      h("h1", {}, "Vista Allplan · passo 0"),
+      h("p", { classe: "tenue" }, "Il punto di partenza di tutti i passi. Da qui si parte da Genera."),
+      h("figure", { classe: "riquadro-vista" }, h("img", { src: `/file/vista/${enc(S.vista)}`, alt: "Vista Allplan", stile: "max-height:none" })));
+  }
+  const titolo = h("h1", {}, `Passo ${passo.numero} · ${passo.nome}`);
+  if (!passo.render) {
+    const padre = passo.da !== "0" ? passoDa(passo.da) : null;
+    const srcPartenza = padre && padre.render ? `/file/render/${padre.identificativo}` : `/file/vista/${enc(S.vista)}`;
+    const testa = passo.attivo
+      ? h("p", { classe: "tenue" }, "Il render arriva qui appena il servizio lo manda. Qui sotto, l'immagine da cui parte.")
+      : h("div", { classe: "avviso errore", role: "alert" },
+        h("b", {}, passo.stato === "errore" ? "Questo passo non è riuscito." : passo.stato === "annullato" ? "Questo passo è stato annullato." : "Il render di questo passo non c'è più nella cartella dei lavori."),
+        passo.fatto ? h("span", {}, passo.fatto) : null,
+        passo.cosa_fare ? h("span", { classe: "cosa-fare" }, passo.cosa_fare) : null,
+        h("span", { classe: "piccolo tenue" }, "Non ha figli e non si può scegliere come punto di partenza."));
+    return h("div", { classe: "palco" }, titolo, testa,
+      h("figure", { classe: "riquadro-vista" }, h("img", { src: srcPartenza, alt: "Immagine di partenza", stile: "max-height:none" })));
+  }
+  const padre = passo.da !== "0" ? passoDa(passo.da) : null;
+  const primaPossibile = padre && padre.render;
+  const contro = p.confronto === "prima" && primaPossibile ? "prima" : "vista";
+  const srcA = contro === "prima" ? `/file/render/${padre.identificativo}` : `/file/vista/${enc(S.vista)}`;
+  const nomeA = contro === "prima" ? `Passo ${padre.numero}` : "Vista Allplan";
+  const srcB = `/file/render/${passo.identificativo}`;
+  const nomeB = `Passo ${passo.numero}`;
+  const modi = h("div", { classe: "switch", role: "group", "aria-label": "Modo di confronto" },
+    [["scorri", "Prima / dopo"], ["affiancati", "Affiancati"]].map(([id, n]) =>
+      h("button", { classe: "seg", "aria-pressed": String(p.modo === id), onclick: () => { p.modo = id; render(); } }, n)));
+  const scegliA = h("select", { "aria-label": "Confronta con" },
+    h("option", { value: "vista", selected: contro === "vista" }, "Vista Allplan (passo 0)"),
+    h("option", { value: "prima", selected: contro === "prima", disabled: !primaPossibile },
+      padre ? `Passo prima (passo ${padre.numero})${primaPossibile ? "" : ": il suo render non c'è più"}` : "Passo prima: è la vista"));
+  scegliA.addEventListener("change", () => { p.confronto = scegliA.value; render(); });
+  let palco, nota = null;
+  if (p.modo === "scorri") ({ palco, nota } = primaDopo(p, srcA, nomeA, srcB, nomeB));
+  else {
+    palco = h("div", { classe: "affiancati" },
+      h("figure", {}, h("img", { src: srcA, alt: nomeA }), h("figcaption", { classe: "tenue piccolo" }, nomeA)),
+      h("figure", {}, h("img", { src: srcB, alt: nomeB }), h("figcaption", { classe: "tenue piccolo" }, nomeB)));
+  }
+  return h("div", { classe: "palco" },
+    h("div", { classe: "riga tra" }, titolo, modi),
+    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Confronta con"), h("div", { stile: "min-width:240px" }, scegliA)),
+    palco,
+    p.modo === "scorri" ? h("div", { classe: "riga tra" },
+      h("span", { classe: "tenue piccolo" }, "Trascina la linea, oppure tasti ← → (con Maiusc il passo è più lungo)"),
+      h("span", { classe: "mono", id: "valore-linea" }, `${Math.round(p.x)}%`)) : null,
+    nota);
+}
+
+function rigaDestinazione(modello) {
+  const d = S.passi.dest[modello];
+  if (!d) return h("p", { classe: "tenue piccolo" }, "Leggo la destinazione…");
+  return h("p", { classe: "destinazione" }, "La vista va a ", h("b", {}, d.destinazione),
+    d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`);
+}
+
+function sceltaModello(stato, onCambio) {
+  const scegli = h("select", { "aria-label": "Modello" },
+    S.catalogo.modelli.map((m) => h("option", { value: m.id, selected: stato.modello === m.id, disabled: !m.verificato }, `${m.nome}${m.verificato ? "" : " · schema non verificato"}`)));
+  scegli.addEventListener("change", async () => { stato.modello = scegli.value; await destinazioneDi(stato.modello); onCambio(); });
+  return scegli;
+}
+
+function pannelloNuovoPasso() {
+  const n = S.passi.nuovo;
+  const da = passoDa(n.da);
+  if (!da) return null;
+  const campo = h("textarea", { id: "testo-passo", rows: "3", placeholder: "Cosa cambiare, a parole: «due alberi davanti al fronte, non coprire le finestre»" });
+  campo.value = n.testo;
+  campo.addEventListener("input", () => { n.testo = campo.value; componiNuovoPasso(); disegnaNuovoPasso(); });
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Nuovo passo" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, `Nuovo passo da qui · dal passo ${da.numero}`),
+      h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Lascia stare")),
+    h("p", { classe: "piccolo" }, da.figli
+      ? `Parte dal passo ${da.numero}: si apre un ramo nuovo accanto a quelli che ci sono già.`
+      : `Parte dal passo ${da.numero} e continua il suo ramo.`),
+    campo,
+    h("div", { classe: "riga" }, h("button", { classe: "chip", disabled: true }, "Su un'area"), presto(), h("span", { classe: "tenue piccolo" }, "arriva con Ritocca")),
+    h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
+      h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
+    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
+    rigaDestinazione(n.modello),
+    h("div", { id: "errore-passo" }),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", id: "applica-passo", onclick: applicaPasso, disabled: true }, "Applica"),
+      h("span", { classe: "tenue piccolo", id: "motivo-applica" })));
+}
+
+function pannelloPulito(passo) {
+  const q = S.passi.pulito;
+  const c = q.composto;
+  if (q.errore && !c) {
+    return h("section", { classe: "pannello evidenziato" }, avviso("errore", q.errore.fatto, q.errore.cosa_fare),
+      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Lascia stare"));
+  }
+  if (!c) return h("section", { classe: "pannello evidenziato" }, h("p", { classe: "tenue" }, "Unisco le richieste della strada…"));
+  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt di Rifai pulito" });
+  prompt.value = c.prompt;
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Rifai pulito dalla vista" },
+    h("span", { classe: "etichetta" }, `Rifai pulito dalla vista · strada ${c.strada.join(" › ")}`),
+    h("p", { classe: "piccolo" }, `Un solo invio dalla vista Allplan, una generazione invece di ${c.generazioni}. Il risultato è un ramo nuovo sotto lo 0.`),
+    h("dl", { classe: "ricetta" },
+      h("dt", {}, "Stile"), h("dd", {}, c.riassunto),
+      h("dt", {}, "Richieste"), h("dd", {}, c.richieste.join(" · "))),
+    h("span", { classe: "piccolo tenue" }, `Il prompt che parte, in inglese · ${c.caratteri} caratteri`),
+    prompt,
+    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(q, render))),
+    rigaDestinazione(q.modello),
+    q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: inviaPulito, disabled: !!S.lavoroAttivo }, "Conferma e invia"),
+      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Lascia stare")),
+    S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: si può inviare quando finisce.") : null);
+}
+
+function ricettaPasso(passo) {
+  const padre = passo.da !== "0" ? passoDa(passo.da) : null;
+  const righe = [
+    ["Strada", passo.strada.join(" › ")],
+    ["Parte da", passo.da === "0" ? "Vista Allplan (passo 0)"
+      : `Passo ${passo.da_numero}${passo.partenza_mancante ? ": il punto di partenza non c'è più" : ""}`],
+    ["Richiesta", passo.riassunto],
+    ["Modello", passo.modello_nome],
+    ["Servizio", passo.destinazione || "—"],
+    ["Costo", passo.costo],
+    ["Data", data(passo.creato_il)],
+    ["Blocchi", passo.versione_blocchi ? `${passo.versione_blocchi} · testi scelti, non ancora provati` : "—"],
+    ["Aree", "nessuna"],
+  ];
+  if (passo.percorso_render) righe.push(["Render", h("span", { classe: "mono" }, passo.percorso_render)]);
+  if (passo.percorso_ricetta) righe.push(["Ricetta", h("span", { classe: "mono" }, passo.percorso_ricetta)]);
+  righe.push(["Albero", h("span", { classe: "mono" }, S.passi.dati.file)]);
+  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt partito" });
+  prompt.value = passo.prompt || "";
+  return h("section", { classe: "pannello", "aria-label": "Com'è stato fatto" },
+    h("span", { classe: "etichetta" }, "Com'è stato fatto"),
+    h("dl", { classe: "ricetta" }, righe.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])),
+    passo.prompt ? h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, `Il prompt, in inglese${passo.prompt_a_mano ? " · scritto a mano" : ""}`)), prompt) : null,
+    padre === null && passo.da !== "0" ? h("p", { classe: "tenue piccolo" }, "Il passo da cui era partito non c'è più nell'albero.") : null);
+}
+
+function latoPassi(passo) {
+  const p = S.passi;
+  if (!passo) return h("div", { classe: "lato" }, p.nuovo ? pannelloNuovoPasso() : null);
+  const blocchi = [];
+  if (p.nuovo) blocchi.push(pannelloNuovoPasso());
+  blocchi.push(h("section", { classe: "pannello", "aria-label": "La strada" },
+    h("span", { classe: "etichetta" }, "La strada"),
+    h("span", { classe: "strada" }, passo.strada.join(" › ")),
+    h("span", { classe: "tenue piccolo" }, `${passo.generazioni} ${passo.generazioni === 1 ? "generazione" : "generazioni di fila"} dalla vista Allplan.`)));
+  if (passo.avviso) {
+    blocchi.push(h("div", { classe: "avviso attenzione", role: "note" },
+      h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
+      h("span", {}, "Se vedi l'edificio cambiare, rifai pulito dalla vista."),
+      h("span", { classe: "piccolo tenue" }, `Avviso da ${S.passi.dati.avviso_da_generazione} generazioni: soglia scelta, da tarare con il piano «catena» del banco di prova.`)));
+  }
+  if (passo.partenza_mancante) {
+    blocchi.push(avviso("errore", "Il punto di partenza non c'è più: il render del passo prima è stato tolto dalla cartella.",
+      "Rifai pulito dalla vista: riparte dalla vista Allplan con le stesse richieste."));
+  }
+  blocchi.push(h("section", { classe: "pannello", "aria-label": "Tenuta della geometria" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Tenuta della geometria"), presto("Misura in arrivo")),
+    h("span", { classe: "misura" }, "Non misurata"),
+    h("p", { classe: "tenue piccolo" }, "Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto. Per ora giudica tu, con la linea del prima/dopo.")));
+  if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
+  const dest = S.passi.dest[passo.modello];
+  const conferma = p.rifai ? h("div", { classe: "avviso" },
+    h("b", {}, "Rifai questo passo"),
+    h("span", {}, passo.da === "0" ? "Stessa vista, stesse scelte: un ramo nuovo sotto lo 0." : `Stesso punto di partenza (passo ${passo.da_numero}), stessa richiesta: un ramo nuovo accanto.`),
+    rigaDestinazione(passo.modello),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => rifaiPasso(passo), disabled: !!S.lavoroAttivo || !dest || !!dest.cosa_manca }, "Conferma e rifai"),
+      h("button", { classe: "btn", onclick: () => { p.rifai = false; render(); } }, "Lascia stare"))) : null;
+  const notaPulito = passo.generazioni <= 1
+    ? "Un passo solo: niente da unire."
+    : `Unisce le richieste dei passi ${passo.strada.slice(1).join(", ")} in un solo invio dalla vista Allplan: una generazione invece di ${passo.generazioni}.`;
+  blocchi.push(h("section", { classe: "pannello", "aria-label": "Adesso" },
+    h("span", { classe: "etichetta" }, "Adesso"),
+    h("div", { classe: "azioni" },
+      h("button", { classe: passo.avviso || passo.partenza_mancante ? "btn primario" : "btn", disabled: passo.generazioni <= 1 || !!S.lavoroAttivo, onclick: () => apriPulito(passo) }, "Rifai pulito dalla vista"),
+      h("button", { classe: "btn", disabled: passo.partenza_mancante || passo.attivo || !!S.lavoroAttivo, onclick: async () => { p.rifai = true; p.pulito = null; await destinazioneDi(passo.modello); render(); } }, "Rifai questo passo"),
+      h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella")),
+    h("p", { classe: "tenue piccolo" }, notaPulito),
+    conferma));
+  blocchi.push(ricettaPasso(passo));
+  return h("div", { classe: "lato" }, blocchi);
+}
+
+function schermataPassi() {
+  const p = S.passi;
+  const sopra = S.errore ? [avviso("errore", S.errore.fatto, S.errore.cosa_fare)] : [];
+  if (!S.vista) {
+    return [...sopra, h("section", { classe: "pannello" }, h("h1", {}, "Passi"),
+      h("p", {}, "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegline una in Genera con Usa un'altra vista…"),
+      h("div", { classe: "azioni" }, h("a", { classe: "btn", href: "#genera" }, "Vai a Genera")))];
+  }
+  if (p.errore) return [...sopra, h("h1", {}, "Passi"), avviso("errore", p.errore.fatto, p.errore.cosa_fare)];
+  if (!p.dati) return [...sopra, h("p", { classe: "tenue" }, "Leggo i passi…")];
+  const passo = p.scelto === "0" ? null : passoScelto();
+  const vuoto = !p.dati.passi.length;
+  return [...sopra, h("h1", { classe: "nascosto" }, "Passi"),
+    h("div", { classe: vuoto ? "layout-passi vuoto" : "layout-passi" },
+      colonnaAlbero(),
+      vuoto ? null : palcoPassi(passo),
+      vuoto ? null : latoPassi(passo))];
+}
+
 // --- disegno -------------------------------------------------------------------
 
 function render() {
@@ -877,20 +1306,24 @@ function render() {
   }
   const attivo = document.activeElement && document.activeElement.id;
   const scorrimento = window.scrollY;
-  const contenuto = S.scheda === "risultato" ? schermataRisultato() : S.scheda === "ritocca" ? schermataRitocca() : schermataGenera();
+  const contenuto = S.scheda === "risultato" ? schermataRisultato()
+    : S.scheda === "passi" ? schermataPassi()
+    : S.scheda === "ritocca" ? schermataRitocca() : schermataGenera();
   main.replaceChildren(...[contenuto].flat(2).filter(Boolean));
   if (attivo && document.getElementById(attivo)) document.getElementById(attivo).focus();
+  if (S.scheda === "passi") { disegnaNuovoPasso(); }
   window.scrollTo(0, scorrimento);
 }
 
 function leggiScheda() {
   const s = (location.hash || "#genera").slice(1);
-  S.scheda = ["genera", "risultato", "ritocca"].includes(s) ? s : "genera";
+  S.scheda = ["genera", "risultato", "passi", "ritocca"].includes(s) ? s : "genera";
 }
 
 window.addEventListener("hashchange", async () => {
   leggiScheda();
   if (S.scheda !== "genera" && S.vista) await caricaRender();
+  if (S.scheda === "passi" && S.vista) await caricaPassi();
   render();
   window.scrollTo(0, 0);
 });
@@ -919,6 +1352,10 @@ async function avvia() {
     const vistaAttiva = attivo && S.studio.viste.find((v) => v.nome === attivo.vista);
     await caricaVista(vistaAttiva ? vistaAttiva.nome : (S.studio.viste[0] ? S.studio.viste[0].nome : null));
     if (attivo) seguiLavoro(attivo);
+    if (S.scheda === "passi") {
+      const modelli = [...new Set((S.passi.dati ? S.passi.dati.passi : []).map((x) => x.modello).filter(Boolean))];
+      await Promise.all(modelli.map(destinazioneDi));
+    }
   } catch (e) { S.errore = e; }
   render();
   setInterval(controllaStudio, 3000);
