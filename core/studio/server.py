@@ -16,11 +16,12 @@ Rotte:
     GET  /api/catalogo                     preset, assi, modelli
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
-    GET  /api/destinazione?modello=<id>    dove va la vista e quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>   dove va la vista e quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
     GET  /file/render/<id>                 l'immagine del render
+    GET  /file/miniatura/<preset>          la miniatura vera di un preset, se c'e'
     POST /api/componi                      prompt, riassunto, caratteri
     POST /api/prova-a-secco                tutto tranne l'invio
     POST /api/invia                        scrive il lavoro in coda
@@ -135,7 +136,8 @@ class _Gestore(BaseHTTPRequestHandler):
             case ["api", "viste", nome, "render"]:
                 self._json(studio.render_della_vista(nome))
             case ["api", "destinazione"]:
-                self._json(studio.destinazione((domanda.get("modello") or [""])[0]))
+                self._json(studio.destinazione((domanda.get("modello") or [""])[0],
+                                               (domanda.get("varianti") or ["1"])[0]))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
@@ -144,6 +146,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._file(studio.percorso_vista(nome))
             case ["file", "render", identificativo]:
                 self._file(studio.file_render(identificativo))
+            case ["file", "miniatura", preset]:
+                self._file(studio.file_miniatura(preset))
             case _:
                 self._json({"errore": {"fatto": "Questa pagina dello Studio non esiste.",
                                        "cosa_fare": "Torna alla pagina principale."}},

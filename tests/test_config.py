@@ -363,3 +363,77 @@ def test_studio_caricamento_massimo_mb_ferma_un_file_enorme_trascinato_per_sbagl
     monkeypatch.setattr(config, "STUDIO_CARICAMENTO_MASSIMO_MB", 0)
     with pytest.raises(RichiestaStudioNonValida):
         studio.carica_vista(_png_tinta((128, 128, 128), 600, 400))
+
+
+# --- banco di prova e varianti -------------------------------------------------
+
+
+def test_varianti_massime_ferma_un_genera_che_costerebbe_senza_che_si_veda(tmp_path):
+    """Caso: un numero di varianti fuori misura arriva dalla pagina e si pagano dieci invii."""
+    from core.studio.servizio import MODELLI, RichiestaStudioNonValida, Studio
+
+    studio = Studio(tmp_path)
+    assert studio.destinazione(MODELLI[0].identificativo, config.VARIANTI_MASSIME)["varianti"] == config.VARIANTI_MASSIME
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.destinazione(MODELLI[0].identificativo, config.VARIANTI_MASSIME + 1)
+
+
+def _due_toni(scatola_cambiata, valore) -> tuple[bytes, bytes]:
+    prima = Image.new("RGB", (200, 100), (100, 100, 100))
+    dopo = prima.copy()
+    dopo.paste((valore,) * 3, scatola_cambiata)
+    return _png(prima), _png(dopo)
+
+
+def _png(img) -> bytes:
+    deposito = io.BytesIO()
+    img.save(deposito, format="PNG")
+    return deposito.getvalue()
+
+
+def test_differenza_pixel_soglia_ignora_il_rumore_e_prende_un_cambio_visibile():
+    """Caso: il rumore della rigenerazione conta come area violata, o un cambio vero passa."""
+    rumore = _due_toni((0, 0, 200, 100), 100 + config.DIFFERENZA_PIXEL_SOGLIA)
+    assert immagine.differenza_fuori_dalle_aree(*rumore, [])["quota_cambiata"] == 0
+    visibile = _due_toni((0, 0, 200, 100), 100 + config.DIFFERENZA_PIXEL_SOGLIA + 1)
+    assert immagine.differenza_fuori_dalle_aree(*visibile, [])["quota_cambiata"] == 1
+
+
+def test_aree_bordo_escluso_px_non_conta_la_sfumatura_sul_bordo_dell_area():
+    """Caso: il modello sfuma la modifica oltre il bordo e il banco dice che ha violato l'area."""
+    area = [(50, 20), (100, 20), (100, 80), (50, 80)]
+    bordo = config.AREE_BORDO_ESCLUSO_PX
+    dentro_la_fascia = _due_toni((50 - bordo + 1, 20, 50, 80), 250)
+    assert immagine.differenza_fuori_dalle_aree(*dentro_la_fascia, [area])["quota_cambiata"] == 0
+    oltre = _due_toni((50 - bordo - 4, 20, 50 - bordo - 1, 80), 250)
+    assert immagine.differenza_fuori_dalle_aree(*oltre, [area])["quota_cambiata"] > 0
+
+
+def test_contorno_aree_px_e_lo_spessore_del_contorno_disegnato():
+    """Caso: un contorno troppo sottile sparisce quando il modello rimpicciolisce l'immagine."""
+    vista = _png(Image.new("RGB", (200, 200), (120, 120, 120)))
+    disegnata = Image.open(io.BytesIO(immagine.disegna_aree(vista, [[(50, 150), (150, 150), (150, 190), (50, 190)]])))
+    colonna = [disegnata.convert("RGB").getpixel((100, y)) for y in range(140, 160)]
+    assert config.CONTORNO_AREE_PX - 1 <= colonna.count((255, 0, 255)) <= config.CONTORNO_AREE_PX + 1
+
+
+def test_spigoli_soglia_lato_e_tolleranza_vedono_uno_spostamento_di_pochi_pixel():
+    """Caso: la misura grezza degli spigoli non distingue un edificio fermo da uno spostato."""
+    prima = Image.new("RGB", (config.SPIGOLI_LATO_PX, config.SPIGOLI_LATO_PX // 2), (200, 200, 200))
+    prima.paste((60, 60, 60), (300, 100, 600, 400))
+    vicino = Image.new("RGB", prima.size, (200, 200, 200))
+    lontano = Image.new("RGB", prima.size, (200, 200, 200))
+    vicino.paste((60, 60, 60), (300 + config.SPIGOLI_TOLLERANZA_PX, 100, 600 + config.SPIGOLI_TOLLERANZA_PX, 400))
+    lontano.paste((60, 60, 60), (300 + 4 * config.SPIGOLI_TOLLERANZA_PX, 100,
+                                 600 + 4 * config.SPIGOLI_TOLLERANZA_PX, 400))
+    assert immagine.spigoli_ritrovati(_png(prima), _png(vicino)) == 1.0
+    assert immagine.spigoli_ritrovati(_png(prima), _png(lontano)) < 0.7
+    assert 0 < config.SPIGOLI_SOGLIA < 140  # il salto fra i due grigi si vede
+
+
+def test_miniatura_larghezza_e_altezza_px_sono_le_proporzioni_della_tessera():
+    """Caso: la miniatura vera ha altre proporzioni e la tessera la taglia male."""
+    alta = _png(Image.new("RGB", (600, 900), (90, 90, 90)))
+    piccola = Image.open(io.BytesIO(immagine.ritaglia_miniatura(alta)))
+    assert piccola.size == (config.MINIATURA_LARGHEZZA_PX, config.MINIATURA_ALTEZZA_PX)
+    assert config.MINIATURA_LARGHEZZA_PX * 9 == config.MINIATURA_ALTEZZA_PX * 16

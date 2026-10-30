@@ -392,3 +392,121 @@ STUDIO_CARICAMENTO_MASSIMO_MB = _registra(Costante(
     ),
     unita=" MB",
 ))
+
+VARIANTI_MASSIME = _registra(Costante(
+    nome="VARIANTI_MASSIME",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quante varianti si possono chiedere con un Genera: ogni variante e' un "
+        "lavoro in coda e un invio pagato. 4 viene dal mockup di Genera "
+        "(«Varianti per invio 2-4», 2026-10-27): abbastanza per scegliere fra "
+        "versioni dello stesso stile, poche perche' un clic non costi senza "
+        "che lo si veda (con Nano Banana 2, circa 69 crediti)."
+    ),
+))
+
+# --- Banco di prova ----------------------------------------------------------
+
+DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(
+    nome="DIFFERENZA_PIXEL_SOGLIA",
+    valore=24,
+    origine=SCELTA,
+    ragione=(
+        "Banco di prova, piano aree: di quanto (0-255, sul canale che cambia di "
+        "piu') deve cambiare un pixel fuori dalle aree per contare come "
+        "cambiato. Un modello che rigenera tutta l'immagine sposta comunque di "
+        "qualche livello anche i pixel che non tocca, e una compressione JPEG "
+        "aggiunge rumore: 24 lascia fuori quel rumore e prende un cambio che "
+        "l'occhio vede. Mai tarato su un risultato vero."
+    ),
+))
+
+AREE_BORDO_ESCLUSO_PX = _registra(Costante(
+    nome="AREE_BORDO_ESCLUSO_PX",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "Banco di prova, piano aree: la fascia intorno a ogni area che non "
+        "entra nella misura «fuori dalle aree». Sul bordo un modello sfuma la "
+        "modifica, e contarlo farebbe sembrare violata un'area rispettata. Piu' "
+        "largo di MASCHERA_SFUMATURA_PX, perche' qui non e' il motore a "
+        "sfumare ma il modello."
+    ),
+    unita=" px",
+))
+
+CONTORNO_AREE_PX = _registra(Costante(
+    nome="CONTORNO_AREE_PX",
+    valore=6,
+    origine=SCELTA,
+    ragione=(
+        "Spessore del contorno delle aree disegnato sull'immagine nel modo (a) "
+        "del piano aree. Abbastanza spesso perche' il modello lo veda anche "
+        "dopo il ridimensionamento interno a circa 1k di lato, non tanto da "
+        "coprire gli spigoli dell'edificio."
+    ),
+    unita=" px",
+))
+
+SPIGOLI_SOGLIA = _registra(Costante(
+    nome="SPIGOLI_SOGLIA",
+    valore=40,
+    origine=SCELTA,
+    ragione=(
+        "Banco di prova, misura grezza degli spigoli: un pixel e' spigolo se il "
+        "filtro dei bordi di Pillow (FIND_EDGES, 0-255) lo da' sopra 40. Basso "
+        "abbastanza per prendere gli spigoli di una vista shaded di Allplan, "
+        "alto abbastanza per ignorare il rumore di un fondo uniforme. Provato "
+        "solo su immagini sintetiche."
+    ),
+))
+
+SPIGOLI_LATO_PX = _registra(Costante(
+    nome="SPIGOLI_LATO_PX",
+    valore=1024,
+    origine=SCELTA,
+    ragione=(
+        "Banco di prova, misura grezza degli spigoli: vista e render si "
+        "confrontano su copie di 1024 px di lato lungo. Sotto il lato dei "
+        "render di Nano Banana 2 (1376), cosi' non si ingrandisce niente; "
+        "abbastanza grande perche' uno spostamento di pochi pixel si veda. Con "
+        "LATO_ANALISI_PX (384) uno spostamento di 10 px su una vista di 1536 "
+        "non si vedeva (provato sulla vista dei test il 2026-10-29)."
+    ),
+    unita=" px",
+))
+
+SPIGOLI_TOLLERANZA_PX = _registra(Costante(
+    nome="SPIGOLI_TOLLERANZA_PX",
+    valore=2,
+    origine=SCELTA,
+    ragione=(
+        "Banco di prova, misura grezza degli spigoli: uno spigolo della vista "
+        "conta come ritrovato se nel render c'e' uno spigolo entro 2 px sulla "
+        "copia di SPIGOLI_LATO_PX, circa 3 px su una vista di 1536. Meno di "
+        "cosi' punirebbe il ricampionamento del modello; di piu' lascerebbe "
+        "passare una finestra spostata."
+    ),
+    unita=" px",
+))
+
+MINIATURA_LARGHEZZA_PX = _registra(Costante(
+    nome="MINIATURA_LARGHEZZA_PX",
+    valore=384,
+    origine=SCELTA,
+    ragione=(
+        "Larghezza della miniatura vera di un preset, ritagliata da un render "
+        "del banco. Tre volte la tessera dello Studio (128 x 72), cosi' resta "
+        "nitida su uno schermo ad alta densita'; in JPEG pesa poche decine di KB."
+    ),
+    unita=" px",
+))
+
+MINIATURA_ALTEZZA_PX = _registra(Costante(
+    nome="MINIATURA_ALTEZZA_PX",
+    valore=216,
+    origine=SCELTA,
+    ragione="Altezza della miniatura vera: 16:9 come la tessera dello Studio (vedi MINIATURA_LARGHEZZA_PX).",
+    unita=" px",
+))

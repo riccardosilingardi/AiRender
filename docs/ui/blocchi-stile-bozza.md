@@ -1,6 +1,8 @@
-# Blocchi di stile — bozza 3 (2026-10-27)
+# Blocchi di stile — bozza 4 (2026-10-29)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
+
+Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campagna; **Verde** è un asse nuovo degli esterni (nessuno, poco, rigoglioso), nel prompt subito dopo l'intorno; **Persone** ha «poche». Ogni blocco che aggiunge qualcosa che nella vista non c'è (contesto, verde, persone, oggetti, la vista fuori dalle finestre) finisce con «do not cover or hide any building element». Gli alberi sono passati da «Niente, sfondo neutro» al Verde, così i due assi non si contraddicono; i preset esterni hanno verde «nessuno». Per questo le lunghezze dei preset sono cresciute.
 
 ## Regola fissa (sempre per prima)
 
@@ -12,7 +14,9 @@ Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill arch
 
 ## Ordine nel prompt
 
-Regola fissa → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Persone → Qualità → Cosa evitare.
+Regola fissa → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
+
+Un **passo** fatto su un render già generato (albero dei passi, piano «catena» del banco di prova) non rimanda tutto: regola fissa → scena → solo gli assi che cambiano → cosa evitare.
 
 Tolti su richiesta di Riccardo (27/10, 19:20) l'elenco «Cosa c'è nella vista» e il campo «Altro da dire». Il soggetto si riduce a esterno/interno dallo switch. Chi vuole scrivere il proprio testo lo fa con «Mostra e modifica il prompt completo», sotto il riassunto.
 
@@ -66,7 +70,18 @@ Esempio di materiali scritti dall'utente e tradotti:
 
 | id | Nome in UI | Testo per il modello | Caratteri |
 |---|---|---|---|
-| `niente` | Niente, sfondo neutro | Plain neutral background; do not add trees, cars or surroundings that are not in the view. | 90 |
+| `niente` | Niente, sfondo neutro | Plain neutral background; do not add buildings, cars or surroundings that are not in the view. | 94 |
+| `citta` | Città | Urban surroundings: neighbouring buildings, pavement and street furniture in the background; do not cover or hide any building element. | 135 |
+| `periferia` | Periferia | Suburban surroundings: low houses, gardens and a quiet street in the background; do not cover or hide any building element. | 123 |
+| `campagna` | Campagna | Countryside surroundings: open fields and distant hills in the background; do not cover or hide any building element. | 117 |
+
+## Verde — esterni
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `nessuno` | Nessuno | Do not add trees, grass or planting that are not in the view. | 61 |
+| `poco` | Poco | A few trees and some low planting around the building; do not cover or hide any building element. | 97 |
+| `rigoglioso` | Rigoglioso | Lush mature trees, hedges and planting around the building; do not cover or hide any building element. | 102 |
 
 ## Luce — interni
 
@@ -83,22 +98,23 @@ Esempio di materiali scritti dall'utente e tradotti:
 | id | Nome in UI | Testo per il modello | Caratteri |
 |---|---|---|---|
 | `neutra` | Fuori dalle finestre: neutro | Keep the view outside the windows soft and neutral; do not invent a landscape. | 78 |
-| `verde` | Fuori: verde | A soft out-of-focus green garden outside the windows. | 53 |
-| `citta` | Fuori: città | A soft out-of-focus city view outside the windows. | 50 |
+| `verde` | Fuori: verde | A soft out-of-focus green garden outside the windows; do not cover or hide any building element. | 96 |
+| `citta` | Fuori: città | A soft out-of-focus city view outside the windows; do not cover or hide any building element. | 93 |
 
 ## Arredo — interni
 
 | id | Nome in UI | Testo per il modello | Caratteri |
 |---|---|---|---|
 | `nessuno` | Non aggiungere arredi | Do not add furniture or objects that are not in the view. | 57 |
-| `leggero` | Qualche oggetto | Add only a few small objects (books, a plant, a throw) without changing the furniture. | 86 |
+| `leggero` | Qualche oggetto | Add only a few small objects (books, a plant, a throw) without changing the furniture; do not cover or hide any building element. | 129 |
 
 ## Persone
 
 | id | Nome in UI | Testo per il modello | Caratteri |
 |---|---|---|---|
 | `nessuna` | Nessuna | No people. | 10 |
-| `movimento` | In movimento | A few people walking, slightly motion-blurred, for scale. | 57 |
+| `poche` | Poche | Two or three people standing or walking, small in the frame, for scale; do not cover or hide any building element. | 114 |
+| `movimento` | In movimento | A few people walking, slightly motion-blurred, for scale; do not cover or hide any building element. | 100 |
 
 ## Qualità
 
@@ -109,29 +125,29 @@ Esempio di materiali scritti dall'utente e tradotti:
 
 ## Preset = combinazioni
 
-Lunghezza misurata del prompt composto senza testo dell'utente. La skill indica 500-600 caratteri come ottimo per Nano Banana/Flux; con la regola fissa e la coda stiamo un po' sopra, da verificare se pesa.
+Lunghezza misurata del prompt composto senza testo dell'utente. La skill indica 500-600 caratteri come ottimo per Nano Banana/Flux; con la regola fissa, la coda e (dalla bozza 4) le frasi «non coprire» stiamo sopra, fra 780 e 1000: da verificare se pesa, con il piano «preset» del banco di prova.
 
 | Preset | Look | Luce | Cielo | Persone | Caratteri |
 |---|---|---|---|---|---|
-| Rivista d'architettura | Canon tilt-shift · rivista | Mezzogiorno | Sereno | Nessuna | 766 |
-| Luce naturale calda | Fujifilm GFX100S · caldo naturale | Estate luminosa | Sereno | Nessuna | 830 |
-| Pellicola morbida | Kodak Portra 160 · morbido | Giorno | Sereno | Nessuna | 718 |
-| Urbano editoriale | LomoChrome Metropolis · urbano | Giorno | Coperto | In movimento | 812 |
-| Ora blu | Leica SL2 · neutro profondo | Ora blu | Sereno | Nessuna | 838 |
-| Notte con luna | Leica SL2 · neutro profondo | Notte con luna | Sereno | Nessuna | 838 |
-| Giornata di pioggia | Kodak Portra 400 · caldo vissuto | Giorno | Pioggia | In movimento | 836 |
-| Autunno nebbioso | Kodak Portra 400 · caldo vissuto | Giorno | Autunno nebbioso | In movimento | 882 |
+| Rivista d'architettura | Canon tilt-shift · rivista | Mezzogiorno | Sereno | Nessuna | 832 |
+| Luce naturale calda | Fujifilm GFX100S · caldo naturale | Estate luminosa | Sereno | Nessuna | 896 |
+| Pellicola morbida | Kodak Portra 160 · morbido | Giorno | Sereno | Nessuna | 784 |
+| Urbano editoriale | LomoChrome Metropolis · urbano | Giorno | Coperto | In movimento | 921 |
+| Ora blu | Leica SL2 · neutro profondo | Ora blu | Sereno | Nessuna | 904 |
+| Notte con luna | Leica SL2 · neutro profondo | Notte con luna | Sereno | Nessuna | 904 |
+| Giornata di pioggia | Kodak Portra 400 · caldo vissuto | Giorno | Pioggia | In movimento | 945 |
+| Autunno nebbioso | Kodak Portra 400 · caldo vissuto | Giorno | Autunno nebbioso | In movimento | 991 |
 
 ### Preset interni
 
 | Preset | Look | Luce | Fuori | Persone | Caratteri |
 |---|---|---|---|---|---|
 | Interno rivista | Canon tilt-shift · rivista | Mattino da finestra | Fuori dalle finestre: neutro | Nessuna | 825 |
-| Interno caldo | Fujifilm GFX100S · caldo naturale | Pomeriggio caldo | Fuori: verde | Nessuna | 791 |
+| Interno caldo | Fujifilm GFX100S · caldo naturale | Pomeriggio caldo | Fuori: verde | Nessuna | 834 |
 | Interno pellicola morbida | Kodak Portra 160 · morbido | Giorno coperto | Fuori dalle finestre: neutro | Nessuna | 803 |
-| Interno sera | Leica SL2 · neutro profondo | Sera, luci accese | Fuori: città | Nessuna | 792 |
+| Interno sera | Leica SL2 · neutro profondo | Sera, luci accese | Fuori: città | Nessuna | 835 |
 | Interno notte, lampade | Leica SL2 · neutro profondo | Notte con lampade | Fuori dalle finestre: neutro | Nessuna | 804 |
-| Interno vissuto | Fujifilm X100V · analogico 35mm | Pomeriggio caldo | Fuori: verde | In movimento | 839 |
+| Interno vissuto | Fujifilm X100V · analogico 35mm | Pomeriggio caldo | Fuori: verde | In movimento | 925 |
 
 ## 16k / 32k
 
@@ -139,7 +155,7 @@ Il modello di modifica restituisce la sua risoluzione, qualunque cosa dica il te
 
 ## Esempio completo: esterno + materiali + Ora blu
 
-> Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. The subject is a building exterior. Materials: white lime plaster walls, dark oak window frames, light grey stone base. Leica SL2 full-frame photograph: rich tonal depth, refined micro-contrast, restrained warm colour, smooth highlight roll-off, detailed shadows, tactile textures. Blue hour, about 20 minutes after sunset: no direct sun, no hard shadows, dark blue sky with a faint warm horizon glow, windows glowing warm amber from inside. Clear sky. Plain neutral background; do not add trees, cars or surroundings that are not in the view. No people. Professional architectural photography, natural detail. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.
+> Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. The subject is a building exterior. Materials: white lime plaster walls, dark oak window frames, light grey stone base. Leica SL2 full-frame photograph: rich tonal depth, refined micro-contrast, restrained warm colour, smooth highlight roll-off, detailed shadows, tactile textures. Blue hour, about 20 minutes after sunset: no direct sun, no hard shadows, dark blue sky with a faint warm horizon glow, windows glowing warm amber from inside. Clear sky. Plain neutral background; do not add buildings, cars or surroundings that are not in the view. Do not add trees, grass or planting that are not in the view. No people. Professional architectural photography, natural detail. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.
 
 Nota: i materiali arrivano in italiano; tradurli in inglese prima dell'invio è un passo da decidere (a mano nel motore o con un modello di testo). Finché non c'è, passano come sono.
 

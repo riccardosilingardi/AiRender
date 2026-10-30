@@ -43,6 +43,10 @@ class RichiestaGenerazione:
     aspetto: str | None = None
     generazione_fissa: bool = False
     seme: int | None = None
+    # Immagini dopo la vista, nello stesso invio (una maschera, una mappa).
+    # Solo i modelli il cui schema lo dichiara le accettano: gli altri si
+    # fermano prima di partire.
+    immagini_in_piu: tuple[bytes, ...] = ()
 
 
 @dataclass(frozen=True)

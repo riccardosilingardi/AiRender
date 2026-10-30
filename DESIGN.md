@@ -15,10 +15,11 @@ Documento vivo, come il PRD. Si aggiorna ogni volta che una schermata cambia.
 > Quello che decidiamo in tutte e due è **cosa c'è, in che ordine, e cosa dice
 > quando non c'è niente.**
 
-I mockup stanno in `docs/ui/mockup/` (copiati dal progetto il 2026-10-27):
-`Palette.dc.html` è la palette v1, `Stile.dc.html` è Studio · Genera,
-`Main.dc.html` è Studio · Risultato, `Ritocca.dc.html` è Studio · Ritocca. I
-testi dei blocchi di prompt sono in `docs/ui/blocchi-stile-bozza.md` (bozza 3).
+I mockup stanno in `docs/ui/mockup/` (copiati dal progetto il 2026-10-27,
+aggiornati il 2026-10-29): `Palette.dc.html` è la palette v1, `Stile.dc.html`
+è Studio · Genera, `Main.dc.html` è Studio · Risultato, `Passi.dc.html` è
+Studio · Passi, `Ritocca.dc.html` è Studio · Ritocca. I testi dei blocchi di
+prompt sono in `docs/ui/blocchi-stile-bozza.md` (bozza 4).
 Dove questo documento e un mockup non dicono la stessa cosa, vale questo
 documento.
 
@@ -97,8 +98,9 @@ grigio. In fondo il percorso della cartella delle viste e Chiudi.
 
 Mockup: `Stile.dc.html`. In alto la barra comune dello Studio: a cosa è
 collegato («Collegato ad Allplan 2026 · BOSCO · Prospettiva centrale»), le
-schede **Genera · Risultato · Ritocca** e, in grigio, **Livelli · Video** e
-**Chiave e tetto di spesa**. Sotto, la vista con il suo esito di idoneità e
+schede **Genera · Risultato · Ritocca** e, in grigio, **Passi · Video** e
+**Chiave e tetto di spesa** (fino al 2026-10-28 la voce Passi si chiamava
+Livelli). Sotto, la vista con il suo esito di idoneità e
 Usa un'altra vista…; se la vista ha colori di visualizzazione, l'avviso «Il
 modello legge i colori della vista come materiali. Per colori veri, salva la
 vista con colori neutri.»
@@ -121,8 +123,10 @@ vista con colori neutri.»
   4. per gli esterni **Cielo e stagione**; per gli interni **Fuori dalle
      finestre** e **Arredo**;
   5. per gli esterni **Cosa può aggiungere il modello**: intorno all'edificio
-     (niente e sfondo neutro, città, periferia, campagna), verde, persone; per
-     gli interni le persone.
+     (niente e sfondo neutro, città, periferia, campagna), verde (nessuno,
+     poco, rigoglioso), persone (nessuna, poche, in movimento); per gli
+     interni le persone. Ogni voce che aggiunge qualcosa dice al modello anche
+     di non coprire l'edificio («do not cover or hide any building element»).
 
 **Colonna destra — cosa parte**
 - **Materiali a parole** (attivo): testo libero, «intonaco a calce bianco,
@@ -144,9 +148,13 @@ vista con colori neutri.»
   verificato.
 - **Qualità**: Base / Altissima definizione (32k) — «da confrontare». Il
   predefinito si sceglie dopo un confronto sulla stessa vista.
-- In grigio: Fedeltà al disegno, Varianti per invio 2–4, Immagine di
-  riferimento per lo stile.
-- **Destinazione e costo**, poi **Prova a secco** e **Genera**.
+- **Varianti per invio**: 1, 2, 3 o 4. Con N varianti partono N lavori nella
+  coda con le stesse scelte, uno dopo l'altro, e il costo accanto a Genera è
+  N volte quello di un render («circa 69 crediti per 4 immagini»). Se il
+  costo del modello non è misurato, resta «non misurato», mai un numero.
+- In grigio: Fedeltà al disegno, Immagine di riferimento per lo stile.
+- **Destinazione e costo**, poi **Prova a secco** e **Genera** («Genera 3
+  render» quando le varianti sono più di una).
 
 - **Vuoto:** nessuna vista nella cartella. Al posto della vista: «Nessuna
   vista ancora. Catturala dalla palette in Allplan, oppure scegli un file con
@@ -197,32 +205,121 @@ decisione che questa schermata deve far prendere.
 - **Pieno:** prima/dopo, Render di questa vista, tenuta della geometria «Non
   misurata», ricetta, Rifai.
 
+### Studio · Passi
+
+Mockup: `Passi.dc.html`. Decisione di Riccardo del 2026-10-28 (PRD, sezione
+5): si lavora su un render dopo l'altro (prima lo stile, poi gli alberi, poi
+le persone) e ogni passo deve restare ritrovabile, senza diventare un grafo a
+nodi alla Comfy o Weavy. **Non costruita**: arriva con il PR dell'albero dei
+passi (PRD, sezione 8). Nella barra laterale la voce si chiama **Passi** (era
+Livelli).
+
+**Colonna sinistra — l'albero dei passi di una vista**
+- Un albero solo, in una colonna. La riga **0 è la vista Allplan**. Ogni passo
+  parte da quello sopra di lui ed è rientrato sotto di lui: «1 Rivista
+  d'architettura», sotto «2 Alberi sul fronte», sotto «3 Persone in
+  movimento».
+- Un passo nuovo fatto da un punto qualsiasi apre un **ramo** lì sotto: se dal
+  passo 2 si fa «4 Cielo al tramonto», il 4 sta sotto il 2, accanto al 3, con
+  la sua linea di collegamento. Un altro render dalla vista (per esempio lo
+  stesso stile con Kontext Pro) è un ramo sotto lo 0.
+- Niente grafo a nodi, niente schede di versione: con le schede un ramo
+  sparisce, con i nodi dopo dieci passi è un groviglio.
+- Ogni riga: numero, nome breve (dalle scelte o dalla nota), modello, data.
+  **Nuovo passo da qui** su ogni riga.
+
+**Centro — prima e dopo**
+- Prima/dopo con la linea, come in Risultato, fra il passo scelto e **la vista
+  Allplan** (predefinito) oppure **il passo prima**. Affiancati a un clic.
+
+**Colonna destra — il passo scelto**
+- **La strada** del passo, dalla vista fino a lui: «0 › 1 › 2 › 4».
+- **La ricetta** del passo (com'è stato fatto, come in Risultato).
+- **Tenuta della geometria**, misurata **sempre contro la vista Allplan**, non
+  contro il passo prima: è l'edificio disegnato che deve restare, e un
+  confronto col passo prima nasconderebbe lo spostamento accumulato. Finché
+  la misura non c'è: «Non misurata».
+- **Dalla seconda generazione di fila**, un avviso: «Questo passo è la 2ª
+  generazione su un render: gli spigoli possono spostarsi un poco a ogni
+  giro. Se vedi l'edificio cambiare, rifai pulito dalla vista.» Quanto si
+  spostino davvero lo misura il piano «catena» del banco di prova (sezione 9
+  del PRD).
+- **Rifai pulito dalla vista**: unisce le richieste della strada (stile del
+  passo 1, alberi del 2, cielo del 4) in **un solo invio dalla vista
+  Allplan**. Il risultato è un ramo nuovo sotto lo 0. Prima dell'invio si
+  vedono destinazione e costo (regola 5).
+- **Rifai questo passo**: stesso punto di partenza, stessa richiesta, un ramo
+  nuovo accanto.
+
+- **Vuoto:** nessun render della vista. L'albero ha solo la riga 0, «Vista
+  Allplan», e sotto «Nessun passo ancora. Genera un render da Genera: sarà il
+  passo 1.» Niente prima/dopo, niente ricetta.
+- **In corso:** il passo che sta nascendo è già nell'albero, al suo posto, con
+  la striscia di avanzamento (servizio, stato del lavoro, tempo, Annulla).
+  Gli altri passi restano sceglibili.
+- **Errore:** il passo fallito resta nell'albero, marcato «non riuscito», con
+  la frase del motore e il gesto successivo; non ha figli e non si può
+  scegliere come punto di partenza. Se il passo da cui parte è stato
+  cancellato dalla cartella, lo dice («il punto di partenza non c'è più») e
+  propone Rifai pulito dalla vista.
+- **Pieno:** albero con rami, prima/dopo sul passo scelto, strada, ricetta,
+  tenuta «Non misurata», l'avviso dove serve, i due Rifai.
+
 ### Studio · Ritocca
 
-Mockup: `Ritocca.dc.html`. **Tutto in grigio.** In testa: «Anteprima delle
-funzioni in arrivo · niente qui è attivabile». Sostituisce le vecchie
-schermate Materiali e Livelli, che qui diventano anteprime.
+Mockup: `Ritocca.dc.html`. Riscritta il 2026-10-28 su richiesta di Riccardo:
+le aree si disegnano come in Photoshop e le modifiche si scrivono su note
+adesive sull'immagine. **Non costruita**: arriva dopo che il piano «aree» del
+banco di prova ha detto se Nano Banana 2 rispetta aree e note (PRD, sezioni 8
+e 9). Finché non c'è, la scheda resta l'anteprima in grigio dello Studio v1.
 
-- **Cambia un materiale**: clic su una superficie, lo Studio dice cos'è («dal
-  modello», esatta, oppure «stimata dall'immagine») e si sceglie il nuovo
-  materiale, con la grana fine / media / grossa. Correzione delle zone con
-  **unisci** e **separa** (PRD, sezione 8). Serve prima: la vista a colori per
-  materiale da Allplan (PRD, sezione 9).
-- **Annota per aree**: riquadri numerati, una nota per riquadro, un solo
-  Applica; fuori dai riquadri i pixel restano quelli di prima. Serve prima: la
-  prova su Nano Banana 2 e Kontext con due riquadri e due note.
-- **Livelli**: ogni modifica è un livello sopra il render, con stile, testo e
-  data, e si rifà da solo; l'ultima riga è il risultato corrente.
+**Strumenti**, in una fila sopra il render:
+- **Rettangolo**: si trascina un riquadro.
+- **Selezione libera**: lazo a mano libera, come in Photoshop; la forma si
+  chiude da sola quando si rilascia.
+- **Clicca una superficie**, in grigio con «In arrivo» fino alla mappa
+  materiali di Allplan (PRD, sezione 8): senza la mappa lo Studio non sa dove
+  finisce una superficie.
 
-- **Vuoto:** se non c'è un render, la scheda dice «Prima serve un render» e
-  mostra solo le tre descrizioni.
-- **In corso / Errore:** non esistono finché le funzioni sono in grigio:
-  niente si attiva, quindi niente parte e niente fallisce.
-- **Pieno:** le tre anteprime sul render corrente, con l'esempio marcato
-  «Esempio dimostrativo: riquadri e zone non sono calcolati».
+**Sul render**
+- Ogni area ha il suo contorno e il suo **numero** (1, 2, …).
+- A ogni area si attacca una **nota adesiva**, numerata come l'area, con il
+  testo della modifica: «infissi in legno scuro», «una panchina in pietra».
+  La nota si sposta per non coprire quello che si sta guardando; l'area no.
+- Un'area si cancella con la sua nota.
 
-Quando una di queste funzioni si accende, prima del codice si scrivono qui i
-suoi quattro stati veri.
+**Colonna destra**
+- **Le note in elenco**, nello stesso ordine e con lo stesso numero, per
+  rileggerle e correggerle senza cercarle sull'immagine.
+- **Un solo Applica per tutte le note**: «Applica le 2 note · un invio», con
+  la destinazione e il costo di **un** invio (regola 5).
+- Il risultato è **un passo nuovo nell'albero** (Studio · Passi), figlio del
+  render su cui si sono disegnate le aree.
+- **Da verificare prima**, scritto a schermo finché vale: se il modello
+  rispetta le aree e lascia uguale il resto (piano «aree» del banco); che la
+  selezione libera diventa una maschera, e un riempimento con maschera non
+  ricalcola riflessi e luce di rimbalzo (trappola di `CLAUDE.md`: per un
+  cambio radicale serve la modalità variante); che Clicca una superficie
+  aspetta la mappa materiali.
+
+Tolta la vecchia **«Grana del nuovo materiale»** (fine / media / grossa): con
+note scritte a parole non ha un comando da muovere, e i modelli del Router
+non hanno un dettaglio della grana (la ricetta lo scrive già come assente).
+
+- **Vuoto:** nessun render della vista: «Prima serve un render. Generane uno
+  da Genera.» Gli strumenti sono spenti con la ragione accanto. Con un render
+  ma senza aree: il render, gli strumenti accesi e «Disegna un'area, poi
+  scrivi cosa cambiare nella sua nota»; Applica è spento con la ragione.
+- **In corso:** dopo Applica, aree e note restano visibili e bloccate, con la
+  striscia di avanzamento (servizio, stato, tempo, Annulla). Allplan e il
+  resto dello Studio restano liberi.
+- **Errore:** un'area senza nota o una nota vuota ferma Applica e lo dice
+  accanto a quella nota; un invio fallito lascia aree e note come erano, con
+  la frase del motore e Rifai; un risultato di dimensione diversa dal render
+  di partenza si dice, perché fuori dalle aree non si può più rimettere il
+  pixel di prima.
+- **Pieno:** render con aree e note numerate, elenco delle note, Applica con
+  destinazione e costo. Dopo l'invio, il passo nuovo è scelto nell'albero.
 
 ## Studio v1, costruito il 2026-10-28
 
@@ -237,10 +334,10 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
 - **Resa**: solo Fotorealistico è attiva. Plastico bianco, Schizzo a matita,
   Acquerello e Cinematografico sono in grigio: non hanno ancora un blocco di
   prompt, e un comando che non cambia il prompt mentirebbe.
-- **Intorno** Città / Periferia / Campagna, **Verde** e **persone «Poche»**:
-  in grigio per la stessa ragione. Le voci attive sono quelle di
-  `core/blocchi.py`, e lo Studio le legge da lì: una voce nuova nei blocchi
-  compare da sola.
+- ~~**Intorno** Città / Periferia / Campagna, **Verde** e **persone «Poche»**:
+  in grigio per la stessa ragione.~~ Attive dal 2026-10-29, con i blocchi
+  della bozza 4. Le voci attive sono quelle di `core/blocchi.py`, e lo Studio
+  le legge da lì: una voce nuova nei blocchi compare da sola.
 - **Ora / Luce** degli esterni ha le sei voci dei blocchi (Mezzogiorno,
   Estate luminosa, Giorno, Ora d'oro, Ora blu, Notte con luna), non le quattro
   del mockup.
@@ -248,7 +345,10 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
   serve un posto dove tenerli, non ancora deciso.
 - **Le miniature** sono disegnate dallo Studio (casa, cielo, luce), non
   immagini: illustrazioni dichiarate tali, come chiede la decisione del
-  2026-10-27.
+  2026-10-27. Dal 2026-10-29 un preset può avere una **miniatura vera**,
+  ritagliata da un render del banco di prova (`scripts/miniatura_da_banco.py`):
+  sotto la tessera c'è «render vero del <data>», e la riga sopra la griglia
+  dice quante sono illustrazioni e quante render veri.
 - **Rifai con la stessa ricetta** chiede conferma, con destinazione e costo,
   prima di rimettere il lavoro in coda: è un invio che si paga (regola 5).
 - **Genera è spento mentre un lavoro è in corso**, con la ragione accanto: due
@@ -270,10 +370,10 @@ contraddicono le nuove, valgono le nuove:
 | Prima | Adesso | Cosa cambia |
 |---|---|---|
 | 1 — Sorgente | Palette · 1 Vista; Studio · Genera, la vista in testa | La cattura la fa la palette dalla finestra attiva; lo stato vuoto non parla più di cartella sorvegliata |
-| 2 — Stile | Palette · 2 Stile; Studio · Genera | Miniature **illustrative** e dichiarate tali, non generate dal preset (vedi Decisioni visive). Niente slider della grana nella scelta dello stile: la grana resta solo nel cambio di materiale. Il testo libero non è una riga sotto la griglia ma il prompt completo modificabile |
+| 2 — Stile | Palette · 2 Stile; Studio · Genera | Miniature **illustrative** e dichiarate tali, non generate dal preset (vedi Decisioni visive). Niente slider della grana nella scelta dello stile; dal 2026-10-28 neanche nel ritocco (Studio · Ritocca). Il testo libero non è una riga sotto la griglia ma il prompt completo modificabile |
 | 3 — Risultato | Studio · Risultato | Prima/dopo con la linea come vista predefinita, affiancati come seconda scelta |
 | 4 — Materiali | Studio · Ritocca, in grigio; Materiali a parole in Genera | La direzione del 2026-10-22 (zone dalla mappa di Allplan, unisci e separa) resta, dentro Ritocca |
-| 5 — Livelli | Studio · Ritocca, in grigio | Contenuto invariato, non ancora costruito |
+| 5 — Livelli | Studio · Passi (dal 2026-10-28) | Non più livelli sopra un render ma un albero di passi, ognuno con la sua ricetta; non ancora costruito |
 
 ## Decisioni visive
 
@@ -314,5 +414,6 @@ contraddicono le nuove, valgono le nuove:
   Studio c'è solo il segnaposto in grigio).
 - Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
-- Gli stati veri di Cambia un materiale, Annota per aree e Livelli: oggi sono
-  anteprime in grigio in Studio · Ritocca.
+- Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
+  stati si scrivono quando la mappa esiste. Passi e Ritocca hanno i loro
+  stati qui sopra, ma non sono costruiti.

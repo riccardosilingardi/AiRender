@@ -22,7 +22,12 @@ a{color:#8FBCFF}a:hover{color:#B9D4FF}
 .card{border:1px dashed #4A4D55;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .dep{font-size:12px;line-height:1.5;color:#A1A4AB;margin:0}
 .box{position:absolute;border:2px dashed #C9CBD0;border-radius:4px}
-.num{position:absolute;top:-12px;left:-12px;width:24px;height:24px;border-radius:50%;background:#C9CBD0;color:#141518;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.numx{position:absolute;top:-12px;left:-12px;width:24px;height:24px;border-radius:50%;background:#C9CBD0;color:#141518;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.seg{font:inherit;font-size:12px;min-height:30px;border-radius:7px;border:0;background:transparent;color:#C9CBD0;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;gap:6px}
+.on{background:#2B2F38;color:#EDEDEF}
+.seg:disabled{color:#8B8F97;cursor:not-allowed}
+.nota{position:absolute;width:190px;background:#F4D35E;color:#2A2410;border-radius:4px;padding:8px 10px;font-size:12px;line-height:1.4;box-shadow:0 6px 16px rgba(0,0,0,.45)}
+.nota b{font-weight:600}
 </style>
 </helmet>
 <div style="font-family: Inter, system-ui, sans-serif; color: #EDEDEF; background: #141518; min-height: 900px; display: flex; flex-direction: column">
@@ -42,66 +47,50 @@ a{color:#8FBCFF}a:hover{color:#B9D4FF}
 <a href="Stile.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 L19 5"/><path d="M15 5h4v4"/><circle cx="7" cy="7" r="2"/></svg>Genera</a>
 <a href="Main.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg>Risultato</a>
 <button class="rail" style="background: #262A33; color: #A1A4AB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Ritocca</button>
-<button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Livelli</button>
+<a href="Passi.dc.html" class="rail" style="text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 13 L12 18 L21 13"/></svg>Passi</a>
 <button class="rail" disabled="disabled"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10 L21 7 V17 L16 14"/></svg>Video</button>
 </nav>
 
 <main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px">
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
-<h1 style="margin: 0; font-size: 18px; font-weight: 600; color: #C9CBD0">Cambia una parte, il resto non si tocca</h1>
+<h1 style="margin: 0; font-size: 18px; font-weight: 600; color: #C9CBD0">Segna dove, scrivi cosa: tutto in un invio</h1>
 <div style="flex: 1"></div>
-<div role="group" aria-label="Strumenti" style="display: flex; flex-wrap: wrap; gap: 6px">
-<button class="btn" disabled="disabled">Clicca una superficie</button>
-<button class="btn" disabled="disabled">Disegna un riquadro</button>
-<button class="btn" disabled="disabled">Unisci</button>
-<button class="btn" disabled="disabled">Separa</button>
+<div role="radiogroup" aria-label="Strumento di selezione" style="display: flex; gap: 2px; border: 1px solid #2E3036; border-radius: 9px; padding: 3px">
+<sc-for list="{{ strumenti }}" as="t" hint-placeholder-count="3"><button class="{{ t.cls }}" role="radio" aria-checked="{{ t.sel }}" onClick="{{ t.pick }}" disabled="{{ t.spento }}">{{ t.nome }}</button></sc-for>
 </div>
+<button class="btn" disabled="disabled">Aggiungi area</button>
+<button class="btn" disabled="disabled">Togli area</button>
 </div>
 
 <figure style="margin: 0; position: relative; background: #1C1D21; border: 1px solid #2A2C31; border-radius: 12px; overflow: hidden">
-<img src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="Render con riquadri e zone dimostrativi, non attivi" style="display: block; width: 100%; aspect-ratio: 820 / 580; object-fit: cover; opacity: .55; filter: grayscale(.4)">
-<div class="box" style="left: 18%; top: 30%; width: 22%; height: 30%"><span class="num">1</span></div>
-<div class="box" style="left: 56%; top: 18%; width: 24%; height: 26%"><span class="num">2</span></div>
-<figcaption style="position: absolute; left: 12px; bottom: 12px; font-size: 12px; color: #EDEDEF; background: rgba(20,21,24,.85); border-radius: 8px; padding: 6px 10px">Esempio dimostrativo: riquadri e zone non sono calcolati</figcaption>
+<img src="/_blob/f31162d2b14f7460edbd003e3fac22db" alt="Render con due aree segnate e due note, dimostrativo" style="display: block; width: 100%; aspect-ratio: 1376 / 768; object-fit: cover">
+<svg viewBox="0 0 1376 768" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<rect x="150" y="300" width="300" height="250" fill="rgba(110,168,254,.15)" stroke="#6EA8FE" stroke-width="4" stroke-dasharray="14 10"/>
+<path d="M820 210 C 900 150, 1060 170, 1110 240 S 1150 390, 1060 430 S 860 450, 830 370 S 760 260, 820 210 Z" fill="rgba(244,211,94,.15)" stroke="#F4D35E" stroke-width="4" stroke-dasharray="14 10"/>
+<circle cx="150" cy="300" r="18" fill="#6EA8FE"/><text x="150" y="307" text-anchor="middle" font-size="20" font-weight="600" font-family="Inter, sans-serif" fill="#0B1220">1</text>
+<circle cx="820" cy="210" r="18" fill="#F4D35E"/><text x="820" y="217" text-anchor="middle" font-size="20" font-weight="600" font-family="Inter, sans-serif" fill="#2A2410">2</text>
+</svg>
+<div class="nota" style="left: 3%; top: 76%"><b>1 · rettangolo</b><br>due alberi davanti all'ingresso, non coprire le finestre</div>
+<div class="nota" style="left: 63%; top: 60%"><b>2 · selezione libera</b><br>facciata in mattone vecchio, giunti chiari</div>
+<figcaption style="position: absolute; right: 12px; bottom: 12px; font-size: 12px; color: #EDEDEF; background: rgba(20,21,24,.85); border-radius: 8px; padding: 6px 10px">Esempio dimostrativo: aree e note disegnate a mano</figcaption>
 </figure>
-
-<div style="display: flex; flex-direction: column; gap: 8px">
-<div class="lbl">Note per riquadro</div>
-<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
-<label style="display: flex; gap: 10px; align-items: center; border: 1px dashed #4A4D55; border-radius: 10px; padding: 10px; color: #8B8F97; font-size: 13px"><span style="font-weight: 600">1</span><input disabled="disabled" placeholder="es. pavimento in rovere chiaro" style="flex: 1; min-width: 0; font: inherit; background: transparent; border: 0; color: #8B8F97"></label>
-<label style="display: flex; gap: 10px; align-items: center; border: 1px dashed #4A4D55; border-radius: 10px; padding: 10px; color: #8B8F97; font-size: 13px"><span style="font-weight: 600">2</span><input disabled="disabled" placeholder="es. muro in mattone vecchio" style="flex: 1; min-width: 0; font: inherit; background: transparent; border: 0; color: #8B8F97"></label>
-</div>
-</div>
+<p style="margin: 0; font-size: 13px; color: #A1A4AB">{{ aiuto }}</p>
 </main>
 
-<aside aria-label="Funzioni in arrivo" style="flex: 1 1 340px; max-width: 400px; display: flex; flex-direction: column; gap: 14px; padding: 18px; border-left: 1px solid #2A2C31; background: #18191C">
+<aside aria-label="Note e invio" style="flex: 1 1 340px; max-width: 400px; display: flex; flex-direction: column; gap: 14px; padding: 18px; border-left: 1px solid #2A2C31; background: #18191C">
+<div style="display: flex; justify-content: space-between; align-items: center"><span class="lbl">Note sull'immagine</span><span class="soon">In arrivo</span></div>
+<label style="display: flex; gap: 10px; align-items: flex-start; border: 1px dashed #4A4D55; border-radius: 10px; padding: 10px; color: #8B8F97; font-size: 13px"><span style="font-weight: 600; color: #6EA8FE">1</span><span style="display: flex; flex-direction: column; gap: 4px; flex: 1"><span style="font-size: 11px">rettangolo</span><input disabled="disabled" value="due alberi davanti all'ingresso, non coprire le finestre" style="font: inherit; background: transparent; border: 0; color: #8B8F97; padding: 0"></span></label>
+<label style="display: flex; gap: 10px; align-items: flex-start; border: 1px dashed #4A4D55; border-radius: 10px; padding: 10px; color: #8B8F97; font-size: 13px"><span style="font-weight: 600; color: #F4D35E">2</span><span style="display: flex; flex-direction: column; gap: 4px; flex: 1"><span style="font-size: 11px">selezione libera</span><input disabled="disabled" value="facciata in mattone vecchio, giunti chiari" style="font: inherit; background: transparent; border: 0; color: #8B8F97; padding: 0"></span></label>
+<p class="dep">Le note si scrivono sul foglietto attaccato all'area, nell'immagine. Qui le ritrovi in elenco per correggerle.</p>
+<button class="btn" disabled="disabled" style="justify-content: center; min-height: 40px">Applica le 2 note · un invio, circa 17 crediti</button>
+<p class="dep">Il risultato diventa un passo nuovo nell'albero dei passi. Fuori dalle aree i pixel restano quelli di prima, e lo si controlla.</p>
 
 <section class="card">
-<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600; color: #C9CBD0">Cambia un materiale</span><span class="soon">In arrivo</span></div>
-<p class="dep">Clicchi una superficie, Studio ti dice cos'è («Calcestruzzo faccia vista», dal modello Allplan) e scegli il nuovo materiale. Ogni zona dice da dove viene: <b style="font-weight: 600; color: #C9CBD0">dal modello</b> (esatta) o <b style="font-weight: 600; color: #C9CBD0">stimata dall'immagine</b>.</p>
-<p class="dep">Serve prima: sapere se Allplan dà una vista a colori per materiale con la stessa camera (PRD §9).</p>
+<div style="font-weight: 600; color: #C9CBD0">Da verificare prima</div>
+<p class="dep">1. Che Nano Banana 2 e Kontext rispettino aree e note numerate: una prova con due aree e due note.</p>
+<p class="dep">2. La selezione libera diventa una maschera. Il ritocco su maschera non rifà riflessi e luce di rimbalzo: per un cambio di materiale grande serve rifare il render intero.</p>
+<p class="dep">3. «Clicca una superficie» arriva dopo, con la mappa dei materiali da Allplan.</p>
 </section>
-
-<section class="card">
-<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600; color: #C9CBD0">Annota per aree</span><span class="soon">In arrivo</span></div>
-<p class="dep">Riquadri numerati, una nota per riquadro, un solo Applica. Fuori dai riquadri i pixel restano quelli di prima, e lo si può verificare.</p>
-<p class="dep">Serve prima: una prova su Nano Banana 2 e Kontext con due riquadri e due note. Disegnare il riquadro qui nello Studio è già risolto.</p>
-</section>
-
-<section class="card">
-<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600; color: #C9CBD0">Livelli</span><span class="soon">In arrivo</span></div>
-<p class="dep">Ogni modifica è un livello sopra il render, con stile, testo e data, e si rifà da sola. L'ultima riga è il risultato corrente.</p>
-</section>
-
-<div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto">
-<div class="lbl">Grana del nuovo materiale</div>
-<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; border: 1px dashed #4A4D55; border-radius: 9px; padding: 3px">
-<button class="btn" disabled="disabled" style="border: 0; justify-content: center">fine</button>
-<button class="btn" disabled="disabled" style="border: 0; justify-content: center">media</button>
-<button class="btn" disabled="disabled" style="border: 0; justify-content: center">grossa</button>
-</div>
-<button class="btn" disabled="disabled" style="justify-content: center; min-height: 40px">Applica</button>
-</div>
 </aside>
 </div>
 </div>
@@ -109,7 +98,14 @@ a{color:#8FBCFF}a:hover{color:#B9D4FF}
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
 class Component extends DCLogic {
 renderVals() {
-return {};
+const st = this.state || {};
+const t = st.t || 'rett';
+const voci = [['rett', 'Rettangolo', false], ['libera', 'Selezione libera', false], ['clic', 'Clicca una superficie', true]];
+const aiuti = { rett: 'Rettangolo: trascina da un angolo all\'altro. Quando lasci, si attacca un foglietto per la nota.', libera: 'Selezione libera, come il lazo di Photoshop: disegna il contorno tenendo premuto. Quando chiudi, si attacca un foglietto.' };
+return {
+strumenti: voci.map((v) => ({ nome: v[1], sel: t === v[0], spento: v[2], cls: t === v[0] ? 'seg on' : 'seg', pick: () => this.setState({ t: v[0] }) })),
+aiuto: aiuti[t] || ''
+};
 }
 }
 </script>

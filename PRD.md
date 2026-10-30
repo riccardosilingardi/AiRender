@@ -92,6 +92,8 @@ Riscritto il 2026-10-28 con lo Studio v1 (sezione 5, riga del 2026-10-27).
 | 2026-10-27 | **Due superfici: la palette fa da telecomando, lo Studio è una finestra propria.** La palette PythonParts dentro Allplan ha quattro sezioni: 1 Vista (cattura e idoneità), 2 Stile (preset, materiali a parole, modello), 3 Invio (destinazione e costo prima di Genera), 4 Ultimo render (Apri nello Studio), più «In arrivo» in grigio. Lo Studio è una pagina locale servita dal motore (`http.server` della libreria standard, solo `127.0.0.1`) e aperta con `msedge --app=`, in un processo separato. Palette e Studio si parlano con la cartella delle viste e una coda di lavori su file | Decisione di Riccardo, che trova la palette di prova pessima da usare. Tre ragioni: **spazio per il confronto** (prima/dopo con la linea, A/B fra modelli: nella palette stretta non ci sta); **il mouse sul render** (cliccare una superficie, disegnare un riquadro: la palette non ha un'immagine cliccabile); **Allplan libero durante la generazione** (oggi la palette chiama il motore dentro Allplan e Allplan resta bloccato fino al render). Costa un processo in più da lanciare e da chiudere, e uno stato in più da tenere coerente fra palette, coda e Studio. Ribalta la riga di sezione 11 che scartava un'applicazione web separata: la ragione di allora (caricare e scaricare file a mano) non vale, perché lo Studio legge la stessa cartella in cui la palette salva. Stati e testi in `DESIGN.md`, mockup in `docs/ui/mockup/` | |
 | 2026-10-27 | **Stile = preset curati + blocchi di prompt.** In alto 8 preset esterni e 6 interni; ogni preset compone blocchi di un asse solo, in ordine fisso: regola fissa → scena → materiali → look → luce → cielo (esterni) oppure fuori dalle finestre + arredo (interni) → intorno → persone → qualità → cosa evitare. Il prompt completo, in inglese, si vede e si modifica | Decisione di Riccardo (ibrido, fra solo preset e solo blocchi). Un blocco che tocca un asse solo si cambia senza disfare gli altri. I testi sono riscritti dalla prompt library di Riccardo, non copiati: `docs/ui/blocchi-stile-bozza.md`, bozza 3. **Nessun blocco è stato provato con il modello** | |
 | 2026-10-27 | Miniature dei preset **illustrative, dichiarate tali a schermo**, al posto di quelle generate | Decisione di Riccardo: niente generazioni a pagamento solo per le miniature, per ora. Si sostituiscono con render veri dei preset. Finché sono illustrazioni, l'etichetta resta (`DESIGN.md`, Decisioni visive) | |
+| 2026-10-28 | **Si lavora per passi, in un albero in una colonna.** Ogni render è un passo; 0 è la vista Allplan, ogni passo parte da quello sopra ed è rientrato sotto di lui, un passo fatto da un punto qualsiasi apre un ramo lì sotto. Niente grafo a nodi, niente schede di versione. La geometria si misura sempre contro la vista Allplan; dalla seconda generazione di fila un avviso; «Rifai pulito dalla vista» unisce le richieste della strada in un invio solo. Nella barra dello Studio «Livelli» diventa «Passi». Schermata Studio · Passi in `DESIGN.md`, mockup `Passi.dc.html` | Decisione di Riccardo: si fa un render, poi si aggiungono alberi, poi persone, e ogni giro deve restare ritrovabile. Un grafo a nodi alla Comfy o Weavy dopo dieci passi diventa un groviglio; con le schede di versione un ramo sparisce. Ogni generazione su un render può spostare un poco gli spigoli: per questo la misura sta contro la vista e c'è il rifai pulito. Quanto si spostino lo misura il piano «catena» del banco di prova | |
+| 2026-10-28 | **Ritocca: rettangolo e selezione libera, con note adesive sull'immagine.** Strumenti Rettangolo e Selezione libera (lazo come in Photoshop); «Clicca una superficie» in grigio fino alla mappa materiali; a ogni area una nota numerata sull'immagine, le note anche in elenco a destra; un solo Applica per tutte, con costo e destinazione; il risultato è un passo nuovo nell'albero. Tolta la «Grana del nuovo materiale» | Decisione di Riccardo: le aree reali non sono rettangoli, e la modifica si scrive dove la si vede. Un invio per tutte le note costa meno di uno per area. Prima di costruirla va misurato se Nano Banana 2 rispetta aree e note, e in quale dei due modi (contorni disegnati o maschera): piano «aree» del banco. Vale la trappola del riempimento con maschera di `CLAUDE.md` | |
 | 2026-10-21 | Lo schema di un modello si scrive **solo dopo una chiamata vera** | Con Magnific endpoint e campi vengono dalla documentazione e non sono mai stati eseguiti. Per Comfy il protocollo della coda viene dalla documentazione; lo schema dei modelli no: `SCHEMI` in `core/provider/comfy.py` resta vuoto finché `scripts/sonda_comfy.py` non ha risposto, e senza schema l'invio si ferma prima di partire | |
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
@@ -117,7 +119,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore e lo Studio. Girano da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **226 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **284 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -128,13 +130,18 @@ python scripts/confronta_modelli.py --immagine vista.png
 python -m core.coda --cartella C:\AIRENDER --aggiungi vista.png --stile ora-blu   # mette un lavoro in coda
 python -m core.coda --cartella C:\AIRENDER                                       # il processo che lo fa
 python -m core.studio --cartella C:\AIRENDER                                     # lo Studio: server, coda e finestra
+python scripts/prova_blocchi.py --immagine vista.png --piano qualita --prova-a-secco # il banco di prova dei blocchi
+python scripts/miniatura_da_banco.py --render <cartella del banco>\ora-blu.png      # un render del banco diventa miniatura
 ```
 
 | Cosa | Dove | Stato |
 |---|---|---|
 | Riga di comando: vista + preset + testo → render, ricetta rieseguibile a fianco | `core/cli.py` | Funziona fino al render salvato: primo invio vero il 2026-10-27 sul PC di Riccardo (Nano Banana 2, 17,17 crediti, ricetta completa accanto al render). Durante l'attesa stampa una riga, per non sembrare bloccata |
 | Coda dei lavori su cartella: il motore come processo a parte. Un lavoro è un JSON in `lavori/in-attesa`; il processo lo sposta in `in-corso`, poi in `fatto` (render e ricetta accanto), `errore` o `annullato`. Stato leggibile sempre in `lavori/stato/<id>.json` (in coda, inviato, in lavorazione, fatto, errore, annullato). Scrittura atomica, file `<id>.annulla` per fermare, recupero al riavvio dei lavori abbandonati. La destinazione si scrive nel lavoro quando nasce, e se al momento dell'invio non è più quella non parte niente | `core/coda.py` | Provata con `pytest` e con un giro vero da riga di comando senza chiave (si ferma con il messaggio della chiave mancante, senza scrivere «inviato»). **Mai girata con un invio vero**, mai su Windows. La usa lo Studio v1; la palette non ancora |
-| Prompt a blocchi: regola fissa → scena → materiali → look → luce → cielo oppure fuori + arredo → intorno → persone → qualità → cosa evitare; 14 preset (8 esterni, 6 interni) | `core/blocchi.py` | Testi identici alla bozza 3 (`docs/ui/blocchi-stile-bozza.md`), controllato da un test che legge la bozza; l'esempio completo e le 14 lunghezze misurate nella bozza tornano al carattere. Tutti i blocchi sono **SCELTI**: nessuno è stato mandato a un modello |
+| Prompt a blocchi: regola fissa → scena → materiali → look → luce → cielo oppure fuori + arredo → intorno → verde → persone → qualità → cosa evitare; 14 preset (8 esterni, 6 interni). Dalla bozza 4 (2026-10-29): intorno città / periferia / campagna, verde nessuno / poco / rigoglioso, persone «poche»; ogni blocco che aggiunge qualcosa finisce con «do not cover or hide any building element». Il prompt di un passo su un render (solo gli assi che cambiano) e quello delle aree con note | `core/blocchi.py` | Testi identici alla bozza 4 (`docs/ui/blocchi-stile-bozza.md`), controllato da un test che legge la bozza; l'esempio completo e le 14 lunghezze misurate nella bozza tornano al carattere. Tutti i blocchi sono **SCELTI**: nessuno è stato mandato a un modello |
+| Varianti per invio, da 1 a 4: N lavori in coda con le stesse scelte, costo scritto come N volte uno («circa 69 crediti per 4 immagini»), «non misurato» se il costo del modello non lo è | `core/studio/servizio.py`, `studio.js` | Provato con `pytest` e a schermo con Playwright su un provider finto. Mai con un invio vero |
+| Banco di prova dei blocchi: piani qualità (2 invii), look (9), preset (8 o 6), catena (4), aree (2). Prima di partire dice quanti invii, dove, quanto, e chiede conferma; a secco prepara tutto senza mandare. Scrive `banco.json`, una pagina con le coppie affiancate, i prompt, le misure («non misurato» dove mancano) e i giudizi in `giudizi.json`. Misure: spigoli della vista ritrovati nel render (grezza, soglie SCELTE) e differenza fuori dalle aree | `core/banco.py`, `scripts/prova_blocchi.py`, `core/immagine.py` | Provato con `pytest` su un provider finto e immagini sintetiche, e a secco sulla vista dei test. **Mai lanciato davvero**: nessun piano ha ancora mandato un'immagine (sezione 9) |
+| Miniature vere dei preset: un render del piano «preset» del banco, ritagliato a 16:9, diventa la miniatura del suo preset; nello Studio «render vero del <data>» sotto la tessera | `scripts/miniatura_da_banco.py`, `core/studio/miniature.py` | Provato con `pytest`. Nessuna miniatura vera nel repository: oggi sono tutte illustrazioni |
 | Studio v1: `python -m core.studio` avvia il server locale (`http.server`, solo `127.0.0.1`, porta scelta dal sistema), la coda come processo figlio e la pagina (Edge `--app=` se c'è). Genera e Risultato come in `DESIGN.md`, Ritocca in grigio. Rotte JSON per viste, preset, composizione del prompt, destinazione e costo, prova a secco, invio, stato, render, ricetta, annulla, rifai. Niente CDN né font scaricati | `core/studio/` | Provato con `pytest` (rotte, prompt, stati, difese del server) e con Playwright su un provider finto: screenshot di ogni stato in `docs/ui/studio-v1/`. **Mai aperto su Windows né con Edge, mai con un invio vero** (sezione 9) |
 | Casa unica delle decisioni: 26 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
@@ -174,6 +181,21 @@ per PR (regola di `CLAUDE.md`).
    aggiornano da script, quale Python lancia lo Studio, se Edge si apre come
    finestra.
 
+**Dal 2026-10-29, dopo le decisioni del 2026-10-28 (sezione 5):**
+
+5. **Passi e Ritocca nei documenti, blocchi mancanti, banco di prova** —
+   questo PR. `DESIGN.md` con Studio · Passi e Studio · Ritocca riscritta;
+   blocchi intorno, verde, persone «poche» (bozza 4) accesi nello Studio;
+   varianti 2–4 col costo; `scripts/prova_blocchi.py` con i piani qualità,
+   look, preset, catena e aree; miniature vere dai render del banco.
+6. **L'albero dei passi nello Studio** — modello dei passi su disco, i render
+   di oggi come passi figli della vista, lavori che partono da un passo,
+   «Rifai pulito dalla vista». Meglio dopo il piano «catena» del banco, che
+   dice quanto costa ogni generazione in più in spigoli.
+7. **Ritocca** — solo dopo il piano «aree» del banco: se Nano Banana 2 non
+   rispetta le aree in nessuno dei due modi, la schermata cambia prima di
+   essere costruita.
+
 - Video — rimandato, non annullato. Arriva come livello sopra un fermo immagine.
 - LoRA di stile addestrati sui render dello studio — è l'argomento di vendita
   forte della v2, non serve all'MVP.
@@ -208,7 +230,10 @@ per PR (regola di `CLAUDE.md`).
      le note si influenzano a vicenda. La trappola del riempimento mascherato
      vale ancora: luce e riflessi del resto non si ricalcolano.
 
-  Due modi di dire al modello dove intervenire, da scegliere dopo la sonda:
+  Dal 2026-10-28 le aree sono rettangoli o selezioni libere, con una nota
+  adesiva numerata ciascuna (sezione 5, `DESIGN.md` Studio · Ritocca). Due
+  modi di dire al modello dove intervenire, da scegliere con il piano «aree»
+  del banco di prova (`scripts/prova_blocchi.py --piano aree`):
   una **maschera per area**, oppure il render con i **riquadri numerati
   disegnati sopra** e un testo che li nomina ("nel riquadro 1…"). Il secondo
   funziona con i modelli di modifica a istruzioni, se li capiscono: nessuno dei
@@ -543,8 +568,47 @@ poggiano su cose non ancora provate:
   `127.0.0.1` dovrebbe funzionare, non è stato provato. **Apri cartella** usa
   `os.startfile` su Windows, mai provato.
 - **Le voci del mockup senza blocco di prompt sono in grigio**: rese diverse
-  da Fotorealistico, intorno Città/Periferia/Campagna, Verde, persone «Poche»,
-  I miei preset. Si accendono quando hanno il loro blocco o il loro salvataggio.
+  da Fotorealistico e I miei preset. Si accendono quando hanno il loro blocco
+  o il loro salvataggio. (Intorno, Verde e persone «Poche» sono accese dal
+  2026-10-29, con i blocchi della bozza 4.)
+
+### Lasciato dalla sessione del 2026-10-29 (blocchi, varianti, banco di prova)
+
+- **Nessun piano del banco è stato lanciato davvero.** Provati con un provider
+  finto e a secco sulla vista dei test. Tutti e cinque costano circa 429
+  crediti con Nano Banana 2 (2 + 9 + 8 + 4 + 2 invii). Per verificare sul PC,
+  un piano alla volta, partendo dal più economico: `py scripts\prova_blocchi.py
+  --immagine tests\dati\vista-20261021-093841.png --piano qualita`, poi
+  aprire la pagina con `--giudica <cartella>` e rimandare `banco.json` e
+  `giudizi.json`. Se i render mancano o la pagina è vuota, il banco ha un
+  difetto; se ci sono, i giudizi decidono il predefinito della qualità.
+- **La seconda immagine a Nano Banana 2 non è mai partita.** Il piano «aree»,
+  modo (b), manda vista e maschera come due parti `inlineData` nella stessa
+  richiesta: è la forma di Vertex AI, mai provata attraverso il Router
+  (`piu_immagini_verificato_il` vuoto in `core/provider/comfy.py`). Se il
+  Router la rifiuta, (b) finisce fra gli errori della pagina e (a) resta
+  valido. Kontext Pro con due immagini si ferma prima di partire.
+- **I blocchi della bozza 4 non sono provati.** In particolare: se «do not
+  cover or hide any building element» basta a tenere alberi e persone lontani
+  dalle finestre; se «sfondo neutro» senza più la parola «trees», insieme a
+  verde «nessuno», tiene il modello dall'aggiungere alberi come faceva il
+  27/10. I prompt dei preset esterni sono cresciuti a 780–990 caratteri: se
+  la lunghezza pesa, lo dice il piano «preset».
+- **Le due misure del banco sono grezze.** «Spigoli della vista ritrovati»
+  (`SPIGOLI_SOGLIA`, `SPIGOLI_LATO_PX`, `SPIGOLI_TOLLERANZA_PX`, tutte
+  SCELTE) è provata su immagini sintetiche e sulla vista dei test spostata a
+  mano: regge il ricampionamento a 1376x768 (99,8%) e vede uno spostamento di
+  4 px (83%). Un'ombra nuova o un albero davanti contano come spigoli persi.
+  Non è lo scostamento della geometria del motore, che resta «non misurato».
+  «Fuori dalle aree» (`DIFFERENZA_PIXEL_SOGLIA`, `AREE_BORDO_ESCLUSO_PX`)
+  non è mai stata tarata su un risultato vero.
+- **Varianti 2–4**: mai con un invio vero. Annulla ferma anche le varianti in
+  attesa, provato solo a codice.
+- **Le miniature vere non esistono ancora.** Il comando c'è; la prima nasce
+  dal piano «preset». Una miniatura entra nel repository: va fatta da una
+  vista che si può mostrare a tutti, non da un progetto sotto NDA.
+- **Passi e Ritocca sono solo nei documenti.** I loro quattro stati in
+  `DESIGN.md` non sono stati provati su nessuna interfaccia.
 
 ### Usciti da questa sezione, con la loro verifica
 
@@ -625,4 +689,5 @@ cambio è in `DESIGN.md`.
 | Palette v1 | Catturare la vista, scegliere lo stile di base, mandare senza bloccare Allplan | "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere (shaded, con ombre), poi Cattura." |
 | Studio · Genera | Scegliere lo stile con calma, vedere il prompt vero, la destinazione e il costo | "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegli un file." |
 | Studio · Risultato | Decidere se è ancora il proprio edificio, confrontare render e modelli | "Nessun render ancora. Scegli uno stile in Genera e premi Genera." |
-| Studio · Ritocca | Anteprima, tutto in grigio: cambia materiale, annota per aree, livelli | "Prima serve un render." |
+| Studio · Passi | Ritrovare e rifare i passi di una vista (progettata, non costruita) | "Nessun passo ancora. Genera un render da Genera: sarà il passo 1." |
+| Studio · Ritocca | Disegnare aree a rettangolo o libere con note numerate, un solo Applica (progettata, non costruita: in grigio) | "Prima serve un render." |

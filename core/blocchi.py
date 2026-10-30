@@ -1,7 +1,7 @@
 """I blocchi di stile e i preset che li combinano.
 
-Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 3 del
-2026-10-27. Sono **riscritti** dalla prompt library di Riccardo (Notion,
+Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 4 del
+2026-10-29 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche»). Sono **riscritti** dalla prompt library di Riccardo (Notion,
 ispirata a Visoid), non copiati: un blocco tocca un asse solo, cosi' cambiarne
 uno non disfa gli altri. Testo per il modello in inglese, nomi per l'utente in
 italiano.
@@ -13,8 +13,12 @@ blocco per blocco.
 
 L'ordine nel prompt e' fisso (PRD, sezione 5, riga del 2026-10-27):
 regola fissa -> scena -> materiali -> look -> luce -> cielo (esterni) oppure
-fuori dalle finestre + arredo (interni) -> intorno -> persone -> qualita' ->
-cosa evitare.
+fuori dalle finestre + arredo (interni) -> intorno -> verde (esterni) ->
+persone -> qualita' -> cosa evitare.
+
+Un blocco che aggiunge qualcosa all'immagine (contesto, verde, persone,
+oggetti) dice anche cosa non toccare: finisce con NON_COPRIRE. Senza, un
+albero o una persona davanti a una finestra cambiano il disegno.
 
 Qui non c'e' nessun modello linguistico: i materiali scritti dall'utente
 passano come sono, anche in italiano (PRD, sezione 9).
@@ -30,7 +34,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-3"
+VERSIONE = "bozza-4"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -49,6 +53,8 @@ class Blocco:
     nome: str
     testo: str
     origine: str = config.SCELTA
+    # Vero se il blocco aggiunge qualcosa che nella vista non c'e'.
+    aggiunge: bool = False
 
     def __post_init__(self) -> None:
         controlla_etichetta(self.nome, f"il nome del blocco {self.identificativo}")
@@ -56,6 +62,15 @@ class Blocco:
 
 def _blocchi(*righe: tuple[str, str, str]) -> dict[str, Blocco]:
     return {r[0]: Blocco(*r) for r in righe}
+
+
+# La coda di ogni blocco che aggiunge qualcosa.
+NON_COPRIRE = "do not cover or hide any building element"
+
+
+def _aggiunta(identificativo: str, nome: str, testo: str) -> tuple[str, Blocco]:
+    """Un blocco che aggiunge qualcosa: il testo finisce con cosa non toccare."""
+    return identificativo, Blocco(identificativo, nome, f"{testo}; {NON_COPRIRE}.", aggiunge=True)
 
 
 REGOLA_FISSA = Blocco(
@@ -152,11 +167,37 @@ CIELO = _blocchi(
      "Winter: snow on the ground and on horizontal surfaces, cold soft light."),
 )
 
-INTORNO = _blocchi(
-    ("niente", "Niente, sfondo neutro",
-     "Plain neutral background; do not add trees, cars or surroundings that "
-     "are not in the view."),
-)
+# Gli alberi non stanno qui: sono dell'asse verde, cosi' "sfondo neutro"
+# insieme a "verde: poco" non si contraddicono.
+INTORNO = {
+    "niente": Blocco(
+        "niente", "Niente, sfondo neutro",
+        "Plain neutral background; do not add buildings, cars or surroundings "
+        "that are not in the view."),
+    **dict((
+        _aggiunta("citta", "Città",
+                  "Urban surroundings: neighbouring buildings, pavement and street "
+                  "furniture in the background"),
+        _aggiunta("periferia", "Periferia",
+                  "Suburban surroundings: low houses, gardens and a quiet street in "
+                  "the background"),
+        _aggiunta("campagna", "Campagna",
+                  "Countryside surroundings: open fields and distant hills in the "
+                  "background"),
+    )),
+}
+
+VERDE = {
+    "nessuno": Blocco(
+        "nessuno", "Nessuno",
+        "Do not add trees, grass or planting that are not in the view."),
+    **dict((
+        _aggiunta("poco", "Poco",
+                  "A few trees and some low planting around the building"),
+        _aggiunta("rigoglioso", "Rigoglioso",
+                  "Lush mature trees, hedges and planting around the building"),
+    )),
+}
 
 LUCE_INTERNI = _blocchi(
     ("mattino", "Mattino da finestra",
@@ -176,27 +217,37 @@ LUCE_INTERNI = _blocchi(
      "light, deep soft shadows."),
 )
 
-FUORI = _blocchi(
-    ("neutra", "Fuori dalle finestre: neutro",
-     "Keep the view outside the windows soft and neutral; do not invent a "
-     "landscape."),
-    ("verde", "Fuori: verde", "A soft out-of-focus green garden outside the windows."),
-    ("citta", "Fuori: città", "A soft out-of-focus city view outside the windows."),
-)
+FUORI = {
+    "neutra": Blocco(
+        "neutra", "Fuori dalle finestre: neutro",
+        "Keep the view outside the windows soft and neutral; do not invent a "
+        "landscape."),
+    **dict((
+        _aggiunta("verde", "Fuori: verde", "A soft out-of-focus green garden outside the windows"),
+        _aggiunta("citta", "Fuori: città", "A soft out-of-focus city view outside the windows"),
+    )),
+}
 
-ARREDO = _blocchi(
-    ("nessuno", "Non aggiungere arredi",
-     "Do not add furniture or objects that are not in the view."),
-    ("leggero", "Qualche oggetto",
-     "Add only a few small objects (books, a plant, a throw) without changing "
-     "the furniture."),
-)
+ARREDO = {
+    "nessuno": Blocco(
+        "nessuno", "Non aggiungere arredi",
+        "Do not add furniture or objects that are not in the view."),
+    **dict((
+        _aggiunta("leggero", "Qualche oggetto",
+                  "Add only a few small objects (books, a plant, a throw) without "
+                  "changing the furniture"),
+    )),
+}
 
-PERSONE = _blocchi(
-    ("nessuna", "Nessuna", "No people."),
-    ("movimento", "In movimento",
-     "A few people walking, slightly motion-blurred, for scale."),
-)
+PERSONE = {
+    "nessuna": Blocco("nessuna", "Nessuna", "No people."),
+    **dict((
+        _aggiunta("poche", "Poche",
+                  "Two or three people standing or walking, small in the frame, for scale"),
+        _aggiunta("movimento", "In movimento",
+                  "A few people walking, slightly motion-blurred, for scale"),
+    )),
+}
 
 QUALITA = _blocchi(
     ("base", "Base", "Professional architectural photography, natural detail."),
@@ -214,6 +265,7 @@ ASSI = {
     "fuori": (FUORI, (INTERNO,)),
     "arredo": (ARREDO, (INTERNO,)),
     "intorno": (INTORNO, (ESTERNO,)),
+    "verde": (VERDE, (ESTERNO,)),
     "persone": (PERSONE, SCENE),
     "qualita": (QUALITA, SCENE),
 }
@@ -237,6 +289,7 @@ class Scelte:
     fuori: str | None = None
     arredo: str | None = None
     intorno: str | None = None
+    verde: str | None = None
     persone: str | None = None
     qualita: str = QUALITA_PREDEFINITA
 
@@ -272,7 +325,7 @@ class PresetStile:
 def _esterno(identificativo, nome, look, luce, cielo, persone) -> PresetStile:
     return PresetStile(identificativo, nome, Scelte(
         scena=ESTERNO, look=look, luce=luce, cielo=cielo, intorno="niente",
-        persone=persone,
+        verde="nessuno", persone=persone,
     ))
 
 
@@ -283,9 +336,10 @@ def _interno(identificativo, nome, look, luce, fuori, persone) -> PresetStile:
     ))
 
 
-# Le combinazioni della bozza 3. Intorno ("niente") e arredo ("nessuno") non
-# sono nelle colonne delle tabelle, ma ci sono nelle lunghezze che la bozza
-# ha misurato: solo con loro i conti tornano al carattere. Lo controlla un test.
+# Le combinazioni della bozza 4. Intorno ("niente"), verde ("nessuno") e arredo
+# ("nessuno") non sono nelle colonne delle tabelle, ma ci sono nelle lunghezze
+# che la bozza ha misurato: solo con loro i conti tornano al carattere. Lo
+# controlla un test.
 PRESET_STILE = {
     p.identificativo: p
     for p in (
@@ -360,10 +414,11 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
         )
     ordine = ["look", "luce"]
     ordine += ["cielo"] if scelte.scena == ESTERNO else ["fuori", "arredo"]
-    ordine += ["intorno", "persone", "qualita"]
+    ordine += ["intorno", "verde"] if scelte.scena == ESTERNO else []
+    ordine += ["persone", "qualita"]
     # Un asse dell'altra scena, se compilato, si rifiuta invece di sparire
     # in silenzio: l'utente crederebbe di averlo mandato.
-    for asse in ("cielo", "fuori", "arredo", "intorno"):
+    for asse in ("cielo", "fuori", "arredo", "intorno", "verde"):
         if asse not in ordine and getattr(scelte, asse):
             _blocco(asse, getattr(scelte, asse), scelte.scena)
     blocchi = [REGOLA_FISSA, SCENA[scelte.scena]]
@@ -389,3 +444,72 @@ def componi(scelte: Scelte) -> str:
         pezzi.append(materiali)
     pezzi += [b.testo for b in blocchi[2:]]
     return " ".join(pezzi)
+
+
+# L'ordine degli assi nel prompt, per chi compone solo una parte (un passo).
+ORDINE_ASSI = ("look", "luce", "cielo", "fuori", "arredo", "intorno", "verde", "persone", "qualita")
+
+
+def componi_passo(scena: str, cambi: dict[str, str]) -> str:
+    """Il prompt di un passo fatto su un render: regola fissa, scena, solo gli assi che cambiano, cosa evitare.
+
+    Serve al banco di prova (piano "catena") e servira' all'albero dei passi:
+    su un render gia' fatto non si rimanda tutto lo stile, solo la richiesta
+    nuova, per esempio {"verde": "poco"}.
+    """
+    if scena not in SCENE:
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno o interno.")
+    if not cambi:
+        raise SceltaNonValida(
+            "Un passo senza richieste non cambia niente.",
+            "Indica almeno un asse da cambiare, per esempio verde o persone.",
+        )
+    sconosciuti = sorted(set(cambi) - set(ORDINE_ASSI))
+    if sconosciuti:
+        raise SceltaNonValida(
+            f"\"{sconosciuti[0]}\" non e' un asse dei blocchi.",
+            f"Gli assi sono: {', '.join(ORDINE_ASSI)}.",
+        )
+    pezzi = [REGOLA_FISSA.testo, SCENA[scena].testo]
+    pezzi += [_blocco(asse, cambi[asse], scena).testo for asse in ORDINE_ASSI if asse in cambi]
+    pezzi.append(COSA_EVITARE.testo)
+    return " ".join(pezzi)
+
+
+# --- aree e note (banco di prova, piano "aree"; Ritocca non c'e' ancora) -----
+
+# Due modi di dire al modello dove intervenire. Nessuno dei due e' provato:
+# il piano "aree" del banco serve a sceglierne uno.
+AREE_CONTORNI = Blocco(
+    "aree-contorni",
+    "Aree disegnate sull'immagine",
+    "Edit this exact image. Numbered magenta outlines are drawn on it. Make "
+    "each change listed below only inside the outline with its number. Outside "
+    "the outlines keep every pixel exactly as it is. Remove the outlines and "
+    "the numbers from the result.",
+)
+
+AREE_MASCHERA = Blocco(
+    "aree-maschera",
+    "Aree in una maschera",
+    "Edit the first image. The second image is a mask of the same view: the "
+    "numbered white areas are the only places to change. Make each change "
+    "listed below only inside the white area with its number. Outside the "
+    "white areas keep every pixel of the first image exactly as it is. Do not "
+    "copy the mask into the result.",
+)
+
+
+def componi_aree(modo: Blocco, note: list[str]) -> str:
+    """Il prompt di un invio con aree: come sono indicate, una riga per nota, cosa evitare.
+
+    Le note passano come le scrive l'utente, anche in italiano, come i materiali.
+    """
+    pulite = [" ".join((n or "").split()).rstrip(".") for n in note]
+    if not pulite or not all(pulite):
+        raise SceltaNonValida(
+            "Un'area senza nota non dice al modello cosa fare.",
+            "Scrivi una nota per ogni area, oppure togli l'area.",
+        )
+    righe = [f"Area {numero}: {nota}." for numero, nota in enumerate(pulite, start=1)]
+    return " ".join([modo.testo, *righe, COSA_EVITARE.testo])

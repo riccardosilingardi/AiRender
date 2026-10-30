@@ -12,7 +12,7 @@ import math
 import os
 from dataclasses import dataclass
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from . import config
 from .errori import FileNonTrovato
@@ -192,4 +192,154 @@ def affianca(pannelli: list[tuple[str, bytes]]) -> bytes:
         x += im.width + fessura
     uscita = io.BytesIO()
     tela.save(uscita, format="PNG")
+    return uscita.getvalue()
+
+
+# --- banco di prova: aree, differenze, spigoli, miniature ----------------------
+
+Punto = tuple[float, float]
+
+_PIENO = 255  # numero-non-configurabile: il bianco pieno di un canale a 8 bit
+_MAGENTA = (_PIENO, 0, _PIENO)  # il colore dei contorni: raro in una vista di Allplan
+
+
+def _png(immagine: Image.Image) -> bytes:
+    uscita = io.BytesIO()
+    immagine.save(uscita, format="PNG")
+    return uscita.getvalue()
+
+
+def _carattere(altezza: int):
+    try:
+        return ImageFont.load_default(size=altezza)
+    except TypeError:  # Pillow prima della 10.1: solo il carattere bitmap piccolo
+        return ImageFont.load_default()
+
+
+def _centro(punti: list[Punto]) -> Punto:
+    return sum(x for x, _ in punti) / len(punti), sum(y for _, y in punti) / len(punti)
+
+
+def disegna_aree(dati: bytes, aree: list[list[Punto]]) -> bytes:
+    """L'immagine con il contorno di ogni area e il suo numero (1, 2, ...) in un cerchio.
+
+    Le aree sono poligoni in pixel dell'immagine: un rettangolo ha quattro
+    punti, una selezione libera quanti ne ha il lazo. E' il modo (a) del piano
+    aree: il modello vede dove intervenire, il testo dice cosa fare.
+    """
+    tela = _apri(dati).convert("RGB")
+    disegno = ImageDraw.Draw(tela)
+    spessore = config.CONTORNO_AREE_PX
+    raggio = spessore * 3  # numero-non-configurabile: il cerchio del numero segue lo spessore
+    carattere = _carattere(raggio)
+    for numero, punti in enumerate(aree, start=1):
+        disegno.line([*punti, punti[0]], fill=_MAGENTA, width=spessore, joint="curve")
+        x, y = punti[0]
+        disegno.ellipse((x - raggio, y - raggio, x + raggio, y + raggio), fill=_MAGENTA)
+        disegno.text((x, y), str(numero), fill="white", font=carattere, anchor="mm")
+    return _png(tela)
+
+
+def maschera_aree(dimensioni_immagine: tuple[int, int], aree: list[list[Punto]]) -> bytes:
+    """La maschera delle aree: nero fuori, bianco dentro, il numero dell'area in nero al centro.
+
+    E' il modo (b) del piano aree, mandata come immagine in piu' dopo la vista.
+    """
+    maschera = Image.new("RGB", dimensioni_immagine, "black")
+    disegno = ImageDraw.Draw(maschera)
+    carattere = _carattere(config.CONTORNO_AREE_PX * 4)  # numero-non-configurabile: leggibile dentro l'area
+    for numero, punti in enumerate(aree, start=1):
+        disegno.polygon(punti, fill="white")
+        disegno.text(_centro(punti), str(numero), fill="black", font=carattere, anchor="mm")
+    return _png(maschera)
+
+
+def _dentro_aree(dimensioni_immagine: tuple[int, int], aree: list[list[Punto]], bordo: int) -> Image.Image:
+    """Bianco dove stanno le aree, piu' una fascia di `bordo` px intorno."""
+    dentro = Image.new("L", dimensioni_immagine, 0)
+    disegno = ImageDraw.Draw(dentro)
+    for punti in aree:
+        disegno.polygon(punti, fill=_PIENO)
+        if bordo > 0:
+            disegno.line([*punti, punti[0]], fill=_PIENO, width=bordo * 2, joint="curve")
+    return dentro
+
+
+def differenza_fuori_dalle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto]]) -> dict:
+    """Quanto e' cambiata l'immagine fuori dalle aree: la domanda del piano aree.
+
+    Restituisce la differenza media (0-255) e la quota di pixel cambiati oltre
+    DIFFERENZA_PIXEL_SOGLIA, contando solo i pixel fuori dalle aree e dalla
+    fascia di AREE_BORDO_ESCLUSO_PX. Se il risultato ha un'altra dimensione si
+    riporta a quella di partenza e lo si dice: allora la misura conta anche
+    il ricampionamento.
+    """
+    base = _apri(prima).convert("RGB")
+    nuova = _apri(dopo).convert("RGB")
+    ridimensionata = nuova.size != base.size
+    if ridimensionata:
+        nuova = nuova.resize(base.size, Image.Resampling.LANCZOS)
+    dentro = _dentro_aree(base.size, aree, config.AREE_BORDO_ESCLUSO_PX)
+    canali = ImageChops.difference(base, nuova).split()
+    piu_alto = ImageChops.lighter(ImageChops.lighter(canali[0], canali[1]), canali[2])
+    # Quanti pixel fuori dalle aree per ogni valore di differenza, da 0 a 255.
+    conteggi = piu_alto.histogram(mask=ImageChops.invert(dentro))
+    totale = sum(conteggi)
+    if not totale:
+        return {"pixel_fuori": 0, "differenza_media": None, "quota_cambiata": None,
+                "ridimensionata": ridimensionata}
+    soglia = config.DIFFERENZA_PIXEL_SOGLIA
+    return {
+        "pixel_fuori": totale,
+        "differenza_media": sum(valore * n for valore, n in enumerate(conteggi)) / totale,
+        "quota_cambiata": sum(conteggi[soglia + 1:]) / totale,
+        "ridimensionata": ridimensionata,
+    }
+
+
+def _spigoli(immagine: Image.Image) -> Image.Image:
+    scala = config.SPIGOLI_LATO_PX / max(immagine.size)
+    piccola = immagine.convert("L").resize(
+        (max(1, round(immagine.width * scala)), max(1, round(immagine.height * scala))),
+        Image.Resampling.LANCZOS)
+    spigoli = piccola.filter(ImageFilter.FIND_EDGES).point(
+        lambda v: _PIENO if v > config.SPIGOLI_SOGLIA else 0)
+    # Il filtro vede un bordo lungo la cornice di ogni immagine: non e' uno spigolo.
+    ImageDraw.Draw(spigoli).rectangle((0, 0, spigoli.width - 1, spigoli.height - 1), outline=0)
+    return spigoli
+
+
+def spigoli_ritrovati(vista: bytes, render: bytes) -> float | None:
+    """Misura grezza: la quota di spigoli della vista che si ritrovano nel render.
+
+    Spigoli dal filtro dei bordi di Pillow su una copia di SPIGOLI_LATO_PX,
+    ritrovati se nel render ce n'e' uno entro SPIGOLI_TOLLERANZA_PX. Il render
+    si porta alla dimensione della vista. Non e' lo scostamento della
+    geometria del motore: un'ombra nuova o un albero davanti contano come
+    spigoli persi. Serve a confrontare fra loro le generazioni dello stesso
+    banco, non a dire se un edificio tiene. None se la vista non ha spigoli.
+    """
+    base = _apri(vista).convert("RGB")
+    nuova = _apri(render).convert("RGB").resize(base.size, Image.Resampling.LANCZOS)
+    della_vista = _spigoli(base)
+    del_render = _spigoli(nuova).filter(ImageFilter.MaxFilter(config.SPIGOLI_TOLLERANZA_PX * 2 + 1))
+    totali = della_vista.histogram()[_PIENO]
+    ritrovati = ImageChops.multiply(della_vista, del_render).histogram()[_PIENO]
+    return ritrovati / totali if totali else None
+
+
+def ritaglia_miniatura(dati: bytes) -> bytes:
+    """Il centro del render alle proporzioni della tessera, a MINIATURA_LARGHEZZA_PX, in JPEG."""
+    immagine = _apri(dati).convert("RGB")
+    larghezza, altezza = config.MINIATURA_LARGHEZZA_PX, config.MINIATURA_ALTEZZA_PX
+    rapporto = larghezza / altezza
+    if immagine.width / immagine.height > rapporto:
+        nuova = round(immagine.height * rapporto)
+        scatola = ((immagine.width - nuova) // 2, 0, (immagine.width - nuova) // 2 + nuova, immagine.height)
+    else:
+        nuova = round(immagine.width / rapporto)
+        scatola = (0, (immagine.height - nuova) // 2, immagine.width, (immagine.height - nuova) // 2 + nuova)
+    piccola = immagine.crop(scatola).resize((larghezza, altezza), Image.Resampling.LANCZOS)
+    uscita = io.BytesIO()
+    piccola.save(uscita, format="JPEG", quality=85)  # numero-non-configurabile: qualita' JPEG di una miniatura
     return uscita.getvalue()

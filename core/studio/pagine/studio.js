@@ -21,6 +21,8 @@ const S = {
   dettagliAperti: true,
   mostraViste: false,
   lavoroAttivo: null,
+  varianti: 1,            // quanti lavori con le stesse scelte per un Genera
+  inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
   secco: null,            // risposta della prova a secco
@@ -194,7 +196,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -232,7 +234,11 @@ function seguiLavoro(lavoro) {
     try {
       const ora = await get(`/api/lavori/${S.lavoroAttivo.identificativo}`);
       S.lavoroAttivo = ora;
-      if (!ora.attivo) {
+      if (!ora.attivo && S.inFila.length) {
+        // Un'altra variante dello stesso Genera aspetta: si segue quella.
+        S.lavoroAttivo = await get(`/api/lavori/${S.inFila.shift()}`);
+        await caricaRender();
+      } else if (!ora.attivo) {
         clearInterval(giroStato);
         S.lavoroAttivo = null;
         S.risultato.scelto = ora.identificativo;
@@ -254,10 +260,11 @@ async function genera() {
   S.errore = null; S.secco = null;
   try {
     const risposta = await post("/api/invia", {
-      vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello,
+      vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
     });
     S.ultimoEsito = null;
+    S.inFila = risposta.identificativi.slice(1);
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
   } catch (e) { S.errore = e; }
   render();
@@ -267,7 +274,8 @@ async function provaASecco() {
   S.errore = null;
   try {
     S.secco = await post("/api/prova-a-secco", {
-      vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, prompt_a_mano: S.promptAMano,
+      vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
+      prompt_a_mano: S.promptAMano,
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -275,7 +283,10 @@ async function provaASecco() {
 
 async function annulla() {
   if (!S.lavoroAttivo) return;
-  try { await post(`/api/lavori/${S.lavoroAttivo.identificativo}/annulla`, {}); } catch (e) { S.errore = e; }
+  // Annulla ferma anche le varianti dello stesso Genera che aspettano in coda.
+  const tutti = [S.lavoroAttivo.identificativo, ...S.inFila];
+  S.inFila = [];
+  try { for (const id of tutti) await post(`/api/lavori/${id}/annulla`, {}); } catch (e) { S.errore = e; }
   render();
 }
 
@@ -285,6 +296,7 @@ async function rifai(lavoro) {
     const dest = await get(`/api/destinazione?modello=${enc(lavoro.modello)}`);
     const risposta = await post(`/api/lavori/${lavoro.identificativo}/rifai`, { destinazione_mostrata: dest.destinazione });
     S.risultato.rifai = false;
+    S.inFila = [];
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
     await caricaRender();
   } catch (e) { S.errore = e; }
@@ -387,10 +399,21 @@ function pannelloViste() {
     file);
 }
 
-function tessera(nome, scelto, onclick, disegno, nota) {
+function tessera(nome, scelto, onclick, disegno, nota, origine) {
   return h("button", { classe: "tessera", "aria-pressed": String(!!scelto), disabled: !onclick, onclick, title: nota || null },
     disegno || h("span", { classe: "segnaposto" }, "In arrivo"),
-    h("span", { classe: "didascalia" }, nome, nota ? h("small", {}, "In arrivo") : null));
+    h("span", { classe: "didascalia" }, nome, nota ? h("small", {}, "In arrivo") : null, origine ? h("small", {}, origine) : null));
+}
+
+// Una miniatura vera (render del banco di prova) se il preset ce l'ha, altrimenti l'illustrazione.
+function miniatura(p) {
+  return p.miniatura ? h("img", { src: p.miniatura.url, alt: "" }) : illustrazione(p.scelte);
+}
+function rigaMiniature(elenco) {
+  const vere = elenco.filter((p) => p.miniatura).length;
+  if (!vere) return "Miniature illustrative: rendono l'idea, non sono render del modello";
+  if (vere === elenco.length) return "Miniature: render veri del banco di prova, con la data sotto";
+  return `${vere} miniature sono render veri (data sotto), le altre ${elenco.length - vere} illustrazioni: rendono l'idea, non sono render del modello`;
 }
 
 function chipAsse(idAsse) {
@@ -414,7 +437,8 @@ function tessereAsse(idAsse) {
 function sintesi() {
   const s = S.scelte;
   const pezzi = ["Fotorealistico", (nomeVoce("look", s.look) || "").split(" · ")[0], nomeVoce("luce", s.luce)];
-  if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`);
+  if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`,
+    `verde: ${(nomeVoce("verde", s.verde) || "—").toLowerCase()}`);
   else pezzi.push(nomeVoce("fuori", s.fuori), nomeVoce("arredo", s.arredo));
   pezzi.push(`persone: ${(nomeVoce("persone", s.persone) || "—").toLowerCase()}`);
   return pezzi.filter(Boolean).join(" · ");
@@ -430,9 +454,10 @@ function colonnaStile() {
   const preset = h("section", { classe: "pannello", "aria-label": "Parti da un preset" },
     h("div", { classe: "riga tra" }, h("h2", {}, "Parti da un preset"),
       h("span", { classe: "tenue piccolo" }, "Ogni preset ha un prompt curato e imposta i comandi qui sotto")),
-    h("p", { classe: "tenue piccolo" }, "Miniature illustrative: rendono l'idea, non sono render del modello"),
+    h("p", { classe: "tenue piccolo" }, rigaMiniature(presetDi(S.scelte.scena))),
     h("div", { classe: "griglia" }, presetDi(S.scelte.scena).map((p) =>
-      tessera(p.nome, S.preset === p.id, () => scegliPreset(p.id), illustrazione(p.scelte)))));
+      tessera(p.nome, S.preset === p.id, () => scegliPreset(p.id), miniatura(p), null,
+        p.miniatura ? `render vero del ${p.miniatura.data}` : null))));
 
   const dettagli = h("details", { classe: "pannello dettagli", open: S.dettagliAperti });
   dettagli.addEventListener("toggle", () => { S.dettagliAperti = dettagli.open; });
@@ -455,8 +480,7 @@ function colonnaStile() {
       : h("div", { classe: "gruppo" }, h("h3", {}, "4 · Cielo e stagione"), tessereAsse("cielo")),
     h("div", { classe: "gruppo" }, h("h3", {}, interno ? "5 · Persone" : "5 · Cosa può aggiungere il modello"),
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Intorno all'edificio"), chipAsse("intorno")),
-      interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Verde"),
-        h("div", { classe: "scelte-chip" }, S.catalogo.verde.map((v) => h("button", { classe: "chip", disabled: true, title: `In arrivo: ${v.nota}` }, v.nome)))),
+      interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Verde"), chipAsse("verde")),
       h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Persone"), chipAsse("persone"))));
   return h("div", { classe: "colonna-stile" }, scena, preset, dettagli);
 }
@@ -523,7 +547,13 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     h("span", { classe: "etichetta" }, "Qualità"), qualita,
     h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Fedeltà al disegno: rigida / bilanciata / libera ", presto("Da provare"))),
-    h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Varianti per invio: 1 ", presto("2–4 in arrivo"))),
+    h("span", { classe: "etichetta" }, "Varianti per invio"),
+    h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
+      Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
+        classe: "seg", "aria-pressed": String(S.varianti === n),
+        onclick: async () => { S.varianti = n; S.secco = null; await caricaDestinazione(); render(); },
+      }, String(n)))),
+    S.varianti > 1 ? h("p", { classe: "tenue piccolo" }, `${S.varianti} lavori in coda con le stesse scelte, uno dopo l'altro: ogni variante è un invio.`) : null,
     h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Immagine di riferimento per lo stile ", presto())));
 
   return h("div", { classe: "colonna-invio" },
@@ -560,13 +590,14 @@ function pannelloInvio() {
   }
   blocco.append(h("div", { classe: "azioni" },
     h("button", { classe: "btn", onclick: provaASecco, disabled: !S.vista }, "Prova a secco"),
-    h("button", { classe: "btn primario", onclick: genera, disabled: !!spento, id: "genera" }, S.lavoroAttivo ? "In corso…" : "Genera render")));
+    h("button", { classe: "btn primario", onclick: genera, disabled: !!spento, id: "genera" },
+      S.lavoroAttivo ? "In corso…" : (S.varianti > 1 ? `Genera ${S.varianti} render` : "Genera render"))));
   if (spento) blocco.append(h("p", { classe: "tenue piccolo" }, spento));
   if (S.secco) {
     const s = S.secco;
     blocco.append(h("div", { classe: "avviso" + (s.problemi.length ? " attenzione" : ""), role: "status" },
       h("b", {}, "Prova a secco: non ho inviato niente."),
-      h("span", {}, `Partirebbe verso ${s.destinazione.destinazione}, ${s.caratteri} caratteri di prompt.`),
+      h("span", {}, `Partirebbe${s.varianti > 1 ? ` ${s.varianti} volte` : ""} verso ${s.destinazione.destinazione}, ${s.caratteri} caratteri di prompt.`),
       s.problemi.length
         ? s.problemi.map((p) => h("span", {}, `Fermerebbe l'invio: ${p.fatto} `, h("span", { classe: "cosa-fare" }, p.cosa_fare)))
         : h("span", {}, "Niente fermerebbe l'invio.")));
@@ -816,15 +847,15 @@ function schermataRisultato() {
 function schermataRitocca() {
   const fatto = S.risultato.lavori.find((l) => l.render);
   const descrizioni = [
-    ["Cambia un materiale", "Clic su una superficie: lo Studio dice cos'è («dal modello», esatta, oppure «stimata dall'immagine») e scegli il nuovo materiale, con la grana fine, media o grossa. Le zone si correggono con unisci e separa.", "Serve prima: la vista a colori per materiale da Allplan (PRD §9)."],
-    ["Annota per aree", "Riquadri numerati, una nota per riquadro, un solo Applica; fuori dai riquadri i pixel restano quelli di prima.", "Serve prima: la prova su Nano Banana 2 e Kontext con due riquadri e due note."],
-    ["Livelli", "Ogni modifica è un livello sopra il render, con stile, testo e data, e si rifà da solo; l'ultima riga è il risultato corrente.", "Serve prima: le due funzioni qui sopra."],
+    ["Annota per aree", "Rettangolo o selezione libera, come in Photoshop. A ogni area una nota adesiva numerata con la modifica, le note anche in elenco, un solo Applica; il risultato è un passo nuovo.", "Serve prima: il piano «aree» del banco di prova, per sapere se Nano Banana 2 rispetta aree e note."],
+    ["Clicca una superficie", "Clic su una superficie: lo Studio dice qual è il materiale di Allplan e scrivi cosa deve diventare. Le zone si correggono con unisci e separa.", "Serve prima: la vista a colori per materiale da Allplan (PRD §9)."],
+    ["Passi", "Ogni render è un passo in un albero: 0 è la vista Allplan, ogni passo parte da quello sopra; si confronta, si rifà, o si rifà pulito dalla vista.", "Serve prima: il PR dell'albero dei passi."],
   ];
   const anteprime = h("div", { classe: "anteprime" }, descrizioni.map(([t, d, serve], i) => h("section", { classe: "pannello grigio", "aria-disabled": "true" },
     h("div", { classe: "riga tra" }, h("h2", {}, t), presto()),
     fatto ? h("div", { stile: "position:relative" },
       h("img", { src: `/file/render/${fatto.identificativo}`, alt: "", stile: "width:100%;display:block;border-radius:8px;opacity:.45;filter:grayscale(.6)" }),
-      i === 1 ? h("span", { stile: "position:absolute;left:18%;top:22%;width:28%;height:34%;border:2px dashed var(--accento);border-radius:6px" }) : null) : null,
+      i === 0 ? h("span", { stile: "position:absolute;left:18%;top:22%;width:28%;height:34%;border:2px dashed var(--accento);border-radius:6px" }) : null) : null,
     h("p", { classe: "piccolo" }, d), h("p", { classe: "piccolo tenue" }, serve))));
   return [
     h("h1", {}, "Ritocca"),

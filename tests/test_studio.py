@@ -111,15 +111,30 @@ def test_il_catalogo_ha_gli_8_preset_esterni_e_i_6_interni_della_bozza(cartella,
 def test_le_voci_senza_blocco_sono_in_grigio_e_dicono_perche(cartella, chiamate):
     """Caso: un comando che si clicca e non cambia il prompt (regola delle funzioni future)."""
     catalogo = _studio(cartella, chiamate).catalogo()
-    intorno = next(a for a in catalogo["scene"]["esterno"]["assi"] if a["id"] == "intorno")
-    spente = [v for v in intorno["voci"] if not v["attivo"]]
-    assert {v["nome"] for v in spente} == {"Città", "Periferia", "Campagna"}
-    assert all(v["nota"] for v in spente)
+    spente = [r for r in catalogo["rese"] if not r["attivo"]]
     assert [r["nome"] for r in catalogo["rese"] if r["attivo"]] == ["Fotorealistico"]
-    assert not any(v["attivo"] for v in catalogo["verde"])
+    assert spente and all(r["nota"] for r in spente)
     # gli assi dell'altra scena non compaiono
     assert "cielo" not in {a["id"] for a in catalogo["scene"]["interno"]["assi"]}
     assert "fuori" not in {a["id"] for a in catalogo["scene"]["esterno"]["assi"]}
+
+
+def test_intorno_verde_e_persone_poche_sono_attivi_con_i_blocchi_della_bozza_4(cartella, chiamate):
+    """Caso: lo Studio lascia in grigio una voce che il motore sa gia' comporre, o viceversa."""
+    assi = {a["id"]: a for a in _studio(cartella, chiamate).catalogo()["scene"]["esterno"]["assi"]}
+    for asse, attese in (("intorno", ["Niente, sfondo neutro", "Città", "Periferia", "Campagna"]),
+                         ("verde", ["Nessuno", "Poco", "Rigoglioso"]),
+                         ("persone", ["Nessuna", "Poche", "In movimento"])):
+        assert [v["nome"] for v in assi[asse]["voci"]] == attese
+        assert all(v["attivo"] and v["origine"] == config.SCELTA for v in assi[asse]["voci"])
+    ordine = list(assi)
+    assert ordine.index("intorno") + 1 == ordine.index("verde")
+
+
+def test_il_riassunto_dice_intorno_verde_e_persone(cartella, chiamate):
+    scelte = blocchi.da_preset("rivista", intorno="campagna", verde="poco", persone="poche")
+    riassunto = _studio(cartella, chiamate).componi({"scelte": scelte.a_dizionario()})["riassunto"]
+    assert "intorno: campagna · verde: poco · persone: poche" in riassunto
 
 
 def test_componi_restituisce_il_prompt_dei_blocchi_e_il_riassunto_in_italiano(cartella, chiamate):
@@ -162,6 +177,25 @@ def test_il_costo_misurato_dice_circa_e_la_data_quello_non_misurato_lo_dice(cart
     assert "17,17" in nano["costo"]
     kontext = studio.destinazione(KONTEXT)
     assert kontext["costo_misurato"] is False and kontext["costo"].startswith("non misurato")
+
+
+def test_il_costo_di_n_varianti_e_n_volte_quello_di_un_render(cartella, chiamate):
+    """Caso: quattro varianti annunciate al prezzo di una (regola 5)."""
+    studio = _studio(cartella, chiamate)
+    quattro = studio.destinazione(NANO, 4)
+    assert quattro["varianti"] == 4
+    totale = round(4 * config.COSTO_NANO_BANANA_2_CREDITI)
+    assert quattro["costo"].startswith(f"circa {totale} crediti per 4 immagini")
+    assert "4 × 17,17" in quattro["costo"] and "misurato il 27/10/2026" in quattro["costo"]
+    assert studio.destinazione(KONTEXT, 3)["costo"].startswith("non misurato")
+    assert "69" not in studio.destinazione(KONTEXT, 4)["costo"]
+
+
+@pytest.mark.parametrize("varianti", [0, 5, "due", 2.5, True, None])
+def test_un_numero_di_varianti_fuori_misura_si_rifiuta(cartella, chiamate, varianti):
+    with pytest.raises(RichiestaStudioNonValida) as errore:
+        _studio(cartella, chiamate).destinazione(NANO, varianti)
+    assert str(config.VARIANTI_MASSIME) in errore.value.cosa_fare
 
 
 def test_un_modello_sconosciuto_si_rifiuta(cartella, chiamate):
@@ -253,6 +287,28 @@ def test_genera_scrive_il_lavoro_con_la_destinazione_mostrata(cartella, vista, c
     assert [a["identificativo"] for a in attivi] == [risposta["identificativo"]]
     assert attivi[0]["vista"] == vista and attivi[0]["preset_nome"] == "Rivista d'architettura"
     assert chiamate == []
+
+
+def test_genera_con_tre_varianti_mette_tre_lavori_con_le_stesse_scelte(cartella, vista, chiamate):
+    """Caso: le varianti partono con scelte diverse, o ne parte una sola e se ne pagano tre."""
+    studio = _studio(cartella, chiamate)
+    risposta = studio.invia(_richiesta(studio, vista, varianti=3))
+    assert len(risposta["identificativi"]) == 3 and risposta["identificativo"] == risposta["identificativi"][0]
+    lavori = [studio.lavoro(i) for i in risposta["identificativi"]]
+    assert {str(l["scelte"]) for l in lavori} == {str(lavori[0]["scelte"])}
+    assert all(l["stato"] == "in coda" for l in lavori)
+    assert chiamate == []
+    coda = _coda(cartella, chiamate)
+    while coda.esegui_uno():
+        pass
+    assert len(chiamate) == 3 and len({c.prompt for c in chiamate}) == 1
+
+
+def test_la_prova_a_secco_dice_quante_varianti_e_il_costo(cartella, vista, chiamate):
+    studio = _studio(cartella, chiamate)
+    secco = studio.prova_a_secco(_richiesta(studio, vista, varianti=2))
+    assert secco["varianti"] == 2 and "per 2 immagini" in secco["destinazione"]["costo"]
+    assert list((cartella / "lavori" / "in-attesa").iterdir()) == []
 
 
 def test_genera_non_manda_se_la_destinazione_mostrata_e_un_altra(cartella, vista, chiamate):
