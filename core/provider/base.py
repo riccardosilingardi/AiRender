@@ -40,6 +40,9 @@ class RichiestaGenerazione:
     testo_utente: str = ""
     forza_struttura: int = config.FORZA_STRUTTURA_PREDEFINITA
     risoluzione: str = config.RISOLUZIONE_PREDEFINITA
+    # Grandezza del render chiesta ai modelli Gemini del Router (1k, 2k, 4k).
+    # Vuota: non si chiede, e il modello torna a 1k come nelle prove vere.
+    dimensione_render: str = ""
     aspetto: str | None = None
     generazione_fissa: bool = False
     seme: int | None = None

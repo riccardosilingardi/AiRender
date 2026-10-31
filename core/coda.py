@@ -611,6 +611,7 @@ class Coda:
             dettaglio_grana=modulo_grana.dettaglio(livello),
             testo_utente=lavoro.scelte.materiali,
             immagini_in_piu=in_piu,
+            dimensione_render=lavoro.scelte.risoluzione,
         )
         return richiesta, motore
 
