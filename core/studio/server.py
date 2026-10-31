@@ -32,6 +32,7 @@ Rotte:
     GET  /api/miei-preset                  i preset salvati dall'utente
     POST /api/miei-preset                  salva le scelte con un nome (rinomina, elimina sotto)
     POST /api/lavori/<id>/misura           spigoli ritrovati di un render fatto prima della misura
+    POST /api/lavori/<id>/esporta          il render in JPEG, PNG o PSD a livelli, nella cartella esportati
     POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
     POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
     POST /api/passi/invia                  un passo nuovo dal render di un passo
@@ -204,6 +205,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.rinomina_mio_preset(self._corpo_json()))
             case ["api", "miei-preset", "elimina"]:
                 self._json(studio.elimina_mio_preset(self._corpo_json()))
+            case ["api", "lavori", identificativo, "esporta"]:
+                self._json(studio.esporta(identificativo, self._corpo_json()))
             case ["api", "lavori", identificativo, "misura"]:
                 self._json(studio.misura_ora(identificativo))
             case ["api", "lavori", identificativo, "rifai"]:

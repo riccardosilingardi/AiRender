@@ -24,7 +24,7 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import passi as modulo_passi
-from .. import preset_utente
+from .. import esporta as modulo_esporta, preset_utente
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
@@ -41,6 +41,8 @@ class RichiestaStudioNonValida(ErroreAirender):
 
 ESTENSIONI_VISTA = (".png", ".jpg", ".jpeg")
 _BYTE_PER_MB = 1024 * 1024  # numero-non-configurabile: definizione di MB
+# Esporta per il cliente: dentro la cartella delle viste, accanto ai lavori.
+CARTELLA_ESPORTATI = "esportati"
 SUFFISSO_CAMERA = ".camera.json"
 
 # Gli identificativi che nuovo_identificativo() di core/coda.py produce.
@@ -768,6 +770,77 @@ class Studio:
         modulo_coda.scrivi_misura(Path(lavoro.vista), render)
         return self._tenuta(render)
 
+    # --- esporta per il cliente ----------------------------------------------
+
+    def cartella_esportati(self) -> Path:
+        return self.cartella / CARTELLA_ESPORTATI
+
+    def esporta(self, identificativo: str, dati: dict) -> dict:
+        """Scrive il render scelto in JPEG, PNG o PSD a livelli nella cartella esportati, e dice dove.
+
+        Il PSD ha in basso la vista di Allplan e sopra un livello per ogni passo
+        della strada fino a questo render. Nessun file contiene prompt o ricetta.
+        """
+        self._controlla_id(identificativo)
+        formato = str(dati.get("formato") or "").lower()
+        render = self._render(identificativo)
+        if render is None:
+            raise FileNonTrovato(
+                "Questo lavoro non ha un render da esportare.",
+                "Scegli un render fatto nell'elenco dei render della vista.",
+            )
+        lavoro, _cartella = self._lavoro(identificativo)
+        vista = Path(lavoro.vista)
+        livelli = None
+        if formato == "psd":
+            livelli = self._livelli_della_strada(vista, identificativo, render)
+        contenuto = modulo_esporta.esporta(render.read_bytes(), formato, livelli)
+        numero = self._numero_passo(vista, identificativo)
+        istante = self._adesso().astimezone()
+        cartella = self.cartella_esportati()
+        cartella.mkdir(parents=True, exist_ok=True)
+        base = f"{vista.stem}-passo{numero}-{istante:%Y%m%d-%H%M%S}" if numero else f"{vista.stem}-{istante:%Y%m%d-%H%M%S}"
+        file = cartella / (base + modulo_esporta.ESTENSIONI[formato])
+        indice = 1
+        while file.exists():
+            indice += 1
+            file = cartella / f"{base}-{indice}{modulo_esporta.ESTENSIONI[formato]}"
+        modulo_coda.scrivi_atomico(file, contenuto)
+        larghezza, altezza = modulo_immagine.dimensioni(render.read_bytes())
+        return {
+            "file": str(file), "nome": file.name, "cartella": str(cartella), "formato": formato,
+            "larghezza": larghezza, "altezza": altezza,
+            "livelli": [nome for nome, _dati in livelli] if livelli else None,
+            "peso_mb": round(len(contenuto) / _BYTE_PER_MB, 1),
+        }
+
+    def _numero_passo(self, vista: Path, identificativo: str) -> int | None:
+        try:
+            passo = self._albero(vista).passo(identificativo)
+        except (ErroreAirender, OSError):
+            return None
+        return passo.get("numero") if passo else None
+
+    def _livelli_della_strada(self, vista: Path, identificativo: str, render: Path) -> list[tuple[str, bytes]]:
+        """Vista di Allplan, poi i render della strada fino a questo, dal basso in alto."""
+        livelli: list[tuple[str, bytes]] = []
+        if vista.is_file():
+            livelli.append(("Vista Allplan", vista.read_bytes()))
+        try:
+            strada = self._albero(vista).strada(identificativo)
+        except (ErroreAirender, OSError):
+            strada = []
+        for passo in strada:
+            file = Path(passo["render"]) if passo.get("render") else None
+            if passo["identificativo"] == identificativo:
+                file = render
+            if file is None or not self._render_valido(file):
+                continue  # un passo senza render (tolto, fallito) non diventa un livello vuoto
+            livelli.append((_nome_livello(passo), file.read_bytes()))
+        if not livelli or livelli[-1][1] != render.read_bytes():
+            livelli.append(("Render", render.read_bytes()))
+        return livelli
+
     def _render_valido(self, percorso: Path) -> bool:
         """Un render si usa come partenza solo se sta in lavori/fatto e c'e' ancora."""
         try:
@@ -1130,7 +1203,11 @@ class Studio:
     # --- cartella --------------------------------------------------------
 
     def apri_cartella(self, quale: str) -> dict:
-        percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
+        if quale == "esportati":
+            percorso = self.cartella_esportati()
+            percorso.mkdir(parents=True, exist_ok=True)
+        else:
+            percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
         try:
             self._apri(percorso)
         except OSError as errore:
@@ -1139,6 +1216,19 @@ class Studio:
                 "Aprila a mano dall'esplora file.",
             ) from None
         return {"aperta": str(percorso)}
+
+
+def _nome_livello(passo: dict) -> str:
+    """Il nome di un livello del PSD: il numero del passo e cosa e' stato chiesto."""
+    if passo.get("aree"):
+        cosa = "ritocco per aree"
+    elif passo.get("richieste"):
+        cosa = modulo_passi.nome_breve("; ".join(passo["richieste"]))
+    elif passo.get("preset") in blocchi.PRESET_STILE:
+        cosa = blocchi.PRESET_STILE[passo["preset"]].nome
+    else:
+        cosa = "scelte libere"
+    return f"{passo.get('numero', '?')} · {cosa}"
 
 
 def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:

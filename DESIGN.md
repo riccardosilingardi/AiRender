@@ -227,8 +227,8 @@ decisione che questa schermata deve far prendere.
 - **Com'è stato fatto** (la ricetta): stile, modello, le parole dell'utente,
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
-- **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine; in
-  grigio Esporta per il cliente.
+- **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine,
+  **Esporta per il cliente** (dal 2026-10-31, vedi sotto).
 - **Cambia una parte**: **Annota per aree** apre Ritocca su questo render; in
   grigio Cambia un materiale e Fai un video da qui.
 
@@ -563,6 +563,27 @@ palette. Blocchi nella bozza 7; quali rese e che testi li ha scelti Claude
   resa …: non parte». Le miniature sono l'illustrazione con un filtro, non
   render del modello.
 
+## Esporta per il cliente, costruita il 2026-10-31
+
+In Studio · Risultato, sotto «Adesso». Decisioni di Riccardo: JPG, PNG, o PSD
+con un livello per ogni passaggio. Dove salvare non l'ha detto: si salva in
+`esportati/` nella cartella delle viste, e «Apri cartella esportati» la apre.
+Alla grandezza del render, senza ingrandire.
+
+- **Vuoto:** il pulsante c'è solo quando il render scelto ha un file; senza
+  render non compare.
+- **In corso:** tre scelte di formato con una riga ciascuna (cosa contiene,
+  dove va, che nel file ci sono solo immagini), poi Esporta → «Esporto…».
+- **Errore:** il render tolto dalla cartella, un formato sconosciuto,
+  un'immagine che non si legge: la frase dice il fatto e cosa fare, il file
+  non si scrive.
+- **Pieno:** «Salvato: vista-1-passo2-20261031-221500.psd», misure, peso e,
+  per il PSD, i nomi dei livelli dal basso: «Vista Allplan, 1 · Rivista
+  d'architettura, 2 · due alberi davanti al fronte». Un passo senza render
+  (fallito o tolto) non diventa un livello vuoto.
+
+Nel file non entrano prompt, ricetta o chiave: si riscrivono solo i pixel.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -614,7 +635,6 @@ contraddicono le nuove, valgono le nuove:
 
 - Schermata di configurazione della chiave API e del tetto di spesa (nello
   Studio c'è solo il segnaposto in grigio).
-- Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.
