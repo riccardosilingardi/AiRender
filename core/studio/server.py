@@ -17,7 +17,7 @@ Rotte:
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
-    GET  /api/destinazione?modello=<id>&varianti=<n>   dove va la vista e quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
@@ -27,6 +27,7 @@ Rotte:
     POST /api/prova-a-secco                tutto tranne l'invio
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
+    POST /api/riferimenti                  carica un'immagine di riferimento per lo stile (corpo: i byte)
     POST /api/lavori/<id>/annulla          file .annulla accanto al lavoro
     GET  /api/miei-preset                  i preset salvati dall'utente
     POST /api/miei-preset                  salva le scelte con un nome (rinomina, elimina sotto)
@@ -151,7 +152,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.passi(nome))
             case ["api", "destinazione"]:
                 self._json(studio.destinazione((domanda.get("modello") or [""])[0],
-                                               (domanda.get("varianti") or ["1"])[0]))
+                                               (domanda.get("varianti") or ["1"])[0],
+                                               (domanda.get("riferimento") or ["0"])[0] == "1"))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
@@ -160,6 +162,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._file(studio.percorso_vista(nome))
             case ["file", "render", identificativo]:
                 self._file(studio.file_render(identificativo))
+            case ["file", "riferimento", nome]:
+                self._file(studio.percorso_riferimento(nome))
             case ["file", "miniatura", preset]:
                 self._file(studio.file_miniatura(preset))
             case _:
@@ -190,6 +194,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.invia(self._corpo_json()))
             case ["api", "viste"]:
                 self._json(studio.carica_vista(self._corpo(), self.headers.get("X-Nome-File", "")))
+            case ["api", "riferimenti"]:
+                self._json(studio.carica_riferimento(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "lavori", identificativo, "annulla"]:
                 self._json(studio.annulla(identificativo))
             case ["api", "miei-preset"]:

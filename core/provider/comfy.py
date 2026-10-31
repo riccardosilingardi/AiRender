@@ -330,6 +330,19 @@ class ProviderComfy(Provider):
             "render e' la prova. Se il servizio lo rifiuta, l'errore lo dice."
         )
 
+    def accetta_piu_immagini(self, modello: str) -> bool:
+        schema = SCHEMI.get(modello)
+        return schema is not None and schema.piu_immagini
+
+    def avviso_piu_immagini(self, modello: str) -> str | None:
+        schema = SCHEMI.get(modello)
+        if schema is None or not schema.piu_immagini or schema.piu_immagini_verificato_il:
+            return None
+        return (
+            f"{modello} non ha mai ricevuto due immagini in una chiamata vera: "
+            "questo render e' la prova. Se il servizio le rifiuta, l'errore lo dice."
+        )
+
     def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
         self._assicura_chiave()
         self._assicura_peso(immagine)

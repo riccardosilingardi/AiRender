@@ -23,6 +23,7 @@ const S = {
   mostraViste: false,
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
+  riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
   inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
@@ -260,7 +261,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset });
+      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: S.riferimento && S.riferimento.nome });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -284,7 +285,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -364,6 +365,7 @@ async function genera() {
     const risposta = await post("/api/invia", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
+      riferimento: S.riferimento && S.riferimento.nome,
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -377,7 +379,7 @@ async function provaASecco() {
   try {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
-      prompt_a_mano: S.promptAMano,
+      prompt_a_mano: S.promptAMano, riferimento: S.riferimento && S.riferimento.nome,
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -668,13 +670,60 @@ function colonnaInvio() {
         onclick: async () => { S.varianti = n; S.secco = null; await caricaDestinazione(); render(); },
       }, String(n)))),
     S.varianti > 1 ? h("p", { classe: "tenue piccolo" }, `${S.varianti} lavori in coda con le stesse scelte, uno dopo l'altro: ogni variante è un invio.`) : null,
-    h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Immagine di riferimento per lo stile ", presto())));
+    ...pannelloRiferimento());
 
   return h("div", { classe: "colonna-invio" },
     h("section", { classe: "pannello", "aria-label": "Materiali" },
       h("span", { classe: "etichetta" }, "Materiali a parole"),
       h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali),
     mappa, cosaParte, scelteInvio, pannelloInvio());
+}
+
+// Immagine di riferimento per lo stile: parte come seconda immagine, solo con
+// i modelli che ne ricevono piu' di una. Il server la salva con la sua
+// impronta; la ricetta tiene l'impronta, non l'immagine.
+async function scegliRiferimento(file) {
+  if (!file) return;
+  try {
+    S.riferimento = await post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+async function togliRiferimento() {
+  S.riferimento = null; S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+function pannelloRiferimento() {
+  const m = modelloScelto();
+  const accetta = !!(m && m.piu_immagini);
+  const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
+  if (!accetta) {
+    return [titolo,
+      h("p", { classe: "tenue piccolo" }, `${m ? m.nome : "Questo modello"} riceve una sola immagine per invio: il riferimento si usa con Nano Banana 2.`),
+      S.riferimento ? h("div", { classe: "riga" },
+        h("span", { classe: "piccolo" }, `Caricato: ${S.riferimento.da || S.riferimento.nome}, non partirebbe.`),
+        h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")) : null];
+  }
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica un'immagine di riferimento per lo stile" });
+  file.addEventListener("change", () => scegliRiferimento(file.files && file.files[0]));
+  if (!S.riferimento) {
+    return [titolo,
+      h("p", { classe: "tenue piccolo" }, "Una foto da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG."),
+      file];
+  }
+  const r = S.riferimento;
+  return [titolo,
+    h("div", { classe: "riga" },
+      h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
+      h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
+      h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
+    h("p", { classe: "tenue piccolo" }, "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
 }
 
 function motivoGeneraSpento() {
@@ -684,6 +733,7 @@ function motivoGeneraSpento() {
   const m = modelloScelto();
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
   if (!S.destinazione) return "Sto leggendo la destinazione.";
+  if (S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
   return null;
 }
 
@@ -698,6 +748,8 @@ function pannelloInvio() {
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
     if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
+    blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
+    if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento, "Se non vuoi fare la prova adesso, togli il riferimento."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",

@@ -114,6 +114,14 @@ class Provider(ABC):
         """Cosa sapere prima di mandare, che non ferma l'invio. None se niente."""
         return None
 
+    def accetta_piu_immagini(self, modello: str) -> bool:
+        """Se il modello riceve immagini dopo la vista nello stesso invio (riferimento, maschera)."""
+        return False
+
+    def avviso_piu_immagini(self, modello: str) -> str | None:
+        """Cosa sapere prima di mandare piu' di un'immagine, che non ferma l'invio. None se niente."""
+        return None
+
     def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
         """Solleva l'errore che fermerebbe l'invio (chiave, schema, peso), senza inviare.
 

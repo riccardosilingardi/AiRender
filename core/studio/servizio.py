@@ -31,7 +31,7 @@ from ..idoneita import valuta
 from ..preset import MODELLI_PREDEFINITI
 from ..provider import comfy
 from ..provider.base import Provider
-from ..ricetta import Ricetta
+from ..ricetta import Ricetta, impronta
 from . import miniature as modulo_miniature
 
 
@@ -272,6 +272,51 @@ class Studio:
         modulo_coda.scrivi_atomico(self.cartella / nome, dati)
         return {"nome": nome, "da": nome_originale}
 
+    # --- immagine di riferimento per lo stile -----------------------------
+
+    def carica_riferimento(self, dati: bytes, nome_originale: str = "") -> dict:
+        """Salva un'immagine di riferimento nella cartella dei riferimenti, chiamata con la sua impronta.
+
+        Il peso massimo e' quello che si manda a Comfy Router: un riferimento
+        piu' pesante sarebbe rifiutato al momento dell'invio, dopo il clic.
+        """
+        massimo = config.COMFY_INVIO_MASSIMO_MB
+        if len(dati) > massimo * _BYTE_PER_MB:
+            raise RichiestaStudioNonValida(
+                f"Il riferimento pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
+                "Riducilo o salvalo in JPEG, poi caricalo di nuovo.",
+            )
+        tipo = comfy.tipo_mime(dati)
+        if tipo not in ("image/png", "image/jpeg"):
+            raise RichiestaStudioNonValida(
+                "Il riferimento per lo stile dev'essere un JPEG o un PNG.",
+                "Salvalo in JPEG o PNG, poi caricalo di nuovo.",
+            )
+        larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
+        estensione = ".jpg" if tipo == "image/jpeg" else ".png"
+        nome = f"rif-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta bastano a non confondere due riferimenti
+        cartella = modulo_coda.cartella_riferimenti(self.cartella)
+        cartella.mkdir(parents=True, exist_ok=True)
+        if not (cartella / nome).exists():
+            modulo_coda.scrivi_atomico(cartella / nome, dati)
+        return {"nome": nome, "da": nome_originale, "larghezza": larghezza,
+                "altezza": altezza, "impronta": impronta(dati)}
+
+    def percorso_riferimento(self, nome: str) -> Path:
+        """Il file di un riferimento. Solo un nome della cartella dei riferimenti, mai un percorso."""
+        if not re.fullmatch(r"rif-[0-9a-f]{16}\.(jpg|png)", nome or ""):
+            raise RichiestaStudioNonValida(
+                f"\"{nome}\" non e' il nome di un riferimento per lo stile.",
+                "Caricalo di nuovo con «Immagine di riferimento per lo stile».",
+            )
+        percorso = modulo_coda.cartella_riferimenti(self.cartella) / nome
+        if not percorso.is_file():
+            raise FileNonTrovato(
+                f"Il riferimento {nome} non c'e' piu' nella cartella dei riferimenti.",
+                "Caricalo di nuovo, oppure toglilo.",
+            )
+        return percorso
+
     # --- stile -----------------------------------------------------------
 
     def catalogo(self) -> dict:
@@ -358,6 +403,8 @@ class Studio:
         """Il prompt vero, il riassunto in italiano e quanti caratteri."""
         scelte = self._scelte(dati.get("scelte"))
         prompt = blocchi.componi(scelte)
+        if dati.get("riferimento"):
+            prompt = blocchi.aggiungi_riferimento(prompt)
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
@@ -394,9 +441,11 @@ class Studio:
             "nome": modello.nome,
             "fornitore": modello.fornitore,
             "verificato": motore.cosa_manca(modello.identificativo) is None,
+            "piu_immagini": motore.accetta_piu_immagini(modello.identificativo),
         }
 
-    def destinazione(self, identificativo_modello: str, varianti: object = 1) -> dict:
+    def destinazione(self, identificativo_modello: str, varianti: object = 1,
+                     riferimento: bool = False) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -417,6 +466,15 @@ class Studio:
             "costo_misurato": modello.costo_crediti is not None,
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
+            # Regola 5: quante immagini partono, detto prima del clic.
+            "immagini": 2 if riferimento else 1,
+            "cosa_parte": ("Partono due immagini: la vista e il riferimento per lo stile."
+                           if riferimento else "Parte una immagine: la vista."),
+            "riferimento_non_accettato": (
+                f"{modello.nome} riceve una sola immagine per invio: il riferimento non partirebbe. "
+                "Toglilo, oppure scegli Nano Banana 2."
+                if riferimento and not motore.accetta_piu_immagini(modello.identificativo) else None),
+            "avviso_riferimento": motore.avviso_piu_immagini(modello.identificativo) if riferimento else None,
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -425,8 +483,12 @@ class Studio:
         """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
+        riferimento = self._riferimento_scelto(dati)
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
+                                         riferimento=riferimento is not None)
         prompt = _prompt_a_mano(dati) or blocchi.componi(scelte)
+        if riferimento is not None:
+            prompt = blocchi.aggiungi_riferimento(prompt)
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
@@ -437,6 +499,9 @@ class Studio:
                 motore.controlla_prima_dell_invio(destinazione["modello"], modulo_immagine.leggi(vista))
             except ErroreAirender as errore:
                 problemi.append(_errore_dict(errore))
+        if destinazione["riferimento_non_accettato"]:
+            problemi.append({"fatto": destinazione["riferimento_non_accettato"],
+                             "cosa_fare": "Togli il riferimento, oppure scegli Nano Banana 2."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -457,19 +522,26 @@ class Studio:
         """
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
+        riferimento = self._riferimento_scelto(dati)
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
+                                         riferimento=riferimento is not None)
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
             preset=dati.get("preset") or None,
             prompt_a_mano=_prompt_a_mano(dati),
             varianti=destinazione["varianti"],
+            riferimento=riferimento,
         )
+
+    def _riferimento_scelto(self, dati: dict) -> Path | None:
+        nome = dati.get("riferimento")
+        return self.percorso_riferimento(str(nome)) if nome else None
 
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
                        varianti: int = 1, parte_da: str | None = None,
                        partenza: Path | None = None, richieste=(), aree=(),
-                       modo_aree: str | None = None) -> dict:
+                       modo_aree: str | None = None, riferimento: Path | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -481,6 +553,9 @@ class Studio:
                 f"Non mando: {destinazione['cosa_manca']}",
                 "Scegli Nano Banana 2, il modello predefinito, il cui schema e' verificato.",
             )
+        if destinazione.get("riferimento_non_accettato"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['riferimento_non_accettato']}",
+                                           "Togli il riferimento, oppure scegli Nano Banana 2.")
         if partenza is None:
             # Da un render l'idoneita' non conta: giudica una vista di
             # Allplan, e quello che parte e' il render del passo.
@@ -499,6 +574,7 @@ class Studio:
                 richieste=tuple(richieste),
                 aree=tuple(aree),
                 modo_aree=modo_aree,
+                riferimento=riferimento,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -536,7 +612,8 @@ class Studio:
                 "La vista di questo lavoro non sta nella cartella dello Studio.",
                 "Riaprila con Usa un'altra vista, poi genera da Genera.",
             )
-        destinazione = self.destinazione(lavoro.modello)
+        riferimento = Path(lavoro.riferimento) if lavoro.riferimento else None
+        destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None)
         return self._metti_in_coda(
             vista, lavoro.scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -549,6 +626,7 @@ class Studio:
             # frattempo RITOCCO_MODO_AREE e' cambiato: e' la sua ricetta.
             aree=lavoro.aree,
             modo_aree=lavoro.modo_aree,
+            riferimento=riferimento,
         )
 
     def annulla(self, identificativo: str) -> dict:
