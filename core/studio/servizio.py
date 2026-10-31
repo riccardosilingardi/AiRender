@@ -295,6 +295,10 @@ class Studio:
             "varianti_massime": config.VARIANTI_MASSIME,
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
+            "risoluzioni": [
+                {"id": r, "nome": r.upper() + ("" if r == config.RISOLUZIONE_RENDER_PREDEFINITA else " · da provare")}
+                for r in config.RISOLUZIONI_RENDER
+            ],
         }
 
     def _assi(self, scena: str) -> list[dict]:

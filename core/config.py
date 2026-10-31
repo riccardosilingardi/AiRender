@@ -320,6 +320,20 @@ RISOLUZIONE_PREDEFINITA = _registra(Costante(
     ),
 ))
 
+RISOLUZIONE_RENDER_PREDEFINITA = _registra(Costante(
+    nome="RISOLUZIONE_RENDER_PREDEFINITA",
+    valore="1k",
+    origine=SCELTA,
+    ragione=(
+        "Quanto grande torna il render dai modelli Gemini (Nano Banana 2 e Pro): "
+        "1k, 2k o 4k sul lato lungo. 1k e' l'unica provata con una chiamata vera "
+        "(senza il campo imageSize); 2k e 4k sono un campo dei documenti di "
+        "Vertex AI, mai passato dal Router, e costano di piu' per immagine. Il "
+        "2026-10-31 Riccardo ha trovato il render da 1k poco definito."
+    ),
+))
+RISOLUZIONI_RENDER = ("1k", "2k", "4k")  # numero-non-configurabile: i valori di imageSize di Vertex AI
+
 # --- Coda dei lavori ---------------------------------------------------------
 
 CODA_INTERVALLO_SECONDI = _registra(Costante(

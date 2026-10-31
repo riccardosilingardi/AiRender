@@ -293,6 +293,16 @@ class Scelte:
     verde: str | None = None
     persone: str | None = None
     qualita: str = QUALITA_PREDEFINITA
+    # Non e' un blocco di prompt: e' la grandezza del render che si chiede al
+    # modello. Sta qui perche' viaggia con le scelte dalla palette alla coda.
+    risoluzione: str = config.RISOLUZIONE_RENDER_PREDEFINITA
+
+    def __post_init__(self) -> None:
+        if self.risoluzione not in config.RISOLUZIONI_RENDER:
+            raise SceltaNonValida(
+                f"La risoluzione del render \"{self.risoluzione}\" non esiste.",
+                f"Scegli fra {', '.join(config.RISOLUZIONI_RENDER)}.",
+            )
 
     def a_dizionario(self) -> dict:
         return {f.name: getattr(self, f.name) for f in fields(self)}

@@ -144,6 +144,7 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
             _scelta("Persone", "Persone"),
             _parametro("Materiali", "String", "Materiali", ""),
             _scelta("Modello", "Modello"),
+            _scelta("Risoluzione", "Risoluzione del render"),
         ),
         _espansore(
             "Sezione3", "3 · Invio",

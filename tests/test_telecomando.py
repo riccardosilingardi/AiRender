@@ -477,3 +477,16 @@ def test_verde_e_persone_della_palette_arrivano_nel_prompt():
     interno = _valori(interno=True, verde="Rigoglioso", persone="In movimento").scelte()
     assert interno.persone == "movimento"
     assert interno.verde != "rigoglioso"  # il verde e' degli esterni, come nello Studio
+
+
+def test_la_risoluzione_scelta_in_palette_arriva_al_modello(cartella, chiamate, vista):
+    """Caso: si sceglie 4K e il modello riceve la richiesta di sempre, a 1K (2026-10-31)."""
+    _coda_che_batte(cartella)
+    telecomando = _telecomando(cartella, chiamate)
+    valori = _valori(risoluzione="4K · da provare")
+    assert valori.scelte().risoluzione == "4k"
+    assert _valori().scelte().risoluzione == "1k"
+    dove, _nota, _costo = telecomando.invio(valori)
+    telecomando.genera(vista, valori, dove)
+    Coda(cartella, crea_provider=lambda _n: ProviderDiProva(chiamate), dire=lambda _t: None).esegui_uno()
+    assert chiamate[0].dimensione_render == "4k"

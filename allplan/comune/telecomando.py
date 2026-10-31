@@ -45,6 +45,8 @@ COME_LA_FINESTRA = "Come la finestra"
 _NOMI_FORMATO = {"21:9": "21:9 panoramico", "1:1": "1:1 quadrato", "3:4": "3:4 verticale",
                  "2:3": "2:3 verticale", "9:16": "9:16 verticale"}
 CARTELLA_ANTEPRIME = "anteprime"
+# Solo 1k e' provata con una chiamata vera: le altre lo dicono nel nome.
+RISOLUZIONI = [("1k", "1K · provata"), ("2k", "2K · da provare"), ("4k", "4K · da provare")]
 NESSUNA_VISTA = (
     "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere "
     "(shaded, con ombre), poi Cattura."
@@ -95,6 +97,7 @@ def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
         "Persone": _voci("persone", blocchi.ESTERNO),
         "Formato": [(None, COME_LA_FINESTRA)] + [(r, _NOMI_FORMATO.get(r, r)) for r in comfy.RAPPORTI],
         "Modello": [(m.identificativo, m.nome) for m in servizio.MODELLI],
+        "Risoluzione": list(RISOLUZIONI),
     }
 
 
@@ -125,6 +128,7 @@ class ValoriPalette:
     materiali: str = ""
     modello: str = ""
     formato: str = COME_LA_FINESTRA
+    risoluzione: str = RISOLUZIONI[0][1]
 
     def preset(self) -> str:
         if self.interno:
@@ -152,6 +156,7 @@ class ValoriPalette:
             cambi["persone"] = persone
         if luce:
             cambi["luce"] = luce
+        cambi["risoluzione"] = _identificativo("Risoluzione", self.risoluzione or RISOLUZIONI[0][1])
         return blocchi.da_preset(self.preset(), **cambi)
 
     def modello_id(self) -> str:

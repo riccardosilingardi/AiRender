@@ -24,7 +24,7 @@ def _richiesta(dati: bytes, *in_piu: bytes) -> RichiestaGenerazione:
                                 modello="m", grana="", dettaglio_grana=0, immagini_in_piu=in_piu)
 
 
-def test_la_vista_di_riccardo_parte_esattamente_3_2_e_torna_1165x715():
+def test_la_vista_di_riccardo_parte_esattamente_3_2_e_torna_della_sua_forma_alla_grandezza_del_render():
     richiesta, cornice = con_cornice(_richiesta(vista(1165, 715)))
     l, a = modulo.dimensioni(richiesta.immagine)
     assert rapporto_piu_vicino(richiesta.immagine) == "3:2"
@@ -40,10 +40,13 @@ def test_la_vista_di_riccardo_parte_esattamente_3_2_e_torna_1165x715():
     uscita = io.BytesIO()
     tela.save(uscita, format="PNG")
     tagliato = modulo.togli_cornice(uscita.getvalue(), cornice)
-    assert modulo.dimensioni(tagliato) == (1165, 715)
+    l, a = modulo.dimensioni(tagliato)
+    # La forma della vista, ma i pixel del render: non si rimpicciolisce alla vista
+    # (2026-10-31: un render 4k sarebbe tornato 1279x827).
+    assert abs(l / a - 1165 / 715) < 0.002 and l >= 1264
     with Image.open(io.BytesIO(tagliato)) as im:
-        assert im.convert("RGB").getpixel((582, 2))[2] < 120  # niente blu della cornice in alto
-        assert im.convert("RGB").getpixel((582, 712))[2] < 120
+        assert im.convert("RGB").getpixel((l // 2, 2))[2] < 120  # niente blu della cornice in alto
+        assert im.convert("RGB").getpixel((l // 2, a - 3))[2] < 120
 
 
 def test_una_vista_stretta_si_allarga_ai_lati_e_la_banda_continua_il_bordo():

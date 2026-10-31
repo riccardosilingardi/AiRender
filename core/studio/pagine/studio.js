@@ -160,7 +160,7 @@ function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -168,7 +168,7 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -565,12 +565,20 @@ function colonnaInvio() {
       classe: "seg", "aria-pressed": String(S.scelte.qualita === v.id), onclick: () => cambiaAsse("qualita", v.id),
     }, v.id === "32k" ? "Altissima definizione (32k) — da confrontare" : v.nome)));
 
+  const risoluzione = h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del render" },
+    S.catalogo.risoluzioni.map((r) => h("button", {
+      classe: "seg", "aria-pressed": String((S.scelte.risoluzione || "1k") === r.id),
+      onclick: () => { S.scelte = { ...S.scelte, risoluzione: r.id }; render(); },
+    }, r.nome)));
+
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
     h("span", { classe: "etichetta" }, "I miei preset"),
     h("div", { classe: "riga" }, h("select", { "aria-label": "I miei preset", disabled: true }, h("option", {}, "Nessuno — scelte libere")),
       h("button", { classe: "btn", disabled: true }, "Salva queste scelte ", presto())),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     h("span", { classe: "etichetta" }, "Qualità"), qualita,
+    h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
+    h("p", { classe: "tenue piccolo" }, "Solo Nano Banana. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
     h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Fedeltà al disegno: rigida / bilanciata / libera ", presto("Da provare"))),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },

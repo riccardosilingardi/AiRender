@@ -235,6 +235,13 @@
 <ValueList>Nano Banana 2|FLUX.1 Kontext Pro|Nano Banana Pro</ValueList>
 <ValueType>StringComboBox</ValueType>
 </Parameter>
+<Parameter>
+<Name>Risoluzione</Name>
+<Text>Risoluzione del render</Text>
+<Value>1K · provata</Value>
+<ValueList>1K · provata|2K · da provare|4K · da provare</ValueList>
+<ValueType>StringComboBox</ValueType>
+</Parameter>
 </Parameters>
 </Parameter>
 <Parameter>
