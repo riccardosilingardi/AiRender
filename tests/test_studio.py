@@ -672,3 +672,15 @@ def test_la_misura_che_non_si_puo_fare_non_diventa_un_numero(tmp_path):
     render.write_bytes(vista_shaded(320, 200))
     misura = modulo_coda.misura_tenuta(tmp_path / "non-c-e.png", render)
     assert misura["spigoli"] is None and "Non ho trovato" in misura["motivo"]
+
+
+def test_i_miei_preset_dallo_studio_vivono_nella_cartella_delle_viste(cartella, chiamate):
+    """Caso: i preset dell'utente finiscono nel repository, o un modello inventato viene salvato."""
+    studio = _studio(cartella, chiamate)
+    scelte = blocchi.da_preset("rivista").a_dizionario()
+    risposta = studio.salva_mio_preset({"nome": "Mio", "scelte": scelte, "modello": NANO})
+    assert [p["nome"] for p in risposta["preset"]] == ["Mio"]
+    assert (cartella / "preset-utente.json").is_file()
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.salva_mio_preset({"nome": "Altro", "scelte": scelte, "modello": "inventato/x"})
+    assert studio.elimina_mio_preset({"nome": "Mio"})["preset"] == []

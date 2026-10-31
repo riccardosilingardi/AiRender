@@ -28,6 +28,8 @@ Rotte:
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
     POST /api/lavori/<id>/annulla          file .annulla accanto al lavoro
+    GET  /api/miei-preset                  i preset salvati dall'utente
+    POST /api/miei-preset                  salva le scelte con un nome (rinomina, elimina sotto)
     POST /api/lavori/<id>/misura           spigoli ritrovati di un render fatto prima della misura
     POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
     POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
@@ -139,6 +141,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.stato_studio())
             case ["api", "catalogo"]:
                 self._json(studio.catalogo())
+            case ["api", "miei-preset"]:
+                self._json(studio.miei_preset())
             case ["api", "viste", nome]:
                 self._json(studio.descrivi_vista(nome))
             case ["api", "viste", nome, "render"]:
@@ -188,6 +192,12 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.carica_vista(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "lavori", identificativo, "annulla"]:
                 self._json(studio.annulla(identificativo))
+            case ["api", "miei-preset"]:
+                self._json(studio.salva_mio_preset(self._corpo_json()))
+            case ["api", "miei-preset", "rinomina"]:
+                self._json(studio.rinomina_mio_preset(self._corpo_json()))
+            case ["api", "miei-preset", "elimina"]:
+                self._json(studio.elimina_mio_preset(self._corpo_json()))
             case ["api", "lavori", identificativo, "misura"]:
                 self._json(studio.misura_ora(identificativo))
             case ["api", "lavori", identificativo, "rifai"]:

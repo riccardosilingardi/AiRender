@@ -7,6 +7,7 @@
 
 const S = {
   scheda: "genera",
+  miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
   studio: null,
   catalogo: null,
   vista: null,            // nome del file nella cartella
@@ -155,6 +156,82 @@ function nomeVoce(idAsse, valore) {
   return v ? v.nome : "";
 }
 function modelloScelto() { return S.catalogo.modelli.find((m) => m.id === S.modello); }
+
+// --- I miei preset -------------------------------------------------------
+
+async function caricaMiei() {
+  try {
+    const r = await get("/api/miei-preset");
+    S.miei.preset = r.preset; S.miei.problema = r.problema;
+  } catch (e) { S.miei.problema = e.fatto; }
+}
+
+async function operaMiei(indirizzo, corpo) {
+  try {
+    const r = await post(indirizzo, corpo);
+    S.miei.preset = r.preset; S.miei.problema = r.problema; S.errore = null;
+    return true;
+  } catch (e) { S.errore = e; render(); return false; }
+}
+
+async function salvaMio() {
+  const nome = window.prompt("Nome del preset (per esempio «Notte cliente Rossi»):", S.miei.scelto || "");
+  if (nome === null) return;
+  const corpo = { nome, scelte: S.scelte, modello: S.modello, prompt_a_mano: S.promptAMano };
+  const doppio = S.miei.preset.some((p) => p.nome.toLowerCase() === nome.trim().toLowerCase());
+  if (doppio && !window.confirm(`Hai già un preset «${nome.trim()}». Lo sostituisco con le scelte di adesso?`)) return;
+  if (await operaMiei("/api/miei-preset", { ...corpo, sovrascrivi: doppio })) {
+    S.miei.scelto = nome.trim(); S.miei.nota = `Salvato «${nome.trim()}».`; render();
+  }
+}
+
+async function rinominaMio() {
+  const vecchio = S.miei.scelto;
+  const nuovo = window.prompt(`Nuovo nome per «${vecchio}»:`, vecchio);
+  if (nuovo === null) return;
+  if (await operaMiei("/api/miei-preset/rinomina", { nome: vecchio, nuovo })) {
+    S.miei.scelto = nuovo.trim(); S.miei.nota = null; render();
+  }
+}
+
+async function eliminaMio() {
+  const nome = S.miei.scelto;
+  if (!window.confirm(`Elimino il preset «${nome}»? Non si può annullare.`)) return;
+  if (await operaMiei("/api/miei-preset/elimina", { nome })) { S.miei.scelto = ""; S.miei.nota = `Eliminato «${nome}».`; render(); }
+}
+
+function caricaMio(nome) {
+  S.miei.scelto = nome; S.miei.nota = null;
+  const p = S.miei.preset.find((x) => x.nome === nome);
+  if (!p) { render(); return; }
+  S.preset = null;
+  S.scelte = { ...p.scelte };
+  if (p.modello && S.catalogo.modelli.some((m) => m.id === p.modello)) S.modello = p.modello;
+  S.promptAMano = p.prompt_a_mano || null;
+  if (p.blocchi_cambiati || p.perse.length) {
+    S.miei.nota = p.perse.length
+      ? `Salvato con i blocchi ${p.versione_blocchi || "di prima"}: ${p.perse.join("; ")}. Il resto è caricato.`
+      : `Salvato con i blocchi ${p.versione_blocchi || "di prima"}: le scelte ci sono tutte, ma il testo dei blocchi può essere cambiato.`;
+  }
+  caricaDestinazione().then(() => aggiornaComposto(S.promptAMano === null)).then(render);
+}
+
+function pannelloMiei() {
+  const m = S.miei;
+  const scelta = h("select", { "aria-label": "I miei preset" },
+    h("option", { value: "", selected: !m.scelto }, m.preset.length ? "Nessuno — scelte libere" : "Nessuno salvato — scelte libere"),
+    m.preset.map((p) => h("option", { value: p.nome, selected: p.nome === m.scelto }, p.nome)));
+  scelta.addEventListener("change", () => caricaMio(scelta.value));
+  return [
+    h("span", { classe: "etichetta" }, "I miei preset"),
+    h("div", { classe: "riga" }, scelta,
+      h("button", { classe: "btn", onclick: salvaMio }, "Salva queste scelte"),
+      m.scelto ? h("button", { classe: "btn", onclick: rinominaMio }, "Rinomina") : null,
+      m.scelto ? h("button", { classe: "btn", onclick: eliminaMio }, "Elimina") : null),
+    m.problema ? avviso("errore", m.problema, "I preset nuovi si salvano in un file nuovo.") : null,
+    m.nota ? h("p", { classe: "tenue piccolo" }, m.nota) : null,
+  ];
+}
 
 function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
@@ -572,9 +649,7 @@ function colonnaInvio() {
     }, r.nome)));
 
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
-    h("span", { classe: "etichetta" }, "I miei preset"),
-    h("div", { classe: "riga" }, h("select", { "aria-label": "I miei preset", disabled: true }, h("option", {}, "Nessuno — scelte libere")),
-      h("button", { classe: "btn", disabled: true }, "Salva queste scelte ", presto())),
+    ...pannelloMiei(),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     h("span", { classe: "etichetta" }, "Qualità"), qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
@@ -1822,6 +1897,7 @@ async function avvia() {
   leggiScheda();
   try {
     [S.studio, S.catalogo] = await Promise.all([get("/api/studio"), get("/api/catalogo")]);
+    await caricaMiei();
     const primo = S.catalogo.scene.esterno.preset[0];
     S.preset = primo.id;
     S.scelte = { ...primo.scelte };

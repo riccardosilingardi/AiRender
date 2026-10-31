@@ -405,8 +405,8 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
 - **Ora / Luce** degli esterni ha le sei voci dei blocchi (Mezzogiorno,
   Estate luminosa, Giorno, Ora d'oro, Ora blu, Notte con luna), non le quattro
   del mockup.
-- **I miei preset**: «Nessuno — scelte libere» e Salva in grigio. Salvare
-  serve un posto dove tenerli, non ancora deciso.
+- ~~**I miei preset**: «Nessuno — scelte libere» e Salva in grigio.~~ Attivi
+  dal 2026-10-31 (prompt 9), vedi sotto «I miei preset».
 - **Le miniature** sono disegnate dallo Studio (casa, cielo, luce), non
   immagini: illustrazioni dichiarate tali, come chiede la decisione del
   2026-10-27. Dal 2026-10-29 un preset può avere una **miniatura vera**,
@@ -478,6 +478,28 @@ provider finto. Dove la schermata si scosta da quello che c'è sopra, e perché:
   il file del suo render e le richieste. La coda legge ancora il formato 1;
   un motore vecchio rifiuta il 2 invece di mandare la vista al posto del
   render.
+
+## I miei preset, costruiti il 2026-10-31
+
+Nella colonna destra di Studio · Genera. Salvano tutte le scelte di adesso
+(scena, assi, materiali a parole, qualità, risoluzione, modello e il prompt
+scritto a mano se c'è) con un nome. Stanno in `preset-utente.json` nella
+cartella delle viste: sono dell'utente, non del repository.
+
+- **Vuoto:** il menu dice «Nessuno salvato — scelte libere»; c'è solo
+  **Salva queste scelte**.
+- **In corso:** il salvataggio è istantaneo; un nome già usato chiede se
+  sostituirlo, e Elimina chiede conferma («Non si può annullare»).
+- **Errore:** nome vuoto, troppo lungo o doppio: la frase dice cosa fare. Se
+  il file non si legge, lo Studio non lo sovrascrive: lo mette da parte come
+  `preset-utente.non-letto-<data>.json` e lo scrive in un avviso rosso.
+- **Pieno:** il menu con i preset dell'utente; sceglierne uno carica le
+  scelte, e compaiono **Rinomina** ed **Elimina**. Se il preset è stato
+  salvato con un'altra versione dei blocchi, una riga dice cosa non esiste
+  più («luce: «alba» non esiste più») e che il resto è caricato.
+
+Nella palette di Allplan i miei preset non compaiono: il menu della palette è
+scritto nel `.pyp` quando si installa, e cambiarlo da script non è provato.
 
 ## Schermate sostituite il 2026-10-27
 
