@@ -64,10 +64,14 @@ py allplan\v2027\pacchetto.py --installa --usr "C:\...\Usr\Local"
 5. In *2 · Stile*: *Verde, alberi* e *Persone* aggiungono vegetazione e
    persone (il verde solo negli esterni). Il resto del preset lo cambi nello
    Studio, in *Dettagli del preset*.
-6. In *3 · Invio* leggi dove va la vista e quanto costa, poi **Genera
+6. In *2 · Stile*, **Risoluzione del render**: 1K è quella provata; 2K e 4K
+   (solo Nano Banana) danno un render più grande, costano di più e non sono
+   ancora passati da una chiamata vera. «32k» nel blocco Qualità è solo una
+   parola nel prompt: non cambia i pixel.
+7. In *3 · Invio* leggi dove va la vista e quanto costa, poi **Genera
    render** (circa 17 crediti con Nano Banana 2). Allplan resta libero; premi
    **Aggiorna** ogni tanto.
-7. Premi **Apri nello Studio**.
+8. Premi **Apri nello Studio**.
 
 ## 4. Il pulsante nell'Actionbar (facoltativo, mai provato)
 

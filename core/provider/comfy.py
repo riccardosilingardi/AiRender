@@ -176,9 +176,22 @@ def _corpo_gemini(richiesta: RichiestaGenerazione) -> dict:
         }],
         "generationConfig": {
             "responseModalities": ["IMAGE"],
-            "imageConfig": {"aspectRatio": rapporto_piu_vicino(richiesta.immagine)},
+            "imageConfig": _config_immagine_gemini(richiesta),
         },
     }
+
+
+def _config_immagine_gemini(richiesta: RichiestaGenerazione) -> dict:
+    """Rapporto e, sopra 1k, grandezza del render.
+
+    imageSize ("2K", "4K") e' un campo dei documenti di Vertex AI, mai passato
+    dal Router (2026-10-31): a 1k non si manda, cosi' il corpo resta quello
+    verificato il 2026-10-27.
+    """
+    config_immagine = {"aspectRatio": rapporto_piu_vicino(richiesta.immagine)}
+    if richiesta.dimensione_render in ("2k", "4k"):
+        config_immagine["imageSize"] = richiesta.dimensione_render.upper()
+    return config_immagine
 
 
 def _immagine_gemini(uscita: object) -> tuple[str, str]:
@@ -400,7 +413,7 @@ class ProviderComfy(Provider):
             grana=richiesta.grana,
             dettaglio_grana=None,
             forza_struttura=None,
-            risoluzione="",
+            risoluzione=(richiesta.dimensione_render or "1k") if schema.corpo is _corpo_gemini else "",
             aspetto="",
             generazione_fissa=False,
             impronta_sorgente=impronta(richiesta.immagine),

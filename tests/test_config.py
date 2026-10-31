@@ -306,6 +306,27 @@ def test_anteprima_taglio_scuro_lascia_vedere_la_scena_tagliata():
     assert 0 < fuori < 200
 
 
+def test_risoluzione_render_predefinita_chiede_imagesize_solo_sopra_1k():
+    """Caso: render da 1279x827 con «altissima definizione» scelta (2026-10-31): 32k nel prompt non cambia i pixel."""
+    from dataclasses import replace
+
+    from core import blocchi
+    from core.provider import comfy
+    from core.provider.base import RichiestaGenerazione
+    from tests.test_cornice import vista as tinta
+
+    assert config.RISOLUZIONE_RENDER_PREDEFINITA == "1k"
+    assert config.costante("RISOLUZIONE_RENDER_PREDEFINITA").origine == config.SCELTA
+    assert blocchi.Scelte().risoluzione == "1k"
+    base = RichiestaGenerazione(immagine=tinta(640, 360), prompt="p", preset="x", preset_versione="1",
+                                modello="vertexai/gemini-3.1-flash-image", grana="", dettaglio_grana=0)
+    assert "imageSize" not in comfy._corpo_gemini(base)["generationConfig"]["imageConfig"]
+    grande = comfy._corpo_gemini(replace(base, dimensione_render="4k"))
+    assert grande["generationConfig"]["imageConfig"]["imageSize"] == "4K"
+    with pytest.raises(blocchi.SceltaNonValida):
+        blocchi.Scelte(risoluzione="32k")
+
+
 # --- guardia -----------------------------------------------------------------
 
 

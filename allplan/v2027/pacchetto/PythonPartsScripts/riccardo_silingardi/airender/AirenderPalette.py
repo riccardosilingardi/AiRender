@@ -254,6 +254,7 @@ class AirenderPalette(BaseScriptObject):
             materiali=e.Materiali.value or "",
             modello=e.Modello.value,
             formato=e.Formato.value,
+            risoluzione=e.Risoluzione.value,
         )
 
     def _vedi_taglio(self) -> None:

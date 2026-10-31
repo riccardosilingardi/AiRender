@@ -257,14 +257,23 @@ def allarga_a_rapporto(dati: bytes, rapporto: float) -> tuple[bytes, Cornice]:
 
 
 def togli_cornice(dati: bytes, cornice: Cornice) -> bytes:
-    """Il render senza la cornice, riportato ai pixel esatti della vista."""
+    """Il render senza la cornice, al rapporto esatto della vista e alla grandezza del render.
+
+    Non si riporta ai pixel della vista: il 2026-10-31 un render di Nano
+    Banana Pro e' tornato a 1279x827 perche' la vista era quella, buttando
+    via i pixel che il modello aveva dato (e che a 2k o 4k sono di piu').
+    """
     render = _apri(dati).convert("RGB")
     l, a = render.size
     ritaglio = render.crop((
         round(cornice.sinistra * l), round(cornice.alto * a),
         l - round(cornice.destra * l), a - round(cornice.basso * a),
     ))
-    return _png(ritaglio.resize((cornice.larghezza, cornice.altezza), Image.Resampling.LANCZOS))
+    altezza = ritaglio.height
+    larghezza = round(altezza * cornice.larghezza / cornice.altezza)
+    if (larghezza, altezza) == ritaglio.size:
+        return _png(ritaglio)
+    return _png(ritaglio.resize((larghezza, altezza), Image.Resampling.LANCZOS))
 
 
 def _scatola_rapporto(larghezza: int, altezza: int, rapporto: float) -> tuple[int, int, int, int]:
