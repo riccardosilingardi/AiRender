@@ -24,13 +24,14 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import passi as modulo_passi
+from .. import esporta as modulo_esporta, preset_utente
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
 from ..preset import MODELLI_PREDEFINITI
 from ..provider import comfy
 from ..provider.base import Provider
-from ..ricetta import Ricetta
+from ..ricetta import Ricetta, impronta
 from . import miniature as modulo_miniature
 
 
@@ -40,6 +41,8 @@ class RichiestaStudioNonValida(ErroreAirender):
 
 ESTENSIONI_VISTA = (".png", ".jpg", ".jpeg")
 _BYTE_PER_MB = 1024 * 1024  # numero-non-configurabile: definizione di MB
+# Esporta per il cliente: dentro la cartella delle viste, accanto ai lavori.
+CARTELLA_ESPORTATI = "esportati"
 SUFFISSO_CAMERA = ".camera.json"
 
 # Gli identificativi che nuovo_identificativo() di core/coda.py produce.
@@ -81,18 +84,25 @@ MODELLI = (
 # Scritti a schermo e non selezionabili: il loro schema non e' verificato.
 MODELLI_NON_PROVATI = ("Seedream", "GPT Image")
 
-# Le voci del mockup che non hanno ancora un blocco di prompt. Si mostrano in
-# grigio con la ragione: un comando che non cambia il prompt e' una bugia.
-_SERVE_UN_BLOCCO = "serve prima il suo blocco di prompt, non ancora scritto"
-RESE = (
-    ("foto", "Fotorealistico", True, ""),
-    ("plastico", "Plastico bianco", False, _SERVE_UN_BLOCCO),
-    ("schizzo", "Schizzo a matita", False, _SERVE_UN_BLOCCO),
-    ("acquerello", "Acquerello", False, _SERVE_UN_BLOCCO),
-    ("cinema", "Cinematografico", False, _SERVE_UN_BLOCCO),
-)
+# Come lo Studio chiama quello che una resa spegne.
+_NOMI_SPENTI = {
+    "materiali": "materiali a parole", "look": "look fotografico", "luce": "luce",
+    "cielo": "cielo", "fuori": "fuori dalle finestre", "intorno": "intorno",
+    "verde": "verde", "persone": "persone", "qualita": "qualità",
+}
+
+
+def _rese() -> list[dict]:
+    """Le cinque rese, tutte con il loro blocco dalla bozza 7, e cosa spegne ognuna."""
+    return [
+        {"id": resa, "nome": nome, "attivo": True, "nota": "", "origine": config.SCELTA,
+         "spegne": sorted(blocchi.SPENTI_DA_RESA[resa]),
+         "spegne_testo": ", ".join(_NOMI_SPENTI[a] for a in _NOMI_SPENTI if a in blocchi.SPENTI_DA_RESA[resa])}
+        for resa, nome in blocchi.NOMI_RESE.items()
+    ]
 
 _TITOLI_ASSI = {
+    "fedelta": "Fedeltà al disegno",
     "look": "Look fotografico",
     "luce": "Ora / Luce",
     "cielo": "Cielo e stagione",
@@ -270,6 +280,51 @@ class Studio:
         modulo_coda.scrivi_atomico(self.cartella / nome, dati)
         return {"nome": nome, "da": nome_originale}
 
+    # --- immagine di riferimento per lo stile -----------------------------
+
+    def carica_riferimento(self, dati: bytes, nome_originale: str = "") -> dict:
+        """Salva un'immagine di riferimento nella cartella dei riferimenti, chiamata con la sua impronta.
+
+        Il peso massimo e' quello che si manda a Comfy Router: un riferimento
+        piu' pesante sarebbe rifiutato al momento dell'invio, dopo il clic.
+        """
+        massimo = config.COMFY_INVIO_MASSIMO_MB
+        if len(dati) > massimo * _BYTE_PER_MB:
+            raise RichiestaStudioNonValida(
+                f"Il riferimento pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
+                "Riducilo o salvalo in JPEG, poi caricalo di nuovo.",
+            )
+        tipo = comfy.tipo_mime(dati)
+        if tipo not in ("image/png", "image/jpeg"):
+            raise RichiestaStudioNonValida(
+                "Il riferimento per lo stile dev'essere un JPEG o un PNG.",
+                "Salvalo in JPEG o PNG, poi caricalo di nuovo.",
+            )
+        larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
+        estensione = ".jpg" if tipo == "image/jpeg" else ".png"
+        nome = f"rif-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta bastano a non confondere due riferimenti
+        cartella = modulo_coda.cartella_riferimenti(self.cartella)
+        cartella.mkdir(parents=True, exist_ok=True)
+        if not (cartella / nome).exists():
+            modulo_coda.scrivi_atomico(cartella / nome, dati)
+        return {"nome": nome, "da": nome_originale, "larghezza": larghezza,
+                "altezza": altezza, "impronta": impronta(dati)}
+
+    def percorso_riferimento(self, nome: str) -> Path:
+        """Il file di un riferimento. Solo un nome della cartella dei riferimenti, mai un percorso."""
+        if not re.fullmatch(r"rif-[0-9a-f]{16}\.(jpg|png)", nome or ""):
+            raise RichiestaStudioNonValida(
+                f"\"{nome}\" non e' il nome di un riferimento per lo stile.",
+                "Caricalo di nuovo con «Immagine di riferimento per lo stile».",
+            )
+        percorso = modulo_coda.cartella_riferimenti(self.cartella) / nome
+        if not percorso.is_file():
+            raise FileNonTrovato(
+                f"Il riferimento {nome} non c'e' piu' nella cartella dei riferimenti.",
+                "Caricalo di nuovo, oppure toglilo.",
+            )
+        return percorso
+
     # --- stile -----------------------------------------------------------
 
     def catalogo(self) -> dict:
@@ -289,9 +344,7 @@ class Studio:
             "versione_blocchi": blocchi.VERSIONE,
             "origine_blocchi": config.SCELTA,
             "scene": scene,
-            "rese": [
-                {"id": i, "nome": n, "attivo": a, "nota": nota} for i, n, a, nota in RESE
-            ],
+            "rese": _rese(),
             "varianti_massime": config.VARIANTI_MASSIME,
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
@@ -300,6 +353,32 @@ class Studio:
                 for r in config.RISOLUZIONI_RENDER
             ],
         }
+
+    # --- i miei preset ------------------------------------------------
+
+    def miei_preset(self) -> dict:
+        elenco = preset_utente.leggi(self.cartella)
+        return {
+            "preset": [preset_utente.carica(v) for v in elenco.preset],
+            "problema": elenco.problema,
+            "file": str(preset_utente.percorso(self.cartella)),
+        }
+
+    def salva_mio_preset(self, dati: dict) -> dict:
+        modello = self._modello(str(dati.get("modello") or "")).identificativo
+        preset_utente.salva(
+            self.cartella, dati.get("nome"), dati.get("scelte") or {}, modello,
+            prompt_a_mano=_prompt_a_mano(dati), sovrascrivi=bool(dati.get("sovrascrivi")),
+        )
+        return self.miei_preset()
+
+    def rinomina_mio_preset(self, dati: dict) -> dict:
+        preset_utente.rinomina(self.cartella, str(dati.get("nome") or ""), dati.get("nuovo"))
+        return self.miei_preset()
+
+    def elimina_mio_preset(self, dati: dict) -> dict:
+        preset_utente.elimina(self.cartella, str(dati.get("nome") or ""))
+        return self.miei_preset()
 
     def _assi(self, scena: str) -> list[dict]:
         assi = []
@@ -330,6 +409,8 @@ class Studio:
         """Il prompt vero, il riassunto in italiano e quanti caratteri."""
         scelte = self._scelte(dati.get("scelte"))
         prompt = blocchi.componi(scelte)
+        if dati.get("riferimento"):
+            prompt = blocchi.aggiungi_riferimento(prompt)
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
@@ -366,9 +447,11 @@ class Studio:
             "nome": modello.nome,
             "fornitore": modello.fornitore,
             "verificato": motore.cosa_manca(modello.identificativo) is None,
+            "piu_immagini": motore.accetta_piu_immagini(modello.identificativo),
         }
 
-    def destinazione(self, identificativo_modello: str, varianti: object = 1) -> dict:
+    def destinazione(self, identificativo_modello: str, varianti: object = 1,
+                     riferimento: bool = False) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -389,6 +472,15 @@ class Studio:
             "costo_misurato": modello.costo_crediti is not None,
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
+            # Regola 5: quante immagini partono, detto prima del clic.
+            "immagini": 2 if riferimento else 1,
+            "cosa_parte": ("Partono due immagini: la vista e il riferimento per lo stile."
+                           if riferimento else "Parte una immagine: la vista."),
+            "riferimento_non_accettato": (
+                f"{modello.nome} riceve una sola immagine per invio: il riferimento non partirebbe. "
+                "Toglilo, oppure scegli Nano Banana 2."
+                if riferimento and not motore.accetta_piu_immagini(modello.identificativo) else None),
+            "avviso_riferimento": motore.avviso_piu_immagini(modello.identificativo) if riferimento else None,
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -397,8 +489,12 @@ class Studio:
         """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
+        riferimento = self._riferimento_scelto(dati)
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
+                                         riferimento=riferimento is not None)
         prompt = _prompt_a_mano(dati) or blocchi.componi(scelte)
+        if riferimento is not None:
+            prompt = blocchi.aggiungi_riferimento(prompt)
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
@@ -409,6 +505,9 @@ class Studio:
                 motore.controlla_prima_dell_invio(destinazione["modello"], modulo_immagine.leggi(vista))
             except ErroreAirender as errore:
                 problemi.append(_errore_dict(errore))
+        if destinazione["riferimento_non_accettato"]:
+            problemi.append({"fatto": destinazione["riferimento_non_accettato"],
+                             "cosa_fare": "Togli il riferimento, oppure scegli Nano Banana 2."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -429,19 +528,26 @@ class Studio:
         """
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
-        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1))
+        riferimento = self._riferimento_scelto(dati)
+        destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
+                                         riferimento=riferimento is not None)
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
             preset=dati.get("preset") or None,
             prompt_a_mano=_prompt_a_mano(dati),
             varianti=destinazione["varianti"],
+            riferimento=riferimento,
         )
+
+    def _riferimento_scelto(self, dati: dict) -> Path | None:
+        nome = dati.get("riferimento")
+        return self.percorso_riferimento(str(nome)) if nome else None
 
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
                        varianti: int = 1, parte_da: str | None = None,
                        partenza: Path | None = None, richieste=(), aree=(),
-                       modo_aree: str | None = None) -> dict:
+                       modo_aree: str | None = None, riferimento: Path | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -453,6 +559,9 @@ class Studio:
                 f"Non mando: {destinazione['cosa_manca']}",
                 "Scegli Nano Banana 2, il modello predefinito, il cui schema e' verificato.",
             )
+        if destinazione.get("riferimento_non_accettato"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['riferimento_non_accettato']}",
+                                           "Togli il riferimento, oppure scegli Nano Banana 2.")
         if partenza is None:
             # Da un render l'idoneita' non conta: giudica una vista di
             # Allplan, e quello che parte e' il render del passo.
@@ -471,6 +580,7 @@ class Studio:
                 richieste=tuple(richieste),
                 aree=tuple(aree),
                 modo_aree=modo_aree,
+                riferimento=riferimento,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -508,7 +618,8 @@ class Studio:
                 "La vista di questo lavoro non sta nella cartella dello Studio.",
                 "Riaprila con Usa un'altra vista, poi genera da Genera.",
             )
-        destinazione = self.destinazione(lavoro.modello)
+        riferimento = Path(lavoro.riferimento) if lavoro.riferimento else None
+        destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None)
         return self._metti_in_coda(
             vista, lavoro.scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -521,6 +632,7 @@ class Studio:
             # frattempo RITOCCO_MODO_AREE e' cambiato: e' la sua ricetta.
             aree=lavoro.aree,
             modo_aree=lavoro.modo_aree,
+            riferimento=riferimento,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -657,6 +769,77 @@ class Studio:
         lavoro, _cartella = self._lavoro(identificativo)
         modulo_coda.scrivi_misura(Path(lavoro.vista), render)
         return self._tenuta(render)
+
+    # --- esporta per il cliente ----------------------------------------------
+
+    def cartella_esportati(self) -> Path:
+        return self.cartella / CARTELLA_ESPORTATI
+
+    def esporta(self, identificativo: str, dati: dict) -> dict:
+        """Scrive il render scelto in JPEG, PNG o PSD a livelli nella cartella esportati, e dice dove.
+
+        Il PSD ha in basso la vista di Allplan e sopra un livello per ogni passo
+        della strada fino a questo render. Nessun file contiene prompt o ricetta.
+        """
+        self._controlla_id(identificativo)
+        formato = str(dati.get("formato") or "").lower()
+        render = self._render(identificativo)
+        if render is None:
+            raise FileNonTrovato(
+                "Questo lavoro non ha un render da esportare.",
+                "Scegli un render fatto nell'elenco dei render della vista.",
+            )
+        lavoro, _cartella = self._lavoro(identificativo)
+        vista = Path(lavoro.vista)
+        livelli = None
+        if formato == "psd":
+            livelli = self._livelli_della_strada(vista, identificativo, render)
+        contenuto = modulo_esporta.esporta(render.read_bytes(), formato, livelli)
+        numero = self._numero_passo(vista, identificativo)
+        istante = self._adesso().astimezone()
+        cartella = self.cartella_esportati()
+        cartella.mkdir(parents=True, exist_ok=True)
+        base = f"{vista.stem}-passo{numero}-{istante:%Y%m%d-%H%M%S}" if numero else f"{vista.stem}-{istante:%Y%m%d-%H%M%S}"
+        file = cartella / (base + modulo_esporta.ESTENSIONI[formato])
+        indice = 1
+        while file.exists():
+            indice += 1
+            file = cartella / f"{base}-{indice}{modulo_esporta.ESTENSIONI[formato]}"
+        modulo_coda.scrivi_atomico(file, contenuto)
+        larghezza, altezza = modulo_immagine.dimensioni(render.read_bytes())
+        return {
+            "file": str(file), "nome": file.name, "cartella": str(cartella), "formato": formato,
+            "larghezza": larghezza, "altezza": altezza,
+            "livelli": [nome for nome, _dati in livelli] if livelli else None,
+            "peso_mb": round(len(contenuto) / _BYTE_PER_MB, 1),
+        }
+
+    def _numero_passo(self, vista: Path, identificativo: str) -> int | None:
+        try:
+            passo = self._albero(vista).passo(identificativo)
+        except (ErroreAirender, OSError):
+            return None
+        return passo.get("numero") if passo else None
+
+    def _livelli_della_strada(self, vista: Path, identificativo: str, render: Path) -> list[tuple[str, bytes]]:
+        """Vista di Allplan, poi i render della strada fino a questo, dal basso in alto."""
+        livelli: list[tuple[str, bytes]] = []
+        if vista.is_file():
+            livelli.append(("Vista Allplan", vista.read_bytes()))
+        try:
+            strada = self._albero(vista).strada(identificativo)
+        except (ErroreAirender, OSError):
+            strada = []
+        for passo in strada:
+            file = Path(passo["render"]) if passo.get("render") else None
+            if passo["identificativo"] == identificativo:
+                file = render
+            if file is None or not self._render_valido(file):
+                continue  # un passo senza render (tolto, fallito) non diventa un livello vuoto
+            livelli.append((_nome_livello(passo), file.read_bytes()))
+        if not livelli or livelli[-1][1] != render.read_bytes():
+            livelli.append(("Render", render.read_bytes()))
+        return livelli
 
     def _render_valido(self, percorso: Path) -> bool:
         """Un render si usa come partenza solo se sta in lavori/fatto e c'e' ancora."""
@@ -1020,7 +1203,11 @@ class Studio:
     # --- cartella --------------------------------------------------------
 
     def apri_cartella(self, quale: str) -> dict:
-        percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
+        if quale == "esportati":
+            percorso = self.cartella_esportati()
+            percorso.mkdir(parents=True, exist_ok=True)
+        else:
+            percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
         try:
             self._apri(percorso)
         except OSError as errore:
@@ -1029,6 +1216,19 @@ class Studio:
                 "Aprila a mano dall'esplora file.",
             ) from None
         return {"aperta": str(percorso)}
+
+
+def _nome_livello(passo: dict) -> str:
+    """Il nome di un livello del PSD: il numero del passo e cosa e' stato chiesto."""
+    if passo.get("aree"):
+        cosa = "ritocco per aree"
+    elif passo.get("richieste"):
+        cosa = modulo_passi.nome_breve("; ".join(passo["richieste"]))
+    elif passo.get("preset") in blocchi.PRESET_STILE:
+        cosa = blocchi.PRESET_STILE[passo["preset"]].nome
+    else:
+        cosa = "scelte libere"
+    return f"{passo.get('numero', '?')} · {cosa}"
 
 
 def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:
@@ -1166,8 +1366,13 @@ def _prompt_a_mano(dati: dict) -> str | None:
 
 def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     """Le scelte in italiano, nell'ordine in cui partono i blocchi."""
-    pezzi = ["Regola fissa", scelte.scena]
-    if scelte.materiali.strip():
+    fedelta = scelte.fedelta or blocchi.FEDELTA_PREDEFINITA
+    regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
+        else f"Fedeltà al disegno {blocchi.FEDELTA[fedelta].nome.lower()}"
+    pezzi = [regola, scelte.scena]
+    resa = blocchi.resa_valida(scelte.resa)
+    via = blocchi.SPENTI_DA_RESA[resa]
+    if scelte.materiali.strip() and "materiali" not in via:
         pezzi.append("i tuoi materiali")
     origine = blocchi.PRESET_STILE.get(preset or "")
     if origine is not None:
@@ -1183,9 +1388,11 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
         "persone": "persone: {}",
         "qualita": "qualità {}",
     }
+    if resa != blocchi.FOTO:
+        pezzi.append(f"resa {blocchi.NOMI_RESE[resa].lower()}")
     for asse, forma in etichette.items():
         valore = getattr(scelte, asse)
-        if valore:
+        if valore and asse not in via:
             nome = blocchi.blocco(asse, valore, scelte.scena).nome
             pezzi.append(forma.format(nome if asse == "look" else nome.lower()))
     pezzi.append("cosa evitare")

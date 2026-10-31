@@ -135,9 +135,9 @@
 <Parameter>
 <Name>Resa</Name>
 <Text>Resa</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
+<Value>Fotorealistico</Value>
+<ValueList>Fotorealistico|Plastico bianco|Schizzo a matita|Acquerello|Cinematografico</ValueList>
+<ValueType>StringComboBox</ValueType>
 </Parameter>
 <Parameter>
 <Name>Interno</Name>
@@ -220,6 +220,13 @@
 <Text>Persone</Text>
 <Value>Come il preset</Value>
 <ValueList>Come il preset|Nessuna|Poche|In movimento</ValueList>
+<ValueType>StringComboBox</ValueType>
+</Parameter>
+<Parameter>
+<Name>Fedelta</Name>
+<Text>Fedeltà al disegno</Text>
+<Value>Bilanciata</Value>
+<ValueList>Bilanciata|Rigida|Libera</ValueList>
 <ValueType>StringComboBox</ValueType>
 </Parameter>
 <Parameter>

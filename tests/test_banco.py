@@ -137,6 +137,26 @@ def test_ogni_piano_cambia_una_cosa_sola():
         p for p, v in blocchi.PRESET_STILE.items() if v.scelte.scena == "interno"]
 
 
+def test_il_piano_fedelta_cambia_solo_la_regola_in_testa():
+    """Caso: le tre fedelta' partono con preset diversi e la differenza non si attribuisce."""
+    fedelta = banco.piano("fedelta")
+    assert [i.scelte["fedelta"] for i in fedelta.invii] == list(blocchi.FEDELTA)
+    riferimento = fedelta.invii[0]
+    for invio in fedelta.invii[1:]:
+        diversi = {k for k in riferimento.scelte if riferimento.scelte[k] != invio.scelte[k]}
+        assert diversi == {"fedelta"}
+    assert fedelta.misura == banco.SPIGOLI
+    assert {c.a for c in fedelta.confronti} >= {banco.VISTA}
+
+
+def test_il_piano_rese_cambia_solo_la_resa():
+    rese = banco.piano("rese")
+    assert [i.scelte["resa"] for i in rese.invii] == list(blocchi.RESA)
+    riferimento = rese.invii[0]
+    for invio in rese.invii[1:]:
+        assert {k for k in riferimento.scelte if riferimento.scelte[k] != invio.scelte[k]} == {"resa"}
+
+
 def test_un_piano_che_non_esiste_dice_quali_esistono():
     with pytest.raises(banco.PianoNonValido) as errore:
         banco.piano("tutto")

@@ -103,9 +103,10 @@ da qui:
   finché la sonda non dice che Allplan aggiorna un'immagine da script, la
   palette scrive nome, dimensioni ed esito. Una miniatura che non si aggiorna
   mostrerebbe la vista sbagliata.
-- **Resa in una riga, non in griglia.** Nello Studio solo «Fotorealistico» ha
-  un blocco di prompt; una griglia di cinque miniature con quattro spente non
-  aggiunge niente. La riga lo dice e rimanda allo Studio.
+- ~~**Resa in una riga, non in griglia.**~~ Dal 2026-10-31 (prompt 12) la
+  Resa è un menu a cinque voci, che apre su Fotorealistico. Gli assi che una
+  resa spegne restano nei menu: la riga «Ripiego» della sezione Invio dice
+  quali non partono.
 - **Esterno / Interno e il preset in Stile.** Il mockup non li ha; senza, la
   palette non saprebbe da quale combinazione partire. Sono lo switch e i preset
   dello Studio · Genera, con gli stessi nomi; Ora, Cielo e Intorno partono da
@@ -179,7 +180,13 @@ vista con colori neutri.»
   coda con le stesse scelte, uno dopo l'altro, e il costo accanto a Genera è
   N volte quello di un render («circa 69 crediti per 4 immagini»). Se il
   costo del modello non è misurato, resta «non misurato», mai un numero.
-- In grigio: Fedeltà al disegno, Immagine di riferimento per lo stile.
+- **Fedeltà al disegno**: Rigida / Bilanciata / Libera, predefinita
+  Bilanciata (SCELTA). Una riga sotto dice cosa fa ognuna e che i tre testi
+  non sono ancora confrontati sul banco di prova. Si conserva quando si
+  cambia preset o scena, come la qualità.
+- **Immagine di riferimento per lo stile**: un file JPEG o PNG, con la
+  miniatura, il nome e Togli. Con FLUX.1 Kontext e Nano Banana Pro il
+  comando è spento e dice perché (ricevono una sola immagine).
 - **Destinazione e costo**, poi **Prova a secco** e **Genera** («Genera 3
   render» quando le varianti sono più di una).
 
@@ -220,8 +227,8 @@ decisione che questa schermata deve far prendere.
 - **Com'è stato fatto** (la ricetta): stile, modello, le parole dell'utente,
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
-- **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine; in
-  grigio Esporta per il cliente.
+- **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine,
+  **Esporta per il cliente** (dal 2026-10-31, vedi sotto).
 - **Cambia una parte**: **Annota per aree** apre Ritocca su questo render; in
   grigio Cambia un materiale e Fai un video da qui.
 
@@ -395,9 +402,8 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
   parla con Allplan: mostra se la coda dei lavori gira, la cartella delle
   viste e, se la palette l'ha salvata, la camera (Prospettiva centrale o
   Vista parallela). Dire «collegato» sarebbe un'informazione che non abbiamo.
-- **Resa**: solo Fotorealistico è attiva. Plastico bianco, Schizzo a matita,
-  Acquerello e Cinematografico sono in grigio: non hanno ancora un blocco di
-  prompt, e un comando che non cambia il prompt mentirebbe.
+- ~~**Resa**: solo Fotorealistico è attiva.~~ Tutte e cinque attive dal
+  2026-10-31 (prompt 12), vedi sotto «Rese non fotografiche».
 - ~~**Intorno** Città / Periferia / Campagna, **Verde** e **persone «Poche»**:
   in grigio per la stessa ragione.~~ Attive dal 2026-10-29, con i blocchi
   della bozza 4. Le voci attive sono quelle di `core/blocchi.py`, e lo Studio
@@ -405,8 +411,8 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
 - **Ora / Luce** degli esterni ha le sei voci dei blocchi (Mezzogiorno,
   Estate luminosa, Giorno, Ora d'oro, Ora blu, Notte con luna), non le quattro
   del mockup.
-- **I miei preset**: «Nessuno — scelte libere» e Salva in grigio. Salvare
-  serve un posto dove tenerli, non ancora deciso.
+- ~~**I miei preset**: «Nessuno — scelte libere» e Salva in grigio.~~ Attivi
+  dal 2026-10-31 (prompt 9), vedi sotto «I miei preset».
 - **Le miniature** sono disegnate dallo Studio (casa, cielo, luce), non
   immagini: illustrazioni dichiarate tali, come chiede la decisione del
   2026-10-27. Dal 2026-10-29 un preset può avere una **miniatura vera**,
@@ -479,6 +485,105 @@ provider finto. Dove la schermata si scosta da quello che c'è sopra, e perché:
   un motore vecchio rifiuta il 2 invece di mandare la vista al posto del
   render.
 
+## I miei preset, costruiti il 2026-10-31
+
+Nella colonna destra di Studio · Genera. Salvano tutte le scelte di adesso
+(scena, assi, materiali a parole, qualità, risoluzione, modello e il prompt
+scritto a mano se c'è) con un nome. Stanno in `preset-utente.json` nella
+cartella delle viste: sono dell'utente, non del repository.
+
+- **Vuoto:** il menu dice «Nessuno salvato — scelte libere»; c'è solo
+  **Salva queste scelte**.
+- **In corso:** il salvataggio è istantaneo; un nome già usato chiede se
+  sostituirlo, e Elimina chiede conferma («Non si può annullare»).
+- **Errore:** nome vuoto, troppo lungo o doppio: la frase dice cosa fare. Se
+  il file non si legge, lo Studio non lo sovrascrive: lo mette da parte come
+  `preset-utente.non-letto-<data>.json` e lo scrive in un avviso rosso.
+- **Pieno:** il menu con i preset dell'utente; sceglierne uno carica le
+  scelte, e compaiono **Rinomina** ed **Elimina**. Se il preset è stato
+  salvato con un'altra versione dei blocchi, una riga dice cosa non esiste
+  più («luce: «alba» non esiste più») e che il resto è caricato.
+
+Nella palette di Allplan i miei preset non compaiono: il menu della palette è
+scritto nel `.pyp` quando si installa, e cambiarlo da script non è provato.
+
+## Fedeltà al disegno, costruita il 2026-10-31
+
+Un comando a tre voci nella colonna destra di Studio · Genera e un menu
+«Fedeltà al disegno» nella sezione 2 della palette. Non è un parametro del
+modello: cambia la regola fissa in testa al prompt (blocchi, bozza 6).
+
+- **Vuoto:** non esiste: c'è sempre una voce scelta, Bilanciata
+  all'apertura, che è la regola fissa di sempre.
+- **In corso:** come Genera; la fedeltà del lavoro partito non cambia se la
+  si tocca dopo.
+- **Errore:** una fedeltà che il motore non conosce (palette vecchia, preset
+  salvato con una voce tolta) si rifiuta con le voci possibili; un mio
+  preset con una fedeltà che non c'è più torna a Bilanciata e lo dice.
+- **Pieno:** «Cosa parte, in breve» comincia con «Fedeltà al disegno
+  rigida» o «libera» quando non è Bilanciata; il prompt completo mostra il
+  testo vero.
+
+## Immagine di riferimento per lo stile, costruita il 2026-10-31
+
+Nella colonna destra di Studio · Genera, sotto le varianti. Nella palette
+non c'è: il riferimento si sceglie nello Studio.
+
+- **Vuoto:** una riga dice cosa fa («solo colori, luce e materiali, non la
+  forma; parte come seconda immagine») e il campo per scegliere il file.
+- **In corso:** come Genera. Prima del clic, sotto la destinazione:
+  «Partono due immagini: la vista e il riferimento per lo stile.» Finché
+  Nano Banana 2 non ha ricevuto due immagini in una chiamata vera, un avviso
+  giallo dice che questo render è la prova.
+- **Errore:** un file che non è JPEG o PNG, o più pesante di quanto si manda
+  a Comfy Router, si rifiuta al caricamento. Con un modello che riceve una
+  sola immagine il comando è spento e, se un riferimento era già caricato,
+  Genera è spento con la ragione. Se il file sparisce prima dell'invio, il
+  lavoro si ferma senza mandare niente.
+- **Pieno:** miniatura, nome del file e misure, Togli. La ricetta salva
+  l'impronta del riferimento, non l'immagine; il file resta in
+  `riferimenti/` nella cartella delle viste.
+
+## Rese non fotografiche, costruite il 2026-10-31
+
+Le tessere della sezione 1 · Resa di Studio · Genera, e il menu Resa della
+palette. Blocchi nella bozza 7; quali rese e che testi li ha scelti Claude
+(«vedi tu» di Riccardo).
+
+- **Vuoto:** non esiste: all'apertura è scelto Fotorealistico, che non
+  aggiunge niente al prompt di sempre.
+- **In corso:** come Genera; cambiare resa dopo il clic non tocca il lavoro
+  partito.
+- **Errore:** una resa che il motore non conosce si rifiuta con quelle
+  possibili; un mio preset con una resa tolta torna a Fotorealistico e lo
+  dice.
+- **Pieno:** la tessera scelta; sotto il titolo una riga dice cosa spegne
+  («Schizzo a matita spegne: materiali a parole, look fotografico, cielo,
+  qualità»). Gli assi spenti restano visibili, in grigio, con «Spento con la
+  resa …: non parte». Le miniature sono l'illustrazione con un filtro, non
+  render del modello.
+
+## Esporta per il cliente, costruita il 2026-10-31
+
+In Studio · Risultato, sotto «Adesso». Decisioni di Riccardo: JPG, PNG, o PSD
+con un livello per ogni passaggio. Dove salvare non l'ha detto: si salva in
+`esportati/` nella cartella delle viste, e «Apri cartella esportati» la apre.
+Alla grandezza del render, senza ingrandire.
+
+- **Vuoto:** il pulsante c'è solo quando il render scelto ha un file; senza
+  render non compare.
+- **In corso:** tre scelte di formato con una riga ciascuna (cosa contiene,
+  dove va, che nel file ci sono solo immagini), poi Esporta → «Esporto…».
+- **Errore:** il render tolto dalla cartella, un formato sconosciuto,
+  un'immagine che non si legge: la frase dice il fatto e cosa fare, il file
+  non si scrive.
+- **Pieno:** «Salvato: vista-1-passo2-20261031-221500.psd», misure, peso e,
+  per il PSD, i nomi dei livelli dal basso: «Vista Allplan, 1 · Rivista
+  d'architettura, 2 · due alberi davanti al fronte». Un passo senza render
+  (fallito o tolto) non diventa un livello vuoto.
+
+Nel file non entrano prompt, ricetta o chiave: si riscrivono solo i pixel.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -530,7 +635,6 @@ contraddicono le nuove, valgono le nuove:
 
 - Schermata di configurazione della chiave API e del tetto di spesa (nello
   Studio c'è solo il segnaposto in grigio).
-- Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.

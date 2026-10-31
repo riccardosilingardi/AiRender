@@ -653,3 +653,15 @@ PALETTE_SECONDI_ATTESA_STUDIO = _registra(Costante(
     ),
     unita=" s",
 ))
+
+ESPORTA_QUALITA_JPEG = _registra(Costante(
+    nome="ESPORTA_QUALITA_JPEG",
+    valore=92,
+    origine=SCELTA,
+    ragione=(
+        "Qualita' del JPEG di Esporta per il cliente (Pillow, 1-95), senza "
+        "sottocampionamento del colore. 92 e' la soglia comune oltre la quale "
+        "il file cresce molto senza differenze visibili; chi vuole i pixel "
+        "esatti sceglie PNG o PSD. Non confrontata a occhio su un render vero."
+    ),
+))

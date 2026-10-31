@@ -486,8 +486,8 @@ def test_la_pagina_ha_la_scheda_passi_attiva(server):
     assert b"Nessun passo ancora. Genera un render da Genera: sar\xc3\xa0 il passo 1." in script
 
 
-def test_la_regola_del_passo_e_quella_della_bozza_5():
+def test_la_regola_del_passo_e_quella_della_bozza():
     """Caso: la regola dei passi riscritta nel codice e non nella bozza."""
     bozza = (Path(__file__).resolve().parent.parent / "docs" / "ui" / "blocchi-stile-bozza.md").read_text(encoding="utf-8")
-    assert "bozza 5" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-5"
+    assert "bozza 7" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-7"
     assert f"> {blocchi.REGOLA_PASSO.testo}" in bozza

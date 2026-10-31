@@ -7,6 +7,7 @@
 
 const S = {
   scheda: "genera",
+  miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
   studio: null,
   catalogo: null,
   vista: null,            // nome del file nella cartella
@@ -22,12 +23,14 @@ const S = {
   mostraViste: false,
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
+  riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
   inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
   secco: null,            // risposta della prova a secco
   viste_viste: new Set(),
-  risultato: { lavori: [], scelto: null, confronto: "vista", modo: "scorri", x: 50, ricetta: null, rifai: false, caricato: false },
+  risultato: { lavori: [], scelto: null, confronto: "vista", modo: "scorri", x: 50, ricetta: null, rifai: false, caricato: false,
+               esporta: false, formato: "jpg", esportato: null, esportando: false },
   // Studio · Passi: l'albero letto dal server, il passo scelto ("0" e' la
   // vista), il confronto e i tre pannelli che si aprono a destra.
   passi: { dati: null, errore: null, caricato: false, scelto: null, confronto: "vista", modo: "scorri", x: 50,
@@ -156,11 +159,87 @@ function nomeVoce(idAsse, valore) {
 }
 function modelloScelto() { return S.catalogo.modelli.find((m) => m.id === S.modello); }
 
+// --- I miei preset -------------------------------------------------------
+
+async function caricaMiei() {
+  try {
+    const r = await get("/api/miei-preset");
+    S.miei.preset = r.preset; S.miei.problema = r.problema;
+  } catch (e) { S.miei.problema = e.fatto; }
+}
+
+async function operaMiei(indirizzo, corpo) {
+  try {
+    const r = await post(indirizzo, corpo);
+    S.miei.preset = r.preset; S.miei.problema = r.problema; S.errore = null;
+    return true;
+  } catch (e) { S.errore = e; render(); return false; }
+}
+
+async function salvaMio() {
+  const nome = window.prompt("Nome del preset (per esempio «Notte cliente Rossi»):", S.miei.scelto || "");
+  if (nome === null) return;
+  const corpo = { nome, scelte: S.scelte, modello: S.modello, prompt_a_mano: S.promptAMano };
+  const doppio = S.miei.preset.some((p) => p.nome.toLowerCase() === nome.trim().toLowerCase());
+  if (doppio && !window.confirm(`Hai già un preset «${nome.trim()}». Lo sostituisco con le scelte di adesso?`)) return;
+  if (await operaMiei("/api/miei-preset", { ...corpo, sovrascrivi: doppio })) {
+    S.miei.scelto = nome.trim(); S.miei.nota = `Salvato «${nome.trim()}».`; render();
+  }
+}
+
+async function rinominaMio() {
+  const vecchio = S.miei.scelto;
+  const nuovo = window.prompt(`Nuovo nome per «${vecchio}»:`, vecchio);
+  if (nuovo === null) return;
+  if (await operaMiei("/api/miei-preset/rinomina", { nome: vecchio, nuovo })) {
+    S.miei.scelto = nuovo.trim(); S.miei.nota = null; render();
+  }
+}
+
+async function eliminaMio() {
+  const nome = S.miei.scelto;
+  if (!window.confirm(`Elimino il preset «${nome}»? Non si può annullare.`)) return;
+  if (await operaMiei("/api/miei-preset/elimina", { nome })) { S.miei.scelto = ""; S.miei.nota = `Eliminato «${nome}».`; render(); }
+}
+
+function caricaMio(nome) {
+  S.miei.scelto = nome; S.miei.nota = null;
+  const p = S.miei.preset.find((x) => x.nome === nome);
+  if (!p) { render(); return; }
+  S.preset = null;
+  S.scelte = { ...p.scelte };
+  if (p.modello && S.catalogo.modelli.some((m) => m.id === p.modello)) S.modello = p.modello;
+  S.promptAMano = p.prompt_a_mano || null;
+  if (p.blocchi_cambiati || p.perse.length) {
+    S.miei.nota = p.perse.length
+      ? `Salvato con i blocchi ${p.versione_blocchi || "di prima"}: ${p.perse.join("; ")}. Il resto è caricato.`
+      : `Salvato con i blocchi ${p.versione_blocchi || "di prima"}: le scelte ci sono tutte, ma il testo dei blocchi può essere cambiato.`;
+  }
+  caricaDestinazione().then(() => aggiornaComposto(S.promptAMano === null)).then(render);
+}
+
+function pannelloMiei() {
+  const m = S.miei;
+  const scelta = h("select", { "aria-label": "I miei preset" },
+    h("option", { value: "", selected: !m.scelto }, m.preset.length ? "Nessuno — scelte libere" : "Nessuno salvato — scelte libere"),
+    m.preset.map((p) => h("option", { value: p.nome, selected: p.nome === m.scelto }, p.nome)));
+  scelta.addEventListener("change", () => caricaMio(scelta.value));
+  return [
+    h("span", { classe: "etichetta" }, "I miei preset"),
+    h("div", { classe: "riga" }, scelta,
+      h("button", { classe: "btn", onclick: salvaMio }, "Salva queste scelte"),
+      m.scelto ? h("button", { classe: "btn", onclick: rinominaMio }, "Rinomina") : null,
+      m.scelto ? h("button", { classe: "btn", onclick: eliminaMio }, "Elimina") : null),
+    m.problema ? avviso("errore", m.problema, "I preset nuovi si salvano in un file nuovo.") : null,
+    m.nota ? h("p", { classe: "tenue piccolo" }, m.nota) : null,
+  ];
+}
+
 function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -168,7 +247,7 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -183,7 +262,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset });
+      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: S.riferimento && S.riferimento.nome });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -207,7 +286,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -287,6 +366,7 @@ async function genera() {
     const risposta = await post("/api/invia", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
+      riferimento: S.riferimento && S.riferimento.nome,
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -300,7 +380,7 @@ async function provaASecco() {
   try {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
-      prompt_a_mano: S.promptAMano,
+      prompt_a_mano: S.promptAMano, riferimento: S.riferimento && S.riferimento.nome,
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -441,27 +521,47 @@ function rigaMiniature(elenco) {
   return `${vere} miniature sono render veri (data sotto), le altre ${elenco.length - vere} illustrazioni: rendono l'idea, non sono render del modello`;
 }
 
+// Le rese: quella scelta e cosa spegne. Un asse spento resta visibile, in
+// grigio, con la ragione: nasconderlo farebbe credere che non esista.
+function resaScelta() { return S.catalogo.rese.find((r) => r.id === (S.scelte.resa || "foto")) || S.catalogo.rese[0]; }
+function spento(idAsse) { return resaScelta().spegne.includes(idAsse); }
+function notaSpento(idAsse) {
+  return spento(idAsse) ? h("p", { classe: "tenue piccolo" }, `Spento con la resa ${resaScelta().nome}: non parte. Torna a Fotorealistico per usarlo.`) : null;
+}
+const FILTRI_RESA = {
+  plastico: "grayscale(1) brightness(1.35) contrast(.8)", schizzo: "grayscale(1) contrast(1.5) brightness(1.1)",
+  acquerello: "saturate(.65) brightness(1.12) blur(.5px)", cinema: "contrast(1.3) saturate(1.25) sepia(.15)",
+};
+function illustrazioneResa(id) {
+  const svg = illustrazione(S.scelte);
+  if (FILTRI_RESA[id]) svg.style.filter = FILTRI_RESA[id];
+  return svg;
+}
+function scegliResa(id) { cambiaAsse("resa", id); }
+
 function chipAsse(idAsse) {
   const a = asse(idAsse);
-  return h("div", { classe: "scelte-chip", role: "group", "aria-label": a.titolo },
+  const via = spento(idAsse);
+  return h("div", {}, h("div", { classe: "scelte-chip", role: "group", "aria-label": a.titolo },
     a.voci.map((v) => h("button", {
-      classe: "chip", "aria-pressed": String(S.scelte[idAsse] === v.id), disabled: !v.attivo,
+      classe: "chip", "aria-pressed": String(S.scelte[idAsse] === v.id), disabled: !v.attivo || via,
       title: v.attivo ? null : `In arrivo: ${v.nota}`,
       onclick: v.attivo ? () => cambiaAsse(idAsse, v.id) : null,
-    }, v.nome)));
+    }, v.nome))), notaSpento(idAsse));
 }
 
 function tessereAsse(idAsse) {
   const a = asse(idAsse);
-  return h("div", { classe: "griglia", role: "group", "aria-label": a.titolo },
+  const via = spento(idAsse);
+  return h("div", {}, h("div", { classe: "griglia", role: "group", "aria-label": a.titolo },
     a.voci.map((v) => tessera(v.nome, S.scelte[idAsse] === v.id,
-      v.attivo ? () => cambiaAsse(idAsse, v.id) : null,
-      v.attivo ? illustrazione({ ...S.scelte, [idAsse]: v.id }) : null, v.attivo ? null : v.nota)));
+      v.attivo && !via ? () => cambiaAsse(idAsse, v.id) : null,
+      v.attivo ? illustrazione({ ...S.scelte, [idAsse]: v.id }) : null, v.attivo ? null : v.nota))), notaSpento(idAsse));
 }
 
 function sintesi() {
   const s = S.scelte;
-  const pezzi = ["Fotorealistico", (nomeVoce("look", s.look) || "").split(" · ")[0], nomeVoce("luce", s.luce)];
+  const pezzi = [resaScelta().nome, spento("look") ? null : (nomeVoce("look", s.look) || "").split(" · ")[0], spento("luce") ? null : nomeVoce("luce", s.luce)];
   if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`,
     `verde: ${(nomeVoce("verde", s.verde) || "—").toLowerCase()}`);
   else pezzi.push(nomeVoce("fuori", s.fuori), nomeVoce("arredo", s.arredo));
@@ -491,9 +591,11 @@ function colonnaStile() {
       h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
       h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
     h("div", { classe: "gruppo" }, h("h3", {}, "1 · Resa"),
-      h("p", { classe: "tenue piccolo" }, "Le altre rese arrivano quando avranno il loro blocco di prompt."),
-      h("div", { classe: "griglia" }, S.catalogo.rese.map((r) => tessera(r.nome, r.attivo, r.attivo ? () => {} : null,
-        r.attivo ? illustrazione(S.scelte) : null, r.attivo ? null : r.nota)))),
+      h("p", { classe: "tenue piccolo" }, resaScelta().spegne.length
+        ? `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}. Testi scelti, non ancora provati con il modello.`
+        : "Miniature illustrative. Le rese non fotografiche sono testi scelti, non ancora provati con il modello."),
+      h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
+        (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
     h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico"),
       h("p", { classe: "tenue piccolo" }, "Colore, contrasto, pellicola o digitale · solo per le rese fotografiche"),
       chipAsse("look")),
@@ -565,6 +667,11 @@ function colonnaInvio() {
       classe: "seg", "aria-pressed": String(S.scelte.qualita === v.id), onclick: () => cambiaAsse("qualita", v.id),
     }, v.id === "32k" ? "Altissima definizione (32k) — da confrontare" : v.nome)));
 
+  const fedelta = h("div", { classe: "switch", role: "group", "aria-label": "Fedeltà al disegno" },
+    asse("fedelta").voci.map((v) => h("button", {
+      classe: "seg", "aria-pressed": String((S.scelte.fedelta || "bilanciata") === v.id), onclick: () => cambiaAsse("fedelta", v.id),
+    }, v.nome)));
+
   const risoluzione = h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del render" },
     S.catalogo.risoluzioni.map((r) => h("button", {
       classe: "seg", "aria-pressed": String((S.scelte.risoluzione || "1k") === r.id),
@@ -572,14 +679,13 @@ function colonnaInvio() {
     }, r.nome)));
 
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
-    h("span", { classe: "etichetta" }, "I miei preset"),
-    h("div", { classe: "riga" }, h("select", { "aria-label": "I miei preset", disabled: true }, h("option", {}, "Nessuno — scelte libere")),
-      h("button", { classe: "btn", disabled: true }, "Salva queste scelte ", presto())),
+    ...pannelloMiei(),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     h("span", { classe: "etichetta" }, "Qualità"), qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
     h("p", { classe: "tenue piccolo" }, "Solo Nano Banana. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
-    h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Fedeltà al disegno: rigida / bilanciata / libera ", presto("Da provare"))),
+    h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
+    h("p", { classe: "tenue piccolo" }, "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova."),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -587,13 +693,61 @@ function colonnaInvio() {
         onclick: async () => { S.varianti = n; S.secco = null; await caricaDestinazione(); render(); },
       }, String(n)))),
     S.varianti > 1 ? h("p", { classe: "tenue piccolo" }, `${S.varianti} lavori in coda con le stesse scelte, uno dopo l'altro: ogni variante è un invio.`) : null,
-    h("div", { classe: "riga" }, h("button", { classe: "btn", disabled: true }, "Immagine di riferimento per lo stile ", presto())));
+    ...pannelloRiferimento());
 
   return h("div", { classe: "colonna-invio" },
     h("section", { classe: "pannello", "aria-label": "Materiali" },
       h("span", { classe: "etichetta" }, "Materiali a parole"),
-      h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali),
+      h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
+      spento("materiali") ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, `Con la resa ${resaScelta().nome} i materiali non partono.`) : null),
     mappa, cosaParte, scelteInvio, pannelloInvio());
+}
+
+// Immagine di riferimento per lo stile: parte come seconda immagine, solo con
+// i modelli che ne ricevono piu' di una. Il server la salva con la sua
+// impronta; la ricetta tiene l'impronta, non l'immagine.
+async function scegliRiferimento(file) {
+  if (!file) return;
+  try {
+    S.riferimento = await post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+async function togliRiferimento() {
+  S.riferimento = null; S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+function pannelloRiferimento() {
+  const m = modelloScelto();
+  const accetta = !!(m && m.piu_immagini);
+  const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
+  if (!accetta) {
+    return [titolo,
+      h("p", { classe: "tenue piccolo" }, `${m ? m.nome : "Questo modello"} riceve una sola immagine per invio: il riferimento si usa con Nano Banana 2.`),
+      S.riferimento ? h("div", { classe: "riga" },
+        h("span", { classe: "piccolo" }, `Caricato: ${S.riferimento.da || S.riferimento.nome}, non partirebbe.`),
+        h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")) : null];
+  }
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica un'immagine di riferimento per lo stile" });
+  file.addEventListener("change", () => scegliRiferimento(file.files && file.files[0]));
+  if (!S.riferimento) {
+    return [titolo,
+      h("p", { classe: "tenue piccolo" }, "Una foto da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG."),
+      file];
+  }
+  const r = S.riferimento;
+  return [titolo,
+    h("div", { classe: "riga" },
+      h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
+      h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
+      h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
+    h("p", { classe: "tenue piccolo" }, "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
 }
 
 function motivoGeneraSpento() {
@@ -603,6 +757,7 @@ function motivoGeneraSpento() {
   const m = modelloScelto();
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
   if (!S.destinazione) return "Sto leggendo la destinazione.";
+  if (S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
   return null;
 }
 
@@ -617,6 +772,8 @@ function pannelloInvio() {
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
     if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
+    blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
+    if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento, "Se non vuoi fare la prova adesso, togli il riferimento."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",
@@ -759,7 +916,7 @@ function elencoRender() {
     r.lavori.length ? h("div", { classe: "elenco-render" }, r.lavori.map((l) => h("button", {
       "aria-current": String(l.identificativo === r.scelto),
       disabled: l.attivo,
-      onclick: async () => { r.scelto = l.identificativo; r.rifai = false; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
+      onclick: async () => { r.scelto = l.identificativo; r.rifai = false; r.esportato = null; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
     },
     l.render ? h("img", { src: `/file/render/${l.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto", stile: "width:64px;height:40px" }),
     h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."),
@@ -860,8 +1017,42 @@ function adesso(l) {
       h("button", { classe: "btn primario", onclick: () => { r.rifai = true; render(); }, disabled: !!S.lavoroAttivo }, "Rifai con la stessa ricetta"),
       h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella"),
       l.render ? h("button", { classe: "btn", onclick: copia }, "Copia immagine") : null,
-      h("button", { classe: "btn", disabled: true }, "Esporta per il cliente ", presto())),
-    conferma);
+      l.render ? h("button", { classe: "btn", "aria-expanded": String(r.esporta), onclick: () => { r.esporta = !r.esporta; r.esportato = null; render(); } }, "Esporta per il cliente") : null),
+    conferma, r.esporta && l.render ? pannelloEsporta(l) : null);
+}
+
+// Esporta per il cliente: JPEG, PNG o PSD con un livello per passaggio, nella
+// cartella «esportati» accanto alle viste. Solo i pixel: niente prompt dentro.
+const FORMATI_ESPORTA = [
+  ["jpg", "JPEG", "Leggero, per mail e presentazioni."],
+  ["png", "PNG", "Senza perdita, pesa di più."],
+  ["psd", "PSD a livelli", "In basso la vista di Allplan, sopra un livello per ogni passo fino a questo render."],
+];
+async function esportaRender(l) {
+  const r = S.risultato;
+  r.esportando = true; r.esportato = null; render();
+  try { r.esportato = await post(`/api/lavori/${l.identificativo}/esporta`, { formato: r.formato }); S.errore = null; }
+  catch (e) { S.errore = e; }
+  r.esportando = false;
+  render();
+}
+function pannelloEsporta(l) {
+  const r = S.risultato;
+  const e = r.esportato;
+  return h("div", { classe: "sotto-gruppo" },
+    h("div", { classe: "switch", role: "group", "aria-label": "Formato" },
+      FORMATI_ESPORTA.map(([id, nome]) => h("button", {
+        classe: "seg", "aria-pressed": String(r.formato === id), onclick: () => { r.formato = id; r.esportato = null; render(); },
+      }, nome))),
+    h("p", { classe: "tenue piccolo" }, FORMATI_ESPORTA.find((f) => f[0] === r.formato)[2],
+      " Si salva nella cartella «esportati», accanto alle viste. Nel file ci sono solo le immagini: niente prompt, niente ricetta."),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => esportaRender(l), disabled: r.esportando }, r.esportando ? "Esporto…" : "Esporta"),
+      e ? h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "esportati" }).catch((x) => { S.errore = x; render(); }) }, "Apri cartella esportati") : null),
+    e ? h("div", { classe: "avviso", role: "status" },
+      h("b", {}, `Salvato: ${e.nome}`),
+      h("span", {}, `${e.larghezza} × ${e.altezza} px · ${String(e.peso_mb).replace(".", ",")} MB` +
+        (e.livelli ? ` · ${e.livelli.length} livelli: ${e.livelli.join(", ")}` : ""))) : null);
 }
 
 function cambiaParte(l) {
@@ -1822,6 +2013,7 @@ async function avvia() {
   leggiScheda();
   try {
     [S.studio, S.catalogo] = await Promise.all([get("/api/studio"), get("/api/catalogo")]);
+    await caricaMiei();
     const primo = S.catalogo.scene.esterno.preset[0];
     S.preset = primo.id;
     S.scelte = { ...primo.scelte };

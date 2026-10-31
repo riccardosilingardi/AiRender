@@ -1,4 +1,4 @@
-"""La composizione del prompt a blocchi, dalla bozza 5 (docs/ui/blocchi-stile-bozza.md)."""
+"""La composizione del prompt a blocchi, dalla bozza 7 (docs/ui/blocchi-stile-bozza.md)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ def test_i_testi_dei_blocchi_sono_quelli_della_bozza():
     nel_codice = set()
     for elenco in (blocchi.SCENA, blocchi.LOOK, blocchi.LUCE_ESTERNI, blocchi.CIELO,
                    blocchi.INTORNO, blocchi.VERDE, blocchi.LUCE_INTERNI, blocchi.FUORI, blocchi.ARREDO,
-                   blocchi.PERSONE, blocchi.QUALITA):
+                   blocchi.PERSONE, blocchi.QUALITA, blocchi.FEDELTA,
+                   blocchi.RESA, blocchi.EVITARE_DA_RESA):
         for blocco in elenco.values():
             nel_codice.add((blocco.identificativo, blocco.testo))
     assert nel_codice == bozza
@@ -41,7 +42,8 @@ def test_nessun_blocco_si_presenta_come_provato():
     """Caso: un blocco mai mandato al modello appare a schermo come misurato."""
     tutti = [blocchi.REGOLA_FISSA, blocchi.COSA_EVITARE]
     for elenco in (blocchi.LOOK, blocchi.LUCE_ESTERNI, blocchi.CIELO, blocchi.QUALITA,
-                   blocchi.INTORNO, blocchi.VERDE, blocchi.PERSONE, blocchi.FUORI, blocchi.ARREDO):
+                   blocchi.INTORNO, blocchi.VERDE, blocchi.PERSONE, blocchi.FUORI, blocchi.ARREDO,
+                   blocchi.FEDELTA, blocchi.RESA, blocchi.EVITARE_DA_RESA):
         tutti += list(elenco.values())
     assert {b.origine for b in tutti} == {config.SCELTA}
 
@@ -204,3 +206,72 @@ def test_un_passo_vuoto_o_con_un_asse_sconosciuto_si_rifiuta():
     assert "verde" in errore.value.cosa_fare
     with pytest.raises(SceltaNonValida):
         blocchi.componi_passo("interno", {"verde": "poco"})
+
+
+# --- fedelta' al disegno (bozza 6) -------------------------------------------
+
+
+def test_la_fedelta_predefinita_lascia_il_prompt_di_prima():
+    """Caso: la bozza 6 cambia in silenzio tutti i prompt, e i render di prima non si confrontano piu'."""
+    assert Scelte().fedelta == blocchi.FEDELTA_PREDEFINITA == "bilanciata"
+    assert blocchi.FEDELTA["bilanciata"].testo == blocchi.REGOLA_FISSA.testo
+    assert componi(da_preset("rivista")).startswith(blocchi.REGOLA_FISSA.testo + " The subject")
+
+
+@pytest.mark.parametrize("fedelta", ["rigida", "libera"])
+def test_la_fedelta_cambia_solo_la_regola_in_testa(fedelta):
+    """Caso: la fedelta' tocca anche gli altri blocchi, e il confronto del banco non dice niente."""
+    base = componi(da_preset("ora-blu"))
+    altra = componi(da_preset("ora-blu", fedelta=fedelta))
+    assert altra.startswith(blocchi.FEDELTA[fedelta].testo + " The subject")
+    assert altra[len(blocchi.FEDELTA[fedelta].testo):] == base[len(blocchi.REGOLA_FISSA.testo):]
+
+
+def test_una_fedelta_che_non_esiste_si_rifiuta_con_le_voci_possibili():
+    with pytest.raises(SceltaNonValida) as errore:
+        componi(Scelte(fedelta="morbida"))
+    assert "rigida" in errore.value.cosa_fare and "libera" in errore.value.cosa_fare
+
+
+def test_la_fedelta_vale_anche_per_gli_interni():
+    assert componi(da_preset("interno-rivista", fedelta="rigida")).startswith(blocchi.FEDELTA["rigida"].testo)
+
+
+# --- rese (bozza 7) -------------------------------------------------------------
+
+
+def test_fotorealistico_lascia_il_prompt_di_prima():
+    """Caso: aggiungere le rese cambia in silenzio tutti i prompt fotografici."""
+    assert Scelte().resa == blocchi.FOTO
+    prima = componi(da_preset("ora-blu", materiali="intonaco bianco"))
+    assert componi(da_preset("ora-blu", materiali="intonaco bianco", resa="foto")) == prima
+    assert prima.endswith(blocchi.COSA_EVITARE.testo)
+
+
+@pytest.mark.parametrize("resa", ["plastico", "schizzo", "acquerello", "cinema"])
+def test_una_resa_mette_la_sua_frase_e_spegne_quello_che_non_ha_senso(resa):
+    scelte = da_preset("ora-blu", materiali="intonaco bianco", resa=resa)
+    prompt = componi(scelte)
+    assert blocchi.RESA[resa].testo in prompt
+    for asse in ("look", "luce", "cielo", "intorno", "verde", "persone", "qualita"):
+        testo = blocchi.blocco(asse, getattr(scelte, asse), "esterno").testo
+        assert (testo in prompt) == (asse not in blocchi.SPENTI_DA_RESA[resa]), asse
+    assert ("Materials:" in prompt) == ("materiali" not in blocchi.SPENTI_DA_RESA[resa])
+    assert prompt.endswith(blocchi._evitare(resa).testo)
+
+
+def test_il_plastico_non_si_dice_di_evitare_il_plastico():
+    """Caso: «cosa evitare» chiede di evitare proprio il look della resa scelta."""
+    assert "plastic" not in componi(da_preset("rivista", resa="plastico")).split("Avoid:")[1]
+
+
+def test_una_resa_che_non_esiste_si_rifiuta():
+    with pytest.raises(SceltaNonValida) as errore:
+        componi(Scelte(resa="olio"))
+    assert "schizzo" in errore.value.cosa_fare
+
+
+def test_richieste_e_riferimento_entrano_prima_del_cosa_evitare_della_resa():
+    base = componi(da_preset("rivista", resa="schizzo"))
+    con = blocchi.aggiungi_riferimento(blocchi.aggiungi_richieste(base, ["due alberi"]))
+    assert con.endswith(f"{blocchi.RIFERIMENTO_STILE.testo} {blocchi.EVITARE_DA_RESA['evitare-schizzo'].testo}")

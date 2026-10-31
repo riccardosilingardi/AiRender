@@ -59,7 +59,34 @@ FORMATO_RITOCCO = 3  # numero-non-configurabile: versione del formato di un lavo
 # cui partono. Si scrive solo per un ritocco: gli altri lavori restano nel 2,
 # cosi' una palette o un motore che legge il 2 non smette di funzionare. Un
 # motore vecchio rifiuta il 3 invece di mandare il render senza le aree.
-FORMATI_LETTI = (1, 2, 3)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_RIFERIMENTO = 4  # numero-non-configurabile: versione del formato di un lavoro con riferimento
+# Il formato 4 (prompt 11) aggiunge l'immagine di riferimento per lo stile.
+# Si scrive solo quando c'e' un riferimento: un motore vecchio rifiuta il 4
+# invece di mandare una sola immagine dopo che lo Studio ne ha annunciate due.
+FORMATI_LETTI = (1, 2, 3, 4)  # numero-non-configurabile: i formati che questo motore sa leggere
+
+# Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
+CARTELLA_RIFERIMENTI = "riferimenti"
+
+
+def cartella_riferimenti(radice: Path) -> Path:
+    return Path(radice) / CARTELLA_RIFERIMENTI
+
+
+def controlla_riferimento(radice: Path, riferimento: Path) -> Path:
+    """Il riferimento, solo se sta nella cartella dei riferimenti e c'e'."""
+    percorso = Path(riferimento).resolve()
+    if percorso.parent != cartella_riferimenti(radice).resolve():
+        raise LavoroNonValido(
+            "L'immagine di riferimento non sta nella cartella dei riferimenti dello Studio.",
+            "Caricala di nuovo con «Immagine di riferimento per lo stile».",
+        )
+    if not percorso.is_file():
+        raise FileNonTrovato(
+            f"L'immagine di riferimento non c'e' piu': {percorso.name}. Non ho inviato niente.",
+            "Caricala di nuovo in Studio · Genera, oppure toglila.",
+        )
+    return percorso
 
 # Gli stati, nelle parole che lo Studio e la palette mostrano.
 IN_CODA = "in coda"
@@ -212,12 +239,17 @@ class Lavoro:
     # render, e le note prendono il posto delle richieste.
     aree: tuple[modulo_aree.Area, ...] = ()
     modo_aree: str | None = None
+    # Studio · Genera: il file dell'immagine di riferimento per lo stile, che
+    # parte come seconda immagine. Solo da una vista, mai con le aree.
+    riferimento: str | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
         if self.aree:
             object.__setattr__(self, "formato", FORMATO_RITOCCO)
+        elif self.riferimento:
+            object.__setattr__(self, "formato", FORMATO_RIFERIMENTO)
 
     def prompt(self) -> str:
         """Il testo che parte.
@@ -235,7 +267,8 @@ class Lavoro:
             base = self.prompt_a_mano.strip()
         else:
             base = blocchi.componi(self.scelte)
-        return blocchi.aggiungi_richieste(base, self.richieste)
+        testo = blocchi.aggiungi_richieste(base, self.richieste)
+        return blocchi.aggiungi_riferimento(testo) if self.riferimento else testo
 
     def a_dizionario(self) -> dict:
         return {
@@ -254,6 +287,7 @@ class Lavoro:
             "richieste": list(self.richieste),
             **({"aree": [a.a_dizionario() for a in self.aree], "modo_aree": self.modo_aree}
                if self.aree else {}),
+            **({"riferimento": self.riferimento} if self.riferimento else {}),
         }
 
     @classmethod
@@ -293,6 +327,13 @@ class Lavoro:
                 "Rimetti il passo in coda dallo Studio · Passi.",
             )
         aree, modo_aree = _aree_del_lavoro(dati, partenza)
+        riferimento = dati.get("riferimento") if dati.get("formato") == FORMATO_RIFERIMENTO else None
+        if dati.get("formato") == FORMATO_RIFERIMENTO and (not riferimento or partenza):
+            raise LavoroNonValido(
+                "Il file del lavoro dice che porta un riferimento per lo stile, ma non dice "
+                "quale, o parte da un render invece che dalla vista.",
+                "Rimetti il lavoro in coda da Studio · Genera.",
+            )
         return cls(
             identificativo=str(dati["identificativo"]),
             vista=str(dati["vista"]),
@@ -307,6 +348,7 @@ class Lavoro:
             richieste=tuple(richieste),
             aree=aree,
             modo_aree=modo_aree,
+            riferimento=str(riferimento) if riferimento else None,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -372,6 +414,7 @@ def metti_in_coda(
     richieste: tuple[str, ...] | list[str] = (),
     aree: tuple[modulo_aree.Area, ...] = (),
     modo_aree: str | None = None,
+    riferimento: Path | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -391,6 +434,13 @@ def metti_in_coda(
                 "Genera prima un render da Genera, poi ritoccalo.",
             )
         modulo_aree.controlla_modo(modo_aree)
+    if riferimento is not None:
+        if partenza or aree:
+            raise LavoroNonValido(
+                "Il riferimento per lo stile parte solo con un render dalla vista, non da un passo o un ritocco.",
+                "Togli il riferimento, oppure genera da Genera.",
+            )
+        riferimento = controlla_riferimento(radice, riferimento)
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -414,7 +464,13 @@ def metti_in_coda(
         richieste=tuple(richieste),
         aree=tuple(aree),
         modo_aree=modo_aree if aree else None,
+        riferimento=str(riferimento) if riferimento else None,
     )
+    if riferimento is not None and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: il riferimento per lo stile non partirebbe.",
+            "Togli il riferimento, oppure scegli Nano Banana 2.",
+        )
     lavoro.prompt()  # solleva SceltaNonValida con la ragione, prima di scrivere
     percorsi = cartelle(radice)
     # Prima lo stato, poi il lavoro: chi trova il lavoro trova anche lo stato.
@@ -643,6 +699,10 @@ class Coda:
         ingresso, in_piu = dati, ()
         if lavoro.aree:
             ingresso, in_piu = modulo_aree.prepara(dati, lavoro.aree, lavoro.modo_aree)
+        if lavoro.riferimento:
+            riferimento = controlla_riferimento(self.radice, Path(lavoro.riferimento)).read_bytes()
+            modulo_immagine.misura(riferimento)  # solleva se non e' un'immagine
+            in_piu = (*in_piu, riferimento)
         # La grana non entra nei blocchi: i modelli del Router non hanno un
         # dettaglio della grana, e la ricetta lo scrive come assente.
         livello = modulo_grana.MEDIA

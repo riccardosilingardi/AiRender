@@ -108,12 +108,26 @@ def test_il_catalogo_ha_gli_8_preset_esterni_e_i_6_interni_della_bozza(cartella,
     assert catalogo["origine_blocchi"] == config.SCELTA
 
 
-def test_le_voci_senza_blocco_sono_in_grigio_e_dicono_perche(cartella, chiamate):
-    """Caso: un comando che si clicca e non cambia il prompt (regola delle funzioni future)."""
+def test_le_rese_sono_tutte_accese_e_dicono_cosa_spengono(cartella, chiamate):
+    """Caso: una resa si clicca e non cambia il prompt, o spegne un asse senza dirlo."""
     catalogo = _studio(cartella, chiamate).catalogo()
-    spente = [r for r in catalogo["rese"] if not r["attivo"]]
-    assert [r["nome"] for r in catalogo["rese"] if r["attivo"]] == ["Fotorealistico"]
-    assert spente and all(r["nota"] for r in spente)
+    assert [r["nome"] for r in catalogo["rese"]] == [
+        "Fotorealistico", "Plastico bianco", "Schizzo a matita", "Acquerello", "Cinematografico"]
+    assert all(r["attivo"] and r["origine"] == config.SCELTA for r in catalogo["rese"])
+    rese = {r["id"]: r for r in catalogo["rese"]}
+    assert rese["foto"]["spegne"] == [] and "look" in rese["schizzo"]["spegne"]
+    assert "look fotografico" in rese["schizzo"]["spegne_testo"]
+
+
+def test_il_riassunto_dice_la_resa_e_tace_gli_assi_spenti(cartella, chiamate):
+    scelte = blocchi.da_preset("rivista", resa="plastico", materiali="mattoni")
+    riassunto = _studio(cartella, chiamate).componi({"scelte": scelte.a_dizionario()})["riassunto"]
+    assert "resa plastico bianco" in riassunto
+    assert "i tuoi materiali" not in riassunto and "cielo" not in riassunto
+
+
+def test_gli_assi_dell_altra_scena_non_compaiono(cartella, chiamate):
+    catalogo = _studio(cartella, chiamate).catalogo()
     # gli assi dell'altra scena non compaiono
     assert "cielo" not in {a["id"] for a in catalogo["scene"]["interno"]["assi"]}
     assert "fuori" not in {a["id"] for a in catalogo["scene"]["esterno"]["assi"]}
@@ -135,6 +149,26 @@ def test_il_riassunto_dice_intorno_verde_e_persone(cartella, chiamate):
     scelte = blocchi.da_preset("rivista", intorno="campagna", verde="poco", persone="poche")
     riassunto = _studio(cartella, chiamate).componi({"scelte": scelte.a_dizionario()})["riassunto"]
     assert "intorno: campagna · verde: poco · persone: poche" in riassunto
+
+
+def test_la_fedelta_al_disegno_e_un_comando_acceso_in_tutte_e_due_le_scene(cartella, chiamate):
+    """Caso: lo Studio lascia «Fedeltà al disegno» in grigio quando il motore la compone gia'."""
+    catalogo = _studio(cartella, chiamate).catalogo()
+    for scena in ("esterno", "interno"):
+        assi = {a["id"]: a for a in catalogo["scene"][scena]["assi"]}
+        assert assi["fedelta"]["titolo"] == "Fedeltà al disegno"
+        assert [v["id"] for v in assi["fedelta"]["voci"]] == ["rigida", "bilanciata", "libera"]
+        assert all(v["origine"] == config.SCELTA for v in assi["fedelta"]["voci"])
+    script = (Path(__file__).resolve().parent.parent / "core" / "studio" / "pagine" / "studio.js").read_text(encoding="utf-8")
+    assert '"Fedeltà al disegno: rigida / bilanciata / libera ", presto' not in script
+
+
+def test_il_riassunto_dice_la_fedelta_solo_se_non_e_la_predefinita(cartella, chiamate):
+    studio = _studio(cartella, chiamate)
+    predefinita = studio.componi({"scelte": blocchi.da_preset("rivista").a_dizionario()})["riassunto"]
+    rigida = studio.componi({"scelte": blocchi.da_preset("rivista", fedelta="rigida").a_dizionario()})["riassunto"]
+    assert predefinita.startswith("Regola fissa · esterno")
+    assert rigida.startswith("Fedeltà al disegno rigida · esterno")
 
 
 def test_componi_restituisce_il_prompt_dei_blocchi_e_il_riassunto_in_italiano(cartella, chiamate):
@@ -672,3 +706,15 @@ def test_la_misura_che_non_si_puo_fare_non_diventa_un_numero(tmp_path):
     render.write_bytes(vista_shaded(320, 200))
     misura = modulo_coda.misura_tenuta(tmp_path / "non-c-e.png", render)
     assert misura["spigoli"] is None and "Non ho trovato" in misura["motivo"]
+
+
+def test_i_miei_preset_dallo_studio_vivono_nella_cartella_delle_viste(cartella, chiamate):
+    """Caso: i preset dell'utente finiscono nel repository, o un modello inventato viene salvato."""
+    studio = _studio(cartella, chiamate)
+    scelte = blocchi.da_preset("rivista").a_dizionario()
+    risposta = studio.salva_mio_preset({"nome": "Mio", "scelte": scelte, "modello": NANO})
+    assert [p["nome"] for p in risposta["preset"]] == ["Mio"]
+    assert (cartella / "preset-utente.json").is_file()
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.salva_mio_preset({"nome": "Altro", "scelte": scelte, "modello": "inventato/x"})
+    assert studio.elimina_mio_preset({"nome": "Mio"})["preset"] == []

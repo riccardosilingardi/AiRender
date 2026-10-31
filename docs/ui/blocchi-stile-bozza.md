@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 5 (2026-10-30)
+# Blocchi di stile — bozza 7 (2026-10-31)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -8,13 +8,56 @@ Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campa
 
 > Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below.
 
+## Fedeltà al disegno (bozza 6, 2026-10-31)
+
+Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è la regola fissa di sempre, parola per parola, ed è la predefinita (SCELTA): i prompt delle bozze 4 e 5 non cambiano. **Rigida** aggiunge vincoli su sagoma, aperture e numero di elementi. **Libera** tiene volumi, aperture e inquadratura e permette dettagli costruttivi; il contesto lo decidono ancora Intorno e Verde, così i blocchi non si contraddicono. Non è un parametro del modello: il Router non ha una forza strutturale. Nessuna delle tre è provata; il piano «fedelta» del banco di prova le confronta sulla stessa vista e misura gli spigoli ritrovati.
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `rigida` | Rigida | Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. Match the drawing strictly: same silhouette, same number and position of windows, doors, columns and floors, same roof line; if in doubt, change less. | 345 |
+| `bilanciata` | Bilanciata | Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. | 194 |
+| `libera` | Libera | Edit this image. Keep the camera, framing, proportions and the building's volumes and openings; you may refine materials and add plausible construction details such as joints, sills, gutters and fixings. Do not change the building's shape. Change the look described below. | 272 |
+
+## Riferimento per lo stile (bozza 6, 2026-10-31)
+
+Solo quando in Studio · Genera c'è un'immagine di riferimento: parte come seconda immagine e questa frase entra subito prima di «cosa evitare». Non provata: il primo render con un riferimento è anche la prima volta che Nano Banana 2 riceve due immagini in una chiamata vera.
+
+> The second image is a style reference only: take from it the colour palette, the light and the look of the materials. Do not copy its geometry, camera, objects or composition; the building stays the one in the first image.
+
+## Rese (bozza 7, 2026-10-31)
+
+Cosa cambia dalla bozza 6: oltre a Fotorealistico ci sono quattro rese. Fotorealistico non ha un blocco: è quello che i blocchi fanno da sempre, e i suoi prompt non cambiano. Le altre quattro mettono la loro frase subito dopo i materiali, spengono gli assi che con quella resa non hanno senso (lo Studio li mostra in grigio e dice perché) e, quando «cosa evitare» le contraddirebbe, ne hanno uno loro. Scelte da Claude il 2026-10-31 («vedi tu» di Riccardo), non provate: il piano «rese» del banco di prova le confronta sulla stessa vista.
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `plastico` | Plastico bianco | Render it as a photograph of a white architectural scale model: matte white card and pale basswood, crisp cut edges, soft even studio light, plain light grey background. | 169 |
+| `schizzo` | Schizzo a matita | Render it as a hand-drawn architectural pencil sketch on white paper: confident graphite lines following every edge of the view, light hatching for shade, no colour. | 165 |
+| `acquerello` | Acquerello | Render it as an architectural watercolour illustration: fine ink lines following every edge of the view, loose transparent washes, soft colour bleeding, white paper showing through. | 181 |
+| `cinema` | Cinematografico | Render it as a cinematic film still: anamorphic widescreen look, deep contrast, restrained teal and amber grading, a soft haze in the light. | 140 |
+
+| Resa | Cosa spegne | Cosa evitare |
+|---|---|---|
+| Fotorealistico | — | quello di sempre |
+| Plastico bianco | materiali, look, luce, cielo, fuori dalle finestre, intorno, verde, persone, qualità | proprio |
+| Schizzo a matita | materiali, look, cielo, qualità | proprio |
+| Acquerello | look, qualità | proprio |
+| Cinematografico | look, qualità | quello di sempre |
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `evitare-plastico` | Cosa evitare · plastico | Avoid: colour, glossy surfaces, real material textures, people, cars, sky. | 74 |
+| `evitare-schizzo` | Cosa evitare · schizzo | Avoid: colour, photographic shading, smooth digital gradients, CGI look. | 72 |
+| `evitare-acquerello` | Cosa evitare · acquerello | Avoid: photographic look, hard digital edges, oversaturated colour, CGI look. | 77 |
+
+Ordine con una resa: regola fissa → scena → materiali (se la resa non li spegne) → **resa** → gli assi accesi → cosa evitare (della resa, se ce l'ha).
+
 ## Cosa evitare (sempre in coda)
 
 > Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.
 
 ## Ordine nel prompt
 
-Regola fissa → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
+Regola fissa (secondo la Fedeltà al disegno) → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
 
 Un **passo** fatto su un render già generato (albero dei passi, piano «catena» del banco di prova) non rimanda tutto: regola fissa → scena → solo gli assi che cambiano → cosa evitare.
 
