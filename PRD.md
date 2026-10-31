@@ -721,6 +721,18 @@ poggiano su cose non ancora provate:
   riaccende lì.
 - **Il menu Resa nella palette** — generato nel `.pyp`, mai aperto in Allplan.
 
+### Lasciato dalla sessione del 2026-10-31 (esporta per il cliente)
+
+- **Il PSD si apre in Photoshop con i livelli e i nomi giusti** — scritto a
+  mano (core/esporta.py), riletto solo con Pillow. Da aprire una volta in
+  Photoshop: deve mostrare la vista in basso e un livello per passo, con
+  accenti e «·» nei nomi.
+- **Il peso del PSD a 4K** — non compresso: circa 4 byte per pixel per
+  livello, quindi un 4K con tre passi supera i 200 MB. Se pesa troppo, si
+  aggiunge la compressione RLE.
+- **Dove salvare** — Riccardo non l'ha detto; scelta `esportati/` accanto
+  alle viste.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di

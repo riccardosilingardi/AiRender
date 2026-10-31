@@ -327,6 +327,12 @@ def test_risoluzione_render_predefinita_chiede_imagesize_solo_sopra_1k():
         blocchi.Scelte(risoluzione="32k")
 
 
+def test_esporta_qualita_jpeg_sta_nel_campo_di_pillow_ed_e_una_scelta():
+    """Caso: un JPEG per il cliente esce sgranato, o con una qualita' che Pillow sconsiglia, spacciata per misurata."""
+    assert 80 <= config.ESPORTA_QUALITA_JPEG <= 95
+    assert config.costante("ESPORTA_QUALITA_JPEG").origine == config.SCELTA
+
+
 def test_geometry_drift_warn_avvisa_solo_sotto_la_soglia_ed_e_una_scelta():
     """Caso: lo Studio avvisa a ogni render, o mai, con una soglia spacciata per misurata."""
     assert 0 < config.GEOMETRY_DRIFT_WARN < 1

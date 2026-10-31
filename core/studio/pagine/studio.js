@@ -29,7 +29,8 @@ const S = {
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
   secco: null,            // risposta della prova a secco
   viste_viste: new Set(),
-  risultato: { lavori: [], scelto: null, confronto: "vista", modo: "scorri", x: 50, ricetta: null, rifai: false, caricato: false },
+  risultato: { lavori: [], scelto: null, confronto: "vista", modo: "scorri", x: 50, ricetta: null, rifai: false, caricato: false,
+               esporta: false, formato: "jpg", esportato: null, esportando: false },
   // Studio · Passi: l'albero letto dal server, il passo scelto ("0" e' la
   // vista), il confronto e i tre pannelli che si aprono a destra.
   passi: { dati: null, errore: null, caricato: false, scelto: null, confronto: "vista", modo: "scorri", x: 50,
@@ -915,7 +916,7 @@ function elencoRender() {
     r.lavori.length ? h("div", { classe: "elenco-render" }, r.lavori.map((l) => h("button", {
       "aria-current": String(l.identificativo === r.scelto),
       disabled: l.attivo,
-      onclick: async () => { r.scelto = l.identificativo; r.rifai = false; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
+      onclick: async () => { r.scelto = l.identificativo; r.rifai = false; r.esportato = null; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
     },
     l.render ? h("img", { src: `/file/render/${l.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto", stile: "width:64px;height:40px" }),
     h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."),
@@ -1016,8 +1017,42 @@ function adesso(l) {
       h("button", { classe: "btn primario", onclick: () => { r.rifai = true; render(); }, disabled: !!S.lavoroAttivo }, "Rifai con la stessa ricetta"),
       h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella"),
       l.render ? h("button", { classe: "btn", onclick: copia }, "Copia immagine") : null,
-      h("button", { classe: "btn", disabled: true }, "Esporta per il cliente ", presto())),
-    conferma);
+      l.render ? h("button", { classe: "btn", "aria-expanded": String(r.esporta), onclick: () => { r.esporta = !r.esporta; r.esportato = null; render(); } }, "Esporta per il cliente") : null),
+    conferma, r.esporta && l.render ? pannelloEsporta(l) : null);
+}
+
+// Esporta per il cliente: JPEG, PNG o PSD con un livello per passaggio, nella
+// cartella «esportati» accanto alle viste. Solo i pixel: niente prompt dentro.
+const FORMATI_ESPORTA = [
+  ["jpg", "JPEG", "Leggero, per mail e presentazioni."],
+  ["png", "PNG", "Senza perdita, pesa di più."],
+  ["psd", "PSD a livelli", "In basso la vista di Allplan, sopra un livello per ogni passo fino a questo render."],
+];
+async function esportaRender(l) {
+  const r = S.risultato;
+  r.esportando = true; r.esportato = null; render();
+  try { r.esportato = await post(`/api/lavori/${l.identificativo}/esporta`, { formato: r.formato }); S.errore = null; }
+  catch (e) { S.errore = e; }
+  r.esportando = false;
+  render();
+}
+function pannelloEsporta(l) {
+  const r = S.risultato;
+  const e = r.esportato;
+  return h("div", { classe: "sotto-gruppo" },
+    h("div", { classe: "switch", role: "group", "aria-label": "Formato" },
+      FORMATI_ESPORTA.map(([id, nome]) => h("button", {
+        classe: "seg", "aria-pressed": String(r.formato === id), onclick: () => { r.formato = id; r.esportato = null; render(); },
+      }, nome))),
+    h("p", { classe: "tenue piccolo" }, FORMATI_ESPORTA.find((f) => f[0] === r.formato)[2],
+      " Si salva nella cartella «esportati», accanto alle viste. Nel file ci sono solo le immagini: niente prompt, niente ricetta."),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => esportaRender(l), disabled: r.esportando }, r.esportando ? "Esporto…" : "Esporta"),
+      e ? h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "esportati" }).catch((x) => { S.errore = x; render(); }) }, "Apri cartella esportati") : null),
+    e ? h("div", { classe: "avviso", role: "status" },
+      h("b", {}, `Salvato: ${e.nome}`),
+      h("span", {}, `${e.larghezza} × ${e.altezza} px · ${String(e.peso_mb).replace(".", ",")} MB` +
+        (e.livelli ? ` · ${e.livelli.length} livelli: ${e.livelli.join(", ")}` : ""))) : null);
 }
 
 function cambiaParte(l) {
