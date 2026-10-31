@@ -608,6 +608,7 @@ function pannelloInvio() {
         ` (${d.fornitore}, ${d.modello_nome})`, d.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
+    if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",

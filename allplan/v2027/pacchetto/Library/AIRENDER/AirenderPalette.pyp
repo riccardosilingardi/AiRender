@@ -105,6 +105,26 @@
 </Parameter>
 </Parameters>
 </Parameter>
+<Parameter>
+<Name>Formato</Name>
+<Text>Formato</Text>
+<Value>Come la finestra</Value>
+<ValueList>Come la finestra|21:9 panoramico|16:9|3:2|4:3|1:1 quadrato|3:4 verticale|2:3 verticale|9:16 verticale</ValueList>
+<ValueType>StringComboBox</ValueType>
+</Parameter>
+<Parameter>
+<Name>RigaTaglio</Name>
+<Text>Taglio</Text>
+<ValueType>Row</ValueType>
+<Parameters>
+<Parameter>
+<Name>VediTaglio</Name>
+<Text>Vedi cosa taglia</Text>
+<EventId>1008</EventId>
+<ValueType>Button</ValueType>
+</Parameter>
+</Parameters>
+</Parameter>
 </Parameters>
 </Parameter>
 <Parameter>
@@ -188,6 +208,21 @@
 <Visible>Interno == 0</Visible>
 </Parameter>
 <Parameter>
+<Name>Verde</Name>
+<Text>Verde, alberi</Text>
+<Value>Come il preset</Value>
+<ValueList>Come il preset|Nessuno|Poco|Rigoglioso</ValueList>
+<ValueType>StringComboBox</ValueType>
+<Visible>Interno == 0</Visible>
+</Parameter>
+<Parameter>
+<Name>Persone</Name>
+<Text>Persone</Text>
+<Value>Come il preset</Value>
+<ValueList>Come il preset|Nessuna|Poche|In movimento</ValueList>
+<ValueType>StringComboBox</ValueType>
+</Parameter>
+<Parameter>
 <Name>Materiali</Name>
 <Text>Materiali</Text>
 <Value></Value>
@@ -197,7 +232,7 @@
 <Name>Modello</Name>
 <Text>Modello</Text>
 <Value>Nano Banana 2</Value>
-<ValueList>Nano Banana 2|FLUX.1 Kontext Pro</ValueList>
+<ValueList>Nano Banana 2|FLUX.1 Kontext Pro|Nano Banana Pro</ValueList>
 <ValueType>StringComboBox</ValueType>
 </Parameter>
 </Parameters>
@@ -240,12 +275,6 @@
 <Text>Motore</Text>
 <ValueType>Row</ValueType>
 <Parameters>
-<Parameter>
-<Name>ProvaASecco</Name>
-<Text>Prova a secco</Text>
-<EventId>1002</EventId>
-<ValueType>Button</ValueType>
-</Parameter>
 <Parameter>
 <Name>Genera</Name>
 <Text>Genera render</Text>

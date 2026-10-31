@@ -334,7 +334,7 @@ def test_genera_si_ferma_prima_con_un_modello_senza_schema(cartella, vista, chia
     """Caso: stato di errore di Genera, modello senza schema verificato."""
     studio = _studio(cartella, chiamate, classe=ProviderSenzaKontext)
     modelli = {m["id"]: m["verificato"] for m in studio.catalogo()["modelli"]}
-    assert modelli == {NANO: True, KONTEXT: False}
+    assert modelli[NANO] is True and modelli[KONTEXT] is False
     with pytest.raises(RichiestaStudioNonValida) as errore:
         studio.invia(_richiesta(studio, vista, modello=KONTEXT))
     assert "Non mando" in errore.value.fatto

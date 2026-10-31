@@ -30,12 +30,21 @@ from pathlib import Path
 from typing import Callable
 
 from core import battito as modulo_battito, blocchi, coda as modulo_coda, config
+from core import immagine as modulo_immagine
 from core.errori import ErroreAirender
+from core.provider import comfy
 from core.studio import servizio
 
+import ponte
 import sonda_palette as sonda
 
 COME_IL_PRESET = "Come il preset"
+COME_LA_FINESTRA = "Come la finestra"
+# I formati fissi sono i rapporti che i modelli accettano: con uno di questi
+# la vista parte senza cornice e torna della stessa forma.
+_NOMI_FORMATO = {"21:9": "21:9 panoramico", "1:1": "1:1 quadrato", "3:4": "3:4 verticale",
+                 "2:3": "2:3 verticale", "9:16": "9:16 verticale"}
+CARTELLA_ANTEPRIME = "anteprime"
 NESSUNA_VISTA = (
     "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere "
     "(shaded, con ombre), poi Cattura."
@@ -82,6 +91,9 @@ def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
         "LuceInterno": _voci("luce", blocchi.INTERNO),
         "Cielo": _voci("cielo", blocchi.ESTERNO),
         "Intorno": _voci("intorno", blocchi.ESTERNO),
+        "Verde": _voci("verde", blocchi.ESTERNO),
+        "Persone": _voci("persone", blocchi.ESTERNO),
+        "Formato": [(None, COME_LA_FINESTRA)] + [(r, _NOMI_FORMATO.get(r, r)) for r in comfy.RAPPORTI],
         "Modello": [(m.identificativo, m.nome) for m in servizio.MODELLI],
     }
 
@@ -108,8 +120,11 @@ class ValoriPalette:
     luce_interno: str = COME_IL_PRESET
     cielo: str = COME_IL_PRESET
     intorno: str = COME_IL_PRESET
+    verde: str = COME_IL_PRESET
+    persone: str = COME_IL_PRESET
     materiali: str = ""
     modello: str = ""
+    formato: str = COME_LA_FINESTRA
 
     def preset(self) -> str:
         if self.interno:
@@ -125,16 +140,34 @@ class ValoriPalette:
             luce = _identificativo("LuceEsterno", self.luce_esterno)
             cielo = _identificativo("Cielo", self.cielo)
             intorno = _identificativo("Intorno", self.intorno)
+            verde = _identificativo("Verde", self.verde)
             if cielo:
                 cambi["cielo"] = cielo
             if intorno:
                 cambi["intorno"] = intorno
+            if verde:
+                cambi["verde"] = verde
+        persone = _identificativo("Persone", self.persone)
+        if persone:
+            cambi["persone"] = persone
         if luce:
             cambi["luce"] = luce
         return blocchi.da_preset(self.preset(), **cambi)
 
     def modello_id(self) -> str:
         return _identificativo("Modello", self.modello)
+
+    def rapporto(self) -> float | None:
+        """Il formato fisso come larghezza/altezza; None per «Come la finestra»."""
+        formato = _identificativo("Formato", self.formato or COME_LA_FINESTRA)
+        if formato is None:
+            return None
+        a, b = (int(x) for x in formato.split(":"))
+        return a / b
+
+    def suffisso_formato(self) -> str:
+        formato = _identificativo("Formato", self.formato or COME_LA_FINESTRA)
+        return formato.replace(":", "x") if formato else ""
 
 
 # --- testi ---------------------------------------------------------------------
@@ -217,6 +250,39 @@ class Telecomando:
             )
         return vista.name
 
+    # --- formato fisso ---------------------------------------------------
+
+    def anteprima(self, vista: str, valori: ValoriPalette) -> str:
+        """L'immagine da mostrare nella palette: la vista, o la vista con scurito cio' che il formato taglia."""
+        vista = (vista or "").strip()
+        rapporto = valori.rapporto()
+        if not vista or rapporto is None or not Path(vista).is_file():
+            return vista
+        cartella = self.cartella / CARTELLA_ANTEPRIME
+        cartella.mkdir(parents=True, exist_ok=True)
+        uscita = cartella / f"{Path(vista).stem}-{valori.suffisso_formato()}.png"
+        if not uscita.exists():
+            uscita.write_bytes(modulo_immagine.anteprima_taglio(modulo_immagine.leggi(vista), rapporto))
+        return str(uscita)
+
+    def vista_al_formato(self, vista: str, valori: ValoriPalette) -> str:
+        """La vista che parte davvero: con un formato fisso, una vista nuova tagliata al centro.
+
+        E' una vista a tutti gli effetti, accanto all'originale: lo Studio
+        confronta il render con quella, non con la finestra intera.
+        """
+        rapporto = valori.rapporto()
+        if rapporto is None:
+            return vista
+        originale = Path(vista)
+        tagliata = originale.with_name(f"{originale.stem}-{valori.suffisso_formato()}{originale.suffix}")
+        if not tagliata.exists():
+            tagliata.write_bytes(modulo_immagine.ritaglia_a_rapporto(modulo_immagine.leggi(originale), rapporto))
+            camera = originale.with_name(originale.stem + ponte.SUFFISSO_CAMERA)
+            if camera.is_file():
+                shutil.copyfile(camera, tagliata.with_name(tagliata.stem + ponte.SUFFISSO_CAMERA))
+        return str(tagliata)
+
     # --- invio ---------------------------------------------------------
 
     def invio(self, valori: ValoriPalette) -> tuple[str, str, str]:
@@ -230,6 +296,8 @@ class Telecomando:
             "Attenzione: il servizio puo' ripiegare su un altro fornitore.")
         if destinazione["cosa_manca"]:
             nota += f" Non parte: {destinazione['cosa_manca']}"
+        if destinazione.get("avviso"):
+            nota += f" {destinazione['avviso']}"
         return destinazione["destinazione"], nota, destinazione["costo"]
 
     def _dati(self, vista: str, valori: ValoriPalette, destinazione_mostrata: str = "") -> dict:
@@ -273,6 +341,8 @@ class Telecomando:
         if not (vista or "").strip():
             return "Non c'e' ancora una vista da usare.\n\nCosa fare: premi prima Cattura vista."
         try:
+            self._nome(vista)  # prima di scrivere una vista tagliata fuori posto
+            vista = self.vista_al_formato(vista, valori)
             risposta = self.studio.invia(self._dati(vista, valori, destinazione_mostrata))
         except ErroreAirender as errore:
             return _errore(errore)

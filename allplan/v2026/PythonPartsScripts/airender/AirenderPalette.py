@@ -44,12 +44,12 @@ except Exception:  # pylint: disable=broad-exception-caught
     _ERRORE_AVVIO = traceback.format_exc()
 
 EVENTO_CATTURA = 1001
-EVENTO_PROVA_A_SECCO = 1002
 EVENTO_GENERA = 1003
 EVENTO_ANNULLA = 1004
 EVENTO_AGGIORNA = 1005
 EVENTO_APRI_STUDIO = 1006
 EVENTO_APRI_CARTELLA = 1007
+EVENTO_VEDI_TAGLIO = 1008
 
 # Le dimensioni del radio «Dimensione», nell'ordine del .pyp.
 DIMENSIONI = (None, (1920, 1080), (3840, 2160))
@@ -178,12 +178,12 @@ class AirenderPalette(BaseScriptObject):
             return
         azioni = {
             EVENTO_CATTURA: self._cattura,
-            EVENTO_PROVA_A_SECCO: self._prova_a_secco,
             EVENTO_GENERA: self._genera,
             EVENTO_ANNULLA: self._annulla,
             EVENTO_AGGIORNA: lambda: None,
             EVENTO_APRI_STUDIO: self._apri_studio,
             EVENTO_APRI_CARTELLA: self._apri_cartella,
+            EVENTO_VEDI_TAGLIO: self._vedi_taglio,
         }
         azione = azioni.get(event_id)
         if azione is None:
@@ -213,6 +213,8 @@ class AirenderPalette(BaseScriptObject):
             return
         ponte.scrivi_camera(vista, self._camera())
         self.build_ele.UltimaVista.value = str(vista)
+        if self._valori().rapporto() is not None:
+            self._vedi_taglio()  # con un formato fisso, si vede subito cosa resta fuori
 
     def _camera(self) -> dict:
         """Da dove guarda la finestra. Ogni voce che fallisce resta scritta come errore."""
@@ -240,12 +242,23 @@ class AirenderPalette(BaseScriptObject):
             luce_interno=e.LuceInterno.value,
             cielo=e.Cielo.value,
             intorno=e.Intorno.value,
+            verde=e.Verde.value,
+            persone=e.Persone.value,
             materiali=e.Materiali.value or "",
             modello=e.Modello.value,
+            formato=e.Formato.value,
         )
 
-    def _prova_a_secco(self) -> None:
-        _messaggio(self.telecomando.prova_a_secco(self.build_ele.UltimaVista.value, self._valori()))
+    def _vedi_taglio(self) -> None:
+        vista = self.build_ele.UltimaVista.value or ""
+        if not vista:
+            _messaggio("Non c'e' ancora una vista.\n\nCosa fare: premi prima Cattura vista.")
+            return
+        anteprima = self.telecomando.anteprima(vista, self._valori())
+        if anteprima == vista:
+            _messaggio("Con «Come la finestra» non si taglia niente: la vista parte intera.")
+            return
+        servizio.apri_nel_sistema(Path(anteprima))
 
     def _genera(self) -> None:
         mostrata = self.build_ele.Destinazione.value or ""
@@ -289,7 +302,7 @@ class AirenderPalette(BaseScriptObject):
         if config.PALETTE_IMMAGINI_DA_SCRIPT:
             # Il secondo dei due modi provati dalla sonda: percorso assoluto nel valore.
             if e.UltimaVista.value and os.path.exists(e.UltimaVista.value):
-                e.VistaImmagine.value = e.UltimaVista.value
+                e.VistaImmagine.value = self.telecomando.anteprima(e.UltimaVista.value, self._valori())
             if riepilogo.render:
                 e.UltimoImmagine.value = riepilogo.render
 
