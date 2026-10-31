@@ -27,10 +27,11 @@ class ProviderDiProva(Provider):
     destinazione = "Servizio di prova (niente rete)"
     usa_forza_struttura = False
 
-    def __init__(self, registro_chiamate, errore=None, durante=None):
+    def __init__(self, registro_chiamate, errore=None, durante=None, eco=False):
         self.registro = registro_chiamate
         self.errore = errore
         self.durante = durante
+        self.eco = eco  # rimanda la vista com'e': un render vero, che si puo' misurare
 
     def destinazione_per(self, modello):
         return f"{self.destinazione} → {modello}"
@@ -44,7 +45,7 @@ class ProviderDiProva(Provider):
         if self.errore:
             raise self.errore
         return Risultato(
-            immagine=b"render-finto",
+            immagine=richiesta.immagine if self.eco else b"render-finto",
             formato="png",
             ricetta=Ricetta(
                 provider=self.nome, modello=richiesta.modello, preset=richiesta.preset,

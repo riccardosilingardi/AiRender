@@ -600,7 +600,8 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "È ancora il tuo edificio?",
         "Prima / dopo", "Affiancati", "Solo render", "Confronta con",
         "Non misurata",
-        "Il controllo automatico degli spigoli non c'è ancora. Per ora giudica tu, confrontando le due immagini.",
+        "Misura grezza: ombre nuove, neve e vegetazione davanti contano come spigoli persi.",
+        "Misura ora",
         "Rifai con la stessa ricetta",
         "Prima serve un render. Generane uno da Genera.",            # Ritocca, vuoto
         "Disegna un'area, poi scrivi cosa cambiare nella sua nota.",
@@ -626,3 +627,48 @@ def test_il_modulo_studio_non_importa_allplan():
     cartella = Path(modulo_servizio.__file__).parent
     for file in cartella.glob("*.py"):
         assert "NemAll_Python" not in file.read_text(encoding="utf-8"), file.name
+
+
+# --- tenuta della geometria (prompt 8, 2026-10-31) -------------------------------
+
+
+def test_ogni_render_esce_con_la_sua_misura_degli_spigoli(cartella, vista, chiamate):
+    """Caso: Risultato scrive «Non misurata» anche quando la misura si poteva fare."""
+    studio = _studio(cartella, chiamate)
+    studio.invia(_richiesta(studio, vista))
+    _coda(cartella, chiamate, eco=True).esegui_uno()
+    tenuta = studio.render_della_vista(vista)[0]["tenuta"]
+    assert tenuta["spigoli"] == 1.0 and tenuta["motivo"] is None and not tenuta["avvisa"]
+
+
+def test_un_render_illeggibile_resta_non_misurato_col_perche(cartella, vista, chiamate):
+    studio = _studio(cartella, chiamate)
+    studio.invia(_richiesta(studio, vista))
+    _coda(cartella, chiamate).esegui_uno()
+    tenuta = studio.render_della_vista(vista)[0]["tenuta"]
+    assert tenuta["spigoli"] is None and "non e' un'immagine" in tenuta["motivo"]
+
+
+def test_un_render_vecchio_dice_perche_non_e_misurato_e_si_misura_a_richiesta(cartella, vista, chiamate):
+    """Caso: un render di prima della misura mostra un numero inventato, o niente e nessun modo di misurarlo."""
+    from core import coda as modulo_coda
+
+    studio = _studio(cartella, chiamate)
+    studio.invia(_richiesta(studio, vista))
+    _coda(cartella, chiamate, eco=True).esegui_uno()
+    lavoro = studio.render_della_vista(vista)[0]
+    render = next((cartella / "lavori" / "fatto").glob("*.png"))
+    modulo_coda.percorso_misura(render).unlink()
+    vecchio = studio.render_della_vista(vista)[0]["tenuta"]
+    assert vecchio["spigoli"] is None and vecchio["da_misurare"] and "prima" in vecchio["motivo"]
+    assert studio.misura_ora(lavoro["identificativo"])["spigoli"] is not None
+
+
+def test_la_misura_che_non_si_puo_fare_non_diventa_un_numero(tmp_path):
+    """Regola 3: vista sparita, la misura dice perche' e non stampa un numero."""
+    from core import coda as modulo_coda
+
+    render = tmp_path / "r.png"
+    render.write_bytes(vista_shaded(320, 200))
+    misura = modulo_coda.misura_tenuta(tmp_path / "non-c-e.png", render)
+    assert misura["spigoli"] is None and "Non ho trovato" in misura["motivo"]

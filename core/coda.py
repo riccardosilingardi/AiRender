@@ -108,6 +108,50 @@ def _adesso() -> str:
 # --- scrittura atomica -------------------------------------------------------
 
 
+SUFFISSO_MISURA = ".misura.json"
+
+
+def percorso_misura(render: Path) -> Path:
+    return render.with_name(render.name + SUFFISSO_MISURA)
+
+
+def misura_tenuta(vista: Path, render: Path) -> dict:
+    """Quota di spigoli della vista Allplan ritrovati nel render, o perche' non si e' misurata.
+
+    Sempre contro la vista, anche per un passo su un render: cosi' lo
+    spostamento che si accumula passo dopo passo si vede tutto.
+    """
+    misura = {"spigoli": None, "motivo": None,
+              "misurato_il": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    try:
+        quota = modulo_immagine.spigoli_ritrovati(modulo_immagine.leggi(vista), modulo_immagine.leggi(render))
+    except ErroreAirender as errore:
+        misura["motivo"] = errore.fatto
+        return misura
+    except (OSError, ValueError) as errore:
+        misura["motivo"] = f"Non ho potuto leggere le immagini: {errore}."
+        return misura
+    if quota is None:
+        misura["motivo"] = "La vista non ha spigoli da cercare."
+    else:
+        misura["spigoli"] = round(quota, 3)  # numero-non-configurabile: tre cifre bastano a un percento
+    return misura
+
+
+def scrivi_misura(vista: Path, render: Path) -> dict:
+    misura = misura_tenuta(vista, render)
+    scrivi_atomico(percorso_misura(render), json.dumps(misura, ensure_ascii=False, indent=2))
+    return misura
+
+
+def leggi_misura(render: Path) -> dict | None:
+    try:
+        dati = json.loads(percorso_misura(render).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return dati if isinstance(dati, dict) else None
+
+
 def scrivi_atomico(percorso: Path, contenuto: bytes | str) -> Path:
     """Scrive su un file temporaneo nella stessa cartella, poi rinomina.
 
@@ -547,6 +591,7 @@ class Coda:
         ricetta = render.with_name(render.name + ".ricetta.json")
         scrivi_atomico(render, risultato.immagine)
         scrivi_atomico(ricetta, risultato.ricetta.a_json())
+        scrivi_misura(Path(lavoro.vista), render)
         altro = {"fuori_aree": self._misura_fuori_aree(lavoro, risultato.immagine)} if lavoro.aree else {}
         self._chiudi(
             preso, FATTO_DIR, FATTO,

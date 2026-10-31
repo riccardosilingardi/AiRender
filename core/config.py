@@ -334,6 +334,19 @@ RISOLUZIONE_RENDER_PREDEFINITA = _registra(Costante(
 ))
 RISOLUZIONI_RENDER = ("1k", "2k", "4k")  # numero-non-configurabile: i valori di imageSize di Vertex AI
 
+GEOMETRY_DRIFT_WARN = _registra(Costante(
+    nome="GEOMETRY_DRIFT_WARN",
+    valore=0.6,
+    origine=SCELTA,
+    ragione=(
+        "Sotto questa quota di spigoli della vista ritrovati nel render, lo "
+        "Studio avvisa che la geometria puo' essersi mossa. Non e' tarata: la "
+        "misura e' grezza (ombre nuove, neve, vegetazione davanti contano come "
+        "spigoli persi) e nessun render vero e' stato ancora giudicato a occhio "
+        "accanto al numero. Si tara col banco, confrontando numero e giudizio."
+    ),
+))
+
 # --- Coda dei lavori ---------------------------------------------------------
 
 CODA_INTERVALLO_SECONDI = _registra(Costante(
