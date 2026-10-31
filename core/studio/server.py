@@ -28,6 +28,7 @@ Rotte:
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
     POST /api/lavori/<id>/annulla          file .annulla accanto al lavoro
+    POST /api/lavori/<id>/misura           spigoli ritrovati di un render fatto prima della misura
     POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
     POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
     POST /api/passi/invia                  un passo nuovo dal render di un passo
@@ -187,6 +188,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.carica_vista(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "lavori", identificativo, "annulla"]:
                 self._json(studio.annulla(identificativo))
+            case ["api", "lavori", identificativo, "misura"]:
+                self._json(studio.misura_ora(identificativo))
             case ["api", "lavori", identificativo, "rifai"]:
                 self._json(studio.rifai(identificativo, self._corpo_json()))
             case ["api", "passi", "componi"]:
