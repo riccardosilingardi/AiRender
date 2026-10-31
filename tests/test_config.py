@@ -451,3 +451,32 @@ def test_miniatura_larghezza_e_altezza_px_sono_le_proporzioni_della_tessera():
     piccola = Image.open(io.BytesIO(immagine.ritaglia_miniatura(alta)))
     assert piccola.size == (config.MINIATURA_LARGHEZZA_PX, config.MINIATURA_ALTEZZA_PX)
     assert config.MINIATURA_LARGHEZZA_PX * 9 == config.MINIATURA_ALTEZZA_PX * 16
+
+
+# --- battito e palette v1 ----------------------------------------------------
+
+
+def test_battito_scaduto_secondi_separa_un_processo_vivo_da_uno_fermo(tmp_path):
+    """Caso: la palette crede viva una coda morta e il lavoro resta in attesa per sempre."""
+    from core import battito
+
+    file = tmp_path / "vivo.json"
+    battito.scrivi(file, {}, adesso=lambda: 1000.0)
+    assert battito.leggi(file, adesso=lambda: 1000.0 + config.BATTITO_SCADUTO_SECONDI) is not None
+    assert battito.leggi(file, adesso=lambda: 1000.1 + config.BATTITO_SCADUTO_SECONDI) is None
+
+
+def test_battito_intervallo_secondi_e_piu_corto_della_scadenza():
+    """Caso: il battito arriva piu' di rado di quanto si aspetta chi lo legge, e un processo vivo sembra morto."""
+    assert config.BATTITO_INTERVALLO_SECONDI * 2 <= config.BATTITO_SCADUTO_SECONDI
+
+
+def test_palette_immagini_da_script_e_spenta_finche_la_sonda_non_risponde():
+    """Caso: la palette conta su un'immagine che Allplan non aggiorna e mostra la vista sbagliata."""
+    assert config.PALETTE_IMMAGINI_DA_SCRIPT is False
+    assert config.costante("PALETTE_IMMAGINI_DA_SCRIPT").origine == config.SCELTA
+
+
+def test_palette_secondi_attesa_studio_lascia_al_battito_il_tempo_di_comparire():
+    """Caso: la palette dice «lo Studio non e' partito» prima che il primo battito possa arrivare."""
+    assert config.PALETTE_SECONDI_ATTESA_STUDIO > config.BATTITO_INTERVALLO_SECONDI

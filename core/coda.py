@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import aree as modulo_aree, blocchi, config, grana as modulo_grana, immagine as modulo_immagine
+from . import aree as modulo_aree, battito as modulo_battito, blocchi, config, grana as modulo_grana, immagine as modulo_immagine
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
@@ -90,6 +90,15 @@ class LavoroAnnullato(ErroreAirender):
 
 class LavoroNonValido(ErroreAirender):
     """Il file del lavoro non si legge, o dice cose che non tornano."""
+
+
+class CodaGiaAttiva(ErroreAirender):
+    """Sulla stessa cartella gira gia' un'altra coda."""
+
+
+def coda_viva(radice: Path) -> dict | None:
+    """Il battito della coda che gira su questa cartella, o None se non ne gira nessuna."""
+    return modulo_battito.leggi(modulo_battito.percorso(radice, modulo_battito.FILE_CODA))
 
 
 def _adesso() -> str:
@@ -665,15 +674,29 @@ class Coda:
         Con `una_volta` esce quando la coda e' vuota; altrimenti aspetta il
         prossimo lavoro finche' non lo si ferma (Ctrl+C).
         """
-        self.recupera_abbandonati()
-        fatti = 0
-        while True:
-            if self.esegui_uno() is not None:
-                fatti += 1
-                continue
-            if una_volta:
-                return fatti
-            self._attesa(config.CODA_INTERVALLO_SECONDI)
+        altra = coda_viva(self.radice)
+        if altra is not None and altra.get("pid") != os.getpid():
+            # Una seconda coda prenderebbe per abbandonato il lavoro in corso
+            # della prima e lo metterebbe fra gli errori mentre e' ancora vivo.
+            raise CodaGiaAttiva(
+                f"Su {self.radice / CARTELLA_LAVORI} gira gia' una coda dei lavori "
+                f"(processo {altra.get('pid')}): ne basta una.",
+                "Non serve fare niente: i lavori li prende quella. Per fermarla, "
+                "chiudi lo Studio o la finestra da cui l'hai lanciata.",
+            )
+        with modulo_battito.Battito(
+            modulo_battito.percorso(self.radice, modulo_battito.FILE_CODA),
+            {"cartella": str(self.radice)},
+        ):
+            self.recupera_abbandonati()
+            fatti = 0
+            while True:
+                if self.esegui_uno() is not None:
+                    fatti += 1
+                    continue
+                if una_volta:
+                    return fatti
+                self._attesa(config.CODA_INTERVALLO_SECONDI)
 
 
 # --- riga di comando ---------------------------------------------------------

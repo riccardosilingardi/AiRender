@@ -4,7 +4,35 @@
 Allplan ha la sua cartella (`v2026/`, poi `v2027/`) con l'unico file che
 importa `NemAll_Python_*`.
 
-## Cosa c'è adesso: `AIRENDER prova` (Allplan 2026)
+## La palette v1: `AIRENDER` (Allplan 2026, prompt 7)
+
+Il telecomando di `DESIGN.md`: Vista, Stile, Invio, Ultimo render. Genera non
+blocca Allplan: scrive un lavoro nella coda e torna. Se sulla cartella non
+gira una coda, la palette avvia lo Studio senza finestra, che la fa partire.
+Logica in `comune/telecomando.py` (pytest), Allplan solo in
+`v2026/PythonPartsScripts/airender/AirenderPalette.py`. Il `.pyp` si genera:
+dopo un cambio dei blocchi, `python allplan/v2026/scrivi_palette_pyp.py`.
+
+Come provarla, la prima volta (mai aperta in Allplan prima):
+
+1. Rilancia `installa.ps1`, riavvia Allplan.
+2. Libreria › Privato › AIRENDER › **AIRENDER**. Se non si apre, copia il
+   messaggio della finestra *Trace*.
+3. Clicca nella finestra 3D, **Cattura vista**: in Vista compaiono nome,
+   dimensioni ed esito.
+4. In Stile cambia **Modello**: «La vista va a» e Costo cambiano subito, o
+   solo al clic successivo? Scrivimelo.
+5. **Prova a secco**: finestra con destinazione, costo e prompt.
+6. Solo se vuoi spendere (circa 17 crediti, `COMFY_API_KEY` impostata):
+   **Genera render**. Allplan deve restare libero subito; Stato dice «In
+   corso da…», Genera diventa Annulla. Premi **Aggiorna** ogni tanto.
+7. **Apri nello Studio**: si apre la finestra dello Studio sulla stessa
+   cartella?
+
+Da rimandare: uno screenshot della palette dopo il punto 3 e dopo il punto 6,
+il testo delle finestre di messaggio e qualunque errore della *Trace*.
+
+## `AIRENDER prova` (Allplan 2026)
 
 Una palette minima, per verificare sulla macchina vera le tre cose che nessuna
 sessione può verificare da qui:

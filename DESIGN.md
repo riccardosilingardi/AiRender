@@ -94,6 +94,33 @@ grigio. In fondo il percorso della cartella delle viste e Chiudi.
   67 toni, sfondo uniforme 10%»), le scelte di stile, destinazione e costo, e
   in Ultimo render il riassunto dell'ultimo lavoro con Apri nello Studio.
 
+**Palette v1, costruita il 2026-10-31** (prompt 7), prima che la sonda della
+palette abbia risposto sul PC di Riccardo. Dove la palette costruita si scosta
+da qui:
+
+- **Miniature spente.** La miniatura della vista e quella dell'ultimo render
+  sono immagini solo se `PALETTE_IMMAGINI_DA_SCRIPT` è acceso (SCELTA, spento):
+  finché la sonda non dice che Allplan aggiorna un'immagine da script, la
+  palette scrive nome, dimensioni ed esito. Una miniatura che non si aggiorna
+  mostrerebbe la vista sbagliata.
+- **Resa in una riga, non in griglia.** Nello Studio solo «Fotorealistico» ha
+  un blocco di prompt; una griglia di cinque miniature con quattro spente non
+  aggiunge niente. La riga lo dice e rimanda allo Studio.
+- **Esterno / Interno e il preset in Stile.** Il mockup non li ha; senza, la
+  palette non saprebbe da quale combinazione partire. Sono lo switch e i preset
+  dello Studio · Genera, con gli stessi nomi; Ora, Cielo e Intorno partono da
+  «Come il preset». Cielo e Intorno si vedono solo con Esterno.
+- **Aggiorna.** Una palette di Allplan non si ridisegna da sola: lo stato del
+  lavoro si rilegge dal disco a ogni clic, e Aggiorna serve a rileggerlo senza
+  fare altro. «In corso da 0:12» è il tempo all'ultimo clic, non un orologio.
+- **Errori in finestra di messaggio.** I campi della palette sono righe
+  corte: la frase intera (fatto e cosa fare) arriva in una finestra di
+  messaggio, il campo Stato ne tiene l'inizio.
+- **Come parte la coda.** Genera scrive il lavoro e, se sulla cartella non
+  gira una coda, avvia lo Studio senza finestra, che la fa partire. Apri nello
+  Studio riapre lo Studio che gira, o lo avvia con la finestra. Una coda sola
+  per cartella (`lavori/coda-viva.json`, vedi PRD sezione 7).
+
 ### Studio · Genera
 
 Mockup: `Stile.dc.html`. In alto la barra comune dello Studio: a cosa è

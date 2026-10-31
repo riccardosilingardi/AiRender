@@ -119,7 +119,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore e lo Studio. Girano da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **313 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **390 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -145,7 +145,7 @@ python scripts/miniatura_da_banco.py --render <cartella del banco>\ora-blu.png  
 | Studio v1: `python -m core.studio` avvia il server locale (`http.server`, solo `127.0.0.1`, porta scelta dal sistema), la coda come processo figlio e la pagina (Edge `--app=` se c'è). Genera e Risultato come in `DESIGN.md`, Ritocca in grigio. Rotte JSON per viste, preset, composizione del prompt, destinazione e costo, prova a secco, invio, stato, render, ricetta, annulla, rifai. Niente CDN né font scaricati | `core/studio/` | Provato con `pytest` (rotte, prompt, stati, difese del server) e con Playwright su un provider finto: screenshot di ogni stato in `docs/ui/studio-v1/`. **Mai aperto su Windows né con Edge, mai con un invio vero** (sezione 9) |
 | Studio · Passi: l'albero dei passi di una vista (0 è la vista Allplan, ogni passo figlio di quello da cui parte, rami), salvato in `<vista>.passi.json` accanto alla vista con la ricetta completa di ogni passo; i render già fatti diventano figli della vista. Un lavoro della coda (formato 2) può partire dal render di un passo con una richiesta a parole. Nello Studio: albero in una colonna, prima/dopo contro la vista o il passo prima, strada, ricetta, Nuovo passo da qui, Rifai questo passo, Rifai pulito dalla vista (le richieste della strada in un invio dalla vista, con il prompt mostrato prima), avviso dalla 2ª generazione di fila, tenuta «Non misurata» | `core/passi.py`, `core/coda.py`, `core/studio/` | Provato con `pytest` (rami, strada, figli, migrazione, unione delle richieste, lavoro da un passo, rotte) e con Playwright su un provider finto: screenshot in `docs/ui/studio-passi/`. **Mai con un invio vero, mai su Windows né con Edge**; nessun passo su un render è mai stato mandato a un modello (sezione 9) |
 | Studio · Ritocca: aree a rettangolo o a selezione libera (lazo) sul render di un passo, una nota adesiva numerata per area (spostabile), le note anche in elenco, un solo Applica con destinazione e costo di un invio; il risultato è un passo figlio del render ritoccato, con la misura «fuori dalle aree» accanto. Le aree partono come contorni disegnati o come maschera in più (`RITOCCO_MODO_AREE`, SCELTA sui contorni). Lavoro della coda del formato 3 (solo per i ritocchi: gli altri restano nel 2), misura scritta nello stato del lavoro. «Clicca una superficie» in grigio | `core/aree.py`, `core/coda.py`, `core/passi.py`, `core/studio/` | Provato con `pytest` (i due modi, prompt, misura, formato 3, passo nell'albero, note vuote, rifai, rifai pulito, rotte) e con Playwright su un provider finto, disegnando con il mouse: screenshot in `docs/ui/studio-ritocca/`. **Mai con un invio vero**: il piano «aree» del banco non è ancora stato lanciato (sezione 9) |
-| Casa unica delle decisioni: 37 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Casa unica delle decisioni: 41 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
 | Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
 | Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. I due modelli predefiniti hanno lo schema dal 2026-10-27: non è ancora stato lanciato davvero (il primo confronto è stato fatto a mano, con le immagini della sonda) |
@@ -153,9 +153,11 @@ python scripts/miniatura_da_banco.py --render <cartella del banco>\ora-blu.png  
 | Rifiuto: il parametro della texture si chiama **grana** e non può chiamarsi scala, né nelle etichette né da riga di comando | `core/lessico.py` | Funziona. Il divieto vale sulle nostre parole, non sul testo libero dell'utente |
 | Ricetta rieseguibile: provider, modello, versione del preset, tutti i parametri, impronta della vista di partenza | `core/ricetta.py` | Fatta. È il seme della pila di livelli, che arriva nella sessione 3 |
 | Errori in italiano, ognuno con il gesto successivo; nessun codice HTTP da solo | `core/errori.py`, `core/provider/comfy.py` | Fatti per: chiave rifiutata, credito esaurito (per Comfy: credito del workspace, con cosa fare), workspace che non può usare il modello, modello sconosciuto, limite di chiamate, immagine troppo pesante, servizio rotto, lavoro fallito, schema del modello non ancora verificato |
+| Palette v1 in Allplan 2026 (AIRENDER), il telecomando: Vista (cattura, dimensione, esito), Stile (Esterno/Interno, preset, ora, cielo, intorno, materiali, modello con i nomi dello Studio), Invio (destinazione e costo prima di Genera, prova a secco, Genera che scrive in coda e torna, Annulla), Ultimo render (riassunto, Apri nello Studio, Apri cartella). Se la coda non gira avvia lo Studio senza finestra con un Python che non è Allplan (regola della sonda) | `allplan/comune/telecomando.py`, `allplan/v2026/PythonPartsScripts/airender/AirenderPalette.py`, `allplan/v2026/Library/AIRENDER/AirenderPalette.pyp` (generato da `allplan/v2026/scrivi_palette_pyp.py`) | Costruita il 2026-10-31 (prompt 7). La logica è provata con pytest e con uno Studio vero avviato senza finestra su Linux (lavoro scritto, preso dalla coda, errore «manca la chiave» riletto dalla palette). **Mai aperta in Allplan**: sezione 9 |
+| Una coda sola per cartella: coda e Studio riscrivono ogni secondo un file «sono vivo» in `lavori/` (`coda-viva.json`, `studio-vivo.json`, con pid e indirizzo). Una seconda coda sulla stessa cartella si rifiuta (metterebbe fra gli errori il lavoro in corso della prima); lo Studio usa la coda che trova | `core/battito.py`, `core/coda.py`, `core/studio/__main__.py` | Fatto, provato con pytest. Un processo ucciso lascia il file: vale come morto dopo `BATTITO_SCADUTO_SECONDI` |
 | Palette di prova in Allplan 2026: cattura la finestra attiva in PNG con la sua camera, prova a secco, genera | `allplan/v2026/`, `allplan/comune/ponte.py` | Cattura, prova a secco e invio vero funzionano in Allplan 2026: primo render dalla palette il 2026-10-27, salvato in `Usr\Local\AIRENDER\viste` con la sua ricetta. La finestra di conferma tronca il percorso del render. Dal 2026-10-21 la palette parla con Comfy Router senza che l'adattatore sia cambiato: segue il predefinito del motore |
 
-**Non c'è ancora:** nessuna palette vera (solo quella di prova), nessun pacchetto ALLEP, nessuna cartella
+**Non c'è ancora:** nessun pacchetto ALLEP, nessuna cartella
 sorvegliata, nessuna pila di livelli su disco, nessuna miniatura, nessuna
 espansione del linguaggio naturale (il testo dell'utente viaggia com'è, in coda
 al prompt del preset).
@@ -178,10 +180,12 @@ per PR (regola di `CLAUDE.md`).
    prompt a blocchi. In `core/`, senza Allplan, senza Studio.
 3. **Studio v1** — fatto in questo PR (sezione 7). Genera e Risultato, eseguibile senza Allplan
    (`python -m core.studio`), sulla coda del PR 2. Ritocca resta in grigio.
-4. **Palette v1** — il telecomando. Si scrive solo dopo che la sonda della
-   palette ha risposto sul PC di Riccardo (sezione 9): quali immagini si
-   aggiornano da script, quale Python lancia lo Studio, se Edge si apre come
-   finestra.
+4. **Palette v1** — il telecomando. Costruita il 2026-10-31 (prompt 7,
+   sezione 7) **prima** che la sonda della palette rispondesse, su richiesta
+   di Riccardo: ogni domanda della sonda è un'impostazione con un ripiego
+   (`PALETTE_IMMAGINI_DA_SCRIPT` spenta; Python ed Edge trovati con la regola
+   della sonda). Resta da fare: lanciare la sonda, fissare le impostazioni,
+   aprire la palette in Allplan (sezione 9).
 
 **Dal 2026-10-29, dopo le decisioni del 2026-10-28 (sezione 5):**
 
@@ -461,6 +465,35 @@ Tutto il resto aspetta il PC di Riccardo:
   alla chiusura della palette.
 - **`Expander` e `Text` come `ValueType` nel `.pyp`** — usati per la prima volta.
 
+### Lasciato dalla sessione del 2026-10-31 (palette v1, prompt 7)
+
+La palette v1 non è mai stata aperta in Allplan: questa sessione non ha
+Allplan. Da verificare sul PC di Riccardo, in quest'ordine:
+
+- **Il .pyp si carica** — `StringComboBox`, `Expander`, `Picture`,
+  `RadioButtonGroup` e le condizioni `<Visible>` su un campo nascosto
+  (`Interno == 0`, `InCorso == 1`) sono scritti dalla documentazione, non
+  provati. Se la palette non si apre, il messaggio della finestra *Trace* dice
+  quale parametro.
+- **I campi si ridisegnano dopo un clic** — l'adattatore scrive i valori in
+  `build_ele` dentro `on_control_event` e dentro `execute`. Non è provato che
+  Allplan ridisegni la palette, né che chiami `execute` dopo il cambio di un
+  elenco (serve per rileggere destinazione e costo quando si cambia modello).
+  Se non lo fa, Genera si rifiuta comunque (la destinazione mostrata non è
+  quella vera) e il clic successivo la riscrive.
+- **Lo Studio parte da Allplan e Allplan resta libero** — è la domanda 3-5
+  della sonda. La palette prova il Python di Allplan con `PYTHONPATH` sulla
+  cartella di Pillow, poi `py`. Se nessuno risponde con Pillow, lo dice con
+  cosa installare.
+- **Uno Studio avviato senza finestra resta acceso** finché non si chiude la
+  sessione di Windows: non ha una finestra da chiudere. Apri nello Studio
+  riapre la sua pagina; chiudere la pagina non lo ferma. Se dà fastidio, serve
+  un «Chiudi lo Studio» nella pagina.
+- **Una coda rimasta orfana** (Studio ucciso dal Task Manager) continua a
+  girare e a battere: il prossimo Studio la usa invece di avviarne un'altra.
+  Provato su Linux, non su Windows.
+- **Le miniature** restano spente finché la sonda non risponde alla domanda 1.
+
 ### Da prima
 
 - **`NemAll_Python_Utility.StartMenuFunction` può lanciare il salvataggio
@@ -737,7 +770,7 @@ cambio è in `DESIGN.md`.
 
 | Schermata | Lavoro che serve | Lo stato vuoto dice |
 |---|---|---|
-| Palette v1 | Catturare la vista, scegliere lo stile di base, mandare senza bloccare Allplan | "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere (shaded, con ombre), poi Cattura." |
+| Palette v1 (costruita il 2026-10-31, mai aperta in Allplan) | Catturare la vista, scegliere lo stile di base, mandare senza bloccare Allplan | "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere (shaded, con ombre), poi Cattura." |
 | Studio · Genera | Scegliere lo stile con calma, vedere il prompt vero, la destinazione e il costo | "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegli un file." |
 | Studio · Risultato | Decidere se è ancora il proprio edificio, confrontare render e modelli | "Nessun render ancora. Scegli uno stile in Genera e premi Genera." |
 | Studio · Passi | Ritrovare e rifare i passi di una vista | "Nessun passo ancora. Genera un render da Genera: sarà il passo 1." |

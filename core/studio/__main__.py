@@ -21,7 +21,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from .. import provider as registro
+from .. import battito as modulo_battito, coda as modulo_coda, provider as registro
 from ..errori import ErroreAirender
 from .server import crea_server, indirizzo
 from .servizio import Studio
@@ -87,13 +87,17 @@ def main(argv: list[str] | None = None) -> int:
     argomenti = costruisci_parser().parse_args(argv)
     cartella = Path(argomenti.cartella) if argomenti.cartella else cartella_predefinita()
     coda = None
+    gia_viva = modulo_coda.coda_viva(cartella.resolve()) is not None
     try:
-        if not argomenti.senza_coda:
+        if not argomenti.senza_coda and not gia_viva:
             coda = avvia_coda(cartella.resolve())
         studio = Studio(
             cartella,
             provider=argomenti.provider,
-            coda_attiva=(lambda: coda is not None and coda.poll() is None),
+            # Vale anche per una coda avviata da altri (la palette, a mano):
+            # conta il suo battito, non chi l'ha lanciata.
+            coda_attiva=(lambda: modulo_coda.coda_viva(studio.cartella) is not None
+                         or (coda is not None and coda.poll() is None)),
         )
         server = crea_server(studio, argomenti.porta)
     except (ErroreAirender, OSError) as errore:
@@ -104,12 +108,23 @@ def main(argv: list[str] | None = None) -> int:
     url = indirizzo(server)
     print(f"Studio su {url}")
     print(f"Cartella delle viste: {studio.cartella}")
-    print("La coda dei lavori gira." if coda else "La coda dei lavori non e' stata avviata (--senza-coda).")
+    if coda:
+        print("La coda dei lavori gira.")
+    elif gia_viva:
+        print("Su questa cartella gira gia' una coda dei lavori: lo Studio usa quella.")
+    else:
+        print("La coda dei lavori non e' stata avviata (--senza-coda).")
     if not argomenti.senza_finestra:
         print(f"Pagina aperta con {apri_finestra(url)}.")
     print("Ctrl+C per chiudere lo Studio e la coda.")
     try:
-        server.serve_forever()
+        # Il battito dice alla palette di Allplan che lo Studio c'e' e dove:
+        # «Apri nello Studio» riapre questa pagina invece di avviarne un altro.
+        with modulo_battito.Battito(
+            modulo_battito.percorso(studio.cartella, modulo_battito.FILE_STUDIO),
+            {"indirizzo": url, "cartella": str(studio.cartella)},
+        ):
+            server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:

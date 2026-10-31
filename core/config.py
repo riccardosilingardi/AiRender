@@ -540,3 +540,61 @@ MINIATURA_ALTEZZA_PX = _registra(Costante(
     ragione="Altezza della miniatura vera: 16:9 come la tessera dello Studio (vedi MINIATURA_LARGHEZZA_PX).",
     unita=" px",
 ))
+
+# --- Palette v1 e processi vivi (prompt 7, 2026-10-31) ------------------------
+
+BATTITO_INTERVALLO_SECONDI = _registra(Costante(
+    nome="BATTITO_INTERVALLO_SECONDI",
+    valore=1,
+    origine=SCELTA,
+    ragione=(
+        "Ogni quanto la coda dei lavori e lo Studio riscrivono il loro file "
+        "«sono vivo» in lavori/. Lo leggono la palette (deve sapere se c'e' gia' "
+        "una coda prima di avviarne una) e la coda stessa (una seconda coda "
+        "sulla stessa cartella metterebbe fra gli errori il lavoro in corso "
+        "della prima). Un secondo: stesso ritmo di CODA_INTERVALLO_SECONDI."
+    ),
+    unita=" s",
+))
+
+BATTITO_SCADUTO_SECONDI = _registra(Costante(
+    nome="BATTITO_SCADUTO_SECONDI",
+    valore=5,
+    origine=SCELTA,
+    ragione=(
+        "Dopo quanti secondi senza battito un processo si considera morto. "
+        "Cinque battiti persi: abbastanza per un disco lento o un antivirus "
+        "che tiene il file un attimo, abbastanza poco perche' la palette non "
+        "aspetti a lungo prima di riavviare la coda dopo un crash."
+    ),
+    unita=" s",
+))
+
+PALETTE_IMMAGINI_DA_SCRIPT = _registra(Costante(
+    nome="PALETTE_IMMAGINI_DA_SCRIPT",
+    valore=False,
+    origine=SCELTA,
+    ragione=(
+        "Se la palette di Allplan mostra la miniatura della vista e dell'ultimo "
+        "render come immagine (Picture) cambiata da script. Lo dice la domanda "
+        "1 della sonda della palette (PRD, sezione 9), mai lanciata al "
+        "2026-10-31. Spenta, la palette scrive nome, dimensioni ed esito al "
+        "posto dell'immagine: funziona in ogni caso. Si accende dopo che la "
+        "sonda ha visto cambiare almeno una delle due immagini."
+    ),
+))
+
+PALETTE_SECONDI_ATTESA_STUDIO = _registra(Costante(
+    nome="PALETTE_SECONDI_ATTESA_STUDIO",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "Quanto la palette aspetta, dopo aver avviato lo Studio, che il suo "
+        "battito compaia prima di dire che non e' partito. Il lavoro resta "
+        "in coda comunque: l'attesa serve solo a dire la cosa giusta. Otto "
+        "secondi: un Python a freddo con Pillow parte in uno o due, il resto "
+        "e' margine per l'antivirus al primo avvio. Allplan e' fermo per "
+        "questo tempo solo quando lo Studio non e' gia' aperto."
+    ),
+    unita=" s",
+))

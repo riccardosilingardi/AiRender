@@ -683,6 +683,14 @@ class Studio:
             "percorso_ricetta": str(percorso),
         }
 
+    def ultimo_lavoro(self) -> dict | None:
+        """Il lavoro nato per ultimo nella cartella, qualunque sia il suo stato. Per la palette."""
+        lavori = self._lavori()
+        if not lavori:
+            return None
+        dati, _cartella = max(lavori, key=lambda c: (c[0].get("creato_il") or "", c[0]["identificativo"]))
+        return self._riassunto_lavoro(dati)
+
     def lavori_attivi(self) -> list[dict]:
         return [
             r for r in (self._riassunto_lavoro(d) for d, cartella in self._lavori()

@@ -1,4 +1,4 @@
-# Copia AIRENDER prova e AIRENDER sonda nella cartella utente (Usr) di Allplan 2026.
+# Copia AIRENDER (palette v1), AIRENDER prova e AIRENDER sonda nella cartella utente (Usr) di Allplan 2026.
 #
 # Uso, da PowerShell nella cartella del repository:
 #   powershell -ExecutionPolicy Bypass -File allplan\v2026\installa.ps1
@@ -43,7 +43,15 @@ Copy-Item (Join-Path $PSScriptRoot "PythonPartsScripts\airender\AirenderSonda.py
 Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\AirenderSonda.pyp") $libreria -Force
 Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\sonda_*.png") $libreria -Force
 
+# La palette v1 (prompt 7): telecomando, adattatore, .pyp e il segnaposto
+# delle immagini, che deve stare accanto al .pyp. Prova e sonda restano
+# finche' Riccardo non dice che la v1 le sostituisce.
+Copy-Item (Join-Path $repo "allplan\comune\telecomando.py") $script -Force
+Copy-Item (Join-Path $PSScriptRoot "PythonPartsScripts\airender\AirenderPalette.py") $script -Force
+Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\AirenderPalette.pyp") $libreria -Force
+Copy-Item (Join-Path $PSScriptRoot "Library\AIRENDER\palette_nessuna.png") $libreria -Force
+
 Write-Host "Fatto."
 Write-Host "  script:   $script"
 Write-Host "  libreria: $libreria"
-Write-Host "In Allplan: Libreria > Privato > AIRENDER > AIRENDER prova (oppure AIRENDER sonda)."
+Write-Host "In Allplan: Libreria > Privato > AIRENDER > AIRENDER (la palette v1; restano AIRENDER prova e AIRENDER sonda)."
