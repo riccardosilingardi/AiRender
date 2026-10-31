@@ -4,6 +4,22 @@
 Allplan ha la sua cartella (`v2026/`, poi `v2027/`) con l'unico file che
 importa `NemAll_Python_*`.
 
+## Allplan 2027: pacchetto plugin e installazione
+
+`v2027/pacchetto/` e' AIRENDER nel formato plugin della 2027 (`.allep`):
+`install-config.yml`, `requirements.in` (Pillow), il `.pyp`, l'adattatore e le
+icone dell'Actionbar, con la disposizione del PythonParts SDK 3.0.0
+(`PythonPartsScripts/<sviluppatore>/<plugin>/`). L'adattatore e' la copia di
+quello 2026 (un test lo tiene uguale), il `.pyp` lo scrive
+`v2027/scrivi_palette_pyp.py`.
+
+    python allplan/v2027/pacchetto.py              # dist/AIRENDER-2027.allep
+    python allplan/v2027/pacchetto.py --installa   # copia nella Usr della 2027
+
+`--installa` trova la Usr, copia gli stessi file dell'.allep e toglie le
+prove della 2026 (AIRENDER prova e sonda). Passi per Riccardo:
+[`docs/installa-2027.md`](../docs/installa-2027.md).
+
 ## La palette v1: `AIRENDER` (Allplan 2026, prompt 7)
 
 Il telecomando di `DESIGN.md`: Vista, Stile, Invio, Ultimo render. Genera non

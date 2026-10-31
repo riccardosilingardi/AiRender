@@ -8,8 +8,9 @@ modelli dello Studio: la palette chiama ogni cosa come lo Studio. Dopo un
 cambio dei blocchi si rilancia questo script; un test (tests/test_palette_pyp.py)
 fallisce finche' il .pyp nel repository non e' aggiornato.
 
-Lo schema della palette e' della versione di Allplan (regola 2 di CLAUDE.md):
-per la 2027 si copia questo file in allplan/v2027/ e si cambia li'.
+Lo schema della palette e' della versione di Allplan (regola 2 di CLAUDE.md).
+La 2027 usa gli stessi campi: allplan/v2027/scrivi_palette_pyp.py chiama
+pyp() con il suo percorso dello script.
 Nessun import di Allplan: gira con un Python qualunque.
 """
 
@@ -102,7 +103,14 @@ def _espansore(nome: str, testo: str, *figli: str) -> str:
     return _parametro(nome, "Expander", testo, figli=list(figli))
 
 
-def pyp() -> str:
+# Chi chiama pyp() senza argomenti ottiene il .pyp della 2026, come prima.
+# La 2027 (allplan/v2027/scrivi_palette_pyp.py) passa il suo anno dello
+# schema, il percorso dello script nel pacchetto plugin e il suo nome.
+SCRIPT_2026 = "airender\\AirenderPalette.py"
+
+
+def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
+        generato_da: str = "allplan/v2026/scrivi_palette_pyp.py") -> str:
     esterno, interno = "Interno == 0", "Interno == 1"
     parametri = [
         _nascosto("ImmaginiDaScript", "Integer", "0"),
@@ -161,10 +169,10 @@ def pyp() -> str:
     corpo = "\n".join(parametri)
     return (
         "<?xml version='1.0' encoding='UTF-8'?>\n"
-        "<!-- Generato da allplan/v2026/scrivi_palette_pyp.py: non modificare a mano. -->\n"
+        f"<!-- Generato da {generato_da}: non modificare a mano. -->\n"
         '<Element xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
-        'xsi:noNamespaceSchemaLocation="https://pythonparts.allplan.com/2026/schemas/PythonPart.xsd">\n'
-        "<Script>\n<Name>airender\\AirenderPalette.py</Name>\n<Title>AIRENDER</Title>\n"
+        f'xsi:noNamespaceSchemaLocation="https://pythonparts.allplan.com/{anno_schema}/schemas/PythonPart.xsd">\n'
+        f"<Script>\n<Name>{escape(script)}</Name>\n<Title>AIRENDER</Title>\n"
         "<Version>1.0</Version>\n</Script>\n"
         "<Page>\n<Name>Pagina</Name>\n<Text>AIRENDER</Text>\n<Parameters>\n"
         f"{corpo}\n</Parameters>\n</Page>\n</Element>\n"
