@@ -137,6 +137,26 @@ def test_il_riassunto_dice_intorno_verde_e_persone(cartella, chiamate):
     assert "intorno: campagna · verde: poco · persone: poche" in riassunto
 
 
+def test_la_fedelta_al_disegno_e_un_comando_acceso_in_tutte_e_due_le_scene(cartella, chiamate):
+    """Caso: lo Studio lascia «Fedeltà al disegno» in grigio quando il motore la compone gia'."""
+    catalogo = _studio(cartella, chiamate).catalogo()
+    for scena in ("esterno", "interno"):
+        assi = {a["id"]: a for a in catalogo["scene"][scena]["assi"]}
+        assert assi["fedelta"]["titolo"] == "Fedeltà al disegno"
+        assert [v["id"] for v in assi["fedelta"]["voci"]] == ["rigida", "bilanciata", "libera"]
+        assert all(v["origine"] == config.SCELTA for v in assi["fedelta"]["voci"])
+    script = (Path(__file__).resolve().parent.parent / "core" / "studio" / "pagine" / "studio.js").read_text(encoding="utf-8")
+    assert '"Fedeltà al disegno: rigida / bilanciata / libera ", presto' not in script
+
+
+def test_il_riassunto_dice_la_fedelta_solo_se_non_e_la_predefinita(cartella, chiamate):
+    studio = _studio(cartella, chiamate)
+    predefinita = studio.componi({"scelte": blocchi.da_preset("rivista").a_dizionario()})["riassunto"]
+    rigida = studio.componi({"scelte": blocchi.da_preset("rivista", fedelta="rigida").a_dizionario()})["riassunto"]
+    assert predefinita.startswith("Regola fissa · esterno")
+    assert rigida.startswith("Fedeltà al disegno rigida · esterno")
+
+
 def test_componi_restituisce_il_prompt_dei_blocchi_e_il_riassunto_in_italiano(cartella, chiamate):
     """Caso: lo Studio mostra un prompt diverso da quello che la coda mandera'."""
     scelte = blocchi.da_preset("ora-blu", materiali="intonaco bianco")

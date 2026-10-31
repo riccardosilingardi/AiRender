@@ -79,6 +79,15 @@ def _voci(asse: str, scena: str) -> list[tuple[str, str]]:
     ]
 
 
+def _fedelta() -> list[tuple[str, str]]:
+    """La predefinita per prima: e' la voce che la palette mostra all'apertura."""
+    voci = blocchi.voci("fedelta", blocchi.ESTERNO)
+    prima = voci[blocchi.FEDELTA_PREDEFINITA]
+    return [(prima.identificativo, prima.nome)] + [
+        (b.identificativo, b.nome) for b in voci.values() if b is not prima
+    ]
+
+
 def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
     """Gli elenchi a scelta della palette, con gli stessi nomi dello Studio · Genera.
 
@@ -95,6 +104,7 @@ def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
         "Intorno": _voci("intorno", blocchi.ESTERNO),
         "Verde": _voci("verde", blocchi.ESTERNO),
         "Persone": _voci("persone", blocchi.ESTERNO),
+        "Fedelta": _fedelta(),
         "Formato": [(None, COME_LA_FINESTRA)] + [(r, _NOMI_FORMATO.get(r, r)) for r in comfy.RAPPORTI],
         "Modello": [(m.identificativo, m.nome) for m in servizio.MODELLI],
         "Risoluzione": list(RISOLUZIONI),
@@ -125,6 +135,7 @@ class ValoriPalette:
     intorno: str = COME_IL_PRESET
     verde: str = COME_IL_PRESET
     persone: str = COME_IL_PRESET
+    fedelta: str = ""  # vuoto = la predefinita, come all'apertura della palette
     materiali: str = ""
     modello: str = ""
     formato: str = COME_LA_FINESTRA
@@ -156,6 +167,7 @@ class ValoriPalette:
             cambi["persone"] = persone
         if luce:
             cambi["luce"] = luce
+        cambi["fedelta"] = _identificativo("Fedelta", self.fedelta or voci_palette()["Fedelta"][0][1])
         cambi["risoluzione"] = _identificativo("Risoluzione", self.risoluzione or RISOLUZIONI[0][1])
         return blocchi.da_preset(self.preset(), **cambi)
 

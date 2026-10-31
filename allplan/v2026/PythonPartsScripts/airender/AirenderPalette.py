@@ -244,6 +244,7 @@ class AirenderPalette(BaseScriptObject):
             intorno=e.Intorno.value,
             verde=e.Verde.value,
             persone=e.Persone.value,
+            fedelta=e.Fedelta.value,
             materiali=e.Materiali.value or "",
             modello=e.Modello.value,
             formato=e.Formato.value,

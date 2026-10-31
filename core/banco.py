@@ -10,6 +10,8 @@ volta:
 - catena    un render, due passi uno sull'altro, poi «rifai pulito» dalla
             vista con le stesse richieste: quanto si spostano gli spigoli
             dopo tre generazioni rispetto a una;
+- fedelta   la stessa vista con la fedelta' al disegno rigida, bilanciata e
+            libera, stesso preset: quanti spigoli della vista restano?
 - aree      due aree con due note sulla stessa immagine, mandate (a) con i
             contorni numerati disegnati sopra e (b) con una maschera come
             immagine in piu': fuori dalle aree i pixel restano quelli di prima?
@@ -41,7 +43,7 @@ from .cli import _salva
 from .errori import ErroreAirender
 from .provider.base import Provider, RichiestaGenerazione
 
-PIANI = ("qualita", "look", "preset", "catena", "aree")
+PIANI = ("qualita", "look", "preset", "catena", "aree", "fedelta")
 VISTA = "vista"
 FORMATO = 1  # numero-non-configurabile: versione del formato di banco.json
 FILE_BANCO = "banco.json"
@@ -133,6 +135,15 @@ def piano(nome: str, scena: str = blocchi.ESTERNO, aree: tuple[Area, ...] = ()) 
         )
         return Piano(nome, "Il blocco 32k cambia il render rispetto a Base, a parità di tutto il resto?",
                      SPIGOLI, invii, (Confronto("base", "32k", "Base contro 32k"),))
+    if nome == "fedelta":
+        invii = tuple(
+            _da_preset(f"fedelta-{f}", f"{nome_riferimento} · fedeltà {b.nome.lower()}", riferimento, fedelta=f)
+            for f, b in blocchi.FEDELTA.items()
+        )
+        confronti = tuple(Confronto(VISTA, i.nome, f"Vista contro {i.titolo}") for i in invii)
+        confronti += (Confronto("fedelta-rigida", "fedelta-libera", "Rigida contro libera"),)
+        return Piano(nome, "Quanto si allontana dalla vista ogni fedeltà al disegno, a parità di tutto il resto?",
+                     SPIGOLI, invii, confronti)
     if nome == "look":
         base = blocchi.preset_stile(riferimento).scelte.look
         invii = [_da_preset(riferimento, f"{nome_riferimento} (look {blocchi.LOOK[base].nome})", riferimento)]

@@ -694,6 +694,15 @@ poggiano su cose non ancora provate:
 - **Un motore vecchio rifiuta i ritocchi** (formato 3) con un messaggio,
   invece di mandare il render senza aree: provato solo a codice.
 
+### Lasciato dalla sessione del 2026-10-31 (fedeltà al disegno)
+
+- **Le tre fedeltà cambiano davvero il render** — non verificato. Rigida e
+  Libera sono testi scritti, mai mandati a un modello; Bilanciata è la regola
+  fissa di sempre. Il piano «fedelta» del banco (3 invii, circa 52 crediti con
+  Nano Banana 2) le confronta sulla stessa vista e misura gli spigoli.
+- **Il menu «Fedeltà al disegno» nella palette** — generato nel `.pyp`, mai
+  aperto in Allplan.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di

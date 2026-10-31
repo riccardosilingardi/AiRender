@@ -94,6 +94,7 @@ RESE = (
 )
 
 _TITOLI_ASSI = {
+    "fedelta": "Fedeltà al disegno",
     "look": "Look fotografico",
     "luce": "Ora / Luce",
     "cielo": "Cielo e stagione",
@@ -1193,7 +1194,10 @@ def _prompt_a_mano(dati: dict) -> str | None:
 
 def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     """Le scelte in italiano, nell'ordine in cui partono i blocchi."""
-    pezzi = ["Regola fissa", scelte.scena]
+    fedelta = scelte.fedelta or blocchi.FEDELTA_PREDEFINITA
+    regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
+        else f"Fedeltà al disegno {blocchi.FEDELTA[fedelta].nome.lower()}"
+    pezzi = [regola, scelte.scena]
     if scelte.materiali.strip():
         pezzi.append("i tuoi materiali")
     origine = blocchi.PRESET_STILE.get(preset or "")
