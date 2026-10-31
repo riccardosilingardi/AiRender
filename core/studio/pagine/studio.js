@@ -766,11 +766,41 @@ function elencoRender() {
     h("p", { classe: "tenue piccolo" }, "Per un A/B fra modelli: genera la stessa vista con un altro modello, poi scegli «Confronta con»."));
 }
 
-function tenuta() {
-  return h("section", { classe: "pannello", "aria-label": "Tenuta della geometria" },
-    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Tenuta della geometria"), presto("Misura in arrivo")),
-    h("span", { classe: "misura" }, "Non misurata"),
-    h("p", { classe: "tenue piccolo" }, "Il controllo automatico degli spigoli non c'è ancora. Per ora giudica tu, confrontando le due immagini."));
+// La misura degli spigoli: un numero solo se il motore l'ha fatta, altrimenti
+// «Non misurata» e perché (regola 3). La spiegazione dice che è grezza.
+const SPIEGA_SPIGOLI = "Quota degli spigoli della vista Allplan ritrovati nel render, sempre contro la vista. Misura grezza: ombre nuove, neve e vegetazione davanti contano come spigoli persi. Il giudizio resta tuo sul prima/dopo.";
+
+function percento(q) { return `${Math.round(q * 100)}%`; }
+
+function corpoTenuta(t, identificativo, nota) {
+  const figli = [h("span", { classe: "etichetta" }, "Tenuta della geometria")];
+  if (!t) {
+    figli.push(h("span", { classe: "misura" }, "Non misurata"), h("p", { classe: "tenue piccolo" }, "Si misura quando il render è pronto."));
+  } else if (t.spigoli === null || t.spigoli === undefined) {
+    figli.push(h("span", { classe: "misura" }, "Non misurata"), h("p", { classe: "tenue piccolo" }, `Perché: ${t.motivo}.`));
+    if (t.da_misurare && identificativo) {
+      figli.push(h("button", { classe: "btn", onclick: () => misuraOra(identificativo) }, "Misura ora"));
+    }
+  } else {
+    figli.push(h("span", { classe: "misura" }, `Spigoli ritrovati: ${percento(t.spigoli)}`));
+    if (t.avvisa) {
+      figli.push(avviso("attenzione", `Sotto il ${percento(t.soglia)}: la geometria può essersi mossa.`, "Guardalo con la linea del prima/dopo. Soglia scelta, non ancora tarata su render veri."));
+    }
+  }
+  figli.push(h("p", { classe: "tenue piccolo" }, nota || SPIEGA_SPIGOLI));
+  return h("section", { classe: "pannello", "aria-label": "Tenuta della geometria" }, ...figli);
+}
+
+async function misuraOra(identificativo) {
+  try {
+    await post(`/api/lavori/${enc(identificativo)}/misura`, {});
+    await caricaRender();
+  } catch (e) { S.errore = e; }
+  render();
+}
+
+function tenuta(l) {
+  return corpoTenuta(l ? l.tenuta : null, l ? l.identificativo : null);
 }
 
 function ricettaPannello(l) {
@@ -834,12 +864,12 @@ function adesso(l) {
     conferma);
 }
 
-function cambiaParte() {
-  return h("section", { classe: "pannello grigio", "aria-label": "Cambia una parte" },
+function cambiaParte(l) {
+  return h("section", { classe: "pannello", "aria-label": "Cambia una parte" },
     h("span", { classe: "etichetta" }, "Cambia una parte"),
     h("div", { classe: "azioni" },
       h("button", { classe: "btn", disabled: true }, "Cambia un materiale ", presto()),
-      h("button", { classe: "btn", disabled: true }, "Annota per aree ", presto()),
+      h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }) }, "Annota per aree"),
       h("button", { classe: "btn", disabled: true }, "Fai un video da qui ", presto("Dopo la v1"))));
 }
 
@@ -879,7 +909,7 @@ function schermataRisultato() {
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
       confronto(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(), ricettaPannello(l), adesso(l), cambiaParte(),
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l), cambiaParte(l),
         altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }
@@ -1695,10 +1725,8 @@ function latoPassi(passo) {
     blocchi.push(avviso("errore", "Il punto di partenza non c'è più: il render del passo prima è stato tolto dalla cartella.",
       "Rifai pulito dalla vista: riparte dalla vista Allplan con le stesse richieste."));
   }
-  blocchi.push(h("section", { classe: "pannello", "aria-label": "Tenuta della geometria" },
-    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Tenuta della geometria"), presto("Misura in arrivo")),
-    h("span", { classe: "misura" }, "Non misurata"),
-    h("p", { classe: "tenue piccolo" }, "Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto. Per ora giudica tu, con la linea del prima/dopo.")));
+  blocchi.push(corpoTenuta(passo.tenuta, null,
+    "Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto. Misura grezza: ombre e vegetazione nuove contano come spigoli persi."));
   if (passo.aree && passo.aree.length && passo.render) blocchi.push(pannelloFuoriAree(passo));
   if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
   const dest = S.passi.dest[passo.modello];

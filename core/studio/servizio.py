@@ -624,7 +624,39 @@ class Studio:
             "prompt_a_mano": bool(dati.get("prompt_a_mano")),
             "render": render is not None,
             "scostamento_geometria": stato.get("scostamento_geometria"),
+            "tenuta": self._tenuta(render),
         }
+
+    def _tenuta(self, render: Path | None) -> dict | None:
+        """La misura degli spigoli di un render, come la mostra lo Studio. None senza render."""
+        if render is None:
+            return None
+        misura = modulo_coda.leggi_misura(render)
+        if misura is None:
+            return {"spigoli": None, "motivo": "render fatto prima che la misura esistesse",
+                    "da_misurare": True, "avvisa": False, "soglia": config.GEOMETRY_DRIFT_WARN}
+        spigoli = misura.get("spigoli")
+        numero = isinstance(spigoli, (int, float))
+        return {
+            "spigoli": spigoli if numero else None,
+            "motivo": None if numero else (misura.get("motivo") or "misura non riuscita"),
+            "da_misurare": False,
+            "avvisa": numero and spigoli < config.GEOMETRY_DRIFT_WARN,
+            "soglia": config.GEOMETRY_DRIFT_WARN,
+        }
+
+    def misura_ora(self, identificativo: str) -> dict:
+        """Misura gli spigoli di un render fatto prima della misura, e la salva accanto."""
+        self._controlla_id(identificativo)
+        render = self._render(identificativo)
+        if render is None:
+            raise FileNonTrovato(
+                "Questo lavoro non ha un render da misurare.",
+                "Scegli un render fatto nell'elenco dei render della vista.",
+            )
+        lavoro, _cartella = self._lavoro(identificativo)
+        modulo_coda.scrivi_misura(Path(lavoro.vista), render)
+        return self._tenuta(render)
 
     def _render_valido(self, percorso: Path) -> bool:
         """Un render si usa come partenza solo se sta in lavori/fatto e c'e' ancora."""
@@ -803,6 +835,7 @@ class Studio:
             "creato_il": passo.get("creato_il"),
             "stato": stato,
             "attivo": stato in STATI_ATTIVI,
+            "tenuta": self._tenuta(render) if ha_render else None,
             "render": ha_render,
             "si_parte": motivo is None,
             "motivo_non_si_parte": motivo,

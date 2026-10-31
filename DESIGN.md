@@ -209,16 +209,21 @@ decisione che questa schermata deve far prendere.
   modello (A/B fra modelli).
 - **Render di questa vista**: l'elenco dei render fatti dalla stessa vista,
   con modello e data, per sceglierne uno o confrontarne due.
-- **Tenuta della geometria: «Non misurata»**, con «Misura in arrivo» e la
-  frase «Il controllo automatico degli spigoli non c'è ancora. Per ora giudica
-  tu, confrontando le due immagini.» Mai un numero finché la misura non c'è.
+- **Tenuta della geometria** (dal 2026-10-31): «Spigoli ritrovati: 82%», la
+  quota degli spigoli della vista Allplan ritrovati nel render, misurata dalla
+  coda appena il render è salvato. Sotto `GEOMETRY_DRIFT_WARN` (scelta, non
+  tarata) un avviso: «la geometria può essersi mossa». Sempre accanto, la
+  frase che la misura è grezza (ombre, neve, vegetazione nuove contano come
+  spigoli persi). Se non si è potuta fare: «Non misurata» e il perché, mai un
+  numero. Render fatti prima della misura: «Non misurata», il perché e il
+  pulsante **Misura ora**.
 - **Com'è stato fatto** (la ricetta): stile, modello, le parole dell'utente,
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
 - **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine; in
   grigio Esporta per il cliente.
-- **Cambia una parte** (in grigio): Cambia un materiale, Annota per aree, Fai
-  un video da qui.
+- **Cambia una parte**: **Annota per aree** apre Ritocca su questo render; in
+  grigio Cambia un materiale e Fai un video da qui.
 
 - **Vuoto:** «Nessun render ancora. Scegli uno stile in Genera e premi
   Genera.» Niente slider, niente ricetta.
@@ -229,8 +234,8 @@ decisione che questa schermata deve far prendere.
   fare adesso; la ricetta del tentativo resta visibile, con Rifai. Se il
   servizio dichiara un provider diverso da quello annunciato, il render ha un
   avviso in testa.
-- **Pieno:** prima/dopo, Render di questa vista, tenuta della geometria «Non
-  misurata», ricetta, Rifai.
+- **Pieno:** prima/dopo, Render di questa vista, tenuta della geometria
+  (spigoli ritrovati, o «Non misurata» col perché), ricetta, Rifai.
 
 ### Studio · Passi
 
@@ -264,8 +269,8 @@ chiama **Passi** (era Livelli).
 - **La ricetta** del passo (com'è stato fatto, come in Risultato).
 - **Tenuta della geometria**, misurata **sempre contro la vista Allplan**, non
   contro il passo prima: è l'edificio disegnato che deve restare, e un
-  confronto col passo prima nasconderebbe lo spostamento accumulato. Finché
-  la misura non c'è: «Non misurata».
+  confronto col passo prima nasconderebbe lo spostamento accumulato. Stessa
+  misura e stesse frasi di Risultato; senza misura: «Non misurata» e perché.
 - **Dalla seconda generazione di fila**, un avviso: «Questo passo è la 2ª
   generazione di fila: gli spigoli possono spostarsi un poco a ogni
   giro. Se vedi l'edificio cambiare, rifai pulito dalla vista.» Quanto si
