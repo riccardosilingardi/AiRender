@@ -380,6 +380,9 @@ class Avviatore:
 
     def _ambiente(self, origine: str) -> dict[str, str]:
         ambiente = sonda.ambiente_per(origine, self.ambiente)
+        # Senza console Python scriverebbe nella codifica di Windows (cp1252):
+        # la coda e lo Studio scrivono in UTF-8, come i loro file.
+        ambiente["PYTHONIOENCODING"] = "utf-8"
         if "sistema" not in origine and self.cartella_pillow:
             # Il Python di Allplan fuori da Allplan non vede la cartella dove
             # «Install Python Package» ha messo Pillow: gliela si indica.

@@ -395,6 +395,27 @@ def chiedi_annullamento(radice: Path, identificativo: str) -> Path:
 # --- il processo -------------------------------------------------------------
 
 
+def dire_sicuro(testo: str) -> None:
+    """print che non fa mai fallire un lavoro.
+
+    Lanciata dalla palette, la coda gira senza console (uscita su DEVNULL) e su
+    Windows Python scrive allora nella codifica locale (cp1252), che non ha la
+    freccia della destinazione: print sollevava UnicodeEncodeError e il lavoro
+    finiva fra gli errori prima dell'invio (Allplan 2027, 2026-10-31). Un
+    carattere che la console non sa scrivere diventa «?», il lavoro va avanti.
+    """
+    flusso = sys.stdout
+    if flusso is None:
+        return
+    try:
+        print(testo, file=flusso)
+    except UnicodeEncodeError:
+        codifica = getattr(flusso, "encoding", None) or "ascii"
+        print(testo.encode(codifica, errors="replace").decode(codifica), file=flusso)
+    except (OSError, ValueError):
+        pass  # uscita chiusa: il messaggio e' solo informativo
+
+
 class Coda:
     """Prende un lavoro alla volta da in-attesa/ e lo porta fino in fondo."""
 
@@ -402,7 +423,7 @@ class Coda:
         self,
         radice: Path,
         crea_provider: Callable[[str], Provider] = registro.crea,
-        dire: Callable[[str], None] = print,
+        dire: Callable[[str], None] = dire_sicuro,
         attesa: Callable[[float], None] = time.sleep,
     ) -> None:
         self.radice = Path(radice)

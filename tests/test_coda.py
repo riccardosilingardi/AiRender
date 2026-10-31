@@ -397,3 +397,25 @@ def test_senza_chiave_lo_stato_non_dice_mai_inviato(radice, vista, monkeypatch):
     assert stato["stato"] == "errore"
     assert comfy.VARIABILI_CHIAVE[0] in stato["cosa_fare"]
     assert "inviato" not in visti
+
+
+def test_dire_sicuro_non_fa_fallire_un_lavoro_su_una_uscita_cp1252(monkeypatch):
+    """Caso vero (Allplan 2027, 2026-10-31): coda senza console su Windows, la
+    freccia della destinazione in cp1252 sollevava UnicodeEncodeError."""
+    import io
+
+    from core import coda as modulo
+
+    grezzo = io.BytesIO()
+    uscita = io.TextIOWrapper(grezzo, encoding="cp1252")
+    monkeypatch.setattr(modulo.sys, "stdout", uscita)
+    modulo.dire_sicuro("Lavoro x: destinazione Comfy Router (api.comfy.org) → vertexai/gemini")
+    uscita.flush()
+    assert "Comfy Router (api.comfy.org) ? vertexai" in grezzo.getvalue().decode("cp1252")
+
+
+def test_dire_sicuro_senza_uscita_non_solleva(monkeypatch):
+    from core import coda as modulo
+
+    monkeypatch.setattr(modulo.sys, "stdout", None)
+    modulo.dire_sicuro("→")
