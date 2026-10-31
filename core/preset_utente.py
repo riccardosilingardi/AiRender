@@ -147,7 +147,8 @@ def carica(voce: dict) -> dict:
             continue
         pulite[asse] = valore
     scena = pulite.get("scena", blocchi.ESTERNO)
-    for asse in blocchi.ORDINE_ASSI:
+    predefinite = {"qualita": blocchi.QUALITA_PREDEFINITA, "fedelta": blocchi.FEDELTA_PREDEFINITA}
+    for asse in ("fedelta", *blocchi.ORDINE_ASSI):
         valore = pulite.get(asse)
         if not valore:
             continue
@@ -156,7 +157,7 @@ def carica(voce: dict) -> dict:
                 raise KeyError(valore)
         except (KeyError, blocchi.SceltaNonValida):
             perse.append(f"{asse}: «{valore}» non esiste piu'")
-            pulite[asse] = None if asse != "qualita" else blocchi.QUALITA_PREDEFINITA
+            pulite[asse] = predefinite.get(asse)
     try:
         scelte = blocchi.Scelte.da_dizionario(pulite).a_dizionario()
     except blocchi.SceltaNonValida as errore:

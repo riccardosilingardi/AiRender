@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 5 (2026-10-30)
+# Blocchi di stile — bozza 6 (2026-10-31)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -8,13 +8,23 @@ Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campa
 
 > Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below.
 
+## Fedeltà al disegno (bozza 6, 2026-10-31)
+
+Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è la regola fissa di sempre, parola per parola, ed è la predefinita (SCELTA): i prompt delle bozze 4 e 5 non cambiano. **Rigida** aggiunge vincoli su sagoma, aperture e numero di elementi. **Libera** tiene volumi, aperture e inquadratura e permette dettagli costruttivi; il contesto lo decidono ancora Intorno e Verde, così i blocchi non si contraddicono. Non è un parametro del modello: il Router non ha una forza strutturale. Nessuna delle tre è provata; il piano «fedelta» del banco di prova le confronta sulla stessa vista e misura gli spigoli ritrovati.
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `rigida` | Rigida | Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. Match the drawing strictly: same silhouette, same number and position of windows, doors, columns and floors, same roof line; if in doubt, change less. | 345 |
+| `bilanciata` | Bilanciata | Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. | 194 |
+| `libera` | Libera | Edit this image. Keep the camera, framing, proportions and the building's volumes and openings; you may refine materials and add plausible construction details such as joints, sills, gutters and fixings. Do not change the building's shape. Change the look described below. | 272 |
+
 ## Cosa evitare (sempre in coda)
 
 > Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.
 
 ## Ordine nel prompt
 
-Regola fissa → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
+Regola fissa (secondo la Fedeltà al disegno) → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
 
 Un **passo** fatto su un render già generato (albero dei passi, piano «catena» del banco di prova) non rimanda tutto: regola fissa → scena → solo gli assi che cambiano → cosa evitare.
 

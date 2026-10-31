@@ -1,8 +1,9 @@
 """I blocchi di stile e i preset che li combinano.
 
-Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 5 del
-2026-10-30 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche» nella
-4, piu' la regola dei passi e le richieste a parole nella 5). Sono **riscritti** dalla prompt library di Riccardo (Notion,
+Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 6 del
+2026-10-31 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche» nella
+4, piu' la regola dei passi e le richieste a parole nella 5, piu' la
+fedelta' al disegno nella 6). Sono **riscritti** dalla prompt library di Riccardo (Notion,
 ispirata a Visoid), non copiati: un blocco tocca un asse solo, cosi' cambiarne
 uno non disfa gli altri. Testo per il modello in inglese, nomi per l'utente in
 italiano.
@@ -35,7 +36,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-5"
+VERSIONE = "bozza-6"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -81,6 +82,30 @@ REGOLA_FISSA = Blocco(
     "building element exactly as they are; do not add, remove or reshape any "
     "architecture. Change only the look described below.",
 )
+
+# Fedelta' al disegno: quanto il modello puo' discostarsi dalla vista. Non e'
+# un parametro del modello (il Router non ha una forza strutturale, vedi
+# provider/comfy.py): e' la regola fissa, scritta in tre modi. «Bilanciata» e'
+# la regola fissa di sempre, parola per parola, cosi' i prompt di prima non
+# cambiano. Nessuna delle tre e' provata: il piano «fedelta» del banco serve
+# a misurarle.
+FEDELTA = _blocchi(
+    ("rigida", "Rigida",
+     REGOLA_FISSA.testo + " Match the drawing strictly: same silhouette, same "
+     "number and position of windows, doors, columns and floors, same roof line; "
+     "if in doubt, change less."),
+    ("bilanciata", "Bilanciata", REGOLA_FISSA.testo),
+    ("libera", "Libera",
+     "Edit this image. Keep the camera, framing, proportions and the building's "
+     "volumes and openings; you may refine materials and add plausible "
+     "construction details such as joints, sills, gutters and fixings. Do not "
+     "change the building's shape. Change the look described below."),
+)
+
+# SCELTA: e' la regola con cui sono stati fatti tutti i render fino al
+# 2026-10-31. Cambia solo se il piano «fedelta» del banco dice che un'altra
+# tiene meglio la geometria senza perdere resa.
+FEDELTA_PREDEFINITA = "bilanciata"
 
 COSA_EVITARE = Blocco(
     "evitare",
@@ -260,6 +285,7 @@ QUALITA = _blocchi(
 # Asse -> (blocchi possibili, scene in cui vale). Un asse fuori dalla sua
 # scena si rifiuta: il cielo di un interno non esiste.
 ASSI = {
+    "fedelta": (FEDELTA, SCENE),
     "look": (LOOK, SCENE),
     "luce": (None, SCENE),  # dipende dalla scena: vedi _blocchi_luce
     "cielo": (CIELO, (ESTERNO,)),
@@ -293,6 +319,7 @@ class Scelte:
     verde: str | None = None
     persone: str | None = None
     qualita: str = QUALITA_PREDEFINITA
+    fedelta: str = FEDELTA_PREDEFINITA
     # Non e' un blocco di prompt: e' la grandezza del render che si chiede al
     # modello. Sta qui perche' viaggia con le scelte dalla palette alla coda.
     risoluzione: str = config.RISOLUZIONE_RENDER_PREDEFINITA
@@ -432,7 +459,8 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
     for asse in ("cielo", "fuori", "arredo", "intorno", "verde"):
         if asse not in ordine and getattr(scelte, asse):
             _blocco(asse, getattr(scelte, asse), scelte.scena)
-    blocchi = [REGOLA_FISSA, SCENA[scelte.scena]]
+    blocchi = [_blocco("fedelta", scelte.fedelta or FEDELTA_PREDEFINITA, scelte.scena),
+               SCENA[scelte.scena]]
     for asse in ordine:
         valore = getattr(scelte, asse)
         if valore:
@@ -449,7 +477,7 @@ def frase_materiali(materiali: str) -> str:
 def componi(scelte: Scelte) -> str:
     """Il prompt che parte al modello, in inglese, nell'ordine fisso."""
     blocchi = blocchi_scelti(scelte)
-    pezzi = [b.testo for b in blocchi[:2]]  # regola fissa, scena
+    pezzi = [b.testo for b in blocchi[:2]]  # regola fissa (secondo la fedelta'), scena
     materiali = frase_materiali(scelte.materiali)
     if materiali:
         pezzi.append(materiali)

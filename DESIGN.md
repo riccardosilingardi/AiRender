@@ -179,7 +179,11 @@ vista con colori neutri.»
   coda con le stesse scelte, uno dopo l'altro, e il costo accanto a Genera è
   N volte quello di un render («circa 69 crediti per 4 immagini»). Se il
   costo del modello non è misurato, resta «non misurato», mai un numero.
-- In grigio: Fedeltà al disegno, Immagine di riferimento per lo stile.
+- **Fedeltà al disegno**: Rigida / Bilanciata / Libera, predefinita
+  Bilanciata (SCELTA). Una riga sotto dice cosa fa ognuna e che i tre testi
+  non sono ancora confrontati sul banco di prova. Si conserva quando si
+  cambia preset o scena, come la qualità.
+- In grigio: Immagine di riferimento per lo stile.
 - **Destinazione e costo**, poi **Prova a secco** e **Genera** («Genera 3
   render» quando le varianti sono più di una).
 
@@ -500,6 +504,23 @@ cartella delle viste: sono dell'utente, non del repository.
 
 Nella palette di Allplan i miei preset non compaiono: il menu della palette è
 scritto nel `.pyp` quando si installa, e cambiarlo da script non è provato.
+
+## Fedeltà al disegno, costruita il 2026-10-31
+
+Un comando a tre voci nella colonna destra di Studio · Genera e un menu
+«Fedeltà al disegno» nella sezione 2 della palette. Non è un parametro del
+modello: cambia la regola fissa in testa al prompt (blocchi, bozza 6).
+
+- **Vuoto:** non esiste: c'è sempre una voce scelta, Bilanciata
+  all'apertura, che è la regola fissa di sempre.
+- **In corso:** come Genera; la fedeltà del lavoro partito non cambia se la
+  si tocca dopo.
+- **Errore:** una fedeltà che il motore non conosce (palette vecchia, preset
+  salvato con una voce tolta) si rifiuta con le voci possibili; un mio
+  preset con una fedeltà che non c'è più torna a Bilanciata e lo dice.
+- **Pieno:** «Cosa parte, in breve» comincia con «Fedeltà al disegno
+  rigida» o «libera» quando non è Bilanciata; il prompt completo mostra il
+  testo vero.
 
 ## Schermate sostituite il 2026-10-27
 

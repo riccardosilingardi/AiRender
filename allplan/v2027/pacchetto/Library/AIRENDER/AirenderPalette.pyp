@@ -223,6 +223,13 @@
 <ValueType>StringComboBox</ValueType>
 </Parameter>
 <Parameter>
+<Name>Fedelta</Name>
+<Text>Fedeltà al disegno</Text>
+<Value>Bilanciata</Value>
+<ValueList>Bilanciata|Rigida|Libera</ValueList>
+<ValueType>StringComboBox</ValueType>
+</Parameter>
+<Parameter>
 <Name>Materiali</Name>
 <Text>Materiali</Text>
 <Value></Value>

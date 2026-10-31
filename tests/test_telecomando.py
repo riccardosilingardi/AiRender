@@ -106,6 +106,15 @@ def test_un_interno_ignora_cielo_e_intorno_dell_esterno():
     blocchi.componi(scelte)
 
 
+def test_la_fedelta_della_palette_parte_dalla_predefinita_e_si_cambia():
+    """Caso: la palette apre su «Rigida» e cambia tutti i render senza che l'utente l'abbia scelto."""
+    voci = tc.voci_palette()["Fedelta"]
+    assert voci[0] == (blocchi.FEDELTA_PREDEFINITA, "Bilanciata")
+    assert {i for i, _n in voci} == set(blocchi.FEDELTA)
+    assert _valori().scelte().fedelta == blocchi.FEDELTA_PREDEFINITA
+    assert _valori(fedelta="Rigida").scelte().fedelta == "rigida"
+
+
 def test_una_voce_che_il_motore_non_conosce_dice_di_reinstallare():
     """Caso: palette vecchia con un motore nuovo, e la scelta si perde in silenzio."""
     with pytest.raises(blocchi.SceltaNonValida) as errore:

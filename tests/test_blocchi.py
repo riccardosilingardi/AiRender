@@ -1,4 +1,4 @@
-"""La composizione del prompt a blocchi, dalla bozza 5 (docs/ui/blocchi-stile-bozza.md)."""
+"""La composizione del prompt a blocchi, dalla bozza 6 (docs/ui/blocchi-stile-bozza.md)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def test_i_testi_dei_blocchi_sono_quelli_della_bozza():
     nel_codice = set()
     for elenco in (blocchi.SCENA, blocchi.LOOK, blocchi.LUCE_ESTERNI, blocchi.CIELO,
                    blocchi.INTORNO, blocchi.VERDE, blocchi.LUCE_INTERNI, blocchi.FUORI, blocchi.ARREDO,
-                   blocchi.PERSONE, blocchi.QUALITA):
+                   blocchi.PERSONE, blocchi.QUALITA, blocchi.FEDELTA):
         for blocco in elenco.values():
             nel_codice.add((blocco.identificativo, blocco.testo))
     assert nel_codice == bozza
@@ -41,7 +41,8 @@ def test_nessun_blocco_si_presenta_come_provato():
     """Caso: un blocco mai mandato al modello appare a schermo come misurato."""
     tutti = [blocchi.REGOLA_FISSA, blocchi.COSA_EVITARE]
     for elenco in (blocchi.LOOK, blocchi.LUCE_ESTERNI, blocchi.CIELO, blocchi.QUALITA,
-                   blocchi.INTORNO, blocchi.VERDE, blocchi.PERSONE, blocchi.FUORI, blocchi.ARREDO):
+                   blocchi.INTORNO, blocchi.VERDE, blocchi.PERSONE, blocchi.FUORI, blocchi.ARREDO,
+                   blocchi.FEDELTA):
         tutti += list(elenco.values())
     assert {b.origine for b in tutti} == {config.SCELTA}
 
@@ -204,3 +205,32 @@ def test_un_passo_vuoto_o_con_un_asse_sconosciuto_si_rifiuta():
     assert "verde" in errore.value.cosa_fare
     with pytest.raises(SceltaNonValida):
         blocchi.componi_passo("interno", {"verde": "poco"})
+
+
+# --- fedelta' al disegno (bozza 6) -------------------------------------------
+
+
+def test_la_fedelta_predefinita_lascia_il_prompt_di_prima():
+    """Caso: la bozza 6 cambia in silenzio tutti i prompt, e i render di prima non si confrontano piu'."""
+    assert Scelte().fedelta == blocchi.FEDELTA_PREDEFINITA == "bilanciata"
+    assert blocchi.FEDELTA["bilanciata"].testo == blocchi.REGOLA_FISSA.testo
+    assert componi(da_preset("rivista")).startswith(blocchi.REGOLA_FISSA.testo + " The subject")
+
+
+@pytest.mark.parametrize("fedelta", ["rigida", "libera"])
+def test_la_fedelta_cambia_solo_la_regola_in_testa(fedelta):
+    """Caso: la fedelta' tocca anche gli altri blocchi, e il confronto del banco non dice niente."""
+    base = componi(da_preset("ora-blu"))
+    altra = componi(da_preset("ora-blu", fedelta=fedelta))
+    assert altra.startswith(blocchi.FEDELTA[fedelta].testo + " The subject")
+    assert altra[len(blocchi.FEDELTA[fedelta].testo):] == base[len(blocchi.REGOLA_FISSA.testo):]
+
+
+def test_una_fedelta_che_non_esiste_si_rifiuta_con_le_voci_possibili():
+    with pytest.raises(SceltaNonValida) as errore:
+        componi(Scelte(fedelta="morbida"))
+    assert "rigida" in errore.value.cosa_fare and "libera" in errore.value.cosa_fare
+
+
+def test_la_fedelta_vale_anche_per_gli_interni():
+    assert componi(da_preset("interno-rivista", fedelta="rigida")).startswith(blocchi.FEDELTA["rigida"].testo)

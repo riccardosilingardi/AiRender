@@ -2,7 +2,7 @@
 
     python allplan/v2026/scrivi_palette_pyp.py
 
-Gli elenchi a scelta (preset, ora, cielo, intorno, verde, persone, formato, modello) vengono da
+Gli elenchi a scelta (preset, ora, cielo, intorno, verde, persone, fedelta', formato, modello) vengono da
 `allplan/comune/telecomando.voci_palette()`, cioe' da core/blocchi.py e dai
 modelli dello Studio: la palette chiama ogni cosa come lo Studio. Dopo un
 cambio dei blocchi si rilancia questo script; un test (tests/test_palette_pyp.py)
@@ -142,6 +142,7 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
             _scelta("Intorno", "Intorno", esterno),
             _scelta("Verde", "Verde, alberi", esterno),
             _scelta("Persone", "Persone"),
+            _scelta("Fedelta", "Fedeltà al disegno"),
             _parametro("Materiali", "String", "Materiali", ""),
             _scelta("Modello", "Modello"),
             _scelta("Risoluzione", "Risoluzione del render"),

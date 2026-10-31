@@ -74,3 +74,15 @@ def test_rinomina_ed_elimina(tmp_path):
     assert [p["nome"] for p in pu.leggi(tmp_path).preset] == ["C"]
     with pytest.raises(pu.PresetUtenteNonValido):
         pu.elimina(tmp_path, "B")
+
+
+def test_la_fedelta_si_salva_e_una_che_non_esiste_torna_alla_predefinita(tmp_path):
+    """Caso: un preset salvato con una fedelta' tolta dai blocchi non si carica piu'."""
+    pu.salva(tmp_path, "Rigido", _scelte(fedelta="rigida"), "m")
+    assert pu.carica(pu.leggi(tmp_path).preset[0])["scelte"]["fedelta"] == "rigida"
+    dati = json.loads(pu.percorso(tmp_path).read_text(encoding="utf-8"))
+    dati["preset"][0]["scelte"]["fedelta"] = "vecchia"
+    pu.percorso(tmp_path).write_text(json.dumps(dati), encoding="utf-8")
+    voce = pu.carica(pu.leggi(tmp_path).preset[0])
+    assert voce["scelte"]["fedelta"] == blocchi.FEDELTA_PREDEFINITA
+    assert any("vecchia" in p for p in voce["perse"])
