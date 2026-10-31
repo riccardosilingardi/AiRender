@@ -320,6 +320,8 @@ def test_il_python_di_allplan_con_pillow_vince_e_vede_la_cartella_di_pillow(cart
     origine, comando, ambiente = avviatore.python()
     assert comando == [python_allplan] and "Allplan" in origine
     assert ambiente["PYTHONPATH"].startswith("C:/Usr/PythonParts-site-packages")
+    # Senza console Windows scriverebbe in cp1252: la freccia «→» faceva fallire il lavoro.
+    assert ambiente["PYTHONIOENCODING"] == "utf-8"
 
 
 def test_senza_pillow_si_passa_al_python_di_sistema_senza_le_variabili_di_allplan(cartella, tmp_path):
@@ -330,6 +332,7 @@ def test_senza_pillow_si_passa_al_python_di_sistema_senza_le_variabili_di_allpla
     origine, comando, ambiente = avviatore.python()
     assert comando == ["C:/Windows/py.exe", "-3"] and "sistema" in origine
     assert "PYTHONHOME" not in ambiente and "PYTHONPATH" not in ambiente
+    assert ambiente["PYTHONIOENCODING"] == "utf-8"
 
 
 def test_allplan_exe_non_si_lancia_mai(cartella, tmp_path):
