@@ -2,7 +2,7 @@
 
     python allplan/v2026/scrivi_palette_pyp.py
 
-Gli elenchi a scelta (preset, ora, cielo, intorno, modello) vengono da
+Gli elenchi a scelta (preset, ora, cielo, intorno, verde, persone, formato, modello) vengono da
 `allplan/comune/telecomando.voci_palette()`, cioe' da core/blocchi.py e dai
 modelli dello Studio: la palette chiama ogni cosa come lo Studio. Dopo un
 cambio dei blocchi si rilancia questo script; un test (tests/test_palette_pyp.py)
@@ -34,13 +34,15 @@ IMMAGINE_VUOTA = "palette_nessuna.png"
 # Gli eventi dei pulsanti: AirenderPalette.py usa gli stessi numeri.
 EVENTI = {
     "Cattura": 1001,
-    "ProvaASecco": 1002,
     "Genera": 1003,
     "Annulla": 1004,
     "Aggiorna": 1005,
     "ApriStudio": 1006,
     "ApriCartella": 1007,
+    "VediTaglio": 1008,
 }
+# 1002 era «Prova a secco», tolta dalla palette il 2026-10-31: non si riusa,
+# cosi' un .pyp vecchio rimasto in giro non fa partire un'altra azione.
 
 
 def _parametro(nome: str, tipo: str, testo: str = "", valore: str | None = None, *,
@@ -125,6 +127,8 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
             _sola_lettura("VistaEsito", "Esito"),
             _riga("RigaCattura", "Finestra attiva", _pulsante("Cattura", "Cattura vista")),
             _radio("Dimensione", "Dimensione", ["Come la finestra", "1920 × 1080", "3840 × 2160"]),
+            _scelta("Formato", "Formato"),
+            _riga("RigaTaglio", "Taglio", _pulsante("VediTaglio", "Vedi cosa taglia")),
         ),
         _espansore(
             "Sezione2", "2 · Stile",
@@ -136,6 +140,8 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
             _scelta("LuceInterno", "Luce", interno),
             _scelta("Cielo", "Cielo", esterno),
             _scelta("Intorno", "Intorno", esterno),
+            _scelta("Verde", "Verde, alberi", esterno),
+            _scelta("Persone", "Persone"),
             _parametro("Materiali", "String", "Materiali", ""),
             _scelta("Modello", "Modello"),
         ),
@@ -146,7 +152,6 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
             _sola_lettura("Costo", "Costo"),
             _sola_lettura("Stato", "Stato"),
             _riga("RigaInvio", "Motore",
-                  _pulsante("ProvaASecco", "Prova a secco"),
                   _pulsante("Genera", "Genera render", "InCorso == 0"),
                   _pulsante("Annulla", "Annulla", "InCorso == 1")),
             _riga("RigaAggiorna", "Stato del lavoro", _pulsante("Aggiorna", "Aggiorna")),

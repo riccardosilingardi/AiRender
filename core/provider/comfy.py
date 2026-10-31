@@ -34,7 +34,7 @@ import os
 import time
 import urllib.parse
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from email.utils import parsedate_to_datetime
 from typing import Callable
 
@@ -77,6 +77,9 @@ class SchemaModello:
     - `immagine` trova l'immagine nel risultato e la restituisce come
       ("url" | "base64" | "data-uri", valore);
     - `verificato_il` e' la data della chiamata vera che lo ha confermato;
+      vuoto vuol dire mai: lo schema e' quello della sua famiglia, aggiunto
+      su richiesta prima della sonda, e l'interfaccia lo dice prima di ogni
+      invio (`avviso`). Il primo render vero e' la verifica;
     - `piu_immagini` dice se il corpo sa portare immagini dopo la vista, e
       `piu_immagini_verificato_il` quando una chiamata vera lo ha confermato
       (vuoto: mai). Un corpo che le porta senza verifica si usa solo dal banco
@@ -105,6 +108,29 @@ def rapporto_piu_vicino(dati: bytes) -> str:
         return abs(a / b - voluto)
 
     return min(RAPPORTI, key=scarto)
+
+
+def con_cornice(richiesta: RichiestaGenerazione) -> tuple[RichiestaGenerazione, "modulo_immagine.Cornice | None"]:
+    """La richiesta con la vista (e le immagini in piu') al rapporto esatto che si mandera'.
+
+    Il modello accetta solo i RAPPORTI fissi: una vista 1,63 partiva come 3:2
+    e tornava di un'altra forma. Allargata con una cornice al rapporto piu'
+    vicino, torna della stessa forma e la cornice si taglia (togli_cornice).
+    Le immagini in piu' (maschera, mappa) hanno la misura della vista e si
+    allargano allo stesso modo, cosi' restano sovrapposte.
+    """
+    larghezza, altezza = modulo_immagine.dimensioni(richiesta.immagine)
+    a, b = (int(x) for x in rapporto_piu_vicino(richiesta.immagine).split(":"))
+    voluto = a / b
+    if abs(larghezza / altezza - voluto) / voluto <= config.CORNICE_TOLLERANZA:
+        return richiesta, None
+    vista, cornice = modulo_immagine.allarga_a_rapporto(richiesta.immagine, voluto)
+    in_piu = tuple(
+        modulo_immagine.allarga_a_rapporto(dati, voluto)[0]
+        if modulo_immagine.dimensioni(dati) == (larghezza, altezza) else dati
+        for dati in richiesta.immagini_in_piu
+    )
+    return replace(richiesta, immagine=vista, immagini_in_piu=in_piu), cornice
 
 
 def immagine_base64(dati: bytes) -> str:
@@ -199,6 +225,16 @@ SCHEMI: dict[str, SchemaModello] = {
         verificato_il="2026-10-27",
         piu_immagini=True,
     ),
+    # Nano Banana Pro: aggiunto il 2026-10-31 su richiesta di Riccardo, PRIMA
+    # della sonda. Il nome viene dalla documentazione di Comfy; il corpo e'
+    # quello di Nano Banana 2 (stessa famiglia Gemini su Vertex AI), non
+    # verificato. Se il Router lo rifiuta, l'errore lo dice e si rifa' la
+    # sonda: scripts/sonda_comfy.py --modello vertexai/gemini-3-pro-image.
+    "vertexai/gemini-3-pro-image": SchemaModello(
+        corpo=_corpo_gemini,
+        immagine=_immagine_gemini,
+        verificato_il="",
+    ),
 }
 
 
@@ -272,6 +308,15 @@ class ProviderComfy(Provider):
             "una chiamata vera, quindi l'invio vero si fermera' prima di partire."
         )
 
+    def avviso(self, modello: str) -> str | None:
+        schema = SCHEMI.get(modello)
+        if schema is None or schema.verificato_il:
+            return None
+        return (
+            f"{modello} non e' ancora stato provato con una chiamata vera: questo "
+            "render e' la prova. Se il servizio lo rifiuta, l'errore lo dice."
+        )
+
     def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
         self._assicura_chiave()
         self._assicura_peso(immagine)
@@ -335,11 +380,15 @@ class ProviderComfy(Provider):
                 "Togli le immagini in piu' (maschera, mappa), oppure usa Nano Banana 2.",
             )
 
-        corpo = schema.corpo(richiesta)
+        inviata, cornice = con_cornice(richiesta)
+        corpo = schema.corpo(inviata)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
         uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
         tipo, valore = schema.immagine(uscita)
         dati = self._byte_immagine(tipo, valore)
+        if cornice is not None:
+            dati = modulo_immagine.togli_cornice(dati, cornice)
+            dettagli = {**dettagli, "cornice": cornice.come_dizionario()}
 
         ricetta = Ricetta(
             provider=self.nome,
@@ -357,7 +406,7 @@ class ProviderComfy(Provider):
             impronta_sorgente=impronta(richiesta.immagine),
             seme=richiesta.seme,
             parametri={
-                "corpo": _senza_immagini(corpo, (richiesta.immagine, *richiesta.immagini_in_piu)),
+                "corpo": _senza_immagini(corpo, (inviata.immagine, *inviata.immagini_in_piu)),
                 "immagini_in_piu": [impronta(d) for d in richiesta.immagini_in_piu],
                 "fallback_provider": FALLBACK,
                 "chiave_idempotenza": chiave_idempotenza,

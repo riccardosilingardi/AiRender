@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 import zipfile
 from dataclasses import dataclass, field
@@ -52,6 +53,29 @@ SOLO_NEL_PACCHETTO = ("install-config.yml", "requirements.in")
 # di prova. La cartella delle viste (Usr\AIRENDER) non si tocca mai.
 VECCHI_SCRIPT = Path("PythonPartsScripts") / "airender"
 VECCHI_NELLA_LIBRERIA = ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_*.png")
+
+
+# Coda e Studio girano staccati da Allplan con la cartella dello script come
+# cartella di lavoro: finche' sono vivi Windows non la lascia cancellare
+# (WinError 32, visto il 2026-10-31). Si fermano prima di copiare; ripartono
+# da soli al primo Genera o Apri nello Studio.
+FERMA_PROCESSI = (
+    "Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
+    "Where-Object { $_.CommandLine -match 'core\\.(studio|coda)' } | "
+    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }"
+)
+
+
+def ferma_coda_e_studio(lancia=subprocess.run, sistema: str = os.name) -> list[str]:
+    """Ferma coda e Studio di AIRENDER su Windows. Restituisce i PID fermati."""
+    if sistema != "nt":
+        return []
+    try:
+        esito = lancia(["powershell", "-NoProfile", "-Command", FERMA_PROCESSI],
+                       capture_output=True, text=True, check=False)
+    except OSError:
+        return []
+    return [riga.strip() for riga in (esito.stdout or "").splitlines() if riga.strip()]
 
 
 def _ignora(_cartella: str, nomi: list[str]) -> list[str]:
@@ -109,9 +133,13 @@ class Esito:
     avvisi: list[str] = field(default_factory=list)
 
 
-def installa(albero: Path, usr: Path) -> Esito:
+def installa(albero: Path, usr: Path, ferma=ferma_coda_e_studio) -> Esito:
     """Copia l'albero del plugin nella Usr e toglie le prove della 2026."""
     esito = Esito(usr=usr)
+    fermati = ferma()
+    if fermati:
+        esito.avvisi.append(f"Ho fermato coda e Studio di AIRENDER (processi {', '.join(fermati)}): "
+                            "ripartono da soli al prossimo Genera.")
     vecchi = usr / VECCHI_SCRIPT
     if vecchi.is_dir():
         shutil.rmtree(vecchi)
@@ -124,7 +152,12 @@ def installa(albero: Path, usr: Path) -> Esito:
 
     script = usr / CARTELLA_SCRIPT
     if script.is_dir():
-        shutil.rmtree(script)  # niente file vecchi del motore che restano indietro
+        try:
+            shutil.rmtree(script)  # niente file vecchi del motore che restano indietro
+        except PermissionError as errore:
+            raise SystemExit(
+                f"Non riesco a togliere la versione vecchia in {script}: {errore}.\n"
+                "Cosa fare: chiudi Allplan e la finestra dello Studio, poi rilancia il comando.") from None
     for voce in VOCI_ALLEP:
         if voce in SOLO_NEL_PACCHETTO:
             continue

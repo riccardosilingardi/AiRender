@@ -335,6 +335,34 @@ CODA_INTERVALLO_SECONDI = _registra(Costante(
     unita=" s",
 ))
 
+# --- Proporzioni della vista ----------------------------------------------------
+
+CORNICE_TOLLERANZA = _registra(Costante(
+    nome="CORNICE_TOLLERANZA",
+    valore=0.01,
+    origine=SCELTA,
+    ragione=(
+        "Scarto relativo fra il rapporto della vista e il piu' vicino che il "
+        "modello accetta, sotto il quale la vista parte com'e'. Sopra, la si "
+        "allarga con una cornice fino al rapporto esatto e al ritorno la "
+        "cornice si taglia: senza, il 2026-10-31 una vista 1165x715 (1,63) e' "
+        "tornata a 3:2 e lo Studio l'ha dovuta stirare del 9,3%. Un 1% e' "
+        "meno di un pixel su dieci di una vista da 1000 px di lato."
+    ),
+))
+
+ANTEPRIMA_TAGLIO_SCURO = _registra(Costante(
+    nome="ANTEPRIMA_TAGLIO_SCURO",
+    valore=0.6,
+    origine=SCELTA,
+    ragione=(
+        "Quanto si scurisce, nell'anteprima della palette, la parte di vista "
+        "che un formato fisso taglierebbe: 0 non si vede niente, 1 e' nero e "
+        "non si capisce piu' cosa si perde. 0,6 lascia leggere la scena tagliata."
+    ),
+))
+
+
 # --- Studio ------------------------------------------------------------------
 
 COSTO_NANO_BANANA_2_CREDITI = _registra(Costante(

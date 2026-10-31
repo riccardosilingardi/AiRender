@@ -36,7 +36,8 @@ Il comando:
 
 - trova da solo la cartella Usr della 2027 (Documenti, OneDrive o
   `C:\Data\Allplan\Allplan 2027`) e dice quale ha usato;
-- copia la palette, il motore e lo Studio;
+- ferma coda e Studio di AIRENDER se girano (tengono occupata la cartella da
+  sostituire), poi copia la palette, il motore e lo Studio;
 - toglie *AIRENDER prova* e *AIRENDER sonda*, le prove della 2026. Le tue viste e
   i render in `Usr\AIRENDER` non li tocca;
 - se non vede Pillow, lo scrive: in quel caso rifai il punto 1.
@@ -55,11 +56,18 @@ py allplan\v2027\pacchetto.py --installa --usr "C:\...\Usr\Local"
    centrale, *shaded* con ombre.
 2. **Library › Privato › AIRENDER › AIRENDER**. La palette si apre nella
    scheda *Proprietà*.
-3. Clicca una volta nella finestra 3D, poi premi **Cattura vista**.
-4. Premi **Prova a secco**.
-5. Solo se vuoi spendere (circa 17 crediti): premi **Genera render**. Allplan
-   resta libero; premi **Aggiorna** ogni tanto.
-6. Premi **Apri nello Studio**.
+3. In *1 · Vista* scegli il **Formato**: *Come la finestra* manda la vista
+   intera, un formato fisso (16:9, 3:2, 4:3, 1:1, verticali) la taglia al
+   centro. Con un formato fisso, dopo *Cattura vista* si apre l'anteprima con
+   scurito quello che resta fuori; *Vedi cosa taglia* la riapre.
+4. Clicca una volta nella finestra 3D, poi premi **Cattura vista**.
+5. In *2 · Stile*: *Verde, alberi* e *Persone* aggiungono vegetazione e
+   persone (il verde solo negli esterni). Il resto del preset lo cambi nello
+   Studio, in *Dettagli del preset*.
+6. In *3 · Invio* leggi dove va la vista e quanto costa, poi **Genera
+   render** (circa 17 crediti con Nano Banana 2). Allplan resta libero; premi
+   **Aggiorna** ogni tanto.
+7. Premi **Apri nello Studio**.
 
 ## 4. Il pulsante nell'Actionbar (facoltativo, mai provato)
 
@@ -73,11 +81,14 @@ Non so ancora da quale voce di menu la 2027 installa un `.allep` da file:
 cercala fra i plugin (o prova a trascinare il file nella finestra di Allplan).
 I file vanno negli stessi posti del punto 2, quindi non si crea un doppione.
 
-## 5. Nano Banana Pro (facoltativo)
+## 5. Nano Banana Pro
 
-Il nome del modello sul Router è `vertexai/gemini-3-pro-image` (dalla
-documentazione di Comfy). Come per gli altri modelli, entra nel menu solo dopo
-una chiamata vera.
+E' nel menu *Modello* dal 2026-10-31, prima della sonda: il nome
+(`vertexai/gemini-3-pro-image`) viene dalla documentazione di Comfy e il
+corpo della richiesta e' quello di Nano Banana 2. Palette e Studio lo dicono
+prima dell'invio, e il costo resta «non misurato» finche' un render vero non
+lo dice. Se il primo render si ferma con un errore del servizio, lancia la
+sonda e mandami l'uscita:
 
 ```powershell
 py scripts\sonda_comfy.py --modello vertexai/gemini-3-pro-image --solo-schema
@@ -90,8 +101,8 @@ stampa la sonda (`x-comfy-credits-used`).
 ## Cosa rimandarmi
 
 - L'uscita del comando del punto 2.
-- Uno screenshot della palette dopo *Cattura vista* e il testo di *Prova a
-  secco*.
+- Uno screenshot della palette dopo *Cattura vista* e l'anteprima di un
+  formato fisso.
 - La riga «Load AirenderPalette.py, Python …» della finestra *Trace*: dice
   la versione di Python della 2027. Più qualunque errore della *Trace*.
 - Se l'hai provato: se l'`.allep` si installa e dove compare il pulsante.

@@ -12,6 +12,7 @@ import re
 import sys
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -160,3 +161,24 @@ def test_solo_l_adattatore_importa_allplan(file):
     """Regola 1 e 2 di CLAUDE.md."""
     importa = "import NemAll_Python" in file.read_text(encoding="utf-8")
     assert importa == (file == ADATTATORE_2027)
+
+
+def test_l_installatore_ferma_coda_e_studio_su_windows():
+    """Caso: WinError 32 del 2026-10-31, la coda teneva aperta la cartella dello script."""
+    lanciati = []
+
+    def lancia(argomenti, **_opzioni):
+        lanciati.append(argomenti)
+        return SimpleNamespace(stdout="1234\n5678\n")
+
+    assert pacchetto.ferma_coda_e_studio(lancia, sistema="nt") == ["1234", "5678"]
+    assert "core\\.(studio|coda)" in lanciati[0][-1]
+    assert pacchetto.ferma_coda_e_studio(lancia, sistema="posix") == []
+    assert len(lanciati) == 1
+
+
+def test_l_installatore_dice_cosa_ha_fermato(tmp_path):
+    usr = tmp_path / "Usr" / "Local"
+    (usr / "PythonParts-site-packages" / "PIL").mkdir(parents=True)
+    esito = pacchetto.installa(pacchetto.costruisci(tmp_path / "dist"), usr, ferma=lambda: ["42"])
+    assert any("42" in avviso for avviso in esito.avvisi)

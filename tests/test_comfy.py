@@ -110,8 +110,19 @@ def test_un_modello_senza_schema_verificato_non_parte_e_dice_di_lanciare_la_sond
 
 def test_solo_i_modelli_sondati_hanno_uno_schema_e_ognuno_dice_quando():
     """Caso: qualcuno aggiunge uno schema dai documenti, senza una chiamata vera dietro."""
-    assert set(comfy.SCHEMI) == {"bfl/flux-kontext-pro", "vertexai/gemini-3.1-flash-image"}
-    assert all(schema.verificato_il == "2026-10-27" for schema in comfy.SCHEMI.values())
+    sondati = {m for m, schema in comfy.SCHEMI.items() if schema.verificato_il}
+    assert sondati == {"bfl/flux-kontext-pro", "vertexai/gemini-3.1-flash-image"}
+    assert all(comfy.SCHEMI[m].verificato_il == "2026-10-27" for m in sondati)
+    # Aggiunti su richiesta prima della sonda: solo questi, e ognuno lo dice prima dell'invio.
+    assert set(comfy.SCHEMI) - sondati == {"vertexai/gemini-3-pro-image"}
+
+
+def test_nano_banana_pro_dice_prima_dell_invio_che_e_la_prima_prova():
+    """Caso: un modello mai provato presentato come sicuro quanto Nano Banana 2 (regola 3)."""
+    motore = comfy.ProviderComfy()
+    assert motore.cosa_manca("vertexai/gemini-3-pro-image") is None
+    assert "non e' ancora stato provato" in motore.avviso("vertexai/gemini-3-pro-image")
+    assert motore.avviso("vertexai/gemini-3.1-flash-image") is None
 
 
 def test_la_prova_a_secco_sa_gia_cosa_fermera_l_invio(modello_verificato):

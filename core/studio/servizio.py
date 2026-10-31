@@ -75,9 +75,11 @@ MODELLI = (
         costo_crediti=config.COSTO_NANO_BANANA_2_CREDITI, costo_misurato_il="27/10/2026",
     ),
     Modello("bfl/flux-kontext-pro", "FLUX.1 Kontext Pro", "Black Forest Labs"),
+    # Costo non ancora misurato: lo dira' il primo render.
+    Modello("vertexai/gemini-3-pro-image", "Nano Banana Pro", "Google"),
 )
 # Scritti a schermo e non selezionabili: il loro schema non e' verificato.
-MODELLI_NON_PROVATI = ("Nano Banana Pro", "Seedream", "GPT Image")
+MODELLI_NON_PROVATI = ("Seedream", "GPT Image")
 
 # Le voci del mockup che non hanno ancora un blocco di prompt. Si mostrano in
 # grigio con la ragione: un comando che non cambia il prompt e' una bugia.
@@ -382,6 +384,7 @@ class Studio:
             "costo": testo_costo(modello, quante),
             "costo_misurato": modello.costo_crediti is not None,
             "cosa_manca": motore.cosa_manca(modello.identificativo),
+            "avviso": motore.avviso(modello.identificativo),
         }
 
     # --- prova a secco e invio -------------------------------------------

@@ -425,3 +425,55 @@ def test_lo_studio_vero_batte_con_il_suo_indirizzo_e_usa_la_coda_che_c_e(cartell
     assert not avviate
     assert letto["indirizzo"] == "http://127.0.0.1:4321/"
     assert not battito.percorso(cartella, battito.FILE_STUDIO).exists()
+
+
+# --- formato fisso, verde e persone (2026-10-31) --------------------------------
+
+
+def test_un_formato_fisso_manda_una_vista_tagliata_al_rapporto_esatto(cartella, chiamate, vista):
+    """Caso: si sceglie 16:9 e parte la finestra intera, che poi torna di un'altra forma."""
+    from core import immagine
+
+    _coda_che_batte(cartella)
+    (cartella / "vista-20261031-120000.camera.json").write_text("{}", encoding="utf-8")
+    telecomando = _telecomando(cartella, chiamate)
+    valori = _valori(formato="16:9")
+    dove, _nota, _costo = telecomando.invio(valori)
+    assert telecomando.genera(vista, valori, dove).startswith("In coda, verso ")
+    tagliata = cartella / "vista-20261031-120000-16x9.png"
+    assert immagine.dimensioni(tagliata.read_bytes()) == (640, 360)
+    assert (cartella / "vista-20261031-120000-16x9.camera.json").is_file()
+    lavoro = next((cartella / "lavori" / "in-attesa").glob("*.json")).read_text(encoding="utf-8")
+    assert "vista-20261031-120000-16x9.png" in lavoro
+
+
+def test_come_la_finestra_non_taglia_e_non_scrive_anteprime(cartella, chiamate, vista):
+    telecomando = _telecomando(cartella, chiamate)
+    assert telecomando.anteprima(vista, _valori()) == vista
+    assert telecomando.vista_al_formato(vista, _valori()) == vista
+    assert not (cartella / tc.CARTELLA_ANTEPRIME).exists()
+
+
+def test_l_anteprima_del_taglio_sta_fuori_dalle_viste(cartella, chiamate, vista):
+    """Caso: l'anteprima scurita finisce fra le viste dello Studio e qualcuno la manda."""
+    telecomando = _telecomando(cartella, chiamate)
+    anteprima = Path(telecomando.anteprima(vista, _valori(formato="9:16 verticale")))
+    assert anteprima.parent == cartella / tc.CARTELLA_ANTEPRIME and anteprima.is_file()
+    assert [v["nome"] for v in telecomando.studio.elenco_viste()] == ["vista-20261031-120000.png"]
+
+
+def test_i_formati_della_palette_sono_i_rapporti_che_il_modello_accetta():
+    from core.provider import comfy
+
+    formati = tc.voci_palette()["Formato"]
+    assert formati[0] == (None, tc.COME_LA_FINESTRA)
+    assert [i for i, _n in formati[1:]] == list(comfy.RAPPORTI)
+
+
+def test_verde_e_persone_della_palette_arrivano_nel_prompt():
+    """Caso: «come aggiungo alberi e persone?» e la palette non lo permette."""
+    scelte = _valori(verde="Rigoglioso", persone="Poche").scelte()
+    assert scelte.verde == "rigoglioso" and scelte.persone == "poche"
+    interno = _valori(interno=True, verde="Rigoglioso", persone="In movimento").scelte()
+    assert interno.persone == "movimento"
+    assert interno.verde != "rigoglioso"  # il verde e' degli esterni, come nello Studio

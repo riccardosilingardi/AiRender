@@ -293,6 +293,19 @@ def test_ritocco_modo_aree_e_un_modo_vero_e_resta_una_scelta_finche_il_banco_non
     assert config.costante("RITOCCO_MODO_AREE").origine == config.SCELTA
 
 
+def test_anteprima_taglio_scuro_lascia_vedere_la_scena_tagliata():
+    """Caso: l'anteprima del formato nasconde del tutto cio' che taglia, o non lo distingue."""
+    from tests.test_cornice import vista as tinta
+    from core import immagine
+
+    assert 0 < config.ANTEPRIMA_TAGLIO_SCURO < 1
+    assert config.costante("ANTEPRIMA_TAGLIO_SCURO").origine == config.SCELTA
+    anteprima = immagine._apri(immagine.anteprima_taglio(tinta(400, 200, (200, 200, 200)), 1.0))
+    assert anteprima.getpixel((200, 100)) == (200, 200, 200)
+    fuori = anteprima.getpixel((10, 100))[0]
+    assert 0 < fuori < 200
+
+
 # --- guardia -----------------------------------------------------------------
 
 
@@ -302,6 +315,21 @@ def test_ogni_costante_dichiarata_ha_un_test_che_nomina_il_suo_caso():
     citate = set(re.findall(r"\b[A-Z][A-Z0-9_]{3,}\b", sorgente))
     mancanti = sorted(set(config.REGISTRO) - citate)
     assert not mancanti, f"costanti senza un test che le nomini: {mancanti}"
+
+
+# --- proporzioni della vista -------------------------------------------------
+
+
+def test_cornice_tolleranza_lascia_partire_com_e_una_vista_gia_al_rapporto_giusto():
+    """Caso: una vista 1920x1080 (16:9 esatto) si allarga lo stesso e perde pixel per niente."""
+    from core.provider.comfy import con_cornice
+    from core.provider.base import RichiestaGenerazione
+    from tests.test_cornice import vista
+
+    richiesta = RichiestaGenerazione(immagine=vista(1920, 1080), prompt="p", preset="x",
+                                     preset_versione="1", modello="m", grana="", dettaglio_grana=0)
+    assert con_cornice(richiesta)[1] is None
+    assert config.CORNICE_TOLLERANZA < 0.05
 
 
 # --- coda dei lavori ---------------------------------------------------------

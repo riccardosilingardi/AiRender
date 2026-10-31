@@ -195,6 +195,108 @@ def affianca(pannelli: list[tuple[str, bytes]]) -> bytes:
     return uscita.getvalue()
 
 
+# --- cornice: la vista al rapporto che il modello accetta ----------------------
+
+
+@dataclass(frozen=True)
+class Cornice:
+    """Quanto si e' aggiunto attorno alla vista, in frazioni dell'immagine allargata.
+
+    In frazioni e non in pixel perche' il modello rimanda un'immagine di
+    un'altra grandezza, con lo stesso rapporto: si taglia in proporzione.
+    """
+
+    larghezza: int  # della vista di partenza, in px
+    altezza: int
+    sinistra: float
+    alto: float
+    destra: float
+    basso: float
+
+    def come_dizionario(self) -> dict:
+        cifre = 5  # numero-non-configurabile: solo per rendere leggibile la ricetta
+        return {
+            "vista_px": [self.larghezza, self.altezza],
+            "sinistra": round(self.sinistra, cifre), "alto": round(self.alto, cifre),
+            "destra": round(self.destra, cifre), "basso": round(self.basso, cifre),
+        }
+
+
+def allarga_a_rapporto(dati: bytes, rapporto: float) -> tuple[bytes, Cornice]:
+    """La vista allargata fino a `rapporto` (larghezza/altezza), al centro.
+
+    Le bande aggiunte ripetono la riga o la colonna di bordo della vista,
+    stirata: il modello vede la scena continuare invece di una fascia di
+    colore che potrebbe leggere come un muro. Tanto la cornice si taglia.
+    """
+    vista = _apri(dati).convert("RGB")
+    larghezza, altezza = vista.size
+    if larghezza / altezza < rapporto:
+        nuova_l, nuova_a = round(altezza * rapporto), altezza
+    else:
+        nuova_l, nuova_a = larghezza, round(larghezza / rapporto)
+    x, y = (nuova_l - larghezza) // 2, (nuova_a - altezza) // 2
+    tela = Image.new("RGB", (nuova_l, nuova_a))
+    tela.paste(vista, (x, y))
+    if x:
+        sinistra = vista.crop((0, 0, 1, altezza)).resize((x, altezza))
+        destra = vista.crop((larghezza - 1, 0, larghezza, altezza)).resize((nuova_l - larghezza - x, altezza))
+        tela.paste(sinistra, (0, y))
+        tela.paste(destra, (x + larghezza, y))
+    if y:
+        alto = tela.crop((0, y, nuova_l, y + 1)).resize((nuova_l, y))
+        basso = tela.crop((0, y + altezza - 1, nuova_l, y + altezza)).resize((nuova_l, nuova_a - altezza - y))
+        tela.paste(alto, (0, 0))
+        tela.paste(basso, (0, y + altezza))
+    cornice = Cornice(
+        larghezza=larghezza, altezza=altezza,
+        sinistra=x / nuova_l, alto=y / nuova_a,
+        destra=(nuova_l - larghezza - x) / nuova_l, basso=(nuova_a - altezza - y) / nuova_a,
+    )
+    return _png(tela), cornice
+
+
+def togli_cornice(dati: bytes, cornice: Cornice) -> bytes:
+    """Il render senza la cornice, riportato ai pixel esatti della vista."""
+    render = _apri(dati).convert("RGB")
+    l, a = render.size
+    ritaglio = render.crop((
+        round(cornice.sinistra * l), round(cornice.alto * a),
+        l - round(cornice.destra * l), a - round(cornice.basso * a),
+    ))
+    return _png(ritaglio.resize((cornice.larghezza, cornice.altezza), Image.Resampling.LANCZOS))
+
+
+def _scatola_rapporto(larghezza: int, altezza: int, rapporto: float) -> tuple[int, int, int, int]:
+    """Il riquadro piu' grande a `rapporto`, al centro della vista."""
+    if larghezza / altezza > rapporto:
+        nuova = round(altezza * rapporto)
+        x = (larghezza - nuova) // 2
+        return x, 0, x + nuova, altezza
+    nuova = round(larghezza / rapporto)
+    y = (altezza - nuova) // 2
+    return 0, y, larghezza, y + nuova
+
+
+def ritaglia_a_rapporto(dati: bytes, rapporto: float) -> bytes:
+    """La vista tagliata al centro a `rapporto` (larghezza/altezza), in PNG.
+
+    E' il formato fisso scelto nella palette: si manda solo cio' che resta,
+    e quello che si taglia si e' visto prima nell'anteprima.
+    """
+    vista = _apri(dati).convert("RGB")
+    return _png(vista.crop(_scatola_rapporto(*vista.size, rapporto)))
+
+
+def anteprima_taglio(dati: bytes, rapporto: float) -> bytes:
+    """La vista intera con scurito quello che il formato taglierebbe."""
+    vista = _apri(dati).convert("RGB")
+    scatola = _scatola_rapporto(*vista.size, rapporto)
+    scura = Image.blend(vista, Image.new("RGB", vista.size), config.ANTEPRIMA_TAGLIO_SCURO)
+    scura.paste(vista.crop(scatola), scatola[:2])
+    return _png(scura)
+
+
 # --- banco di prova: aree, differenze, spigoli, miniature ----------------------
 
 Punto = tuple[float, float]

@@ -107,6 +107,10 @@ class Provider(ABC):
         """Cosa fermerebbe l'invio vero, detto gia' nella prova a secco. None se niente."""
         return None
 
+    def avviso(self, modello: str) -> str | None:
+        """Cosa sapere prima di mandare, che non ferma l'invio. None se niente."""
+        return None
+
     def controlla_prima_dell_invio(self, modello: str, immagine: bytes) -> None:
         """Solleva l'errore che fermerebbe l'invio (chiave, schema, peso), senza inviare.
 
