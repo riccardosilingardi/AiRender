@@ -18,6 +18,12 @@ Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è
 | `bilanciata` | Bilanciata | Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. | 194 |
 | `libera` | Libera | Edit this image. Keep the camera, framing, proportions and the building's volumes and openings; you may refine materials and add plausible construction details such as joints, sills, gutters and fixings. Do not change the building's shape. Change the look described below. | 272 |
 
+## Riferimento per lo stile (bozza 6, 2026-10-31)
+
+Solo quando in Studio · Genera c'è un'immagine di riferimento: parte come seconda immagine e questa frase entra subito prima di «cosa evitare». Non provata: il primo render con un riferimento è anche la prima volta che Nano Banana 2 riceve due immagini in una chiamata vera.
+
+> The second image is a style reference only: take from it the colour palette, the light and the look of the materials. Do not copy its geometry, camera, objects or composition; the building stays the one in the first image.
+
 ## Cosa evitare (sempre in coda)
 
 > Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.

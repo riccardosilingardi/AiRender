@@ -183,7 +183,9 @@ vista con colori neutri.»
   Bilanciata (SCELTA). Una riga sotto dice cosa fa ognuna e che i tre testi
   non sono ancora confrontati sul banco di prova. Si conserva quando si
   cambia preset o scena, come la qualità.
-- In grigio: Immagine di riferimento per lo stile.
+- **Immagine di riferimento per lo stile**: un file JPEG o PNG, con la
+  miniatura, il nome e Togli. Con FLUX.1 Kontext e Nano Banana Pro il
+  comando è spento e dice perché (ricevono una sola immagine).
 - **Destinazione e costo**, poi **Prova a secco** e **Genera** («Genera 3
   render» quando le varianti sono più di una).
 
@@ -521,6 +523,26 @@ modello: cambia la regola fissa in testa al prompt (blocchi, bozza 6).
 - **Pieno:** «Cosa parte, in breve» comincia con «Fedeltà al disegno
   rigida» o «libera» quando non è Bilanciata; il prompt completo mostra il
   testo vero.
+
+## Immagine di riferimento per lo stile, costruita il 2026-10-31
+
+Nella colonna destra di Studio · Genera, sotto le varianti. Nella palette
+non c'è: il riferimento si sceglie nello Studio.
+
+- **Vuoto:** una riga dice cosa fa («solo colori, luce e materiali, non la
+  forma; parte come seconda immagine») e il campo per scegliere il file.
+- **In corso:** come Genera. Prima del clic, sotto la destinazione:
+  «Partono due immagini: la vista e il riferimento per lo stile.» Finché
+  Nano Banana 2 non ha ricevuto due immagini in una chiamata vera, un avviso
+  giallo dice che questo render è la prova.
+- **Errore:** un file che non è JPEG o PNG, o più pesante di quanto si manda
+  a Comfy Router, si rifiuta al caricamento. Con un modello che riceve una
+  sola immagine il comando è spento e, se un riferimento era già caricato,
+  Genera è spento con la ragione. Se il file sparisce prima dell'invio, il
+  lavoro si ferma senza mandare niente.
+- **Pieno:** miniatura, nome del file e misure, Togli. La ricetta salva
+  l'impronta del riferimento, non l'immagine; il file resta in
+  `riferimenti/` nella cartella delle viste.
 
 ## Schermate sostituite il 2026-10-27
 

@@ -580,6 +580,31 @@ def componi_passo(scena: str, cambi: dict[str, str]) -> str:
     return " ".join(pezzi)
 
 
+# --- riferimento per lo stile (Studio · Genera, bozza 6) ----------------------
+
+# La seconda immagine dell'invio: una foto scelta dall'utente da cui prendere
+# solo l'atmosfera. Come ogni blocco, non provato con il modello; il primo
+# render con un riferimento e' anche la prima volta che Nano Banana 2 riceve
+# due immagini in una chiamata vera.
+RIFERIMENTO_STILE = Blocco(
+    "riferimento",
+    "Immagine di riferimento per lo stile",
+    "The second image is a style reference only: take from it the colour "
+    "palette, the light and the look of the materials. Do not copy its "
+    "geometry, camera, objects or composition; the building stays the one in "
+    "the first image.",
+)
+
+
+def aggiungi_riferimento(base: str) -> str:
+    """Il prompt con la frase del riferimento prima di «cosa evitare», se c'e'."""
+    base = base.strip()
+    if base.endswith(COSA_EVITARE.testo):
+        testa = base[: -len(COSA_EVITARE.testo)].rstrip()
+        return f"{testa} {RIFERIMENTO_STILE.testo} {COSA_EVITARE.testo}"
+    return f"{base} {RIFERIMENTO_STILE.testo}"
+
+
 # --- aree e note (banco di prova, piano "aree"; Ritocca non c'e' ancora) -----
 
 # Due modi di dire al modello dove intervenire. Nessuno dei due e' provato:

@@ -703,6 +703,14 @@ poggiano su cose non ancora provate:
 - **Il menu «Fedeltà al disegno» nella palette** — generato nel `.pyp`, mai
   aperto in Allplan.
 
+### Lasciato dalla sessione del 2026-10-31 (riferimento per lo stile)
+
+- **Nano Banana 2 riceve due immagini in una chiamata vera** — mai provato
+  (`piu_immagini_verificato_il` vuoto). Il primo render con un riferimento è
+  la prova, circa 17 crediti; lo Studio lo dice prima dell'invio.
+- **Il modello prende dal riferimento solo palette, luce e materiali** — la
+  frase è scritta, non provata. Se copia forme o inquadratura, va riscritta.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di
