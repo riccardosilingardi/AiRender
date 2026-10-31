@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import os
 import sys
+import traceback
+from datetime import datetime
 from pathlib import Path
 
 import NemAll_Python_AllplanSettings as AllplanSettings
@@ -27,12 +29,19 @@ _CARTELLA = Path(__file__).resolve().parent
 if str(_CARTELLA) not in sys.path:
     sys.path.insert(0, str(_CARTELLA))
 
-# pylint: disable=wrong-import-position
-import ponte  # noqa: E402
-import telecomando  # noqa: E402
-from core import config  # noqa: E402
-from core.errori import ErroreAirender  # noqa: E402
-from core.studio import servizio  # noqa: E402
+# Se un import fallisce (Pillow mancante, file non copiato, Python diverso)
+# Allplan non apre la palette e spesso non dice niente. L'errore si tiene qui,
+# si scrive in Usr\AIRENDER\avvio.txt e si mostra al primo clic.
+_ERRORE_AVVIO = ""
+try:
+    # pylint: disable=wrong-import-position
+    import ponte  # noqa: E402
+    import telecomando  # noqa: E402
+    from core import config  # noqa: E402
+    from core.errori import ErroreAirender  # noqa: E402
+    from core.studio import servizio  # noqa: E402
+except Exception:  # pylint: disable=broad-exception-caught
+    _ERRORE_AVVIO = traceback.format_exc()
 
 EVENTO_CATTURA = 1001
 EVENTO_PROVA_A_SECCO = 1002
@@ -50,13 +59,59 @@ RESA = "Fotorealistico · le altre rese aspettano il loro blocco di prompt (vedi
 print("Load AirenderPalette.py, Python", sys.version.split()[0])
 
 
+def _file_avvio() -> Path:
+    return Path(AllplanSettings.AllplanPaths.GetUsrPath()) / "AIRENDER" / "avvio.txt"
+
+
+def _scrivi_avvio(errore: str) -> str:
+    """Scrive cosa ha visto la palette all'avvio. Restituisce il percorso, o il motivo per cui non c'e'."""
+    try:
+        try:
+            import PIL  # pylint: disable=import-outside-toplevel
+            pillow = f"{PIL.__version__} in {Path(PIL.__file__).parent}"
+        except ImportError as mancante:
+            pillow = f"NON TROVATO ({mancante})"
+        righe = [
+            f"AIRENDER, avvio della palette: {datetime.now():%Y-%m-%d %H:%M:%S}",
+            f"Python {sys.version}",
+            f"eseguibile {sys.executable}",
+            f"cartella dello script {_CARTELLA}",
+            f"file accanto: {sorted(p.name for p in _CARTELLA.iterdir())}",
+            f"Pillow {pillow}",
+            "sys.path:", *[f"  {voce}" for voce in sys.path],
+            "", "ERRORE:" if errore else "Nessun errore.", errore,
+        ]
+        percorso = _file_avvio()
+        percorso.parent.mkdir(parents=True, exist_ok=True)
+        percorso.write_text("\n".join(righe), encoding="utf-8")
+        return str(percorso)
+    except Exception as non_scritto:  # pylint: disable=broad-exception-caught
+        return f"(avvio.txt non scritto: {non_scritto})"
+
+
+def _mostra_errore_avvio(errore: str) -> None:
+    dove = _scrivi_avvio(errore)
+    ultime = "\n".join(errore.strip().splitlines()[-4:])
+    _messaggio(f"AIRENDER non si apre.\n\n{ultime}\n\nTutti i dettagli sono in:\n{dove}\n"
+               "Mandalo a chi ti segue AIRENDER.")
+
+
 def check_allplan_version(_build_ele: BuildingElement, _version: str) -> bool:
     return True
 
 
 def create_script_object(build_ele: BuildingElement,
                          script_object_data: BaseScriptObjectData) -> BaseScriptObject:
-    return AirenderPalette(build_ele, script_object_data)
+    if _ERRORE_AVVIO:
+        _mostra_errore_avvio(_ERRORE_AVVIO)
+        raise RuntimeError("AIRENDER: import fallito, vedi Usr\\AIRENDER\\avvio.txt")
+    try:
+        palette = AirenderPalette(build_ele, script_object_data)
+    except Exception:
+        _mostra_errore_avvio(traceback.format_exc())
+        raise
+    _scrivi_avvio("")
+    return palette
 
 
 def _cartella_pillow() -> str | None:
