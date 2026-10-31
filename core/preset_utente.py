@@ -158,6 +158,9 @@ def carica(voce: dict) -> dict:
         except (KeyError, blocchi.SceltaNonValida):
             perse.append(f"{asse}: «{valore}» non esiste piu'")
             pulite[asse] = predefinite.get(asse)
+    if pulite.get("resa") and pulite["resa"] not in blocchi.NOMI_RESE:
+        perse.append(f"resa: «{pulite['resa']}» non esiste piu'")
+        pulite["resa"] = blocchi.FOTO
     try:
         scelte = blocchi.Scelte.da_dizionario(pulite).a_dizionario()
     except blocchi.SceltaNonValida as errore:

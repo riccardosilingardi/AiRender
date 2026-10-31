@@ -105,6 +105,7 @@ def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
         "Verde": _voci("verde", blocchi.ESTERNO),
         "Persone": _voci("persone", blocchi.ESTERNO),
         "Fedelta": _fedelta(),
+        "Resa": list(blocchi.NOMI_RESE.items()),
         "Formato": [(None, COME_LA_FINESTRA)] + [(r, _NOMI_FORMATO.get(r, r)) for r in comfy.RAPPORTI],
         "Modello": [(m.identificativo, m.nome) for m in servizio.MODELLI],
         "Risoluzione": list(RISOLUZIONI),
@@ -136,6 +137,7 @@ class ValoriPalette:
     verde: str = COME_IL_PRESET
     persone: str = COME_IL_PRESET
     fedelta: str = ""  # vuoto = la predefinita, come all'apertura della palette
+    resa: str = ""  # vuoto = Fotorealistico, la prima voce
     materiali: str = ""
     modello: str = ""
     formato: str = COME_LA_FINESTRA
@@ -168,6 +170,7 @@ class ValoriPalette:
         if luce:
             cambi["luce"] = luce
         cambi["fedelta"] = _identificativo("Fedelta", self.fedelta or voci_palette()["Fedelta"][0][1])
+        cambi["resa"] = _identificativo("Resa", self.resa or voci_palette()["Resa"][0][1])
         cambi["risoluzione"] = _identificativo("Risoluzione", self.risoluzione or RISOLUZIONI[0][1])
         return blocchi.da_preset(self.preset(), **cambi)
 
@@ -315,6 +318,11 @@ class Telecomando:
             nota += f" Non parte: {destinazione['cosa_manca']}"
         if destinazione.get("avviso"):
             nota += f" {destinazione['avviso']}"
+        resa = _identificativo("Resa", valori.resa or voci_palette()["Resa"][0][1])
+        if resa != blocchi.FOTO:
+            spenti = blocchi.SPENTI_DA_RESA[resa]
+            nota += (f" Con la resa {blocchi.NOMI_RESE[resa]} non partono: "
+                     f"{', '.join(a for a in ('materiali', *blocchi.ORDINE_ASSI) if a in spenti)}.")
         return destinazione["destinazione"], nota, destinazione["costo"]
 
     def _dati(self, vista: str, valori: ValoriPalette, destinazione_mostrata: str = "") -> dict:

@@ -6,7 +6,8 @@
     python scripts/prova_blocchi.py --giudica C:\\AIRENDER\\vista-banco-preset-20261029-101500
 
 I piani: qualita (2 invii), look (9), preset (8 esterni o 6 interni), catena
-(4), aree (2), fedelta (3: rigida, bilanciata, libera). Per il piano aree l'immagine e' quella da ritoccare, di solito
+(4), aree (2), fedelta (3: rigida, bilanciata, libera), rese (4: plastico,
+schizzo, acquerello, cinematografico). Per il piano aree l'immagine e' quella da ritoccare, di solito
 un render; le aree predefinite sono un rettangolo a sinistra e una selezione
 libera in basso a destra, con due note: --aree ne legge altre da un file JSON,
 [{"forma": "rettangolo" | "libera", "punti": [[x, y], ...], "nota": "..."}]

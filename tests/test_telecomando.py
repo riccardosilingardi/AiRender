@@ -115,6 +115,17 @@ def test_la_fedelta_della_palette_parte_dalla_predefinita_e_si_cambia():
     assert _valori(fedelta="Rigida").scelte().fedelta == "rigida"
 
 
+def test_la_resa_della_palette_parte_da_fotorealistico_e_dice_cosa_spegne(cartella, chiamate):
+    """Caso: la palette manda uno schizzo e l'utente crede che il cielo scelto parta."""
+    assert tc.voci_palette()["Resa"][0] == (blocchi.FOTO, "Fotorealistico")
+    assert _valori().scelte().resa == blocchi.FOTO
+    assert _valori(resa="Schizzo a matita").scelte().resa == "schizzo"
+    telecomando = _telecomando(cartella, chiamate)
+    _dest, nota, _costo = telecomando.invio(_valori(resa="Schizzo a matita"))
+    assert "Con la resa Schizzo a matita non partono: materiali, look, cielo, qualita." in nota
+    assert "Con la resa" not in telecomando.invio(_valori())[1]
+
+
 def test_una_voce_che_il_motore_non_conosce_dice_di_reinstallare():
     """Caso: palette vecchia con un motore nuovo, e la scelta si perde in silenzio."""
     with pytest.raises(blocchi.SceltaNonValida) as errore:

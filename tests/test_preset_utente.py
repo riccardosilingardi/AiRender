@@ -86,3 +86,13 @@ def test_la_fedelta_si_salva_e_una_che_non_esiste_torna_alla_predefinita(tmp_pat
     voce = pu.carica(pu.leggi(tmp_path).preset[0])
     assert voce["scelte"]["fedelta"] == blocchi.FEDELTA_PREDEFINITA
     assert any("vecchia" in p for p in voce["perse"])
+
+
+def test_una_resa_tolta_torna_a_fotorealistico_e_lo_dice(tmp_path):
+    pu.salva(tmp_path, "Schizzo", _scelte(resa="schizzo"), "m")
+    assert pu.carica(pu.leggi(tmp_path).preset[0])["scelte"]["resa"] == "schizzo"
+    dati = json.loads(pu.percorso(tmp_path).read_text(encoding="utf-8"))
+    dati["preset"][0]["scelte"]["resa"] = "olio"
+    pu.percorso(tmp_path).write_text(json.dumps(dati), encoding="utf-8")
+    voce = pu.carica(pu.leggi(tmp_path).preset[0])
+    assert voce["scelte"]["resa"] == blocchi.FOTO and any("olio" in p for p in voce["perse"])

@@ -12,6 +12,9 @@ volta:
             dopo tre generazioni rispetto a una;
 - fedelta   la stessa vista con la fedelta' al disegno rigida, bilanciata e
             libera, stesso preset: quanti spigoli della vista restano?
+- rese      la stessa vista in plastico bianco, schizzo, acquerello e
+            cinematografico: ogni resa rende quello che promette, e tiene
+            l'edificio?
 - aree      due aree con due note sulla stessa immagine, mandate (a) con i
             contorni numerati disegnati sopra e (b) con una maschera come
             immagine in piu': fuori dalle aree i pixel restano quelli di prima?
@@ -43,7 +46,7 @@ from .cli import _salva
 from .errori import ErroreAirender
 from .provider.base import Provider, RichiestaGenerazione
 
-PIANI = ("qualita", "look", "preset", "catena", "aree", "fedelta")
+PIANI = ("qualita", "look", "preset", "catena", "aree", "fedelta", "rese")
 VISTA = "vista"
 FORMATO = 1  # numero-non-configurabile: versione del formato di banco.json
 FILE_BANCO = "banco.json"
@@ -144,6 +147,13 @@ def piano(nome: str, scena: str = blocchi.ESTERNO, aree: tuple[Area, ...] = ()) 
         confronti += (Confronto("fedelta-rigida", "fedelta-libera", "Rigida contro libera"),)
         return Piano(nome, "Quanto si allontana dalla vista ogni fedeltà al disegno, a parità di tutto il resto?",
                      SPIGOLI, invii, confronti)
+    if nome == "rese":
+        invii = tuple(
+            _da_preset(f"resa-{resa}", f"{nome_riferimento} · resa {b.nome.lower()}", riferimento, resa=resa)
+            for resa, b in blocchi.RESA.items()
+        )
+        return Piano(nome, "Ogni resa non fotografica rende quello che promette, e l'edificio resta quello?",
+                     SPIGOLI, invii, tuple(Confronto(VISTA, i.nome, f"Vista contro {i.titolo}") for i in invii))
     if nome == "look":
         base = blocchi.preset_stile(riferimento).scelte.look
         invii = [_da_preset(riferimento, f"{nome_riferimento} (look {blocchi.LOOK[base].nome})", riferimento)]

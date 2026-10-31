@@ -108,12 +108,26 @@ def test_il_catalogo_ha_gli_8_preset_esterni_e_i_6_interni_della_bozza(cartella,
     assert catalogo["origine_blocchi"] == config.SCELTA
 
 
-def test_le_voci_senza_blocco_sono_in_grigio_e_dicono_perche(cartella, chiamate):
-    """Caso: un comando che si clicca e non cambia il prompt (regola delle funzioni future)."""
+def test_le_rese_sono_tutte_accese_e_dicono_cosa_spengono(cartella, chiamate):
+    """Caso: una resa si clicca e non cambia il prompt, o spegne un asse senza dirlo."""
     catalogo = _studio(cartella, chiamate).catalogo()
-    spente = [r for r in catalogo["rese"] if not r["attivo"]]
-    assert [r["nome"] for r in catalogo["rese"] if r["attivo"]] == ["Fotorealistico"]
-    assert spente and all(r["nota"] for r in spente)
+    assert [r["nome"] for r in catalogo["rese"]] == [
+        "Fotorealistico", "Plastico bianco", "Schizzo a matita", "Acquerello", "Cinematografico"]
+    assert all(r["attivo"] and r["origine"] == config.SCELTA for r in catalogo["rese"])
+    rese = {r["id"]: r for r in catalogo["rese"]}
+    assert rese["foto"]["spegne"] == [] and "look" in rese["schizzo"]["spegne"]
+    assert "look fotografico" in rese["schizzo"]["spegne_testo"]
+
+
+def test_il_riassunto_dice_la_resa_e_tace_gli_assi_spenti(cartella, chiamate):
+    scelte = blocchi.da_preset("rivista", resa="plastico", materiali="mattoni")
+    riassunto = _studio(cartella, chiamate).componi({"scelte": scelte.a_dizionario()})["riassunto"]
+    assert "resa plastico bianco" in riassunto
+    assert "i tuoi materiali" not in riassunto and "cielo" not in riassunto
+
+
+def test_gli_assi_dell_altra_scena_non_compaiono(cartella, chiamate):
+    catalogo = _studio(cartella, chiamate).catalogo()
     # gli assi dell'altra scena non compaiono
     assert "cielo" not in {a["id"] for a in catalogo["scene"]["interno"]["assi"]}
     assert "fuori" not in {a["id"] for a in catalogo["scene"]["esterno"]["assi"]}
