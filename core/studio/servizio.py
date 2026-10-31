@@ -24,6 +24,7 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import passi as modulo_passi
+from .. import preset_utente
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
@@ -300,6 +301,32 @@ class Studio:
                 for r in config.RISOLUZIONI_RENDER
             ],
         }
+
+    # --- i miei preset ------------------------------------------------
+
+    def miei_preset(self) -> dict:
+        elenco = preset_utente.leggi(self.cartella)
+        return {
+            "preset": [preset_utente.carica(v) for v in elenco.preset],
+            "problema": elenco.problema,
+            "file": str(preset_utente.percorso(self.cartella)),
+        }
+
+    def salva_mio_preset(self, dati: dict) -> dict:
+        modello = self._modello(str(dati.get("modello") or "")).identificativo
+        preset_utente.salva(
+            self.cartella, dati.get("nome"), dati.get("scelte") or {}, modello,
+            prompt_a_mano=_prompt_a_mano(dati), sovrascrivi=bool(dati.get("sovrascrivi")),
+        )
+        return self.miei_preset()
+
+    def rinomina_mio_preset(self, dati: dict) -> dict:
+        preset_utente.rinomina(self.cartella, str(dati.get("nome") or ""), dati.get("nuovo"))
+        return self.miei_preset()
+
+    def elimina_mio_preset(self, dati: dict) -> dict:
+        preset_utente.elimina(self.cartella, str(dati.get("nome") or ""))
+        return self.miei_preset()
 
     def _assi(self, scena: str) -> list[dict]:
         assi = []
