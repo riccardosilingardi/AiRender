@@ -1,0 +1,34 @@
+# Configurazione del plugin AIRENDER per Allplan 2027 (formato .allep).
+# Ricalcata da quella del PythonParts SDK 3.0.0 di Allplan GmbH
+# (github.com/NemetschekAllplan/pythonparts-sdk, install-config.yml):
+# stesse chiavi, stessa disposizione delle cartelle. Il pacchetto si
+# costruisce con: python allplan/v2027/pacchetto.py
+plugin:
+  name: AIRENDER
+  UUID: 53381a1d-3ee9-4cf5-b1b3-73fa5f5c9cc0
+  version: 1.0.0
+  developer: riccardo_silingardi
+  default-language: en
+  min-allplan-version: 2027
+
+installation:
+  target-location: USR
+
+tools:
+  - id: airender
+    pyp: Library\AIRENDER\AirenderPalette.pyp
+    display-name:
+      en: AIRENDER
+      de: AIRENDER
+      it: AIRENDER
+    icons:
+      small: PythonPartsActionbar\riccardo_silingardi\airender\Airender_24.png
+      large: PythonPartsActionbar\riccardo_silingardi\airender\Airender_128.png
+
+task-area:
+  display-name:
+    en: AIRENDER
+    de: AIRENDER
+    it: AIRENDER
+  layout:
+    - airender

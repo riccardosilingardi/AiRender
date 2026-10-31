@@ -47,7 +47,7 @@ DIMENSIONI = (None, (1920, 1080), (3840, 2160))
 
 RESA = "Fotorealistico · le altre rese aspettano il loro blocco di prompt (vedi lo Studio)"
 
-print("Load AirenderPalette.py")
+print("Load AirenderPalette.py, Python", sys.version.split()[0])
 
 
 def check_allplan_version(_build_ele: BuildingElement, _version: str) -> bool:
