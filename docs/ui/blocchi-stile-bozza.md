@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 6 (2026-10-31)
+# Blocchi di stile — bozza 7 (2026-10-31)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -23,6 +23,33 @@ Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è
 Solo quando in Studio · Genera c'è un'immagine di riferimento: parte come seconda immagine e questa frase entra subito prima di «cosa evitare». Non provata: il primo render con un riferimento è anche la prima volta che Nano Banana 2 riceve due immagini in una chiamata vera.
 
 > The second image is a style reference only: take from it the colour palette, the light and the look of the materials. Do not copy its geometry, camera, objects or composition; the building stays the one in the first image.
+
+## Rese (bozza 7, 2026-10-31)
+
+Cosa cambia dalla bozza 6: oltre a Fotorealistico ci sono quattro rese. Fotorealistico non ha un blocco: è quello che i blocchi fanno da sempre, e i suoi prompt non cambiano. Le altre quattro mettono la loro frase subito dopo i materiali, spengono gli assi che con quella resa non hanno senso (lo Studio li mostra in grigio e dice perché) e, quando «cosa evitare» le contraddirebbe, ne hanno uno loro. Scelte da Claude il 2026-10-31 («vedi tu» di Riccardo), non provate: il piano «rese» del banco di prova le confronta sulla stessa vista.
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `plastico` | Plastico bianco | Render it as a photograph of a white architectural scale model: matte white card and pale basswood, crisp cut edges, soft even studio light, plain light grey background. | 169 |
+| `schizzo` | Schizzo a matita | Render it as a hand-drawn architectural pencil sketch on white paper: confident graphite lines following every edge of the view, light hatching for shade, no colour. | 165 |
+| `acquerello` | Acquerello | Render it as an architectural watercolour illustration: fine ink lines following every edge of the view, loose transparent washes, soft colour bleeding, white paper showing through. | 181 |
+| `cinema` | Cinematografico | Render it as a cinematic film still: anamorphic widescreen look, deep contrast, restrained teal and amber grading, a soft haze in the light. | 140 |
+
+| Resa | Cosa spegne | Cosa evitare |
+|---|---|---|
+| Fotorealistico | — | quello di sempre |
+| Plastico bianco | materiali, look, luce, cielo, fuori dalle finestre, intorno, verde, persone, qualità | proprio |
+| Schizzo a matita | materiali, look, cielo, qualità | proprio |
+| Acquerello | look, qualità | proprio |
+| Cinematografico | look, qualità | quello di sempre |
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `evitare-plastico` | Cosa evitare · plastico | Avoid: colour, glossy surfaces, real material textures, people, cars, sky. | 74 |
+| `evitare-schizzo` | Cosa evitare · schizzo | Avoid: colour, photographic shading, smooth digital gradients, CGI look. | 72 |
+| `evitare-acquerello` | Cosa evitare · acquerello | Avoid: photographic look, hard digital edges, oversaturated colour, CGI look. | 77 |
+
+Ordine con una resa: regola fissa → scena → materiali (se la resa non li spegne) → **resa** → gli assi accesi → cosa evitare (della resa, se ce l'ha).
 
 ## Cosa evitare (sempre in coda)
 

@@ -54,7 +54,6 @@ EVENTO_VEDI_TAGLIO = 1008
 # Le dimensioni del radio «Dimensione», nell'ordine del .pyp.
 DIMENSIONI = (None, (1920, 1080), (3840, 2160))
 
-RESA = "Fotorealistico · le altre rese aspettano il loro blocco di prompt (vedi lo Studio)"
 
 print("Load AirenderPalette.py, Python", sys.version.split()[0])
 
@@ -130,7 +129,6 @@ class AirenderPalette(BaseScriptObject):
         super().__init__(script_object_data)
         self.build_ele = build_ele
         self.build_ele.ImmaginiDaScript.value = 1 if config.PALETTE_IMMAGINI_DA_SCRIPT else 0
-        self.build_ele.Resa.value = RESA
         self.telecomando = None
         self._apri()
 
@@ -245,6 +243,7 @@ class AirenderPalette(BaseScriptObject):
             verde=e.Verde.value,
             persone=e.Persone.value,
             fedelta=e.Fedelta.value,
+            resa=e.Resa.value,
             materiali=e.Materiali.value or "",
             modello=e.Modello.value,
             formato=e.Formato.value,

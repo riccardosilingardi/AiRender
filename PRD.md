@@ -711,6 +711,16 @@ poggiano su cose non ancora provate:
 - **Il modello prende dal riferimento solo palette, luce e materiali** — la
   frase è scritta, non provata. Se copia forme o inquadratura, va riscritta.
 
+### Lasciato dalla sessione del 2026-10-31 (rese non fotografiche)
+
+- **Le quattro rese rendono quello che promettono** — mai mandate a un
+  modello. Il piano «rese» del banco (4 invii, circa 69 crediti con Nano
+  Banana 2) le confronta sulla stessa vista.
+- **Quali assi spegnere** — scelto a tavolino (SPENTI_DA_RESA in
+  core/blocchi.py). Se uno schizzo con la luce accesa rende meglio, si
+  riaccende lì.
+- **Il menu Resa nella palette** — generato nel `.pyp`, mai aperto in Allplan.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di

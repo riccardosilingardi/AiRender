@@ -103,9 +103,10 @@ da qui:
   finché la sonda non dice che Allplan aggiorna un'immagine da script, la
   palette scrive nome, dimensioni ed esito. Una miniatura che non si aggiorna
   mostrerebbe la vista sbagliata.
-- **Resa in una riga, non in griglia.** Nello Studio solo «Fotorealistico» ha
-  un blocco di prompt; una griglia di cinque miniature con quattro spente non
-  aggiunge niente. La riga lo dice e rimanda allo Studio.
+- ~~**Resa in una riga, non in griglia.**~~ Dal 2026-10-31 (prompt 12) la
+  Resa è un menu a cinque voci, che apre su Fotorealistico. Gli assi che una
+  resa spegne restano nei menu: la riga «Ripiego» della sezione Invio dice
+  quali non partono.
 - **Esterno / Interno e il preset in Stile.** Il mockup non li ha; senza, la
   palette non saprebbe da quale combinazione partire. Sono lo switch e i preset
   dello Studio · Genera, con gli stessi nomi; Ora, Cielo e Intorno partono da
@@ -401,9 +402,8 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
   parla con Allplan: mostra se la coda dei lavori gira, la cartella delle
   viste e, se la palette l'ha salvata, la camera (Prospettiva centrale o
   Vista parallela). Dire «collegato» sarebbe un'informazione che non abbiamo.
-- **Resa**: solo Fotorealistico è attiva. Plastico bianco, Schizzo a matita,
-  Acquerello e Cinematografico sono in grigio: non hanno ancora un blocco di
-  prompt, e un comando che non cambia il prompt mentirebbe.
+- ~~**Resa**: solo Fotorealistico è attiva.~~ Tutte e cinque attive dal
+  2026-10-31 (prompt 12), vedi sotto «Rese non fotografiche».
 - ~~**Intorno** Città / Periferia / Campagna, **Verde** e **persone «Poche»**:
   in grigio per la stessa ragione.~~ Attive dal 2026-10-29, con i blocchi
   della bozza 4. Le voci attive sono quelle di `core/blocchi.py`, e lo Studio
@@ -543,6 +543,25 @@ non c'è: il riferimento si sceglie nello Studio.
 - **Pieno:** miniatura, nome del file e misure, Togli. La ricetta salva
   l'impronta del riferimento, non l'immagine; il file resta in
   `riferimenti/` nella cartella delle viste.
+
+## Rese non fotografiche, costruite il 2026-10-31
+
+Le tessere della sezione 1 · Resa di Studio · Genera, e il menu Resa della
+palette. Blocchi nella bozza 7; quali rese e che testi li ha scelti Claude
+(«vedi tu» di Riccardo).
+
+- **Vuoto:** non esiste: all'apertura è scelto Fotorealistico, che non
+  aggiunge niente al prompt di sempre.
+- **In corso:** come Genera; cambiare resa dopo il clic non tocca il lavoro
+  partito.
+- **Errore:** una resa che il motore non conosce si rifiuta con quelle
+  possibili; un mio preset con una resa tolta torna a Fotorealistico e lo
+  dice.
+- **Pieno:** la tessera scelta; sotto il titolo una riga dice cosa spegne
+  («Schizzo a matita spegne: materiali a parole, look fotografico, cielo,
+  qualità»). Gli assi spenti restano visibili, in grigio, con «Spento con la
+  resa …: non parte». Le miniature sono l'illustrazione con un filtro, non
+  render del modello.
 
 ## Schermate sostituite il 2026-10-27
 

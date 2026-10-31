@@ -238,7 +238,7 @@ function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -246,7 +246,7 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -520,27 +520,47 @@ function rigaMiniature(elenco) {
   return `${vere} miniature sono render veri (data sotto), le altre ${elenco.length - vere} illustrazioni: rendono l'idea, non sono render del modello`;
 }
 
+// Le rese: quella scelta e cosa spegne. Un asse spento resta visibile, in
+// grigio, con la ragione: nasconderlo farebbe credere che non esista.
+function resaScelta() { return S.catalogo.rese.find((r) => r.id === (S.scelte.resa || "foto")) || S.catalogo.rese[0]; }
+function spento(idAsse) { return resaScelta().spegne.includes(idAsse); }
+function notaSpento(idAsse) {
+  return spento(idAsse) ? h("p", { classe: "tenue piccolo" }, `Spento con la resa ${resaScelta().nome}: non parte. Torna a Fotorealistico per usarlo.`) : null;
+}
+const FILTRI_RESA = {
+  plastico: "grayscale(1) brightness(1.35) contrast(.8)", schizzo: "grayscale(1) contrast(1.5) brightness(1.1)",
+  acquerello: "saturate(.65) brightness(1.12) blur(.5px)", cinema: "contrast(1.3) saturate(1.25) sepia(.15)",
+};
+function illustrazioneResa(id) {
+  const svg = illustrazione(S.scelte);
+  if (FILTRI_RESA[id]) svg.style.filter = FILTRI_RESA[id];
+  return svg;
+}
+function scegliResa(id) { cambiaAsse("resa", id); }
+
 function chipAsse(idAsse) {
   const a = asse(idAsse);
-  return h("div", { classe: "scelte-chip", role: "group", "aria-label": a.titolo },
+  const via = spento(idAsse);
+  return h("div", {}, h("div", { classe: "scelte-chip", role: "group", "aria-label": a.titolo },
     a.voci.map((v) => h("button", {
-      classe: "chip", "aria-pressed": String(S.scelte[idAsse] === v.id), disabled: !v.attivo,
+      classe: "chip", "aria-pressed": String(S.scelte[idAsse] === v.id), disabled: !v.attivo || via,
       title: v.attivo ? null : `In arrivo: ${v.nota}`,
       onclick: v.attivo ? () => cambiaAsse(idAsse, v.id) : null,
-    }, v.nome)));
+    }, v.nome))), notaSpento(idAsse));
 }
 
 function tessereAsse(idAsse) {
   const a = asse(idAsse);
-  return h("div", { classe: "griglia", role: "group", "aria-label": a.titolo },
+  const via = spento(idAsse);
+  return h("div", {}, h("div", { classe: "griglia", role: "group", "aria-label": a.titolo },
     a.voci.map((v) => tessera(v.nome, S.scelte[idAsse] === v.id,
-      v.attivo ? () => cambiaAsse(idAsse, v.id) : null,
-      v.attivo ? illustrazione({ ...S.scelte, [idAsse]: v.id }) : null, v.attivo ? null : v.nota)));
+      v.attivo && !via ? () => cambiaAsse(idAsse, v.id) : null,
+      v.attivo ? illustrazione({ ...S.scelte, [idAsse]: v.id }) : null, v.attivo ? null : v.nota))), notaSpento(idAsse));
 }
 
 function sintesi() {
   const s = S.scelte;
-  const pezzi = ["Fotorealistico", (nomeVoce("look", s.look) || "").split(" · ")[0], nomeVoce("luce", s.luce)];
+  const pezzi = [resaScelta().nome, spento("look") ? null : (nomeVoce("look", s.look) || "").split(" · ")[0], spento("luce") ? null : nomeVoce("luce", s.luce)];
   if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`,
     `verde: ${(nomeVoce("verde", s.verde) || "—").toLowerCase()}`);
   else pezzi.push(nomeVoce("fuori", s.fuori), nomeVoce("arredo", s.arredo));
@@ -570,9 +590,11 @@ function colonnaStile() {
       h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
       h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
     h("div", { classe: "gruppo" }, h("h3", {}, "1 · Resa"),
-      h("p", { classe: "tenue piccolo" }, "Le altre rese arrivano quando avranno il loro blocco di prompt."),
-      h("div", { classe: "griglia" }, S.catalogo.rese.map((r) => tessera(r.nome, r.attivo, r.attivo ? () => {} : null,
-        r.attivo ? illustrazione(S.scelte) : null, r.attivo ? null : r.nota)))),
+      h("p", { classe: "tenue piccolo" }, resaScelta().spegne.length
+        ? `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}. Testi scelti, non ancora provati con il modello.`
+        : "Miniature illustrative. Le rese non fotografiche sono testi scelti, non ancora provati con il modello."),
+      h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
+        (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
     h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico"),
       h("p", { classe: "tenue piccolo" }, "Colore, contrasto, pellicola o digitale · solo per le rese fotografiche"),
       chipAsse("look")),
@@ -675,7 +697,8 @@ function colonnaInvio() {
   return h("div", { classe: "colonna-invio" },
     h("section", { classe: "pannello", "aria-label": "Materiali" },
       h("span", { classe: "etichetta" }, "Materiali a parole"),
-      h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali),
+      h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
+      spento("materiali") ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, `Con la resa ${resaScelta().nome} i materiali non partono.`) : null),
     mappa, cosaParte, scelteInvio, pannelloInvio());
 }
 

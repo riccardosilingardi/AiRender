@@ -82,16 +82,22 @@ MODELLI = (
 # Scritti a schermo e non selezionabili: il loro schema non e' verificato.
 MODELLI_NON_PROVATI = ("Seedream", "GPT Image")
 
-# Le voci del mockup che non hanno ancora un blocco di prompt. Si mostrano in
-# grigio con la ragione: un comando che non cambia il prompt e' una bugia.
-_SERVE_UN_BLOCCO = "serve prima il suo blocco di prompt, non ancora scritto"
-RESE = (
-    ("foto", "Fotorealistico", True, ""),
-    ("plastico", "Plastico bianco", False, _SERVE_UN_BLOCCO),
-    ("schizzo", "Schizzo a matita", False, _SERVE_UN_BLOCCO),
-    ("acquerello", "Acquerello", False, _SERVE_UN_BLOCCO),
-    ("cinema", "Cinematografico", False, _SERVE_UN_BLOCCO),
-)
+# Come lo Studio chiama quello che una resa spegne.
+_NOMI_SPENTI = {
+    "materiali": "materiali a parole", "look": "look fotografico", "luce": "luce",
+    "cielo": "cielo", "fuori": "fuori dalle finestre", "intorno": "intorno",
+    "verde": "verde", "persone": "persone", "qualita": "qualità",
+}
+
+
+def _rese() -> list[dict]:
+    """Le cinque rese, tutte con il loro blocco dalla bozza 7, e cosa spegne ognuna."""
+    return [
+        {"id": resa, "nome": nome, "attivo": True, "nota": "", "origine": config.SCELTA,
+         "spegne": sorted(blocchi.SPENTI_DA_RESA[resa]),
+         "spegne_testo": ", ".join(_NOMI_SPENTI[a] for a in _NOMI_SPENTI if a in blocchi.SPENTI_DA_RESA[resa])}
+        for resa, nome in blocchi.NOMI_RESE.items()
+    ]
 
 _TITOLI_ASSI = {
     "fedelta": "Fedeltà al disegno",
@@ -336,9 +342,7 @@ class Studio:
             "versione_blocchi": blocchi.VERSIONE,
             "origine_blocchi": config.SCELTA,
             "scene": scene,
-            "rese": [
-                {"id": i, "nome": n, "attivo": a, "nota": nota} for i, n, a, nota in RESE
-            ],
+            "rese": _rese(),
             "varianti_massime": config.VARIANTI_MASSIME,
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
@@ -1276,7 +1280,9 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
         else f"Fedeltà al disegno {blocchi.FEDELTA[fedelta].nome.lower()}"
     pezzi = [regola, scelte.scena]
-    if scelte.materiali.strip():
+    resa = blocchi.resa_valida(scelte.resa)
+    via = blocchi.SPENTI_DA_RESA[resa]
+    if scelte.materiali.strip() and "materiali" not in via:
         pezzi.append("i tuoi materiali")
     origine = blocchi.PRESET_STILE.get(preset or "")
     if origine is not None:
@@ -1292,9 +1298,11 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
         "persone": "persone: {}",
         "qualita": "qualità {}",
     }
+    if resa != blocchi.FOTO:
+        pezzi.append(f"resa {blocchi.NOMI_RESE[resa].lower()}")
     for asse, forma in etichette.items():
         valore = getattr(scelte, asse)
-        if valore:
+        if valore and asse not in via:
             nome = blocchi.blocco(asse, valore, scelte.scena).nome
             pezzi.append(forma.format(nome if asse == "look" else nome.lower()))
     pezzi.append("cosa evitare")

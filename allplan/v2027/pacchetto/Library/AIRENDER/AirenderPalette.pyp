@@ -135,9 +135,9 @@
 <Parameter>
 <Name>Resa</Name>
 <Text>Resa</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
+<Value>Fotorealistico</Value>
+<ValueList>Fotorealistico|Plastico bianco|Schizzo a matita|Acquerello|Cinematografico</ValueList>
+<ValueType>StringComboBox</ValueType>
 </Parameter>
 <Parameter>
 <Name>Interno</Name>
