@@ -8,7 +8,7 @@ niente grafo a nodi.
 
 L'albero si salva accanto alla vista, in `<nome della vista>.passi.json`,
 scritto atomico e leggibile a mano. Ogni passo porta la sua ricetta completa:
-immagine di partenza, scelte, testo, aree (nessuna finche' non c'e' Ritocca),
+immagine di partenza, scelte, testo, aree (solo i ritocchi),
 modello, versione dei blocchi, costo, data.
 
 Chi scrive cosa:
@@ -207,7 +207,9 @@ def _passo_da_lavoro(lavoro: dict, numero: int) -> dict:
         "preset": None if partenza else lavoro.get("preset"),
         "prompt_a_mano": None if partenza else lavoro.get("prompt_a_mano"),
         "richieste": richieste,
-        "aree": None,  # le aree arrivano con Ritocca
+        # Un ritocco (Studio · Ritocca): le aree con le note, e come sono partite.
+        "aree": lavoro.get("aree") or None,
+        "modo_aree": lavoro.get("modo_aree"),
         "partenza": {"passo": lavoro.get("parte_da") or VISTA, "file": partenza or lavoro.get("vista")},
         "prompt": _prompt(lavoro),
         "versione_blocchi": blocchi.VERSIONE,
@@ -235,6 +237,8 @@ def _esito(stato: dict, ricetta: dict | None) -> dict:
         "render": stato.get("render") if stato.get("stato") == modulo_coda.FATTO else None,
         "ricetta": stato.get("ricetta") if stato.get("stato") == modulo_coda.FATTO else None,
     }
+    if "fuori_aree" in stato:
+        esito["fuori_aree"] = stato["fuori_aree"]
     if ricetta is not None:
         parametri = ricetta.get("parametri") or {}
         crediti = parametri.get("crediti_usati")

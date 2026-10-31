@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import blocchi, config, grana as modulo_grana, immagine as modulo_immagine
+from . import aree as modulo_aree, blocchi, config, grana as modulo_grana, immagine as modulo_immagine
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
@@ -54,7 +54,12 @@ FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
 # parole. Un lavoro del formato 1 si legge ancora: parte dalla vista, senza
 # richieste. Un motore vecchio rifiuta il 2 invece di mandare la vista al
 # posto del render da cui il passo doveva partire.
-FORMATI_LETTI = (1, 2)
+FORMATO_RITOCCO = 3  # numero-non-configurabile: versione del formato di un lavoro con aree
+# Il formato 3 (prompt 6) aggiunge le aree di Studio · Ritocca e il modo in
+# cui partono. Si scrive solo per un ritocco: gli altri lavori restano nel 2,
+# cosi' una palette o un motore che legge il 2 non smette di funzionare. Un
+# motore vecchio rifiuta il 3 invece di mandare il render senza le aree.
+FORMATI_LETTI = (1, 2, 3)  # numero-non-configurabile: i formati che questo motore sa leggere
 
 # Gli stati, nelle parole che lo Studio e la palette mostrano.
 IN_CODA = "in coda"
@@ -149,16 +154,28 @@ class Lavoro:
     # Le richieste a parole dei passi: una per un passo nuovo, quelle della
     # strada per «Rifai pulito dalla vista».
     richieste: tuple[str, ...] = ()
+    # Studio · Ritocca: le aree con le loro note, disegnate sul render di
+    # partenza, e come partono (aree.MODI). Un ritocco parte sempre da un
+    # render, e le note prendono il posto delle richieste.
+    aree: tuple[modulo_aree.Area, ...] = ()
+    modo_aree: str | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
+
+    def __post_init__(self) -> None:
+        if self.aree:
+            object.__setattr__(self, "formato", FORMATO_RITOCCO)
 
     def prompt(self) -> str:
         """Il testo che parte.
 
-        Da un render: solo le richieste, con la regola del passo (lo stile
-        c'e' gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti
-        i blocchi, piu' le richieste se ce ne sono.
+        Un ritocco: come sono indicate le aree e una riga per nota. Da un
+        render: solo le richieste, con la regola del passo (lo stile c'e'
+        gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti i
+        blocchi, piu' le richieste se ce ne sono.
         """
+        if self.aree:
+            return modulo_aree.prompt(self.modo_aree, self.aree)
         if self.partenza:
             return blocchi.componi_richieste(self.scelte.scena, self.richieste)
         if self.prompt_a_mano and self.prompt_a_mano.strip():
@@ -182,6 +199,8 @@ class Lavoro:
             "parte_da": self.parte_da,
             "partenza": self.partenza,
             "richieste": list(self.richieste),
+            **({"aree": [a.a_dizionario() for a in self.aree], "modo_aree": self.modo_aree}
+               if self.aree else {}),
         }
 
     @classmethod
@@ -220,6 +239,7 @@ class Lavoro:
                 "Nel file del lavoro le richieste non sono un elenco di frasi.",
                 "Rimetti il passo in coda dallo Studio · Passi.",
             )
+        aree, modo_aree = _aree_del_lavoro(dati, partenza)
         return cls(
             identificativo=str(dati["identificativo"]),
             vista=str(dati["vista"]),
@@ -232,8 +252,25 @@ class Lavoro:
             parte_da=str(parte_da) if parte_da else None,
             partenza=str(partenza) if partenza else None,
             richieste=tuple(richieste),
+            aree=aree,
+            modo_aree=modo_aree,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
+
+
+def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
+    """Le aree di un lavoro del formato 3, o nessuna. Un lavoro con aree che non tornano non parte."""
+    if dati.get("formato") != FORMATO_RITOCCO:
+        return (), None
+    if not partenza:
+        raise LavoroNonValido(
+            "Il file del lavoro ha delle aree ma non il render su cui sono disegnate.",
+            "Rimetti il ritocco in coda dallo Studio · Ritocca.",
+        )
+    try:
+        return modulo_aree.da_elenco(dati.get("aree")), modulo_aree.controlla_modo(dati.get("modo_aree"))
+    except modulo_aree.AreaNonValida as errore:
+        raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
 
 
 def nuovo_identificativo(adesso: datetime | None = None) -> str:
@@ -280,6 +317,8 @@ def metti_in_coda(
     parte_da: str | None = None,
     partenza: Path | None = None,
     richieste: tuple[str, ...] | list[str] = (),
+    aree: tuple[modulo_aree.Area, ...] = (),
+    modo_aree: str | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -292,6 +331,13 @@ def metti_in_coda(
             "Un passo ha bisogno sia del passo da cui parte sia del suo render.",
             "Scegli il passo di partenza nell'albero dello Studio · Passi.",
         )
+    if aree:
+        if not partenza:
+            raise LavoroNonValido(
+                "Un ritocco per aree parte da un render, non dalla vista.",
+                "Genera prima un render da Genera, poi ritoccalo.",
+            )
+        modulo_aree.controlla_modo(modo_aree)
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -313,6 +359,8 @@ def metti_in_coda(
         parte_da=parte_da,
         partenza=str(Path(partenza).resolve()) if partenza else None,
         richieste=tuple(richieste),
+        aree=tuple(aree),
+        modo_aree=modo_aree if aree else None,
     )
     lavoro.prompt()  # solleva SceltaNonValida con la ragione, prima di scrivere
     percorsi = cartelle(radice)
@@ -469,12 +517,14 @@ class Coda:
         ricetta = render.with_name(render.name + ".ricetta.json")
         scrivi_atomico(render, risultato.immagine)
         scrivi_atomico(ricetta, risultato.ricetta.a_json())
+        altro = {"fuori_aree": self._misura_fuori_aree(lavoro, risultato.immagine)} if lavoro.aree else {}
         self._chiudi(
             preso, FATTO_DIR, FATTO,
             render=str(render),
             ricetta=str(ricetta),
             scostamento_geometria=risultato.scostamento_geometria,
             avvisi=list(risultato.avvisi),
+            **altro,
         )
         self._dire(f"Lavoro {identificativo}: render salvato in {render}")
 
@@ -515,11 +565,14 @@ class Coda:
                 "mostra di nuovo prima dell'invio.",
             )
         motore.controlla_prima_dell_invio(lavoro.modello, dati)
+        ingresso, in_piu = dati, ()
+        if lavoro.aree:
+            ingresso, in_piu = modulo_aree.prepara(dati, lavoro.aree, lavoro.modo_aree)
         # La grana non entra nei blocchi: i modelli del Router non hanno un
         # dettaglio della grana, e la ricetta lo scrive come assente.
         livello = modulo_grana.MEDIA
         richiesta = RichiestaGenerazione(
-            immagine=dati,
+            immagine=ingresso,
             prompt=lavoro.prompt(),
             preset=lavoro.preset or SCELTE_LIBERE,
             preset_versione=blocchi.VERSIONE,
@@ -527,8 +580,21 @@ class Coda:
             grana=livello,
             dettaglio_grana=modulo_grana.dettaglio(livello),
             testo_utente=lavoro.scelte.materiali,
+            immagini_in_piu=in_piu,
         )
         return richiesta, motore
+
+    def _misura_fuori_aree(self, lavoro: Lavoro, render: bytes) -> dict | None:
+        """Quanto e' cambiato il render fuori dalle aree, contro il render di partenza senza contorni.
+
+        Il render e' gia' pagato e salvato: una misura che non riesce non lo
+        butta, resta None e lo Studio scrive «non misurato».
+        """
+        try:
+            return modulo_aree.misura(Path(lavoro.partenza).read_bytes(), render, lavoro.aree)
+        except (OSError, ErroreAirender) as errore:
+            self._dire(f"Lavoro {lavoro.identificativo}: misura fuori dalle aree non riuscita, {errore}")
+            return None
 
     @staticmethod
     def _leggi_partenza(partenza: Path) -> bytes:

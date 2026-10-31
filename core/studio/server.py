@@ -33,6 +33,8 @@ Rotte:
     POST /api/passi/invia                  un passo nuovo dal render di un passo
     POST /api/passi/pulito/componi         il prompt di «Rifai pulito dalla vista»
     POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
+    POST /api/ritocca/componi              il prompt di un ritocco (aree e note), prima di Applica
+    POST /api/ritocca/invia                tutte le note in un invio sul render di un passo
     POST /api/apri-cartella                apre viste o render nel sistema
 """
 
@@ -195,6 +197,10 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_pulito(self._corpo_json()))
             case ["api", "passi", "pulito", "invia"]:
                 self._json(studio.invia_pulito(self._corpo_json()))
+            case ["api", "ritocca", "componi"]:
+                self._json(studio.componi_ritocco(self._corpo_json()))
+            case ["api", "ritocca", "invia"]:
+                self._json(studio.invia_ritocco(self._corpo_json()))
             case ["api", "apri-cartella"]:
                 self._json(studio.apri_cartella(str(self._corpo_json().get("quale", ""))))
             case _:

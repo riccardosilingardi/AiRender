@@ -285,6 +285,14 @@ def test_passi_avviso_da_generazione_avvisa_gia_dal_primo_passo_su_un_render():
     assert config.costante("PASSI_AVVISO_DA_GENERAZIONE").origine == config.SCELTA
 
 
+def test_ritocco_modo_aree_e_un_modo_vero_e_resta_una_scelta_finche_il_banco_non_parla():
+    """Caso: lo Studio manda le aree in un modo che il motore non sa preparare, o lo spaccia per misurato."""
+    from core import aree
+
+    assert config.RITOCCO_MODO_AREE in aree.MODI
+    assert config.costante("RITOCCO_MODO_AREE").origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 

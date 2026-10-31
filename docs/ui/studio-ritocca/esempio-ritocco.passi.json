@@ -1,0 +1,269 @@
+{
+  "formato": 1,
+  "vista": "vista-20261021-093841.png",
+  "passi": [
+    {
+      "identificativo": "20261030-171147-447712-8111",
+      "numero": 1,
+      "da": "0",
+      "creato_il": "2026-10-30T17:11:47+00:00",
+      "scena": "esterno",
+      "scelte": {
+        "scena": "esterno",
+        "materiali": "",
+        "look": "canon",
+        "luce": "mezzogiorno",
+        "cielo": "sereno",
+        "fuori": null,
+        "arredo": null,
+        "intorno": "niente",
+        "verde": "nessuno",
+        "persone": "nessuna",
+        "qualita": "base"
+      },
+      "preset": "rivista",
+      "prompt_a_mano": null,
+      "richieste": [],
+      "aree": null,
+      "modo_aree": null,
+      "partenza": {
+        "passo": "0",
+        "file": "/tmp/tmp_5vob6wp/AIRENDER/viste/vista-20261021-093841.png"
+      },
+      "prompt": "Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below. The subject is a building exterior. Professional architectural photograph, Canon EOS R5 with 17mm tilt-shift lens: perfectly straight verticals, deep focus, crisp micro-contrast, clean polarized colour. Midday sun high in the sky, crisp natural shadows, deep blue sky with thin cirrus. Clear sky. Plain neutral background; do not add buildings, cars or surroundings that are not in the view. Do not add trees, grass or planting that are not in the view. No people. Professional architectural photography, natural detail. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "comfy",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router (api.comfy.org) → vertexai/gemini-3.1-flash-image",
+      "stato": "fatto",
+      "render": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171147-447712-8111.png",
+      "ricetta": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171147-447712-8111.png.ricetta.json",
+      "costo_crediti": 17.17,
+      "impronta_partenza": "2737f67293230640fcc80aaf3efdd0662ba446fb59a7945333bf7d17ec93cd59",
+      "fatto_il": "2026-10-30T17:11:47+00:00"
+    },
+    {
+      "identificativo": "20261030-171204-751227-e868",
+      "numero": 2,
+      "da": "20261030-171147-447712-8111",
+      "creato_il": "2026-10-30T17:12:04+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [],
+      "aree": [
+        {
+          "forma": "rettangolo",
+          "punti": [
+            [
+              0.18,
+              0.3
+            ],
+            [
+              0.42,
+              0.62
+            ]
+          ],
+          "nota": "infissi in legno scuro, vetri un po' riflettenti"
+        },
+        {
+          "forma": "libera",
+          "punti": [
+            [
+              0.62,
+              0.6571
+            ],
+            [
+              0.64,
+              0.6451
+            ],
+            [
+              0.66,
+              0.6331
+            ],
+            [
+              0.68,
+              0.6211
+            ],
+            [
+              0.7,
+              0.6091
+            ],
+            [
+              0.72,
+              0.5971
+            ],
+            [
+              0.748,
+              0.6011
+            ],
+            [
+              0.776,
+              0.6051
+            ],
+            [
+              0.804,
+              0.6091
+            ],
+            [
+              0.832,
+              0.6131
+            ],
+            [
+              0.86,
+              0.6171
+            ],
+            [
+              0.868,
+              0.6451
+            ],
+            [
+              0.876,
+              0.6731
+            ],
+            [
+              0.884,
+              0.7011
+            ],
+            [
+              0.892,
+              0.7291
+            ],
+            [
+              0.9,
+              0.7571
+            ],
+            [
+              0.88,
+              0.7771
+            ],
+            [
+              0.86,
+              0.7971
+            ],
+            [
+              0.84,
+              0.8171
+            ],
+            [
+              0.82,
+              0.8371
+            ],
+            [
+              0.8,
+              0.8571
+            ],
+            [
+              0.772,
+              0.8491
+            ],
+            [
+              0.744,
+              0.8411
+            ],
+            [
+              0.716,
+              0.8331
+            ],
+            [
+              0.688,
+              0.8251
+            ],
+            [
+              0.66,
+              0.8171
+            ],
+            [
+              0.652,
+              0.7851
+            ],
+            [
+              0.644,
+              0.7531
+            ],
+            [
+              0.636,
+              0.7211
+            ],
+            [
+              0.628,
+              0.6891
+            ],
+            [
+              0.62,
+              0.6571
+            ]
+          ],
+          "nota": "una panchina in pietra chiara"
+        }
+      ],
+      "modo_aree": "contorni",
+      "partenza": {
+        "passo": "20261030-171147-447712-8111",
+        "file": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171147-447712-8111.png"
+      },
+      "prompt": "Edit this exact image. Numbered magenta outlines are drawn on it. Make each change listed below only inside the outline with its number. Outside the outlines keep every pixel exactly as it is. Remove the outlines and the numbers from the result. Area 1: infissi in legno scuro, vetri un po' riflettenti. Area 2: una panchina in pietra chiara. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "comfy",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router (api.comfy.org) → vertexai/gemini-3.1-flash-image",
+      "stato": "fatto",
+      "render": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171204-751227-e868.png",
+      "ricetta": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171204-751227-e868.png.ricetta.json",
+      "fuori_aree": {
+        "pixel_fuori": 1128088,
+        "differenza_media": 0.0,
+        "quota_cambiata": 0.0,
+        "ridimensionata": false,
+        "dimensioni_render": [
+          1536,
+          857
+        ]
+      },
+      "costo_crediti": 17.17,
+      "impronta_partenza": "f83df95e79fd31ba1f8994e76dc0d3bdbb261455b81c0421b18cd8e42e2c3207",
+      "fatto_il": "2026-10-30T17:12:05+00:00"
+    },
+    {
+      "identificativo": "20261030-171212-249667-b594",
+      "numero": 3,
+      "da": "20261030-171204-751227-e868",
+      "creato_il": "2026-10-30T17:12:12+00:00",
+      "scena": "esterno",
+      "scelte": null,
+      "preset": null,
+      "prompt_a_mano": null,
+      "richieste": [],
+      "aree": [
+        {
+          "forma": "rettangolo",
+          "punti": [
+            [
+              0.05,
+              0.08
+            ],
+            [
+              0.3,
+              0.25
+            ]
+          ],
+          "nota": "cielo coperto, nuvole basse"
+        }
+      ],
+      "modo_aree": "contorni",
+      "partenza": {
+        "passo": "20261030-171204-751227-e868",
+        "file": "/tmp/tmp_5vob6wp/AIRENDER/viste/lavori/fatto/20261030-171204-751227-e868.png"
+      },
+      "prompt": "Edit this exact image. Numbered magenta outlines are drawn on it. Make each change listed below only inside the outline with its number. Outside the outlines keep every pixel exactly as it is. Remove the outlines and the numbers from the result. Area 1: cielo coperto, nuvole basse. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.",
+      "versione_blocchi": "bozza-5",
+      "provider": "comfy",
+      "modello": "vertexai/gemini-3.1-flash-image",
+      "destinazione": "Comfy Router (api.comfy.org) → vertexai/gemini-3.1-flash-image",
+      "stato": "errore",
+      "fatto": "Comfy ha risposto 402: crediti finiti. Non e' stato addebitato niente.",
+      "cosa_fare": "Ricarica i crediti nel tuo workspace Comfy, poi rifai."
+    }
+  ]
+}

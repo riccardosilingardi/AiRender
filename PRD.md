@@ -144,7 +144,8 @@ python scripts/miniatura_da_banco.py --render <cartella del banco>\ora-blu.png  
 | Miniature vere dei preset: un render del piano «preset» del banco, ritagliato a 16:9, diventa la miniatura del suo preset; nello Studio «render vero del <data>» sotto la tessera | `scripts/miniatura_da_banco.py`, `core/studio/miniature.py` | Provato con `pytest`. Nessuna miniatura vera nel repository: oggi sono tutte illustrazioni |
 | Studio v1: `python -m core.studio` avvia il server locale (`http.server`, solo `127.0.0.1`, porta scelta dal sistema), la coda come processo figlio e la pagina (Edge `--app=` se c'è). Genera e Risultato come in `DESIGN.md`, Ritocca in grigio. Rotte JSON per viste, preset, composizione del prompt, destinazione e costo, prova a secco, invio, stato, render, ricetta, annulla, rifai. Niente CDN né font scaricati | `core/studio/` | Provato con `pytest` (rotte, prompt, stati, difese del server) e con Playwright su un provider finto: screenshot di ogni stato in `docs/ui/studio-v1/`. **Mai aperto su Windows né con Edge, mai con un invio vero** (sezione 9) |
 | Studio · Passi: l'albero dei passi di una vista (0 è la vista Allplan, ogni passo figlio di quello da cui parte, rami), salvato in `<vista>.passi.json` accanto alla vista con la ricetta completa di ogni passo; i render già fatti diventano figli della vista. Un lavoro della coda (formato 2) può partire dal render di un passo con una richiesta a parole. Nello Studio: albero in una colonna, prima/dopo contro la vista o il passo prima, strada, ricetta, Nuovo passo da qui, Rifai questo passo, Rifai pulito dalla vista (le richieste della strada in un invio dalla vista, con il prompt mostrato prima), avviso dalla 2ª generazione di fila, tenuta «Non misurata» | `core/passi.py`, `core/coda.py`, `core/studio/` | Provato con `pytest` (rami, strada, figli, migrazione, unione delle richieste, lavoro da un passo, rotte) e con Playwright su un provider finto: screenshot in `docs/ui/studio-passi/`. **Mai con un invio vero, mai su Windows né con Edge**; nessun passo su un render è mai stato mandato a un modello (sezione 9) |
-| Casa unica delle decisioni: 36 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
+| Studio · Ritocca: aree a rettangolo o a selezione libera (lazo) sul render di un passo, una nota adesiva numerata per area (spostabile), le note anche in elenco, un solo Applica con destinazione e costo di un invio; il risultato è un passo figlio del render ritoccato, con la misura «fuori dalle aree» accanto. Le aree partono come contorni disegnati o come maschera in più (`RITOCCO_MODO_AREE`, SCELTA sui contorni). Lavoro della coda del formato 3 (solo per i ritocchi: gli altri restano nel 2), misura scritta nello stato del lavoro. «Clicca una superficie» in grigio | `core/aree.py`, `core/coda.py`, `core/passi.py`, `core/studio/` | Provato con `pytest` (i due modi, prompt, misura, formato 3, passo nell'albero, note vuote, rifai, rifai pulito, rotte) e con Playwright su un provider finto, disegnando con il mouse: screenshot in `docs/ui/studio-ritocca/`. **Mai con un invio vero**: il piano «aree» del banco non è ancora stato lanciato (sezione 9) |
+| Casa unica delle decisioni: 37 costanti, ognuna con la ragione e l'etichetta MISURATA / SCELTA / VINCOLO | `core/config.py` | Fatta. Un test impedisce di cablare numeri altrove, e un altro che una costante resti senza il suo caso |
 | Strato provider sostituibile: genera, modifica una regione con maschera, riesegue a parametri identici; ogni provider dice dove manda la vista e se ha una forza della struttura | `core/provider/` | Interfaccia + due provider. **Comfy Router**, predefinito: protocollo della coda (confermato dalla sonda il 2026-10-27), idempotenza, errori, crediti scalati nella ricetta; schemi verificati per FLUX.1 Kontext Pro e Nano Banana 2, ogni altro modello si ferma prima di partire. **Magnific**: registrato, non più a consumo |
 | Sonda di Comfy Router: schema del modello (gratis), una generazione, risposte stampate senza chiave | `scripts/sonda_comfy.py` | Lanciata davvero sul PC di Riccardo il 2026-10-27: schema e una generazione per FLUX.1 Kontext Pro e per Nano Banana 2 |
 | Confronto affiancato: la stessa vista attraverso due modelli, con la vista di partenza, per giudicare gli spigoli a occhio | `scripts/confronta_modelli.py` | Scritto e provato senza rete. I due modelli predefiniti hanno lo schema dal 2026-10-27: non è ancora stato lanciato davvero (il primo confronto è stato fatto a mano, con le immagini della sonda) |
@@ -194,9 +195,12 @@ per PR (regola di `CLAUDE.md`).
    vista, lavori che partono da un passo, «Rifai pulito dalla vista». Fatto
    prima del piano «catena» del banco: la soglia dell'avviso resta SCELTA
    finché il banco non dice quanto costa ogni generazione in più in spigoli.
-7. **Ritocca** — solo dopo il piano «aree» del banco: se Nano Banana 2 non
-   rispetta le aree in nessuno dei due modi, la schermata cambia prima di
-   essere costruita.
+7. **Ritocca** — fatto il 2026-10-30 (sezione 7), prima del piano «aree» del
+   banco, su richiesta di Riccardo: il modo delle aree è un'impostazione.
+   Resta da fare: lanciare il piano «aree», fissare `RITOCCO_MODO_AREE` con
+   il risultato, e se Nano Banana 2 non rispetta le aree in nessuno dei due
+   modi, rimettere i pixel fuori dalle aree nel motore (qui sotto,
+   «Annotazione per aree», punto 2) o cambiare la schermata.
 
 - Video — rimandato, non annullato. Arriva come livello sopra un fermo immagine.
 - LoRA di stile addestrati sui render dello studio — è l'argomento di vendita
@@ -609,9 +613,8 @@ poggiano su cose non ancora provate:
 - **Le miniature vere non esistono ancora.** Il comando c'è; la prima nasce
   dal piano «preset». Una miniatura entra nel repository: va fatta da una
   vista che si può mostrare a tutti, non da un progetto sotto NDA.
-- **Ritocca è solo nei documenti.** I suoi quattro stati in `DESIGN.md` non
-  sono stati provati su nessuna interfaccia. (Passi è uscita da qui il
-  2026-10-30: vedi la sessione dell'albero dei passi qui sotto.)
+- (Ritocca e Passi sono usciti da qui il 2026-10-30: vedi le due sessioni
+  qui sotto.)
 
 ### Lasciato dalla sessione del 2026-10-30 (albero dei passi)
 
@@ -636,6 +639,27 @@ poggiano su cose non ancora provate:
   Linux, a 1440 px e a 1280×800, con un provider finto che tinge la vista.
 - **La coda vecchia rifiuta i lavori nuovi** (formato 2) con un messaggio,
   invece di mandare la vista al posto del render: provato solo a codice.
+
+### Lasciato dalla sessione del 2026-10-30 (Ritocca)
+
+- **Il piano «aree» non è mai partito, e Ritocca è costruita senza.**
+  `RITOCCO_MODO_AREE` = «contorni» è SCELTA: partono con un'immagine sola, e
+  basta. Non sappiamo se Nano Banana 2 tiene fermo il resto, se toglie i
+  contorni magenta e i numeri dal risultato (la misura non lo vede: i
+  contorni stanno nella fascia esclusa, i numeri appena fuori), né se segue
+  le note numerate.
+- **Nessun ritocco è mai partito verso un modello**, né in modo contorni né
+  in modo maschera. La maschera parte come seconda immagine: Nano Banana 2 la
+  accetta secondo lo schema, mai provato.
+- **La misura fuori dalle aree non è tarata** su un risultato vero; se un
+  modello rende un'altra dimensione, la misura ricampiona e lo dice.
+- **Il lazo si semplifica** (un punto ogni 0,4% del lato) e un'area sotto
+  l'1% del lato si scarta come clic sbagliato: due numeri della pagina,
+  scelti, non in `config.py` perché non toccano il motore.
+- **Mai aperto su Windows né con Edge**, né con un touchpad o una penna: le
+  schermate sono di Chromium su Linux con il mouse simulato.
+- **Un motore vecchio rifiuta i ritocchi** (formato 3) con un messaggio,
+  invece di mandare il render senza aree: provato solo a codice.
 
 ### Usciti da questa sezione, con la loro verifica
 
@@ -717,4 +741,4 @@ cambio è in `DESIGN.md`.
 | Studio · Genera | Scegliere lo stile con calma, vedere il prompt vero, la destinazione e il costo | "Nessuna vista ancora. Catturala dalla palette in Allplan, oppure scegli un file." |
 | Studio · Risultato | Decidere se è ancora il proprio edificio, confrontare render e modelli | "Nessun render ancora. Scegli uno stile in Genera e premi Genera." |
 | Studio · Passi | Ritrovare e rifare i passi di una vista | "Nessun passo ancora. Genera un render da Genera: sarà il passo 1." |
-| Studio · Ritocca | Disegnare aree a rettangolo o libere con note numerate, un solo Applica (progettata, non costruita: in grigio) | "Prima serve un render." |
+| Studio · Ritocca | Disegnare aree a rettangolo o libere con note numerate, un solo Applica; il risultato è un passo nuovo | "Prima serve un render. Generane uno da Genera." |

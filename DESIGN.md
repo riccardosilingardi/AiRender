@@ -269,9 +269,12 @@ chiama **Passi** (era Livelli).
 
 Mockup: `Ritocca.dc.html`. Riscritta il 2026-10-28 su richiesta di Riccardo:
 le aree si disegnano come in Photoshop e le modifiche si scrivono su note
-adesive sull'immagine. **Non costruita**: arriva dopo che il piano «aree» del
-banco di prova ha detto se Nano Banana 2 rispetta aree e note (PRD, sezioni 8
-e 9). Finché non c'è, la scheda resta l'anteprima in grigio dello Studio v1.
+adesive sull'immagine. **Costruita il 2026-10-30** (prompt 6), prima del piano
+«aree» del banco di prova: il modo in cui partono le aree (contorni disegnati o
+maschera) è un'impostazione, `RITOCCO_MODO_AREE` in `core/config.py`, SCELTA
+sui contorni finché il banco non dice quale tiene fermi i pixel fuori dalle
+aree. Dove la schermata costruita si scosta da qui, sotto «Ritocca, costruita
+il 2026-10-30».
 
 **Strumenti**, in una fila sopra il render:
 - **Rettangolo**: si trascina un riquadro.
@@ -320,6 +323,35 @@ non hanno un dettaglio della grana (la ricetta lo scrive già come assente).
   pixel di prima.
 - **Pieno:** render con aree e note numerate, elenco delle note, Applica con
   destinazione e costo. Dopo l'invio, il passo nuovo è scelto nell'albero.
+
+### Ritocca, costruita il 2026-10-30
+
+Codice in `core/aree.py` (aree, i due modi, misura), `core/coda.py` (lavoro
+del formato 3), `core/studio/`; screenshot di ogni stato in
+`docs/ui/studio-ritocca/`, con render finti. Dove si scosta da sopra, e perché:
+
+- **Il render da ritoccare si sceglie in testa**, fra i passi riusciti della
+  vista (predefinito: quello scelto nei Passi, altrimenti il più recente).
+  Cambiarlo svuota le aree: erano disegnate su un'altra immagine.
+- **Risultato in Ritocca, non subito nei Passi.** Finito l'invio la scheda
+  mostra il prima/dopo contro il render ritoccato, la misura **fuori dalle
+  aree** accanto e le note applicate, con «Ritocca questo render», «Torna al
+  render di prima» e «Vedi nei Passi». Il passo nuovo è già scelto
+  nell'albero. La misura è quella del banco (`DIFFERENZA_PIXEL_SOGLIA`,
+  `AREE_BORDO_ESCLUSO_PX`, SCELTE), contro il render di partenza senza
+  contorni; se il motore non l'ha potuta fare, «non misurato». Un risultato di
+  dimensione diversa lo dice nella stessa frase.
+- **La riga della destinazione dice cosa parte**: «Il render, con le aree
+  disegnate sopra, va a …» (o «con la maschera delle aree»), non «la vista».
+- **In Passi un ritocco è un passo come gli altri**: nome «Ritocco · 2 note ·
+  …», nella ricetta le aree con le note e il modo, il pannello «Fuori dalle
+  aree». «Rifai questo passo» lo rimanda con le stesse aree e lo stesso modo,
+  anche se nel frattempo `RITOCCO_MODO_AREE` è cambiato. «Rifai pulito dalla
+  vista» mette le note come richieste a parole e avvisa che le aree non valgono
+  più: erano disegnate su un render.
+- **Il motore non rimette i pixel fuori dalle aree.** L'idea della sezione 8
+  del PRD (incollare il render di partenza fuori dalle aree, con il bordo
+  sfumato) non è in questo PR: prima si guarda cosa fa il modello da solo.
 
 ## Studio v1, costruito il 2026-10-28
 
@@ -382,8 +414,9 @@ provider finto. Dove la schermata si scosta da quello che c'è sopra, e perché:
   farlo direbbe la stessa cosa in due modi.
 - **Un passo nuovo è una richiesta a parole**, una sola per invio, con il
   modello (predefinito: quello del passo da cui parte), il prompt che parte
-  (in sola lettura), destinazione e costo, e **Applica**. «Su un'area» c'è,
-  in grigio: arriva con Ritocca. Il prompt di un passo non si scrive a mano:
+  (in sola lettura), destinazione e costo, e **Applica**. «Su un'area…»
+  apre Ritocca sul render di quel passo (dal 2026-10-30), come «Ritocca da
+  qui» in Adesso. Il prompt di un passo non si scrive a mano:
   quello si fa in Genera, dove i comandi sanno che il testo è stato toccato.
 - **Da un render non si controlla l'idoneità**: giudica una vista di Allplan
   (shaded, toni, sfondo), e un render non lo è. Si controlla che il render ci
@@ -468,5 +501,4 @@ contraddicono le nuove, valgono le nuove:
 - Esportazione finale (formati, risoluzione, dove salva).
 - Qualunque cosa riguardi il video.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
-  stati si scrivono quando la mappa esiste. Ritocca ha i suoi stati qui
-  sopra, ma non è costruita.
+  stati si scrivono quando la mappa esiste.

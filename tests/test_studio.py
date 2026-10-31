@@ -602,8 +602,9 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "Non misurata",
         "Il controllo automatico degli spigoli non c'è ancora. Per ora giudica tu, confrontando le due immagini.",
         "Rifai con la stessa ricetta",
-        "Anteprima delle funzioni in arrivo · niente qui è attivabile",  # Ritocca
-        "Prima serve un render.",
+        "Prima serve un render. Generane uno da Genera.",            # Ritocca, vuoto
+        "Disegna un'area, poi scrivi cosa cambiare nella sua nota.",
+        "Un'area senza nota non dice al modello cosa fare.",
     ):
         assert testo in script, testo
 

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from .. import blocchi, config, coda as modulo_coda, immagine as modulo_immagine
+from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import passi as modulo_passi
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
@@ -163,6 +163,11 @@ class Studio:
             "viste": viste,
             "lavori_attivi": self.lavori_attivi(),
             "modello_predefinito": MODELLI[0].identificativo,
+            "ritocco": {
+                "modo": config.RITOCCO_MODO_AREE,
+                "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
+                "origine": config.costante("RITOCCO_MODO_AREE").origine,
+            },
         }
 
     # --- viste -----------------------------------------------------------
@@ -428,7 +433,8 @@ class Studio:
 
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
                        varianti: int = 1, parte_da: str | None = None,
-                       partenza: Path | None = None, richieste=()) -> dict:
+                       partenza: Path | None = None, richieste=(), aree=(),
+                       modo_aree: str | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -456,6 +462,8 @@ class Studio:
                 parte_da=parte_da,
                 partenza=partenza,
                 richieste=tuple(richieste),
+                aree=tuple(aree),
+                modo_aree=modo_aree,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -502,6 +510,10 @@ class Studio:
             parte_da=lavoro.parte_da,
             partenza=partenza,
             richieste=lavoro.richieste,
+            # Un ritocco si rifa' con le sue aree e il suo modo, anche se nel
+            # frattempo RITOCCO_MODO_AREE e' cambiato: e' la sua ricetta.
+            aree=lavoro.aree,
+            modo_aree=lavoro.modo_aree,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -756,7 +768,7 @@ class Studio:
         partenza = passo.get("partenza") or {}
         # Un passo fatto su un render il cui render non c'e' piu': non si
         # puo' rifare uguale, si propone di rifarlo pulito dalla vista.
-        partenza_mancante = _tipo_passo(passo) == "passo" and (
+        partenza_mancante = _tipo_passo(passo) in ("passo", "ritocco") and (
             padre_passo is None
             or not (padre_passo.get("render") and self._render_valido(Path(padre_passo["render"])))
         )
@@ -794,6 +806,11 @@ class Studio:
             "percorso_render": passo.get("render"),
             "percorso_ricetta": passo.get("ricetta"),
             "aree": passo.get("aree"),
+            "modo_aree": passo.get("modo_aree"),
+            "modo_aree_nome": modulo_aree.NOMI_MODI.get(passo.get("modo_aree") or ""),
+            "fuori_aree": passo.get("fuori_aree") if stato == modulo_coda.FATTO else None,
+            "fuori_aree_testo": modulo_aree.testo_misura(passo.get("fuori_aree"))
+            if passo.get("aree") and stato == modulo_coda.FATTO else None,
         }
 
     def _passo_di_partenza(self, albero: modulo_passi.Albero, identificativo: str) -> tuple[dict, Path]:
@@ -868,7 +885,10 @@ class Studio:
                 "Genera di nuovo dalla vista in Genera, poi rifai i passi.",
             )
         scelte = blocchi.Scelte.da_dizionario(base["scelte"])
-        richieste = [r for p in strada for r in (p.get("richieste") or [])]
+        # Le note di un ritocco entrano come richieste a parole: dalla vista
+        # le aree non valgono piu', erano disegnate su un render. Lo si dice.
+        richieste = [r for p in strada for r in _richieste_del_passo(p)]
+        senza_aree = [str(p.get("numero")) for p in strada if p.get("aree")]
         testo_base = (base.get("prompt_a_mano") or "").strip() or blocchi.componi(scelte)
         prompt = blocchi.aggiungi_richieste(testo_base, richieste)
         return {
@@ -879,6 +899,7 @@ class Studio:
             "prompt": prompt,
             "strada": ["0"] + [str(p.get("numero")) for p in strada],
             "generazioni": len(strada),
+            "senza_aree": senza_aree,
         }
 
     def componi_pulito(self, dati: dict) -> dict:
@@ -892,6 +913,7 @@ class Studio:
             "strada": unione["strada"],
             "generazioni": unione["generazioni"],
             "riassunto": riassunto(unione["scelte"], unione["preset"]),
+            "senza_aree": unione["senza_aree"],
         }
 
     def invia_pulito(self, dati: dict) -> dict:
@@ -905,6 +927,46 @@ class Studio:
             preset=unione["preset"] or None,
             prompt_a_mano=unione["prompt_a_mano"],
             richieste=unione["richieste"],
+        )
+
+    # --- ritocco ---------------------------------------------------------
+
+    def _ritocco(self, dati: dict) -> tuple[Path, modulo_passi.Albero, dict, Path, tuple]:
+        """Vista, albero, passo da ritoccare, il suo render e le aree della richiesta."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        albero = self._albero(vista)
+        passo, render = self._passo_di_partenza(albero, dati.get("da"))
+        try:
+            aree = modulo_aree.da_elenco(dati.get("aree"))
+        except modulo_aree.AreaNonValida as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        return vista, albero, passo, render, aree
+
+    def componi_ritocco(self, dati: dict) -> dict:
+        """Il prompt di un ritocco, da mostrare prima di Applica."""
+        _vista, albero, passo, _render, aree = self._ritocco(dati)
+        prompt = modulo_aree.prompt(config.RITOCCO_MODO_AREE, aree)
+        return {
+            "prompt": prompt,
+            "caratteri": len(prompt),
+            "note": len(aree),
+            "modo": config.RITOCCO_MODO_AREE,
+            "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
+            "da_numero": str(passo.get("numero")),
+            "ramo_nuovo": bool(albero.figli(passo["identificativo"])),
+            "generazioni": albero.generazioni(passo["identificativo"]) + 1,
+        }
+
+    def invia_ritocco(self, dati: dict) -> dict:
+        """Tutte le note in un invio solo, sul render del passo: il risultato e' un passo figlio."""
+        vista, albero, passo, render, aree = self._ritocco(dati)
+        destinazione = self.destinazione(str(dati.get("modello") or ""))
+        return self._metti_in_coda(
+            vista, blocchi.Scelte(scena=self._scena(albero, passo)), destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=None, prompt_a_mano=None,
+            parte_da=passo["identificativo"], partenza=render,
+            aree=aree, modo_aree=config.RITOCCO_MODO_AREE,
         )
 
     # --- cartella --------------------------------------------------------
@@ -932,8 +994,18 @@ def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:
     return {"url": f"/file/miniatura/{preset}", "data": quando, "modello": voce.get("modello")}
 
 
+def _richieste_del_passo(passo: dict) -> list[str]:
+    """Le richieste a parole di un passo; per un ritocco, le sue note."""
+    if passo.get("aree"):
+        return [str(a.get("nota") or "") for a in passo["aree"] if isinstance(a, dict)]
+    return list(passo.get("richieste") or [])
+
+
 def _tipo_passo(passo: dict) -> str:
-    """stile (dalla vista), passo (da un render), pulito (dalla vista con le richieste di una strada)."""
+    """stile (dalla vista), passo (da un render), ritocco (aree e note su un render),
+    pulito (dalla vista con le richieste di una strada)."""
+    if passo.get("aree"):
+        return "ritocco"
     if (passo.get("partenza") or {}).get("passo", modulo_passi.VISTA) != modulo_passi.VISTA:
         return "passo"
     return "pulito" if passo.get("richieste") else "stile"
@@ -947,6 +1019,10 @@ def _nome_stile(passo: dict) -> str:
 def _nome_passo(passo: dict) -> str:
     """Il nome breve della riga: dalle scelte, o dalla richiesta."""
     tipo = _tipo_passo(passo)
+    if tipo == "ritocco":
+        note = _richieste_del_passo(passo)
+        quante = "1 nota" if len(note) == 1 else f"{len(note)} note"
+        return modulo_passi.nome_breve(f"Ritocco · {quante} · {note[0] if note else ''}")
     if tipo == "passo":
         breve = modulo_passi.nome_breve((passo.get("richieste") or [""])[0])
         return breve[:1].upper() + breve[1:] if breve else "Passo senza richiesta"
@@ -959,6 +1035,11 @@ def _riassunto_passo(passo: dict, padre: dict | None) -> str:
     """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
     tipo = _tipo_passo(passo)
     richieste = passo.get("richieste") or []
+    if tipo == "ritocco":
+        numero = padre.get("numero") if padre else "?"
+        note = _richieste_del_passo(passo)
+        return f"Ritocco del passo {numero}: " + "; ".join(
+            f"area {i}, {n}" for i, n in enumerate(note, start=1))
     if tipo == "passo":
         numero = padre.get("numero") if padre else "?"
         return f"Dal passo {numero}: " + "; ".join(richieste)
