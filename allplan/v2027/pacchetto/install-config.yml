@@ -6,7 +6,7 @@
 plugin:
   name: AIRENDER
   UUID: 53381a1d-3ee9-4cf5-b1b3-73fa5f5c9cc0
-  version: 1.0.9
+  version: 1.0.10
   developer: riccardo_silingardi
   default-language: en
   min-allplan-version: 2027

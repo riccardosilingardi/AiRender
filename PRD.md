@@ -267,6 +267,16 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Color map, motore (2026-11-01)
+
+- **`core/colormap.py` funziona su una segmentazione vera** — non verificato.
+  I test usano maschere disegnate. La forma delle uscite di SAM3, SAM2
+  automatico e OneFormer su Comfy Cloud (maschere separate o immagine a colori)
+  e' presa dal catalogo dei nodi, non da una chiamata.
+- **Le tre soglie COLORMAP_*** sono scelte, non misurate.
+- **I materiali letti da Allplan coprono la vista** — non verificato: la
+  sonda 2 ha letto 30 elementi su 13.570, e le facciate non danno materiale.
+
 ### Palette: Esc per tornare alla Library (2026-11-01)
 
 - **Esc chiude palette e sonda e fa tornare la Library** — non verificato in
