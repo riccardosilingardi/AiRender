@@ -34,9 +34,11 @@ def test_i_testi_dei_blocchi_sono_quelli_della_bozza():
                    blocchi.PERSONE, blocchi.QUALITA, blocchi.FEDELTA,
                    blocchi.RESA, blocchi.EVITARE_DA_RESA,
                    blocchi.FEDELTA_PRODOTTO, blocchi.LOOK_PRODOTTO, blocchi.LUCE_PRODOTTO,
-                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO):
+                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO, blocchi.INQUADRATURE):
         for blocco in elenco.values():
             nel_codice.add((blocco.identificativo, blocco.testo))
+    for blocco in (blocchi.CONTESTO_FUORI_INTATTO, blocchi.CONTESTO_PULISCI_MAPPA):
+        nel_codice.add((blocco.identificativo, blocco.testo))
     assert nel_codice == bozza
 
 

@@ -24,6 +24,10 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
+  // Inserisci nel contesto: l'immagine del luogo portata dall'utente, il
+  // rettangolo dove va l'edificio (coordinate da 0 a 1), l'inquadratura,
+  // «pulisci la mappa» e il luogo a parole.
+  contesto: null,         // { nome, da, larghezza, altezza, area, inquadratura, pulisci, luogo }
   inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
@@ -278,7 +282,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: S.riferimento && S.riferimento.nome });
+      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: !S.contesto && S.riferimento && S.riferimento.nome, contesto: contestoPerServer() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -302,7 +306,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento ? 1 : 0}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && !S.contesto ? 1 : 0}&contesto=${S.contesto ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -382,7 +386,7 @@ async function genera() {
     const risposta = await post("/api/invia", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
-      riferimento: S.riferimento && S.riferimento.nome,
+      riferimento: !S.contesto && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -396,7 +400,8 @@ async function provaASecco() {
   try {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
-      prompt_a_mano: S.promptAMano, riferimento: S.riferimento && S.riferimento.nome,
+      prompt_a_mano: S.promptAMano, riferimento: !S.contesto && S.riferimento && S.riferimento.nome,
+      contesto: contestoPerServer(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -632,7 +637,8 @@ function colonnaStile() {
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Intorno all'edificio"), chipAsse("intorno")),
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Verde"), chipAsse("verde")),
       h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Persone"), chipAsse("persone"))));
-  return h("div", { classe: "colonna-stile" }, scena, preset, dettagli);
+  // Con il contesto le scelte di stile non partono: restano visibili ma spente, e il pannello del contesto dice perche'.
+  return h("div", { classe: S.contesto ? "colonna-stile spenta-contesto" : "colonna-stile", title: S.contesto ? "Con «Inserisci nel contesto» la luce la dà l'immagine del luogo: queste scelte non partono." : null }, scena, preset, dettagli);
 }
 
 function colonnaInvio() {
@@ -722,6 +728,7 @@ function colonnaInvio() {
     ...pannelloRiferimento());
 
   return h("div", { classe: "colonna-invio" },
+    pannelloContesto(),
     h("section", { classe: "pannello", "aria-label": "Materiali" },
       h("span", { classe: "etichetta" }, "Materiali a parole"),
       h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
@@ -753,6 +760,10 @@ function pannelloRiferimento() {
   const m = modelloScelto();
   const accetta = !!(m && m.piu_immagini);
   const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
+  if (S.contesto) {
+    return [titolo, h("p", { classe: "tenue piccolo" },
+      "Con «Inserisci nel contesto» il riferimento non parte: le due immagini sono già il contesto e la vista, e la luce la dà il contesto.")];
+  }
   if (!accetta) {
     return [titolo,
       h("p", { classe: "tenue piccolo" }, `${m ? m.nome : "Questo modello"} riceve una sola immagine per invio: il riferimento si usa con Nano Banana 2.`),
@@ -776,6 +787,123 @@ function pannelloRiferimento() {
     h("p", { classe: "tenue piccolo" }, "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
 }
 
+// Inserisci nel contesto: il fotoinserimento. L'utente porta l'immagine del
+// luogo (screenshot satellitare, ortofoto, foto da drone), ci disegna un
+// rettangolo dove va l'edificio e sceglie l'inquadratura. Partono due
+// immagini: prima il contesto con l'area in magenta, poi la vista. Lo Studio
+// non scarica immagini da mappe.
+function contestoPerServer() {
+  const c = S.contesto;
+  if (!c || !c.area) return null;
+  return { nome: c.nome, area: c.area, inquadratura: c.inquadratura, pulisci_mappa: c.pulisci, luogo: c.luogo };
+}
+async function dopoCambioContesto() {
+  S.secco = null; S.promptAMano = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+async function scegliContesto(file) {
+  if (!file) return;
+  try {
+    const caricato = await post("/api/contesti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.contesto = { ...caricato, area: null, inquadratura: S.catalogo.contesto.predefinita, pulisci: false, luogo: "",
+                   ...(S.contesto ? { inquadratura: S.contesto.inquadratura, pulisci: S.contesto.pulisci, luogo: S.contesto.luogo } : {}) };
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  await dopoCambioContesto();
+}
+async function togliContesto() { S.contesto = null; await dopoCambioContesto(); }
+function cambiaContesto(campo, valore) { S.contesto = { ...S.contesto, [campo]: valore }; dopoCambioContesto(); }
+
+function telaContesto() {
+  const c = S.contesto;
+  const img = h("img", { src: `/file/contesto/${enc(c.nome)}`, alt: "Immagine del contesto", draggable: "false" });
+  const contenitore = h("div");
+  const rett = c.area ? `<polygon class="contorno-area" points="${attributoPunti(puntiSvg({ forma: "rettangolo", punti: c.area }))}"></polygon>` : "";
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${rett}<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline");
+  const numero = c.area ? h("span", { classe: "numero-area", stile: `left:${c.area[0][0] * 100}%;top:${c.area[0][1] * 100}%`, "aria-hidden": "true" }, "1") : null;
+  const tela = h("div", { classe: "tela-ritocco tela-contesto", "data-strumento": "rettangolo" }, img, disegno, numero);
+  let inizio = null;
+  const punto = (ev) => {
+    const b = img.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
+  };
+  tela.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    tela.setPointerCapture(ev.pointerId);
+    inizio = punto(ev);
+  });
+  tela.addEventListener("pointermove", (ev) => {
+    if (!inizio || !tela.hasPointerCapture(ev.pointerId)) return;
+    traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: [inizio, punto(ev)] })) + " " + attributoPunti([inizio]));
+  });
+  tela.addEventListener("pointerup", (ev) => {
+    if (!inizio) return;
+    const [ax, ay] = inizio, [bx, by] = punto(ev);
+    inizio = null;
+    traccia.setAttribute("points", "");
+    if (Math.abs(bx - ax) < AREA_MINIMA || Math.abs(by - ay) < AREA_MINIMA) return;
+    const area = [[Math.min(ax, bx), Math.min(ay, by)], [Math.max(ax, bx), Math.max(ay, by)]]
+      .map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
+    cambiaContesto("area", area);
+  });
+  tela.addEventListener("pointercancel", () => { inizio = null; traccia.setAttribute("points", ""); });
+  return tela;
+}
+
+function pannelloContesto() {
+  const titolo = h("span", { classe: "etichetta" }, "Inserisci nel contesto");
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica l'immagine del contesto" });
+  file.addEventListener("change", () => scegliContesto(file.files && file.files[0]));
+  if (!S.contesto) {
+    return h("section", { classe: "pannello", "aria-label": "Inserisci nel contesto" },
+      titolo,
+      h("p", { classe: "tenue piccolo" }, "Metti l'edificio dentro un'immagine del luogo: uno screenshot satellitare, un'ortofoto o una foto da drone, che porti tu. Disegni dove va l'edificio e scegli zenitale o volo d'uccello. JPEG o PNG."),
+      file);
+  }
+  const c = S.contesto;
+  const cat = S.catalogo.contesto;
+  const inquadratura = h("div", { classe: "switch", role: "group", "aria-label": "Inquadratura del contesto" },
+    cat.inquadrature.map((i) => h("button", {
+      classe: "seg", "aria-pressed": String(c.inquadratura === i.id), onclick: () => cambiaContesto("inquadratura", i.id),
+    }, i.nome)));
+  const luogo = h("input", { type: "text", id: "luogo-contesto", maxlength: String(cat.luogo_massimo), "aria-label": "Luogo: indirizzo o coordinate",
+    placeholder: "es. Via Rontano, San Valentino (RE) · 44.5215, 10.6991" });
+  luogo.value = c.luogo || "";
+  let attesaLuogo = null;
+  luogo.addEventListener("input", () => {
+    S.contesto.luogo = luogo.value; S.secco = null;
+    clearTimeout(attesaLuogo); attesaLuogo = setTimeout(() => aggiornaComposto(true), 300);
+  });
+  const pulisci = h("input", { type: "checkbox", id: "pulisci-contesto", checked: c.pulisci });
+  pulisci.addEventListener("change", () => cambiaContesto("pulisci", pulisci.checked));
+  const cerca = h("input", { type: "checkbox", id: "cerca-web-contesto", disabled: !cat.ricerca_web_verificata });
+  return h("section", { classe: "pannello", "aria-label": "Inserisci nel contesto" },
+    h("div", { classe: "riga tra" }, titolo, h("button", { classe: "btn", onclick: togliContesto }, "Togli il contesto")),
+    h("p", { classe: "tenue piccolo" }, c.area
+      ? "Trascina di nuovo per cambiare l'area. Fuori dal rettangolo il contesto deve restare com'è."
+      : "Trascina sull'immagine il rettangolo dove va l'edificio."),
+    telaContesto(),
+    h("p", { classe: "tenue piccolo" }, `${c.da || c.nome} · ${c.larghezza} × ${c.altezza} · `,
+      h("label", { classe: "link-file" }, "cambia immagine", h("span", { classe: "nascosto" }, file))),
+    h("span", { classe: "etichetta" }, "Inquadratura"), inquadratura,
+    h("p", { classe: "tenue piccolo" }, c.inquadratura === "volo"
+      ? "Volo d'uccello: cattura da Allplan una vista dall'alto e di sbieco, simile all'angolo del contesto."
+      : "Zenitale: cattura da Allplan la vista in pianta dall'alto, con le ombre."),
+    h("span", { classe: "etichetta" }, "Luogo (facoltativo)"), luogo,
+    h("p", { classe: "tenue piccolo" }, "Indirizzo o coordinate: entrano nel prompt come li scrivi, anche in italiano."),
+    h("label", { classe: "riga" }, pulisci, h("span", { classe: "piccolo" }, "È uno screenshot di una mappa: togli etichette e icone e rendilo una foto aerea")),
+    c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null,
+    h("label", { classe: "riga grigio", "aria-disabled": String(!cat.ricerca_web_verificata) }, cerca,
+      h("span", { classe: "piccolo" }, "Cerca sul web per capire il luogo"), presto("Da provare")),
+    h("p", { classe: "tenue piccolo" }, "La ricerca Google di Nano Banana: non ancora provata attraverso Comfy, costo non misurato."),
+    h("p", { classe: "tenue piccolo" }, "Con il contesto le scelte di stile a sinistra non partono: la luce e il colore li dà l'immagine del luogo. Partono i materiali."));
+}
+
 function motivoGeneraSpento() {
   if (!S.vista) return "Serve una vista: catturala dalla palette o scegline una con Usa un'altra vista…";
   if (S.descrizione && !S.descrizione.idonea) return "La vista non è adatta: guarda il motivo sopra.";
@@ -783,7 +911,9 @@ function motivoGeneraSpento() {
   const m = modelloScelto();
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
   if (!S.destinazione) return "Sto leggendo la destinazione.";
-  if (S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
+  if (S.contesto && !S.contesto.area) return "Disegna sul contesto il rettangolo dove va l'edificio.";
+  if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
+  if (!S.contesto && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
   return null;
 }
 
@@ -799,7 +929,8 @@ function pannelloInvio() {
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
     if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
-    if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento, "Se non vuoi fare la prova adesso, togli il riferimento."));
+    if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento,
+      S.contesto ? "Il contesto parte sempre con due immagini: è la prima prova vera anche di questo." : "Se non vuoi fare la prova adesso, togli il riferimento."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",

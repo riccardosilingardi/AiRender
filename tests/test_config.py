@@ -293,6 +293,25 @@ def test_ritocco_modo_aree_e_un_modo_vero_e_resta_una_scelta_finche_il_banco_non
     assert config.costante("RITOCCO_MODO_AREE").origine == config.SCELTA
 
 
+def test_contesto_inquadratura_predefinita_e_un_inquadratura_vera():
+    """Caso: «Inserisci nel contesto» si apre su un'inquadratura che il prompt non conosce."""
+    from core import blocchi
+
+    assert config.CONTESTO_INQUADRATURA_PREDEFINITA in blocchi.INQUADRATURE
+    assert config.costante("CONTESTO_INQUADRATURA_PREDEFINITA").origine == config.SCELTA
+
+
+def test_contesto_luogo_massimo_ferma_un_luogo_che_diventa_un_secondo_prompt():
+    """Caso: nel campo luogo si incolla un intero prompt e parte senza che nessuno lo veda."""
+    from core.contesto import Contesto, ContestoNonValido
+
+    area = ((0.1, 0.1), (0.5, 0.5))
+    Contesto("x.png", area, luogo="a" * config.CONTESTO_LUOGO_MASSIMO)
+    with pytest.raises(ContestoNonValido):
+        Contesto("x.png", area, luogo="a" * (config.CONTESTO_LUOGO_MASSIMO + 1))
+    assert config.costante("CONTESTO_LUOGO_MASSIMO").origine == config.SCELTA
+
+
 def test_anteprima_taglio_scuro_lascia_vedere_la_scena_tagliata():
     """Caso: l'anteprima del formato nasconde del tutto cio' che taglia, o non lo distingue."""
     from tests.test_cornice import vista as tinta

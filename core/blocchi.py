@@ -4,7 +4,7 @@ Da dove vengono i testi: `docs/ui/blocchi-stile-bozza.md`, bozza 7 del
 2026-10-31 (la 3 del 2026-10-27 piu' intorno, verde e persone «poche» nella
 4, piu' la regola dei passi e le richieste a parole nella 5, piu' la
 fedelta' al disegno e il riferimento per lo stile nella 6, piu' le rese non
-fotografiche nella 7). Sono **riscritti** dalla prompt library di Riccardo (Notion,
+fotografiche nella 7, piu' «Inserisci nel contesto» nella 8). Sono **riscritti** dalla prompt library di Riccardo (Notion,
 ispirata a Visoid), non copiati: un blocco tocca un asse solo, cosi' cambiarne
 uno non disfa gli altri. Testo per il modello in inglese, nomi per l'utente in
 italiano.
@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-8"
+VERSIONE = "bozza-9"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -861,3 +861,91 @@ def componi_aree(modo: Blocco, note: list[str]) -> str:
         )
     righe = [f"Area {numero}: {nota}." for numero, nota in enumerate(pulite, start=1)]
     return " ".join([modo.testo, *righe, COSA_EVITARE.testo])
+
+
+# --- inserisci nel contesto (Studio · Genera, bozza 9) -----------------------
+
+# La scena del fotoinserimento (thread del 2026-11-01): la prima immagine e'
+# il contesto portato dall'utente (screenshot satellitare, ortofoto, foto da
+# drone) con un contorno magenta dove va l'edificio; la seconda e' la vista
+# Allplan. Il contesto va per primo perche' il rapporto del render segue la
+# prima immagine. Testi riscritti dal prompt di Riccardo (Notion, «Transform
+# this Google Maps satellite screenshot...») e dal suo flusso a parole: come
+# ogni blocco, non provati con il modello.
+ZENITALE = "zenitale"
+VOLO = "volo"
+
+CONTESTO_REGOLA = Blocco(
+    "contesto-regola",
+    "Regola dell'inserimento nel contesto",
+    "Photo insertion. The first image is the real site; the second image is a "
+    "view of the new building designed for it. Place the building from the "
+    "second image into the first image, inside the numbered magenta outline, "
+    "and remove the outline and its number from the result. Adapt the "
+    "building's perspective, scale and orientation to the site, so it stands "
+    "on the ground at a believable size next to the roads, trees and "
+    "buildings around it. Keep the building's shape, proportions, openings "
+    "and materials as designed; do not redesign it. Match the light, sun "
+    "direction, shadows, colour, haze and grain of the site image, so the "
+    "building looks photographed together with it.",
+)
+
+CONTESTO_FUORI_INTATTO = Blocco(
+    "contesto-fuori",
+    "Fuori dall'area il contesto resta com'e'",
+    "Outside the outline keep every pixel of the site image exactly as it is.",
+)
+
+INQUADRATURE = _blocchi(
+    (ZENITALE, "Zenitale",
+     "The site image is a top-down aerial view: show the building from "
+     "straight above, as roofs, terraces and the ground around it, with its "
+     "shadow cast on the ground in the same direction as the other shadows."),
+    (VOLO, "Volo d'uccello",
+     "The site image is an oblique bird's-eye view: show the building from "
+     "the same height and direction as the buildings around it, with its "
+     "facades and roof foreshortened like theirs and its shadow in the same "
+     "direction as the other shadows."),
+)
+
+CONTESTO_PULISCI_MAPPA = Blocco(
+    "contesto-pulisci",
+    "Pulisci lo screenshot della mappa",
+    "The site image is a map screenshot: remove every interface element "
+    "(labels, street names, pins, icons, logos, buttons, compass, "
+    "watermarks) and fill those spots with what would realistically be "
+    "underneath. Turn the whole image into a photorealistic, high-resolution "
+    "aerial photograph of the same place, keeping every road, building "
+    "footprint, tree and field in its position, size and orientation; do not "
+    "add or remove buildings.",
+)
+
+
+def controlla_inquadratura(inquadratura: object) -> str:
+    if inquadratura not in INQUADRATURE:
+        raise SceltaNonValida(
+            f"\"{inquadratura}\" non e' un'inquadratura del contesto.",
+            "Scegli zenitale o volo d'uccello.",
+        )
+    return str(inquadratura)
+
+
+def frase_luogo(luogo: str) -> str:
+    """Il luogo come lo scrive l'utente (indirizzo o coordinate), anche in italiano."""
+    testo = " ".join((luogo or "").split()).rstrip(".")
+    return f"The site is at {testo}." if testo else ""
+
+
+def componi_contesto(inquadratura: str, *, pulisci_mappa: bool = False,
+                     luogo: str = "", materiali: str = "") -> str:
+    """Il prompt di «Inserisci nel contesto»: regola, inquadratura, luogo, materiali, fuori dall'area, cosa evitare.
+
+    Con «pulisci la mappa» il contesto non resta identico fuori dall'area:
+    diventa una foto, e la frase del fuori intatto lascia il posto a quella
+    della pulizia (direbbero due cose opposte).
+    """
+    pezzi = [CONTESTO_REGOLA.testo, INQUADRATURE[controlla_inquadratura(inquadratura)].testo]
+    pezzi += [p for p in (frase_luogo(luogo), frase_materiali(materiali)) if p]
+    pezzi.append(CONTESTO_PULISCI_MAPPA.testo if pulisci_mappa else CONTESTO_FUORI_INTATTO.testo)
+    pezzi.append(COSA_EVITARE.testo)
+    return " ".join(pezzi)

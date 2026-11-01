@@ -489,5 +489,5 @@ def test_la_pagina_ha_la_scheda_passi_attiva(server):
 def test_la_regola_del_passo_e_quella_della_bozza():
     """Caso: la regola dei passi riscritta nel codice e non nella bozza."""
     bozza = (Path(__file__).resolve().parent.parent / "docs" / "ui" / "blocchi-stile-bozza.md").read_text(encoding="utf-8")
-    assert "bozza 8" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-8"
+    assert "bozza 9" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-9"
     assert f"> {blocchi.REGOLA_PASSO.testo}" in bozza
