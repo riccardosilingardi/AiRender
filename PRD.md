@@ -119,7 +119,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore e lo Studio. Girano da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **522 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **554 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -819,6 +819,17 @@ poggiano su cose non ancora provate:
 - **La scheda Video a video, su Windows** — provata solo in un browser senza
   schermo qui (caricamento, prova a secco, invio, lettore col video finto).
   Da guardare a occhio sul PC di Riccardo, col lettore che suona un mp4 vero.
+
+### Lasciato dalla sessione del 2026-11-01 (inserisci in un luogo, rifatta)
+
+- **Da terra (foto, Street View)** — blocco nuovo, mai mandato. Per
+  verificare: foto da terra del lotto, rettangolo, vista Allplan in
+  prospettiva ad altezza d'occhio girata come la foto, Genera. Guarda
+  prospettiva, scala contro auto e alberi, alberi davanti all'edificio.
+- **L'edificio non esce più grigio** — la regola non dice più di tenere i
+  materiali «as designed»; dedotto dal testo, non provato. Se esce ancora
+  grigio, scrivere i materiali a parole e confrontare.
+- **La nuova schermata si capisce** — solo a video, sul PC di Riccardo.
 
 ### Usciti da questa sezione, con la loro verifica
 

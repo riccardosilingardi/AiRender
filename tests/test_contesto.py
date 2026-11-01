@@ -98,6 +98,27 @@ def test_i_blocchi_del_contesto_non_si_presentano_come_provati():
     assert {b.origine for b in tutti} == {config.SCELTA}
 
 
+def test_da_terra_chiede_la_stessa_camera_della_foto():
+    """Caso: una foto da Street View trattata come una vista dall'alto (prova di Riccardo, 2026-11-01)."""
+    testo = blocchi.componi_contesto("terra")
+    assert blocchi.INQUADRATURE["terra"].testo in testo
+    assert "eye level" in testo and "vanishing points" in testo
+
+
+def test_la_regola_non_tiene_il_grigio_della_vista():
+    """Caso: «materials as designed» faceva uscire l'edificio grigio come la vista Allplan."""
+    regola = blocchi.CONTESTO_REGOLA.testo
+    assert "materials as designed" not in regola
+    assert "not materials" in regola
+
+
+def test_pulisci_la_mappa_con_una_foto_da_terra_si_rifiuta():
+    """Caso: la pulizia della mappa trasformerebbe una foto da terra in una foto aerea."""
+    with pytest.raises(ContestoNonValido):
+        Contesto("x.png", AREA, inquadratura="terra", pulisci_mappa=True)
+    assert Contesto("x.png", AREA, inquadratura="terra").inquadratura == "terra"
+
+
 def test_la_regola_del_contesto_e_quella_della_bozza():
     bozza = (Path(__file__).resolve().parent.parent / "docs" / "ui" / "blocchi-stile-bozza.md").read_text(encoding="utf-8")
     assert f"> {blocchi.CONTESTO_REGOLA.testo}" in bozza
@@ -198,7 +219,7 @@ def test_contesto_e_riferimento_insieme_si_rifiutano(cartella, chiamate):
 
 def test_il_catalogo_dice_le_inquadrature_e_che_la_ricerca_web_e_spenta(cartella, chiamate):
     voce = _studio(cartella, chiamate).catalogo()["contesto"]
-    assert [i["id"] for i in voce["inquadrature"]] == ["zenitale", "volo"]
+    assert [i["id"] for i in voce["inquadrature"]] == ["zenitale", "volo", "terra"]
     assert voce["ricerca_web_verificata"] is False
 
 

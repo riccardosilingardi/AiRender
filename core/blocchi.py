@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-9"
+VERSIONE = "bozza-10"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -863,7 +863,7 @@ def componi_aree(modo: Blocco, note: list[str]) -> str:
     return " ".join([modo.testo, *righe, COSA_EVITARE.testo])
 
 
-# --- inserisci nel contesto (Studio · Genera, bozza 9) -----------------------
+# --- inserisci nel contesto (Studio · Genera, bozza 9, rivista in bozza 10) ---
 
 # La scena del fotoinserimento (thread del 2026-11-01): la prima immagine e'
 # il contesto portato dall'utente (screenshot satellitare, ortofoto, foto da
@@ -874,6 +874,9 @@ def componi_aree(modo: Blocco, note: list[str]) -> str:
 # ogni blocco, non provati con il modello.
 ZENITALE = "zenitale"
 VOLO = "volo"
+# Bozza 10 (prova di Riccardo del 2026-11-01 con una foto da Street View):
+# una foto scattata da terra, ad altezza d'occhio.
+TERRA = "terra"
 
 CONTESTO_REGOLA = Blocco(
     "contesto-regola",
@@ -884,8 +887,11 @@ CONTESTO_REGOLA = Blocco(
     "and remove the outline and its number from the result. Adapt the "
     "building's perspective, scale and orientation to the site, so it stands "
     "on the ground at a believable size next to the roads, trees and "
-    "buildings around it. Keep the building's shape, proportions, openings "
-    "and materials as designed; do not redesign it. Match the light, sun "
+    "buildings around it. Keep the building's shape, proportions and "
+    "openings as designed; do not redesign it. The second image is an "
+    "untextured CAD view: its flat greys and colours are not materials, so "
+    "give the building real, photographed building materials, glass that "
+    "reflects the site, and real weathering. Match the light, sun "
     "direction, shadows, colour, haze and grain of the site image, so the "
     "building looks photographed together with it.",
 )
@@ -906,6 +912,13 @@ INQUADRATURE = _blocchi(
      "the same height and direction as the buildings around it, with its "
      "facades and roof foreshortened like theirs and its shadow in the same "
      "direction as the other shadows."),
+    (TERRA, "Da terra (foto)",
+     "The site image is a photograph taken from the ground at eye level: "
+     "show the building as the same camera would see it, from the same eye "
+     "height, with the same perspective, vanishing points and lens; size it "
+     "against the cars, people, doors and trees in the photo; let objects "
+     "in front of the outline, such as trees, poles or cars, stay in front "
+     "of the building."),
 )
 
 CONTESTO_PULISCI_MAPPA = Blocco(
@@ -925,7 +938,7 @@ def controlla_inquadratura(inquadratura: object) -> str:
     if inquadratura not in INQUADRATURE:
         raise SceltaNonValida(
             f"\"{inquadratura}\" non e' un'inquadratura del contesto.",
-            "Scegli zenitale o volo d'uccello.",
+            "Scegli zenitale, volo d'uccello o da terra.",
         )
     return str(inquadratura)
 

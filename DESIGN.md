@@ -550,38 +550,42 @@ non c'è: il riferimento si sceglie nello Studio.
   l'impronta del riferimento, non l'immagine; il file resta in
   `riferimenti/` nella cartella delle viste.
 
-## Inserisci nel contesto, costruita il 2026-11-01
+## Inserisci in un luogo, rifatta il 2026-11-01
 
-Il fotoinserimento: l'edificio di Allplan dentro un'immagine del luogo.
-In cima alla colonna destra di Studio · Genera. È il flusso di Riccardo
-(screenshot da Google Earth + vista dell'edificio + area selezionata + prompt)
-messo nello Studio. Lo Studio non scarica immagini da mappe: il contesto lo
-porta l'utente. Screenshot in `docs/ui/studio-contesto/`.
+Il fotoinserimento: l'edificio di Allplan dentro una foto del luogo. La prima
+versione (in cima alla colonna destra, immagine piccola, stile spento) non si
+capiva: Riccardo l'ha provata con uno Street View e non ha trovato dove
+disegnare. Adesso è un **modo di Genera**: in cima due schede grandi,
+«Render della vista» e «Inserisci in un luogo». Lo Studio non scarica mappe:
+la foto la porta l'utente. Screenshot in `docs/ui/studio-contesto/` (65–68).
 
-- **Vuoto:** una riga dice cosa fa (screenshot satellitare, ortofoto o foto
-  da drone, che porti tu; disegni dove va l'edificio; zenitale o volo
-  d'uccello) e il campo per scegliere il file.
-- **Contesto senza area:** l'immagine, «Trascina sull'immagine il rettangolo
-  dove va l'edificio», Genera spento con la stessa ragione.
-- **Pieno:** l'immagine con il rettangolo numerato (trascinando di nuovo si
-  rifà), nome e misure, «cambia immagine», Togli il contesto; Inquadratura
-  Zenitale | Volo d'uccello con una riga su che vista catturare da Allplan;
-  Luogo facoltativo (indirizzo o coordinate, entra nel prompt com'è scritto);
-  «È uno screenshot di una mappa: rendilo una foto aerea», che quando è
-  acceso avvisa che la misura fuori dall'area non si fa; «Cerca sul web» in
-  grigio, Da provare. La colonna dello stile resta visibile ma spenta: con il
-  contesto partono solo i materiali. Il riferimento per lo stile non parte e
-  lo dice.
-- **In corso:** come Genera. Prima del clic, sotto la destinazione:
-  «Partono due immagini: prima il contesto con l'area segnata in magenta,
-  poi la vista.» e l'avviso giallo della prima prova con due immagini.
+- **Vuoto:** passo 1 «Carica la foto del luogo», un riquadro grande
+  tratteggiato da cliccare (Google Earth, ortofoto, drone, foto da terra o
+  Street View); i passi 2 e 3 accanto, il 2 spento. Genera spento: «Passo 1:
+  carica la foto del luogo.»
+- **Foto senza area:** la foto grande a sinistra, sopra in blu «Trascina sulla
+  foto un rettangolo, da un angolo all'altro, dove deve stare l'edificio».
+  A destra 2 · Com'è stata scattata la foto (Zenitale | Volo d'uccello | Da
+  terra (foto), con una riga su che foto è) e 3 · L'edificio, da Allplan (la
+  vista in piccolo e che vista catturare per quell'inquadratura). Ogni passo
+  fatto ha la spunta verde. Genera e Prova a secco spenti con la ragione.
+- **Pieno:** il rettangolo numerato sulla foto (trascinando si rifà),
+  «cambia foto», «togli». Sotto a sinistra «Facoltativo»: materiali a parole
+  (la vista è grigia: senza materiali li sceglie il modello), dove si trova,
+  «È uno screenshot con scritte e icone» (non c'è con Da terra), «Cerca il
+  luogo sul web» in grigio, Da provare. Una riga dice che preset e stile qui
+  non servono. A destra «Cosa parte», modello, risoluzione, varianti, invio;
+  qualità e fedeltà al disegno non ci sono perché non entrano nel prompt.
+- **In corso:** come Genera. Prima del clic: «Partono due immagini: prima il
+  contesto con l'area segnata in magenta, poi la vista.»
 - **Errore:** file non JPEG/PNG o troppo pesante rifiutato al caricamento;
-  con FLUX.1 Kontext (una sola immagine) Genera è spento con la ragione; se il
-  file del contesto sparisce prima dell'invio il lavoro si ferma senza mandare
-  niente.
-- **Risultato:** il render ha la forma del contesto. La tenuta degli spigoli
-  contro la vista non si calcola (il render non è la vista); al suo posto la
-  misura «fuori dall'area» contro il contesto, come nel Ritocca.
+  con FLUX.1 Kontext Genera è spento con la ragione; «pulisci la mappa» con
+  Da terra rifiutato dal motore; se il file sparisce prima dell'invio il
+  lavoro si ferma senza mandare niente.
+- **Risultato:** come prima: la misura «fuori dall'area» al posto della
+  tenuta degli spigoli.
+- Tornando a «Render della vista» la foto e l'area restano da parte e
+  tornano quando si rientra.
 
 ## Rese non fotografiche, costruite il 2026-10-31
 

@@ -2,8 +2,8 @@
 
 Il flusso di Riccardo (2026-11-01), messo nello Studio: l'utente porta
 un'immagine del contesto (screenshot satellitare, ortofoto, foto da drone),
-ci disegna un rettangolo dove va l'edificio, sceglie l'inquadratura (zenitale
-o volo d'uccello) e manda. Partono due immagini: prima il contesto con il
+ci disegna un rettangolo dove va l'edificio, sceglie l'inquadratura (zenitale,
+volo d'uccello o da terra, come una foto o uno Street View) e manda. Partono due immagini: prima il contesto con il
 contorno dell'area, poi la vista Allplan.
 
 AIRENDER non scarica immagini da mappe: il contesto lo porta l'utente. I
@@ -90,6 +90,11 @@ class Contesto:
             blocchi.controlla_inquadratura(self.inquadratura)
         except blocchi.SceltaNonValida as errore:
             raise ContestoNonValido(errore.fatto, errore.cosa_fare) from None
+        if self.pulisci_mappa and self.inquadratura == blocchi.TERRA:
+            raise ContestoNonValido(
+                "«Pulisci la mappa» vale per gli screenshot dall'alto, non per una foto da terra.",
+                "Togli la spunta, oppure scegli Zenitale o Volo d'uccello.",
+            )
         luogo = " ".join((self.luogo or "").split())
         if len(luogo) > config.CONTESTO_LUOGO_MASSIMO:
             raise ContestoNonValido(
