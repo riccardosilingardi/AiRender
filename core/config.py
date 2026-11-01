@@ -744,3 +744,43 @@ VIDEO_ATTESA_MASSIMA_SECONDI = _registra(Costante(
     ),
     unita=" s",
 ))
+
+
+# --- color map (mappa materiali, 2026-11-01) ----------------------------------
+
+COLORMAP_AREA_MINIMA_PERCENTO = _registra(Costante(
+    nome="COLORMAP_AREA_MINIMA_PERCENTO",
+    valore=0.5,
+    origine=SCELTA,
+    ragione=(
+        "Sotto questa parte dell'immagine una zona della segmentazione si "
+        "scarta: su una vista 1920×1080 lo 0,5% sono circa 10.000 pixel, "
+        "un pezzo di facciata che si vede. Le zone piu' piccole sono quasi "
+        "sempre briciole di SAM2 automatico, e un colore in piu' per ognuna "
+        "confonde il modello. Non misurato: lo dira' la prima segmentazione vera."
+    ),
+    unita="%",
+))
+
+COLORMAP_ZONE_MASSIME = _registra(Costante(
+    nome="COLORMAP_ZONE_MASSIME",
+    valore=12,
+    origine=SCELTA,
+    ragione=(
+        "Quante zone al massimo in una color map: si tengono le piu' grandi. "
+        "Una vista di architettura ha raramente piu' di una dozzina di "
+        "materiali che contano, e ogni colore in piu' e' una frase in piu' nel "
+        "prompt. Deve restare sotto i 16 colori della tavolozza di core/colormap.py."
+    ),
+))
+
+COLORMAP_COLORI_IN_INGRESSO_MASSIMI = _registra(Costante(
+    nome="COLORMAP_COLORI_IN_INGRESSO_MASSIMI",
+    valore=256,
+    origine=SCELTA,
+    ragione=(
+        "Un'immagine di segmentazione a colori piatti con piu' colori di cosi' "
+        "non e' una segmentazione: e' una foto o un JPEG che ha sporcato i "
+        "bordi. OneFormer ADE20K ha 150 classi, quindi 256 basta e avanza."
+    ),
+))

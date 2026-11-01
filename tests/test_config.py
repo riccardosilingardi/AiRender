@@ -571,3 +571,26 @@ def test_palette_immagini_da_script_e_spenta_finche_la_sonda_non_risponde():
 def test_palette_secondi_attesa_studio_lascia_al_battito_il_tempo_di_comparire():
     """Caso: la palette dice «lo Studio non e' partito» prima che il primo battito possa arrivare."""
     assert config.PALETTE_SECONDI_ATTESA_STUDIO > config.BATTITO_INTERVALLO_SECONDI
+
+
+# --- color map -----------------------------------------------------------------
+
+
+def test_colormap_area_minima_scarta_le_briciole_ma_non_un_pezzo_di_facciata():
+    """Caso: SAM2 automatico da' cento briciole e ognuna diventa un colore nel prompt."""
+    assert 0 < config.COLORMAP_AREA_MINIMA_PERCENTO <= 1
+    assert config.costante("COLORMAP_AREA_MINIMA_PERCENTO").origine == config.SCELTA
+
+
+def test_colormap_zone_massime_sta_dentro_la_tavolozza():
+    """Caso: piu' zone che colori, e due materiali diversi prendono lo stesso colore."""
+    from core import colormap
+
+    assert config.COLORMAP_ZONE_MASSIME <= len(colormap.TAVOLOZZA)
+    assert len(set(colormap.TAVOLOZZA)) == len(colormap.TAVOLOZZA)
+    assert colormap.NON_ASSEGNATO not in colormap.TAVOLOZZA
+
+
+def test_colormap_colori_in_ingresso_bastano_per_oneformer_ma_rifiutano_una_foto():
+    """Caso: si passa la vista al posto della segmentazione e nascono migliaia di zone."""
+    assert 150 <= config.COLORMAP_COLORI_IN_INGRESSO_MASSIMI < 1000
