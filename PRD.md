@@ -277,6 +277,17 @@ la verifica si nomina qui.
 - **I materiali letti da Allplan coprono la vista** — non verificato: la
   sonda 2 ha letto 30 elementi su 13.570, e le facciate non danno materiale.
 
+### Palette: Esc per tornare alla Library (2026-11-01)
+
+- **Esc chiude palette e sonda e fa tornare la Library** — non verificato in
+  Allplan. Gli adattatori ora rispondono a `on_cancel_function` con
+  `OnCancelFunctionResult.CANCEL_INPUT`, importato da
+  `ScriptObjectInteractors.OnCancelFunctionResult`. Nome del modulo e del
+  valore sono quelli del PythonParts Framework come li ricordo: la
+  documentazione non era raggiungibile da questa sessione. Se l'import manca,
+  resta il comportamento di Allplan. Verifica: aprire la palette, premere Esc
+  con il mouse sopra la finestra del disegno e guardare se torna la Library.
+
 ### Lasciato dalla sessione 1 (motore)
 
 - **L'API Magnific risponde alle chiamate che il motore fa** — non verificato:

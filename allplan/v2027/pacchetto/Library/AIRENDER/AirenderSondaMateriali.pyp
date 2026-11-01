@@ -12,7 +12,7 @@
 <Parameters>
 <Parameter>
 <Name>Spiegazione</Name>
-<Text>Premi i pulsanti dall'alto in basso. Non cambia il modello e non manda niente a nessun servizio. Tutto finisce in Usr\...\AIRENDER\sonda-materiali</Text>
+<Text>Premi i pulsanti dall'alto in basso. Non cambia il modello e non manda niente a nessun servizio. Tutto finisce in Usr\...\AIRENDER\sonda-materiali. Per tornare alla Library premi Esc.</Text>
 <ValueType>Text</ValueType>
 </Parameter>
 <Parameter>
