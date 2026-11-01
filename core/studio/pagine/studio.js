@@ -28,6 +28,11 @@ const S = {
   // rettangolo dove va l'edificio (coordinate da 0 a 1), l'inquadratura,
   // «pulisci la mappa» e il luogo a parole.
   contesto: null,         // { nome, da, larghezza, altezza, area, inquadratura, pulisci, luogo }
+  // Genera ha due modi: "vista" (il render della vista) e "contesto"
+  // (inserisci l'edificio in una foto del luogo). Passando a "vista" il
+  // contesto resta da parte in contestoTenuto e torna quando si rientra.
+  modo: "vista",
+  contestoTenuto: null,
   inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
@@ -286,7 +291,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: !S.contesto && S.riferimento && S.riferimento.nome, contesto: contestoPerServer() });
+      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -310,7 +315,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && !S.contesto ? 1 : 0}&contesto=${S.contesto ? 1 : 0}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -390,7 +395,7 @@ async function genera() {
     const risposta = await post("/api/invia", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
-      riferimento: !S.contesto && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
+      riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -404,7 +409,7 @@ async function provaASecco() {
   try {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
-      prompt_a_mano: S.promptAMano, riferimento: !S.contesto && S.riferimento && S.riferimento.nome,
+      prompt_a_mano: S.promptAMano, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome,
       contesto: contestoPerServer(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
@@ -641,8 +646,7 @@ function colonnaStile() {
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Intorno all'edificio"), chipAsse("intorno")),
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Verde"), chipAsse("verde")),
       h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Persone"), chipAsse("persone"))));
-  // Con il contesto le scelte di stile non partono: restano visibili ma spente, e il pannello del contesto dice perche'.
-  return h("div", { classe: S.contesto ? "colonna-stile spenta-contesto" : "colonna-stile", title: S.contesto ? "Con «Inserisci nel contesto» la luce la dà l'immagine del luogo: queste scelte non partono." : null }, scena, preset, dettagli);
+  return h("div", { classe: "colonna-stile" }, scena, preset, dettagli);
 }
 
 function colonnaInvio() {
@@ -678,7 +682,9 @@ function colonnaInvio() {
   });
   const cosaParte = h("section", { classe: "pannello", "aria-label": "Cosa parte" },
     h("span", { classe: "etichetta" }, "Cosa parte, in breve"),
-    h("p", { id: "riassunto" }, S.composto ? S.composto.riassunto : "…"),
+    h("p", { id: "riassunto" }, S.modo === "contesto" && !contestoPerServer()
+      ? "Il prompt si compone quando la foto del luogo e l'area ci sono (passo 1)."
+      : S.composto ? S.composto.riassunto : "…"),
     h("p", { classe: "tenue piccolo" }, `Blocchi di prompt ${S.catalogo.versione_blocchi}: testi scelti, non ancora provati con il modello.`),
     h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
       S.mostraPrompt ? "Nascondi il prompt" : "Mostra e modifica il prompt completo"),
@@ -717,11 +723,11 @@ function colonnaInvio() {
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
     ...pannelloMiei(),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
-    h("span", { classe: "etichetta" }, "Qualità"), qualita,
+    S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
     h("p", { classe: "tenue piccolo" }, "Vale per Nano Banana e Seedream; GPT Image ha misure sue. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
-    h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
-    h("p", { classe: "tenue piccolo" }, "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova."),
+    ...(S.modo === "contesto" ? [] : [h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
+    h("p", { classe: "tenue piccolo" }, "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -732,12 +738,11 @@ function colonnaInvio() {
     ...pannelloRiferimento());
 
   return h("div", { classe: "colonna-invio" },
-    pannelloContesto(),
-    h("section", { classe: "pannello", "aria-label": "Materiali" },
+    S.modo === "contesto" ? null : h("section", { classe: "pannello", "aria-label": "Materiali" },
       h("span", { classe: "etichetta" }, "Materiali a parole"),
       h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
       spento("materiali") ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, `Con la resa ${resaScelta().nome} i materiali non partono.`) : null),
-    mappa, cosaParte, scelteInvio, pannelloInvio());
+    S.modo === "contesto" ? null : mappa, cosaParte, scelteInvio, pannelloInvio());
 }
 
 // Immagine di riferimento per lo stile: parte come seconda immagine, solo con
@@ -764,7 +769,7 @@ function pannelloRiferimento() {
   const m = modelloScelto();
   const accetta = !!(m && m.piu_immagini);
   const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
-  if (S.contesto) {
+  if (S.modo === "contesto") {
     return [titolo, h("p", { classe: "tenue piccolo" },
       "Con «Inserisci nel contesto» il riferimento non parte: le due immagini sono già il contesto e la vista, e la luce la dà il contesto.")];
   }
@@ -859,53 +864,122 @@ function telaContesto() {
   return tela;
 }
 
-function pannelloContesto() {
-  const titolo = h("span", { classe: "etichetta" }, "Inserisci nel contesto");
-  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica l'immagine del contesto" });
-  file.addEventListener("change", () => scegliContesto(file.files && file.files[0]));
-  if (!S.contesto) {
-    return h("section", { classe: "pannello", "aria-label": "Inserisci nel contesto" },
-      titolo,
-      h("p", { classe: "tenue piccolo" }, "Metti l'edificio dentro un'immagine del luogo: uno screenshot satellitare, un'ortofoto o una foto da drone, che porti tu. Disegni dove va l'edificio e scegli zenitale o volo d'uccello. JPEG o PNG."),
-      file);
-  }
+// Il modo di Genera: render della vista o inserimento in una foto del luogo.
+async function cambiaModo(modo) {
+  if (modo === S.modo) return;
+  if (modo === "vista") { S.contestoTenuto = S.contesto; S.contesto = null; }
+  else { S.contesto = S.contestoTenuto; S.contestoTenuto = null; }
+  S.modo = modo;
+  await dopoCambioContesto();
+}
+
+function sceltaModo() {
+  return h("div", { classe: "scelta-modo", role: "group", "aria-label": "Cosa vuoi fare" },
+    [["vista", "Render della vista", "La vista di Allplan diventa una foto, con lo stile che scegli."],
+     ["contesto", "Inserisci in un luogo", "L'edificio dentro una foto del luogo vero: dall'alto, a volo d'uccello o da terra."]]
+      .map(([id, nome, spiega]) => h("button", { classe: "modo", "aria-pressed": String(S.modo === id), onclick: () => cambiaModo(id) },
+        h("b", {}, nome), h("span", { classe: "tenue piccolo" }, spiega))));
+}
+
+function passo(numero, titolo, fatto, ...corpo) {
+  return h("div", { classe: "passo-contesto" + (fatto ? " fatto" : "") },
+    h("h3", {}, h("span", { classe: "numero-passo", "aria-hidden": "true" }, fatto ? "✓" : String(numero)), `${numero} · ${titolo}`),
+    ...corpo);
+}
+
+// Che vista catturare in Allplan per ogni inquadratura: la camera della
+// vista deve somigliare a quella della foto, il modello non ruota l'edificio
+// di 90 gradi.
+const VISTA_PER_INQUADRATURA = {
+  zenitale: "In Allplan cattura la pianta vista dall'alto, shaded con le ombre.",
+  volo: "In Allplan cattura una vista dall'alto e di sbieco, con lo stesso angolo della foto.",
+  terra: "In Allplan cattura una prospettiva ad altezza d'occhio (circa 1,6 m), girata come la foto.",
+};
+
+function sezioneContesto() {
   const c = S.contesto;
   const cat = S.catalogo.contesto;
-  const inquadratura = h("div", { classe: "switch", role: "group", "aria-label": "Inquadratura del contesto" },
-    cat.inquadrature.map((i) => h("button", {
-      classe: "seg", "aria-pressed": String(c.inquadratura === i.id), onclick: () => cambiaContesto("inquadratura", i.id),
-    }, i.nome)));
-  const luogo = h("input", { type: "text", id: "luogo-contesto", maxlength: String(cat.luogo_massimo), "aria-label": "Luogo: indirizzo o coordinate",
-    placeholder: "es. Via Rontano, San Valentino (RE) · 44.5215, 10.6991" });
-  luogo.value = c.luogo || "";
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica la foto del luogo" });
+  file.addEventListener("change", () => scegliContesto(file.files && file.files[0]));
+
+  // 1 · la foto del luogo, grande: e' dove si disegna.
+  const uno = c
+    ? passo(1, "Segna dove va l'edificio", !!c.area,
+        h("p", { classe: c.area ? "tenue piccolo" : "piccolo invito" }, c.area
+          ? "Fatto. Per cambiare l'area trascina di nuovo. Fuori dal rettangolo la foto deve restare com'è."
+          : "Trascina sulla foto un rettangolo, da un angolo all'altro, dove deve stare l'edificio."),
+        telaContesto(),
+        h("p", { classe: "tenue piccolo" }, `${c.da || c.nome} · ${c.larghezza} × ${c.altezza} · `,
+          h("label", { classe: "link-file" }, "cambia foto", h("span", { classe: "nascosto" }, file)),
+          " · ", h("button", { classe: "link-file come-link", onclick: togliContesto }, "togli")))
+    : passo(1, "Carica la foto del luogo", false,
+        h("label", { classe: "carica-luogo" },
+          h("b", {}, "Scegli la foto del luogo"),
+          h("span", { classe: "tenue piccolo" }, "Uno screenshot di Google Earth, un'ortofoto, una foto da drone o una foto da terra, anche uno Street View. JPEG o PNG."),
+          h("span", { classe: "nascosto" }, file)),
+        h("p", { classe: "tenue piccolo" }, "AIRENDER non scarica mappe: la foto la porti tu."));
+
+  // 2 · com'e' stata scattata la foto.
+  const inq = c ? c.inquadratura : cat.predefinita;
+  const due = passo(2, "Com'è stata scattata la foto", !!c,
+    h("div", { classe: "switch", role: "group", "aria-label": "Com'è stata scattata la foto" },
+      cat.inquadrature.map((i) => h("button", {
+        classe: "seg", "aria-pressed": String(inq === i.id), disabled: !c,
+        onclick: () => { const cambi = { inquadratura: i.id }; if (i.id === "terra") cambi.pulisci = false; S.contesto = { ...S.contesto, ...cambi }; dopoCambioContesto(); },
+      }, i.nome))),
+    h("p", { classe: "tenue piccolo" }, {
+      zenitale: "Dall'alto, in pianta: Google Earth o un'ortofoto.",
+      volo: "Dall'alto e di sbieco: Google Earth inclinato o un drone.",
+      terra: "Da terra, ad altezza d'occhio: una foto o uno Street View.",
+    }[inq]));
+
+  // 3 · l'edificio: la vista di Allplan, con la camera giusta.
+  const tre = passo(3, "L'edificio, da Allplan", !!(S.vista && S.descrizione && S.descrizione.idonea),
+    S.vista
+      ? h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(S.vista)}`, alt: `Vista di Allplan ${S.vista}` })
+      : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."),
+    h("p", { classe: "piccolo" }, VISTA_PER_INQUADRATURA[inq]),
+    h("div", { classe: "riga" },
+      h("button", { classe: "btn", onclick: () => { S.mostraViste = !S.mostraViste; render(); }, "aria-expanded": String(S.mostraViste) }, "Usa un'altra vista…")),
+    S.mostraViste ? pannelloViste() : null);
+
+  return h("section", { classe: "pannello sezione-contesto", "aria-label": "Inserisci in un luogo" },
+    h("div", { classe: "griglia-contesto" }, uno, h("div", { classe: "passi-destra" }, due, tre)));
+}
+
+function colonnaContesto() {
+  const c = S.contesto;
+  const cat = S.catalogo.contesto;
+  const luogo = h("input", { type: "text", id: "luogo-contesto", maxlength: String(cat.luogo_massimo), "aria-label": "Dove si trova: indirizzo o coordinate",
+    placeholder: "es. Via Statale 467, Casalgrande (RE) · 44.5893, 10.7381", disabled: !c });
+  luogo.value = (c && c.luogo) || "";
   let attesaLuogo = null;
   luogo.addEventListener("input", () => {
     S.contesto.luogo = luogo.value; S.secco = null;
     clearTimeout(attesaLuogo); attesaLuogo = setTimeout(() => aggiornaComposto(true), 300);
   });
-  const pulisci = h("input", { type: "checkbox", id: "pulisci-contesto", checked: c.pulisci });
+  const materiali = h("textarea", { id: "materiali", rows: "3", "aria-label": "Materiali a parole",
+    placeholder: "es. intonaco bianco, infissi in rovere scuro, zoccolo in pietra grigia" });
+  materiali.value = S.scelte.materiali || "";
+  materiali.addEventListener("input", () => { S.scelte.materiali = materiali.value; aggiornaComposto(); });
+  const pulisci = h("input", { type: "checkbox", id: "pulisci-contesto", checked: !!(c && c.pulisci), disabled: !c });
   pulisci.addEventListener("change", () => cambiaContesto("pulisci", pulisci.checked));
-  const cerca = h("input", { type: "checkbox", id: "cerca-web-contesto", disabled: !cat.ricerca_web_verificata });
-  return h("section", { classe: "pannello", "aria-label": "Inserisci nel contesto" },
-    h("div", { classe: "riga tra" }, titolo, h("button", { classe: "btn", onclick: togliContesto }, "Togli il contesto")),
-    h("p", { classe: "tenue piccolo" }, c.area
-      ? "Trascina di nuovo per cambiare l'area. Fuori dal rettangolo il contesto deve restare com'è."
-      : "Trascina sull'immagine il rettangolo dove va l'edificio."),
-    telaContesto(),
-    h("p", { classe: "tenue piccolo" }, `${c.da || c.nome} · ${c.larghezza} × ${c.altezza} · `,
-      h("label", { classe: "link-file" }, "cambia immagine", h("span", { classe: "nascosto" }, file))),
-    h("span", { classe: "etichetta" }, "Inquadratura"), inquadratura,
-    h("p", { classe: "tenue piccolo" }, c.inquadratura === "volo"
-      ? "Volo d'uccello: cattura da Allplan una vista dall'alto e di sbieco, simile all'angolo del contesto."
-      : "Zenitale: cattura da Allplan la vista in pianta dall'alto, con le ombre."),
-    h("span", { classe: "etichetta" }, "Luogo (facoltativo)"), luogo,
-    h("p", { classe: "tenue piccolo" }, "Indirizzo o coordinate: entrano nel prompt come li scrivi, anche in italiano."),
-    h("label", { classe: "riga" }, pulisci, h("span", { classe: "piccolo" }, "È uno screenshot di una mappa: togli etichette e icone e rendilo una foto aerea")),
-    c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null,
-    h("label", { classe: "riga grigio", "aria-disabled": String(!cat.ricerca_web_verificata) }, cerca,
-      h("span", { classe: "piccolo" }, "Cerca sul web per capire il luogo"), presto("Da provare")),
-    h("p", { classe: "tenue piccolo" }, "La ricerca Google di Nano Banana: non ancora provata attraverso Comfy, costo non misurato."),
-    h("p", { classe: "tenue piccolo" }, "Con il contesto le scelte di stile a sinistra non partono: la luce e il colore li dà l'immagine del luogo. Partono i materiali."));
+  const cerca = h("input", { type: "checkbox", id: "cerca-web-contesto", disabled: true });
+  const terra = c && c.inquadratura === "terra";
+  return h("div", { classe: "colonna-stile" },
+    h("section", { classe: "pannello", "aria-label": "Facoltativo" },
+      h("h2", {}, "Facoltativo"),
+      h("span", { classe: "etichetta" }, "Materiali a parole"),
+      h("p", { classe: "tenue piccolo" }, "La vista di Allplan è grigia: senza materiali il modello li sceglie da solo. Scrivili come vuoi, anche in italiano."),
+      materiali,
+      h("span", { classe: "etichetta" }, "Dove si trova"), luogo,
+      h("p", { classe: "tenue piccolo" }, "Indirizzo o coordinate: aiutano il modello a capire il posto. Entrano nel prompt come li scrivi."),
+      terra ? null : h("label", { classe: "riga" }, pulisci,
+        h("span", { classe: "piccolo" }, "È uno screenshot con scritte e icone (Google Earth, Maps): toglile e rendilo una foto aerea")),
+      c && c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null,
+      h("label", { classe: "riga grigio", "aria-disabled": "true" }, cerca,
+        h("span", { classe: "piccolo" }, "Cerca il luogo sul web"), presto("Da provare"))),
+    h("p", { classe: "tenue piccolo" }, "Qui preset e stile non servono: luce, cielo e colore li prende dalla foto del luogo. Per scegliere lo stile torna a «Render della vista»."));
 }
 
 function motivoGeneraSpento() {
@@ -915,9 +989,10 @@ function motivoGeneraSpento() {
   const m = modelloScelto();
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
   if (!S.destinazione) return "Sto leggendo la destinazione.";
-  if (S.contesto && !S.contesto.area) return "Disegna sul contesto il rettangolo dove va l'edificio.";
+  if (S.modo === "contesto" && !S.contesto) return "Passo 1: carica la foto del luogo.";
+  if (S.contesto && !S.contesto.area) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio.";
   if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
-  if (!S.contesto && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
+  if (S.modo !== "contesto" && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
   return null;
 }
 
@@ -934,14 +1009,14 @@ function pannelloInvio() {
     if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
     if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento,
-      S.contesto ? "Il contesto parte sempre con due immagini: è la prima prova vera anche di questo." : "Se non vuoi fare la prova adesso, togli il riferimento."));
+      S.modo === "contesto" ? "Il contesto parte sempre con due immagini: è la prima prova vera anche di questo." : "Se non vuoi fare la prova adesso, togli il riferimento."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",
       "Chiudi e riapri lo Studio, che la fa partire."));
   }
   blocco.append(h("div", { classe: "azioni" },
-    h("button", { classe: "btn", onclick: provaASecco, disabled: !S.vista }, "Prova a secco"),
+    h("button", { classe: "btn", onclick: provaASecco, disabled: !S.vista || (S.modo === "contesto" && !contestoPerServer()) }, "Prova a secco"),
     h("button", { classe: "btn primario", onclick: genera, disabled: !!spento, id: "genera" },
       S.lavoroAttivo ? "In corso…" : (S.varianti > 1 ? `Genera ${S.varianti} render` : "Genera render"))));
   if (spento) blocco.append(h("p", { classe: "tenue piccolo" }, spento));
@@ -967,12 +1042,16 @@ function schermataGenera() {
       h("span", {}, e.fatto || ""), e.cosa_fare ? h("span", { classe: "cosa-fare" }, e.cosa_fare) : null,
       h("span", { classe: "piccolo tenue" }, `Le scelte sono rimaste: ${e.preset_nome} · ${e.modello_nome}. Puoi rifarlo da Risultato con la stessa ricetta.`)));
   }
-  return [h("h1", { classe: "nascosto" }, "Genera"), ...sopra, sezioneVista(), h("div", { classe: "colonne" }, colonnaStile(), colonnaInvio())];
+  if (S.modo === "contesto") {
+    return [h("h1", { classe: "nascosto" }, "Genera"), ...sopra, sceltaModo(), sezioneContesto(),
+      h("div", { classe: "colonne" }, colonnaContesto(), colonnaInvio())];
+  }
+  return [h("h1", { classe: "nascosto" }, "Genera"), ...sopra, sceltaModo(), sezioneVista(), h("div", { classe: "colonne" }, colonnaStile(), colonnaInvio())];
 }
 
 function disegnaComposto() {
   const r = document.getElementById("riassunto");
-  if (r && S.composto) r.textContent = S.composto.riassunto;
+  if (r && S.composto && !(S.modo === "contesto" && !contestoPerServer())) r.textContent = S.composto.riassunto;
   const s = document.getElementById("sintesi");
   if (s) s.textContent = sintesi();
   const p = document.getElementById("prompt");

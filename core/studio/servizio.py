@@ -493,7 +493,7 @@ class Studio:
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
-            "riassunto": riassunto_contesto(contesto) if contesto else riassunto(scelte, dati.get("preset")),
+            "riassunto": riassunto_contesto(contesto, scelte.materiali) if contesto else riassunto(scelte, dati.get("preset")),
             "versione_blocchi": blocchi.VERSIONE,
         }
 
@@ -1620,9 +1620,11 @@ def _cosa_parte(riferimento: bool, contesto: bool) -> str:
     return "Parte una immagine: la vista."
 
 
-def riassunto_contesto(contesto: modulo_contesto.Contesto) -> str:
+def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") -> str:
     """Cosa parte con «Inserisci nel contesto», in italiano."""
     pezzi = ["Inserisci nel contesto", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
+    pezzi.append(f"materiali: {materiali.strip()}" if materiali and materiali.strip()
+                 else "materiali: li sceglie il modello")
     if contesto.luogo:
         pezzi.append(f"luogo: {contesto.luogo}")
     pezzi.append("lo screenshot diventa una foto" if contesto.pulisci_mappa

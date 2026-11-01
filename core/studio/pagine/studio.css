@@ -372,13 +372,40 @@ select { min-height: 34px; padding: 0 10px; }
 .elenco-verifiche { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--testo-2); }
 .vuoto-ritocco { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 
-/* Inserisci nel contesto: la stessa tela del Ritocca, con un rettangolo solo. */
+/* Genera: i due modi, render della vista o inserisci in un luogo. */
+.scelta-modo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.scelta-modo .modo {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  font: inherit; color: var(--testo); background: var(--pannello); border: 1px solid var(--bordo-forte);
+  border-radius: 12px; padding: 12px 16px; cursor: pointer;
+}
+.scelta-modo .modo[aria-pressed="true"] { border: 2px solid var(--accento); padding: 11px 15px; background: var(--pannello-2); }
+.scelta-modo .modo b { font-size: 15px; }
+
+/* Inserisci in un luogo: tre passi numerati, la foto grande a sinistra. */
+.griglia-contesto { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+.passi-destra { display: flex; flex-direction: column; gap: 20px; }
+.passo-contesto { display: flex; flex-direction: column; gap: 8px; }
+.passo-contesto h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; }
+.numero-passo {
+  display: inline-flex; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center;
+  background: var(--accento); color: #fff; font-size: 12px; font-weight: 600; flex: none;
+}
+.passo-contesto.fatto .numero-passo { background: var(--ok); }
+.invito { color: var(--accento); font-weight: 600; }
+.carica-luogo {
+  display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; text-align: center;
+  min-height: 260px; padding: 24px; border: 2px dashed var(--bordo-forte); border-radius: 12px; cursor: pointer;
+  background: var(--pannello-2);
+}
+.carica-luogo:hover { border-color: var(--accento); }
+.carica-luogo b { color: var(--accento); font-size: 15px; }
+.miniatura-vista { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; background: var(--pannello-2); }
 .tela-contesto { margin: 4px 0; }
 .link-file { color: var(--accento); cursor: pointer; text-decoration: underline; }
+.come-link { background: none; border: 0; padding: 0; font: inherit; }
 .riga.grigio { opacity: .6; }
 #luogo-contesto { width: 100%; }
-.colonna-stile.spenta-contesto { opacity: .55; }
-
 /* Studio · Video */
 .posti-video { display: flex; flex-wrap: wrap; gap: 12px; }
 .posto-video { flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -387,3 +414,7 @@ select { min-height: 34px; padding: 0 10px; }
 .elenco-video { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
 .voce-video { flex: 1 1 320px; display: flex; flex-direction: column; gap: 6px; }
 .lettore-video { width: 100%; border-radius: 6px; background: #000; }
+
+@media (max-width: 900px) {
+  .griglia-contesto, .scelta-modo { grid-template-columns: 1fr; }
+}
