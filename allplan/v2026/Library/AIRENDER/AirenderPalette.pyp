@@ -41,6 +41,11 @@
 <Visible>False</Visible>
 </Parameter>
 <Parameter>
+<Name>Chiudi</Name>
+<Text>Per tornare alla Library premi Esc. I render in corso continuano.</Text>
+<ValueType>Text</ValueType>
+</Parameter>
+<Parameter>
 <Name>Sezione1</Name>
 <Text>1 · Vista</Text>
 <ValueType>Expander</ValueType>
@@ -393,27 +398,17 @@
 </Parameter>
 <Parameter>
 <Name>Sezione5</Name>
-<Text>In arrivo</Text>
+<Text>Nello Studio</Text>
 <ValueType>Expander</ValueType>
 <Parameters>
 <Parameter>
-<Name>InArrivo0</Name>
-<Text>Cambia materiale: in arrivo, non ancora attivo</Text>
+<Name>NelloStudio0</Name>
+<Text>Annota aree e ritocchi: scheda Ritocca</Text>
 <ValueType>Text</ValueType>
 </Parameter>
 <Parameter>
-<Name>InArrivo1</Name>
-<Text>Livelli: in arrivo, non ancora attivo</Text>
-<ValueType>Text</ValueType>
-</Parameter>
-<Parameter>
-<Name>InArrivo2</Name>
-<Text>Annota aree: nello Studio, scheda Ritocca</Text>
-<ValueType>Text</ValueType>
-</Parameter>
-<Parameter>
-<Name>InArrivo3</Name>
-<Text>Video: nello Studio, scheda Video</Text>
+<Name>NelloStudio1</Name>
+<Text>Video dai render: scheda Video</Text>
 <ValueType>Text</ValueType>
 </Parameter>
 </Parameters>
