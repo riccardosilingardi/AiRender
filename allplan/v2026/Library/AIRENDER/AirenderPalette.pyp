@@ -403,17 +403,17 @@
 </Parameter>
 <Parameter>
 <Name>InArrivo1</Name>
-<Text>Annota aree: in arrivo, non ancora attivo</Text>
-<ValueType>Text</ValueType>
-</Parameter>
-<Parameter>
-<Name>InArrivo2</Name>
 <Text>Livelli: in arrivo, non ancora attivo</Text>
 <ValueType>Text</ValueType>
 </Parameter>
 <Parameter>
+<Name>InArrivo2</Name>
+<Text>Annota aree: nello Studio, scheda Ritocca</Text>
+<ValueType>Text</ValueType>
+</Parameter>
+<Parameter>
 <Name>InArrivo3</Name>
-<Text>Video: in arrivo, non ancora attivo</Text>
+<Text>Video: nello Studio, scheda Video</Text>
 <ValueType>Text</ValueType>
 </Parameter>
 </Parameters>

@@ -75,8 +75,9 @@ grigio. In fondo il percorso della cartella delle viste e Chiudi.
 3. **Invio** — dove va la vista, costo, Prova a secco, Genera.
 4. **Ultimo render** — preset e modello, crediti, **Apri nello Studio**, Apri
    cartella.
-5. **In arrivo** (chiuso, in grigio) — Cambia materiale, Annota aree, Livelli,
-   Video.
+5. **In arrivo** (chiuso, in grigio) — Cambia materiale, Livelli. Annota aree
+   e Video dicono dove sono già: nello Studio, schede Ritocca e Video
+   (aggiornato il 2026-11-01).
 
 - **Vuoto:** «Nessuna vista ancora. Clicca una volta nella finestra 3D da
   rendere (shaded, con ombre), poi Cattura.» Stile si può già impostare;
