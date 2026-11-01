@@ -149,12 +149,24 @@ class AirenderSondaMateriali(BaseScriptObject):
             _messaggio(riga)
             return
         elenco = list(elementi)
-        letti = [self._leggi(documento, adattatore, i)
-                 for i, adattatore in enumerate(elenco[:sonda.MASSIMO_ELEMENTI])]
+        # Il nome di ogni elemento (GetDisplayName ha retto 30 volte su 30 il
+        # 2026-11-01): serve a contare i tipi e a scegliere quelli 3D.
+        self.diario.prima(f"GetDisplayName su tutti i {len(elenco)} elementi")
+        nomi = []
+        for adattatore in elenco:
+            ok, nome = sonda.prova(adattatore.GetDisplayName)
+            nomi.append(str(nome) if ok else "")
+        tipi = sonda.conta_tipi(nomi)
+        self.registro.scrivi("2 tipi", " · ".join(f"{n or '?'} {q}" for n, q in tipi[:40]))
+        scelti = sonda.scegli_elementi(nomi)
+        letti = []
+        for indice in scelti:
+            letti.append(self._leggi(documento, elenco[indice], indice))
+            # Scritto a ogni elemento: se Allplan si chiude, quelli gia' letti restano.
+            self.registro.scrivi_file(sonda.FILE_ELEMENTI, sonda.json_elementi(letti))
         self.diario.prima("fine: lettura completa")
-        self.registro.scrivi_file(sonda.FILE_ELEMENTI, sonda.json_elementi(letti))
-        self.registro.scrivi("2 elementi", f"{len(elenco)} elementi ({da}), descritti {len(letti)} "
-                                           f"in {sonda.FILE_ELEMENTI}")
+        self.registro.scrivi("2 elementi", f"{len(elenco)} elementi ({da}), {len(tipi)} tipi, "
+                                           f"descritti {len(letti)} non 2D in {sonda.FILE_ELEMENTI}")
         trovati = sonda.valori_di_materiale(letti)
         if trovati:
             for campo, valori in trovati.items():
@@ -170,8 +182,8 @@ class AirenderSondaMateriali(BaseScriptObject):
     def _leggi(self, documento, adattatore, indice: int) -> dict:
         """Poche letture con nome, ognuna annotata nel diario prima di farla.
 
-        Niente chiamate alla cieca ai metodi Get* e niente GetElement: il
-        2026-11-01 hanno fatto chiudere Allplan su un progetto vero.
+        Niente chiamate alla cieca ai metodi Get*: il 2026-11-01 hanno fatto
+        chiudere Allplan su un progetto vero.
         """
         dati: dict = {}
         for nome in ("GetDisplayName", "GetElementAdapterType"):
@@ -183,7 +195,35 @@ class AirenderSondaMateriali(BaseScriptObject):
         dati["proprieta_comuni"] = sonda.proprieta(comuni) if ok else comuni
         self.diario.prima(f"elemento {indice} ({dati.get('GetDisplayName', '')}): GetAttributes")
         dati["attributi"] = self._attributi(documento, adattatore)
+        dati["superficie"] = self._superficie(adattatore, indice, dati.get("GetDisplayName", ""))
         return dati
+
+    def _superficie(self, adattatore, indice: int, nome: str) -> dict:
+        """Il materiale Allplan dell'elemento: TextureDefinition.SurfacePath (api.txt, ModelElement3D).
+
+        GetElement e' l'ultima lettura di ogni elemento, annotata nel diario:
+        se e' lei a far chiudere Allplan, lo si vede e gli elementi gia' letti
+        sono salvati.
+        """
+        self.diario.prima(f"elemento {indice} ({nome}): GetElement")
+        ok, elemento = sonda.prova(lambda: AllplanBaseEle.GetElement(adattatore))
+        if not ok or elemento is None:
+            return {"GetElement": sonda.corto(elemento)}
+        risultato: dict = {"tipo_python": type(elemento).__name__}
+        if hasattr(elemento, "GetTextureDefinition"):
+            self.diario.prima(f"elemento {indice} ({nome}): GetTextureDefinition")
+            ok, texture = sonda.prova(elemento.GetTextureDefinition)
+            if ok and texture is not None:
+                ok, percorso = sonda.prova(lambda: texture.SurfacePath)
+                risultato["SurfacePath"] = sonda.corto(percorso)
+            else:
+                risultato["GetTextureDefinition"] = sonda.corto(texture)
+        # Muri, solai, tetti: le proprieta' dell'elemento architettonico, solo valori.
+        if hasattr(elemento, "Properties"):
+            self.diario.prima(f"elemento {indice} ({nome}): Properties")
+            ok, proprieta = sonda.prova(lambda: elemento.Properties)
+            risultato["Properties"] = sonda.proprieta(proprieta) if ok else proprieta
+        return risultato
 
     def _attributi(self, documento, adattatore) -> dict:
         """Gli attributi per nome. La superficie potrebbe stare qui, come attributo."""

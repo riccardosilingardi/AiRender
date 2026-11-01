@@ -182,5 +182,19 @@ def test_la_lettura_degli_elementi_non_chiama_alla_cieca():
     fine = testo.index("def _attributi")
     lettura = testo[inizio:fine]
     assert "sonda.descrivi(" not in lettura
-    assert "GetElement(" not in lettura
-    assert lettura.count("self.diario.prima(") >= 5
+    # GetElement una volta sola, subito dopo la sua riga nel diario.
+    assert lettura.count("GetElement(") == 1
+    prima = lettura[:lettura.index("GetElement(")]
+    assert prima.rstrip().splitlines()[-2].strip().startswith("self.diario.prima(")
+    assert lettura.count("self.diario.prima(") >= 7
+    # elementi.json si riscrive a ogni elemento: un crash non perde quelli gia' letti.
+    assert "scrivi_file(sonda.FILE_ELEMENTI" in lettura[lettura.index("for indice in scelti"):]
+
+
+def test_si_scelgono_pochi_elementi_per_tipo_e_niente_2d():
+    """Caso del 2026-11-01: i primi 30 di 13570 erano linee e punti, nessun muro."""
+    nomi = ["Linea"] * 40 + ["Punto", "Superficie 3D", "Muro", "Muro", "Muro", "Muro", "'Solaio'", "Testo", ""]
+    scelti = sonda.scegli_elementi(nomi, per_tipo=3, massimo=30)
+    assert [nomi[i] for i in scelti] == ["Superficie 3D", "Muro", "Muro", "Muro", "'Solaio'"]
+    assert len(sonda.scegli_elementi(["Muro"] * 100, per_tipo=100, massimo=30)) == 30
+    assert sonda.conta_tipi(["Linea", "Muro", "Linea"])[0] == ("Linea", 2)
