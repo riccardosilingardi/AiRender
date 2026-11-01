@@ -114,7 +114,10 @@ def test_solo_i_modelli_sondati_hanno_uno_schema_e_ognuno_dice_quando():
     assert sondati == {"bfl/flux-kontext-pro", "vertexai/gemini-3.1-flash-image"}
     assert all(comfy.SCHEMI[m].verificato_il == "2026-10-27" for m in sondati)
     # Aggiunti su richiesta prima della sonda: solo questi, e ognuno lo dice prima dell'invio.
-    assert set(comfy.SCHEMI) - sondati == {"vertexai/gemini-3-pro-image"}
+    assert set(comfy.SCHEMI) - sondati == {
+        "vertexai/gemini-3-pro-image", "openai/gpt-image-2", "byteplus/seedream-5-0-260128"}
+    assert all("non e' ancora stato provato" in comfy.ProviderComfy().avviso(m)
+               for m in set(comfy.SCHEMI) - sondati)
 
 
 def test_nano_banana_pro_dice_prima_dell_invio_che_e_la_prima_prova():
@@ -500,3 +503,47 @@ def test_chi_ascolta_l_avanzamento_puo_fermare_l_attesa(modello_verificato):
     with pytest.raises(Fermati):
         motore.genera(richiesta())
     assert trasporto.scaricati == []
+
+
+# --- GPT Image 2 e Seedream 5.0 (dalla documentazione, mai provati) ----------
+
+
+def test_gpt_image_manda_la_vista_come_data_uri_alla_misura_piu_vicina():
+    """Caso: vista 16:9 verso un modello che conosce solo 3 misure, e torna schiacciata."""
+    dati = vista_shaded(1600, 900)
+    inviata, cornice = comfy.con_cornice(richiesta(dati), comfy.SCHEMI["openai/gpt-image-2"].rapporti)
+    corpo = comfy.SCHEMI["openai/gpt-image-2"].corpo(inviata)
+    assert corpo["size"] == "1536x1024"
+    assert cornice is not None  # 16:9 si allarga a 3:2 e la cornice si toglie al ritorno
+    assert corpo["image"][0].startswith("data:image/png;base64,")
+    assert "seed" not in corpo
+
+
+def test_seedream_chiede_la_forma_esatta_della_vista_senza_cornice():
+    dati = vista_shaded(1165, 715)
+    schema = comfy.SCHEMI["byteplus/seedream-5-0-260128"]
+    assert schema.rapporti == ()
+    corpo = schema.corpo(richiesta(dati, seme=7))
+    larghezza, altezza = (int(x) for x in corpo["size"].split("x"))
+    assert abs(larghezza / altezza - 1165 / 715) < 0.02
+    assert 2560 * 1440 <= larghezza * altezza <= 3072 * 3072
+    assert corpo["watermark"] is False and corpo["seed"] == 7
+    assert corpo["image"].startswith("data:image/png;base64,")
+    con_riferimento = schema.corpo(richiesta(dati, immagini_in_piu=(PNG,)))
+    assert len(con_riferimento["image"]) == 2
+
+
+def test_seedream_a_4k_chiede_piu_pixel():
+    dati = vista_shaded(1600, 900)
+    piccola = comfy.misura_seedream(dati, "1k")
+    grande = comfy.misura_seedream(dati, "4k")
+    area = lambda m: int(m.split("x")[0]) * int(m.split("x")[1])  # noqa: E731
+    assert area(grande) > area(piccola)
+    assert area(grande) <= 3072 * 3072
+
+
+def test_gpt_e_seedream_leggono_l_immagine_in_base64_o_link():
+    assert comfy._immagine_dati({"data": [{"b64_json": "QUJD"}]}) == ("base64", "QUJD")
+    assert comfy._immagine_dati({"data": [{"url": "https://x/y.png"}]}) == ("url", "https://x/y.png")
+    with pytest.raises(ErroreProvider):
+        comfy._immagine_dati({"data": []})

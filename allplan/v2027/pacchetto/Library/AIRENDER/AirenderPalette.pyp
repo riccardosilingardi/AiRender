@@ -270,7 +270,7 @@
 <Name>Modello</Name>
 <Text>Modello</Text>
 <Value>Nano Banana 2</Value>
-<ValueList>Nano Banana 2|FLUX.1 Kontext Pro|Nano Banana Pro</ValueList>
+<ValueList>Nano Banana 2|FLUX.1 Kontext Pro|Nano Banana Pro|GPT Image 2|Seedream 5.0</ValueList>
 <ValueType>StringComboBox</ValueType>
 </Parameter>
 <Parameter>

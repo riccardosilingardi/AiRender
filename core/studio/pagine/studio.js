@@ -715,7 +715,7 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     h("span", { classe: "etichetta" }, "Qualità"), qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
-    h("p", { classe: "tenue piccolo" }, "Solo Nano Banana. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
+    h("p", { classe: "tenue piccolo" }, "Vale per Nano Banana e Seedream; GPT Image ha misure sue. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
     h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
     h("p", { classe: "tenue piccolo" }, "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova."),
     h("span", { classe: "etichetta" }, "Varianti per invio"),

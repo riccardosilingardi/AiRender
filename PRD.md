@@ -406,9 +406,10 @@ FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
   pochi muri. Servono almeno una vista con solaio e ombre portate, e una con
   aperture e più piani. Per verificare: `scripts/confronta_modelli.py` sulle
   catture nuove, e un occhio sugli spigoli.
-- **Gli altri modelli del catalogo** (Kontext Max, Nano Banana Pro, Seedream,
-  GPT Image) non hanno schema: si fermano prima di partire finché non passano
-  dalla sonda. Una fonte non ufficiale dice Nano Banana 2 deprecato in favore di
+- **Gli altri modelli del catalogo** (Kontext Max e altri) non hanno schema:
+  si fermano prima di partire finché non passano dalla sonda. Nano Banana Pro
+  (2026-10-31), GPT Image 2 e Seedream 5.0 (2026-11-01) hanno uno schema preso
+  dalla documentazione, non dalla sonda. Una fonte non ufficiale dice Nano Banana 2 deprecato in favore di
   `vertexai/gemini-nano-banana-2.1`: se il Router lo ritira, il preset va
   cambiato e il nuovo modello va sondato.
 - **Il seme con Nano Banana** — lo schema di Gemini non ha un campo per il seme:
@@ -777,6 +778,23 @@ poggiano su cose non ancora provate:
   con modelli di AI. AIRENDER non le scarica; lo screenshot lo porta
   l'utente, e per la vendita va detto (thread «Pianificare il
   fotoinserimento», 2026-11-01).
+
+### Lasciato dalla sessione del 2026-11-01 (GPT Image 2 e Seedream 5.0)
+
+- **GPT Image 2 e Seedream 5.0 rispondono al corpo scritto in `comfy.py`** —
+  non verificato. Nomi (`openai/gpt-image-2`, `byteplus/seedream-5-0-260128`) e
+  campi vengono dalle pagine «code» della documentazione del Router lette il
+  2026-11-01 (quelle di `gpt-image-1.5` e `seedream-5-0-260128`; la pagina di
+  `gpt-image-2` è uguale a parte il nome). Da qui api.comfy.org non risponde: il
+  primo render vero è la prova, e lo Studio lo dice prima dell'invio.
+- **GPT Image tiene la geometria** — non verificato, e c'è un motivo di dubbio:
+  è un modello che ridisegna l'immagine intera, non un modello di modifica
+  come Kontext. Confrontare gli spigoli col banco o a occhio.
+- **Seedream rispetta la misura in pixel chiesta** — non verificato. Si chiede
+  la forma esatta della vista (area fra circa 2560×1440 e 3072×3072, secondo la
+  documentazione), senza cornice.
+- **Costo di GPT Image 2 e Seedream 5.0** — non misurato: lo dice il primo
+  render (`x-comfy-credits-used`).
 
 ### Usciti da questa sezione, con la loro verifica
 
