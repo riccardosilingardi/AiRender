@@ -133,3 +133,25 @@ def test_materiali_allplan_dagli_elementi_della_sonda():
 def test_core_colormap_non_importa_allplan():
     testo = (Path(colormap.__file__)).read_text(encoding="utf-8")
     assert "NemAll" not in testo
+
+
+def test_colori_richiesti_sporchi_vanno_al_piu_vicino_e_si_riportano_alla_vista():
+    # Il modello rende a un'altra misura e con colori non esatti.
+    resa = Image.new("RGB", (100, 50), (5, 3, 8))
+    ImageDraw.Draw(resa).rectangle((0, 0, 49, 49), fill=(220, 40, 80))  # quasi #e6194b
+    ImageDraw.Draw(resa).rectangle((50, 0, 74, 49), fill=(70, 95, 210))  # quasi #4363d8
+    uscita = io.BytesIO()
+    resa.save(uscita, format="PNG")
+    richiesti = [colormap.ColoreRichiesto("#e6194b", "metal cladding", "metallo"),
+                 colormap.ColoreRichiesto("#4363d8", "glass"),
+                 colormap.ColoreRichiesto("#ffe119", "concrete", "CLS")]
+
+    zone = colormap.zone_da_colori_richiesti(uscita.getvalue(), richiesti, LATO)
+    mappa = colormap.componi(LATO, zone)
+
+    voci = {voce.etichetta: voce for voce in mappa.legenda}
+    assert voci["metal cladding"].area_percento == 50.0
+    assert voci["metal cladding"].materiale_allplan == "metallo"
+    assert voci["glass"].area_percento == 25.0
+    assert mappa.scartate == ["concrete"]
+    assert mappa.non_assegnato_percento == 25.0

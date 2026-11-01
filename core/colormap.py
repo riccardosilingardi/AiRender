@@ -179,6 +179,48 @@ def zone_da_immagine_colorata(dati: bytes) -> list[Zona]:
     return zone
 
 
+@dataclass(frozen=True)
+class ColoreRichiesto:
+    """Un colore chiesto a un modello che dipinge la color map da se'.
+
+    Un modello d'immagine (Nano Banana) puo' ridipingere la vista a colori
+    piatti, un colore per materiale. Non restituisce colori esatti: bordi
+    sfumati e compressione sporcano i pixel. Ogni pixel va quindi al colore
+    richiesto piu' vicino, nero compreso (= «non assegnato»).
+    """
+
+    colore: str
+    etichetta: str
+    materiale_allplan: str = ""
+
+
+def zone_da_colori_richiesti(dati: bytes, richiesti: list[ColoreRichiesto],
+                             dimensioni: tuple[int, int] | None = None) -> list[Zona]:
+    """Le zone di una color map dipinta da un modello, una per colore richiesto.
+
+    Se `dimensioni` e' data (quelle della vista), l'immagine si riporta a
+    quella misura prima, senza sfumare: il modello rende spesso un'altra
+    risoluzione. Le zone restano apparenza, non modello (Trappole note).
+    """
+    immagine = Image.open(io.BytesIO(dati)).convert("RGB")
+    if dimensioni and immagine.size != tuple(dimensioni):
+        immagine = immagine.resize(tuple(dimensioni), Image.Resampling.NEAREST)
+    colori = [_rgb(NON_ASSEGNATO)] + [_rgb(voce.colore) for voce in richiesti]
+    tavola = Image.new("P", (1, 1))
+    piatta = [canale for colore in colori for canale in colore]
+    # Il resto della tavola ripete il nero, cosi' nessun pixel ci finisce per errore.
+    tavola.putpalette(piatta + piatta[:3] * (256 - len(colori)))  # numero-non-configurabile: voci di una tavolozza PIL
+    indici = immagine.quantize(palette=tavola, dither=Image.Dither.NONE)
+    zone = []
+    for posto, voce in enumerate(richiesti, start=1):
+        maschera = indici.point(lambda valore, voluto=posto: 255 if valore == voluto else 0, mode="L")  # numero-non-configurabile: bianco/nero di una maschera a 8 bit
+        uscita = io.BytesIO()
+        maschera.save(uscita, format="PNG")
+        zone.append(Zona(maschera=uscita.getvalue(), etichetta=voce.etichetta,
+                         materiale_allplan=voce.materiale_allplan))
+    return zone
+
+
 def _uguale_a(immagine: Image.Image, colore: tuple[int, int, int]) -> Image.Image:
     canali = [canale.point(lambda valore, voluto=voluto: 255 if valore == voluto else 0)  # numero-non-configurabile: bianco/nero di una maschera a 8 bit
               for canale, voluto in zip(immagine.split(), colore)]
