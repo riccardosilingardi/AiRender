@@ -486,6 +486,42 @@ class ProviderComfy(Provider):
             "--provider magnific, che pero' richiede un piano a crediti.",
         )
 
+    def fa_video(self) -> bool:
+        return True
+
+    def controlla_video(self, immagini) -> None:
+        """Chiave e peso di ogni immagine: quello che fermerebbe un video prima di mandarlo."""
+        self._assicura_chiave()
+        for dati in immagini:
+            self._assicura_peso(dati)
+
+    def genera_video(self, modello: str, corpo: dict, immagini: tuple[bytes, ...]) -> tuple[bytes, dict]:
+        """Un video dal Router: stesso protocollo di coda, attesa piu' lunga, mp4 scaricato.
+
+        Il corpo lo costruisce core/video.py dalla documentazione del modello;
+        qui si controllano chiave e peso delle immagini, si manda col fallback
+        spento e si scarica `content.video_url` (link firmato, scade).
+        """
+        self.controlla_video(immagini)
+        chiave_idempotenza = self._nuova_chiave_idempotenza()
+        uscita, dettagli = self._esegui(modello, corpo, chiave_idempotenza,
+                                        attesa_massima=config.VIDEO_ATTESA_MASSIMA_SECONDI)
+        try:
+            indirizzo = str(uscita["content"]["video_url"])
+        except (KeyError, TypeError):
+            raise ErroreProvider(
+                "Comfy Router ha chiuso il lavoro senza un video nel risultato.",
+                "Riprova. Se si ripete, e' cambiato lo schema del modello video.",
+            ) from None
+        video = self.trasporto.scarica(indirizzo)
+        if video[4:8] not in (b"ftyp", b"moov"):  # numero-non-configurabile: intestazione MP4/MOV
+            raise ErroreProvider(
+                f"{self.destinazione} ha mandato un file che non e' un video MP4.",
+                "Riprova. Se si ripete, e' cambiato lo schema del modello video.",
+            )
+        return video, {**dettagli, "chiave_idempotenza": chiave_idempotenza,
+                       "fallback_provider": FALLBACK}
+
     # --- dentro ---------------------------------------------------------------
 
     def _genera(self, richiesta: RichiestaGenerazione, avvisi_in_piu: list[str]) -> Risultato:
@@ -570,8 +606,10 @@ class ProviderComfy(Provider):
                 "sviluppo: lo schema si scrive in core/provider/comfy.py da li'.",
             ) from None
 
-    def _esegui(self, modello: str, corpo: dict, chiave_idempotenza: str) -> tuple[object, dict]:
+    def _esegui(self, modello: str, corpo: dict, chiave_idempotenza: str,
+                attesa_massima: float | None = None) -> tuple[object, dict]:
         """Coda del Router: invio, attesa rispettando Retry-After, risultato."""
+        massimo = config.ATTESA_MASSIMA_SECONDI if attesa_massima is None else attesa_massima
         query = urllib.parse.urlencode({"fallback_provider": FALLBACK})
         intestazioni = {
             INTESTAZIONE_CHIAVE: self.chiave,
@@ -602,12 +640,12 @@ class ProviderComfy(Provider):
         # Le letture portano la chiave ma non l'idempotenza: non spendono.
         lettura = {INTESTAZIONE_CHIAVE: self.chiave, "Accept": "application/json"}
         lavoro = f"{BASE}/{modello}/requests/{urllib.parse.quote(str(richiesta_id), safe='')}"
-        scadenza = self._orologio() + config.ATTESA_MASSIMA_SECONDI
+        scadenza = self._orologio() + massimo
 
         corpo_stato = inviata
         while (stato_router := self._stato_lavoro(corpo_stato, richiesta_id)) != STATO_FINITO:
             self._segnala(IN_LAVORAZIONE if stato_router == "IN_PROGRESS" else INVIATO)
-            self._aspetta(risposte, scadenza, richiesta_id)
+            self._aspetta(risposte, scadenza, richiesta_id, massimo)
             stato, risposte, corpo_stato = self._con_tentativi("GET", f"{lavoro}/status", lettura)
             if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
                 raise self._errore(stato, risposte, corpo_stato, modello)
@@ -616,7 +654,7 @@ class ProviderComfy(Provider):
         while True:
             stato, risposte, uscita = self._con_tentativi("GET", lavoro, lettura)
             if stato == ANCORA_IN_CORSO:
-                self._aspetta(risposte, scadenza, richiesta_id)
+                self._aspetta(risposte, scadenza, richiesta_id, massimo)
                 continue
             if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
                 raise self._errore(stato, risposte, uscita, modello)
@@ -660,14 +698,15 @@ class ProviderComfy(Provider):
             return stato, risposte, corpo_risposta
         raise AssertionError("non raggiungibile")  # il ciclo esce sempre con return o raise
 
-    def _aspetta(self, risposte: dict, scadenza: float, richiesta_id: str) -> None:
+    def _aspetta(self, risposte: dict, scadenza: float, richiesta_id: str,
+                 massimo: float | None = None) -> None:
         """Aspetta quanto chiede Retry-After. Se supera il tempo concesso, lo dice subito."""
         attesa = secondi_retry_after(risposte)
         attesa = config.INTERVALLO_ATTESA_SECONDI if attesa is None else attesa
         if self._orologio() + attesa > scadenza:
             raise ErroreProvider(
                 f"{self.destinazione} non ha finito entro "
-                f"{config.ATTESA_MASSIMA_SECONDI} secondi.",
+                f"{config.ATTESA_MASSIMA_SECONDI if massimo is None else massimo} secondi.",
                 "Il lavoro puo' essere ancora in corso sul Router, che conserva il "
                 f"risultato per 24 ore (richiesta {richiesta_id}): controlla i "
                 "crediti del workspace prima di rilanciare, cosi' non lo paghi "

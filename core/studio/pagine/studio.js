@@ -1,4 +1,4 @@
-// Lo Studio: Genera, Risultato, Passi, Ritocca.
+// Lo Studio: Genera, Risultato, Passi, Ritocca, Video.
 // Niente framework e niente CDN: deve funzionare offline. Lo stato sta in S,
 // render() ridisegna la schermata, le richieste passano da api().
 // Gli stati di ogni schermata sono quelli di DESIGN.md: vuoto, in corso,
@@ -44,6 +44,10 @@ const S = {
   // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
   ritocca: { da: null, strumento: "rettangolo", aree: [], modello: null, composto: null, errore: null,
              inviato: null, esito: null, x: 50 },
+  // Studio · Video: il catalogo letto dal server, come partire, i posti
+  // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
+  video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
+           durata: null, risoluzione: null, audio: false, secco: null, errore: null, caricando: false },
 };
 
 // --- attrezzi ---------------------------------------------------------------
@@ -1218,7 +1222,7 @@ function cambiaParte(l) {
     h("div", { classe: "azioni" },
       h("button", { classe: "btn", disabled: true }, "Cambia un materiale ", presto()),
       h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }) }, "Annota per aree"),
-      h("button", { classe: "btn", disabled: true }, "Fai un video da qui ", presto("Dopo la v1"))));
+      h("button", { classe: "btn", onclick: () => videoDa(l.identificativo) }, "Fai un video da qui")));
 }
 
 function schermataRisultato() {
@@ -2122,6 +2126,221 @@ function schermataPassi() {
 
 // --- disegno -------------------------------------------------------------------
 
+
+// --- Studio · Video ------------------------------------------------------------
+// Un video da uno o piu' render: si caricano o arrivano da Risultato. Il modello
+// e' Seedance 2.5 via Comfy Router, mai provato con una chiamata vera: lo si dice.
+
+let giroVideo = null;
+async function caricaVideo() {
+  const v = S.video;
+  try {
+    if (!v.catalogo) {
+      v.catalogo = await get("/api/video/catalogo");
+      v.durata = v.durata || v.catalogo.durate[0];
+      v.risoluzione = v.risoluzione || v.catalogo.risoluzioni[0];
+    }
+    v.voci = await get("/api/video");
+    v.caricato = true;
+  } catch (e) { v.errore = e; }
+  clearInterval(giroVideo);
+  if (v.voci.some((x) => x.stato === "in coda" || x.stato === "inviato")) {
+    giroVideo = setInterval(async () => {
+      if (S.scheda !== "video") return;
+      try { S.video.voci = await get("/api/video"); } catch (e) { return; }
+      if (!S.video.voci.some((x) => x.stato === "in coda" || x.stato === "inviato")) clearInterval(giroVideo);
+      render();
+    }, 3000);
+  }
+}
+
+function videoModo() { return S.video.catalogo && S.video.catalogo.modi.find((m) => m.id === S.video.modo); }
+
+function postiPer(modo, posti) {
+  const m = S.video.catalogo.modi.find((x) => x.id === modo);
+  const pieni = posti.filter(Boolean);
+  const quanti = Math.max(m.minimo, Math.min(m.massimo, pieni.length || 1));
+  return Array.from({ length: quanti }, (_, i) => pieni[i] || null);
+}
+
+async function videoDa(identificativo) {
+  location.hash = "#video";
+  await caricaVideo();
+  const v = S.video;
+  const voce = { render: identificativo };
+  const vuoto = v.posti.indexOf(null);
+  if (vuoto >= 0) v.posti[vuoto] = voce; else v.posti = [voce];
+  v.secco = null;
+  render();
+}
+
+function srcPosto(voce) {
+  if (!voce) return null;
+  return voce.render ? `/file/render/${enc(voce.render)}` : `/file/immagine-video/${enc(voce.caricata)}`;
+}
+
+function postoVideo(indice, titolo) {
+  const v = S.video;
+  const voce = v.posti[indice];
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", classe: "nascosto", "aria-label": `Carica un render: ${titolo}` });
+  file.addEventListener("change", async () => {
+    const scelto = file.files[0];
+    if (!scelto) return;
+    v.errore = null; v.caricando = true; render();
+    try {
+      const r = await post("/api/video/immagini", scelto, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(scelto.name) });
+      v.posti[indice] = { caricata: r.nome, da: r.da || scelto.name };
+      v.secco = null;
+    } catch (e) { v.errore = e; }
+    v.caricando = false;
+    render();
+  });
+  const togli = () => { v.posti[indice] = null; if (v.modo === "riferimenti" && v.posti.length > 1) v.posti.splice(indice, 1); v.secco = null; render(); };
+  return h("div", { classe: "posto-video" },
+    h("span", { classe: "etichetta" }, titolo),
+    voce ? h("img", { src: srcPosto(voce), alt: titolo }) : h("div", { classe: "posto-vuoto" }, "Nessuna immagine"),
+    voce ? h("span", { classe: "piccolo tenue" }, voce.render ? `Render ${voce.render}` : (voce.da || voce.caricata)) : null,
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn", onclick: () => file.click(), disabled: v.caricando }, voce ? "Cambia…" : "Carica un render…"),
+      voce ? h("button", { classe: "btn", onclick: togli }, "Togli") : null),
+    file);
+}
+
+function corpoVideo() {
+  const v = S.video;
+  return { immagini: v.posti.filter(Boolean), modo: v.modo, movimento: v.movimento, testo: v.testo,
+           durata: v.durata, risoluzione: v.risoluzione, audio: v.audio };
+}
+
+function motivoVideoSpento() {
+  const v = S.video;
+  const m = videoModo();
+  const pieni = v.posti.filter(Boolean).length;
+  if (!pieni) return "Carica il render da cui partire, oppure da Risultato premi Fai un video da qui.";
+  if (m && pieni < m.minimo) return `«${m.nome}» vuole ${m.minimo} immagini: ne manca ${m.minimo - pieni}.`;
+  if (!v.catalogo.fa_video) return "Il servizio scelto non fa video.";
+  if (v.voci.some((x) => x.stato === "in coda" || x.stato === "inviato")) return "Un video è già in lavorazione: aspetta che finisca o annullalo.";
+  return null;
+}
+
+async function provaASeccoVideo() {
+  S.video.errore = null;
+  try { S.video.secco = await post("/api/video/prova-a-secco", corpoVideo()); } catch (e) { S.video.errore = e; S.video.secco = null; }
+  render();
+}
+
+async function generaVideo() {
+  const v = S.video;
+  v.errore = null; v.secco = null;
+  try {
+    await post("/api/video/invia", { ...corpoVideo(), destinazione_mostrata: v.catalogo.destinazione });
+    await caricaVideo();
+  } catch (e) { v.errore = e; }
+  render();
+}
+
+async function annullaVideo(id) {
+  try { await post(`/api/video/${enc(id)}/annulla`, {}); await caricaVideo(); } catch (e) { S.video.errore = e; }
+  render();
+}
+
+function colonnaImmaginiVideo() {
+  const v = S.video;
+  const c = v.catalogo;
+  const m = videoModo();
+  const titoli = v.modo === "primo-ultimo" ? ["Primo fotogramma", "Ultimo fotogramma"]
+    : v.modo === "primo" ? ["Il render da cui parte"] : v.posti.map((_, i) => `Riferimento ${i + 1}`);
+  return h("div", { classe: "colonna-stile" },
+    h("section", { classe: "pannello", "aria-label": "Come partire" },
+      h("span", { classe: "etichetta" }, "Come partire"),
+      h("div", { classe: "switch", role: "group", "aria-label": "Come partire" },
+        c.modi.map((x) => h("button", { classe: "seg", "aria-pressed": String(v.modo === x.id),
+          onclick: () => { v.modo = x.id; v.posti = postiPer(x.id, v.posti); v.secco = null; render(); } }, x.nome))),
+      h("p", { classe: "tenue piccolo" }, m ? m.spiega : ""),
+      h("div", { classe: "posti-video" }, titoli.map((t, i) => postoVideo(i, t))),
+      v.modo === "riferimenti" && v.posti.length < m.massimo
+        ? h("div", { classe: "azioni" }, h("button", { classe: "btn", onclick: () => { v.posti.push(null); render(); } }, `Aggiungi un riferimento (fino a ${m.massimo})`))
+        : null,
+      h("p", { classe: "tenue piccolo" }, "JPEG o PNG, anche fatti fuori da AIRENDER. Il video prende la forma della prima immagine.")));
+}
+
+function colonnaInvioVideo() {
+  const v = S.video;
+  const c = v.catalogo;
+  const testo = h("textarea", { id: "testo-video", rows: "3", placeholder: "Per esempio: le luci delle finestre si accendono, passa qualche persona", "aria-label": "Cosa succede, a parole" }, v.testo);
+  testo.addEventListener("input", () => { v.testo = testo.value; v.secco = null; });
+  const audio = h("input", { type: "checkbox", checked: v.audio || null });
+  audio.addEventListener("change", () => { v.audio = audio.checked; v.secco = null; });
+  const spento = motivoVideoSpento();
+  const pieni = v.posti.filter(Boolean).length;
+  const invio = h("section", { classe: "pannello", "aria-label": "Invio del video" },
+    h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : `Le ${pieni || "immagini"} immagini vanno`} a `, h("b", {}, c.destinazione),
+      ` (${c.fornitore}, ${c.modello_nome})`, c.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
+    h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, c.costo)),
+    avviso("attenzione", c.avviso, "Il primo video è la prova: se va, lo segno come provato."));
+  if (!S.studio.coda_attiva) invio.append(avviso("attenzione", "La coda dei lavori non sta girando: il video resterebbe in attesa.", "Chiudi e riapri lo Studio, che la fa partire."));
+  invio.append(h("div", { classe: "azioni" },
+    h("button", { classe: "btn", onclick: provaASeccoVideo, disabled: !pieni }, "Prova a secco"),
+    h("button", { classe: "btn primario", onclick: generaVideo, disabled: !!spento }, "Genera video")));
+  if (spento) invio.append(h("p", { classe: "tenue piccolo" }, spento));
+  if (v.secco) {
+    const s = v.secco;
+    invio.append(h("div", { classe: "avviso" + (s.problemi.length ? " attenzione" : ""), role: "status" },
+      h("b", {}, "Prova a secco: non ho inviato niente."),
+      h("span", {}, `Partirebbero ${s.immagini} immagini verso ${s.destinazione}, ${s.caratteri} caratteri di prompt.`),
+      s.problemi.length
+        ? s.problemi.map((p) => h("span", {}, `Fermerebbe l'invio: ${p.fatto} `, h("span", { classe: "cosa-fare" }, p.cosa_fare)))
+        : h("span", {}, "Niente fermerebbe l'invio."),
+      s.prompt ? h("span", { classe: "mono piccolo" }, s.prompt) : null));
+  }
+  return h("div", { classe: "colonna-invio" },
+    h("section", { classe: "pannello", "aria-label": "Movimento" },
+      h("span", { classe: "etichetta" }, "Movimento della camera"),
+      h("div", { classe: "scelte-chip", role: "group", "aria-label": "Movimento della camera" },
+        c.movimenti.map((x) => h("button", { classe: "chip", "aria-pressed": String(v.movimento === x.id),
+          onclick: () => { v.movimento = x.id; v.secco = null; render(); } }, x.nome))),
+      h("span", { classe: "etichetta" }, "Cosa succede, a parole (facoltativo)"), testo,
+      h("span", { classe: "etichetta" }, "Durata"),
+      h("div", { classe: "switch", role: "group", "aria-label": "Durata" },
+        c.durate.map((d) => h("button", { classe: "seg", "aria-pressed": String(v.durata === d),
+          onclick: () => { v.durata = d; v.secco = null; render(); } }, `${d} secondi`))),
+      h("span", { classe: "etichetta" }, "Risoluzione"),
+      h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del video" },
+        c.risoluzioni.map((r) => h("button", { classe: "seg", "aria-pressed": String(v.risoluzione === r),
+          onclick: () => { v.risoluzione = r; v.secco = null; render(); } }, r))),
+      h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio (per un render d'architettura di solito non serve)")),
+      h("p", { classe: "tenue piccolo" }, "Durate, risoluzioni e audio spento sono scelte nostre, non misurate.")),
+    invio);
+}
+
+function voceVideo(x) {
+  const attivo = x.stato === "in coda" || x.stato === "inviato";
+  const righe = [
+    h("div", { classe: "riga tra" },
+      h("b", {}, `${x.movimento || "Video"} · ${x.durata || "?"} s · ${x.risoluzione || ""}`),
+      h("span", { classe: "tag-stato" }, x.stato)),
+    h("span", { classe: "piccolo tenue" }, `${x.modo} · ${x.immagini} ${x.immagini === 1 ? "immagine" : "immagini"} · ${data(x.aggiornato_il)}`),
+  ];
+  if (x.pronto) righe.push(h("video", { src: `/file/video/${enc(x.identificativo)}`, controls: true, preload: "metadata", classe: "lettore-video" }),
+    h("span", { classe: "piccolo tenue" }, x.crediti_usati !== null && x.crediti_usati !== undefined ? `Costo letto dal servizio: ${String(x.crediti_usati).replace(".", ",")} crediti` : "Costo: il servizio non l'ha detto"));
+  if (attivo) righe.push(h("span", { classe: "piccolo" }, x.stato === "in coda" ? "In coda: parte appena la coda lo prende." : "Seedance ci lavora: di solito qualche minuto. Lo Studio e Allplan restano liberi."),
+    x.stato === "in coda" ? h("div", { classe: "azioni" }, h("button", { classe: "btn", onclick: () => annullaVideo(x.identificativo) }, "Annulla")) : null);
+  if (x.stato === "errore") righe.push(avviso("errore", x.fatto || "Il video non è andato.", x.cosa_fare));
+  return h("div", { classe: "pannello voce-video" }, ...righe);
+}
+
+function schermataVideo() {
+  const v = S.video;
+  const sopra = v.errore ? [avviso("errore", v.errore.fatto, v.errore.cosa_fare)] : [];
+  if (!v.catalogo) return [h("h1", { classe: "nascosto" }, "Video"), ...sopra, h("p", { classe: "tenue" }, v.errore ? "" : "Apro la scheda Video…")];
+  return [h("h1", { classe: "nascosto" }, "Video"), ...sopra,
+    h("div", { classe: "colonne" }, colonnaImmaginiVideo(), colonnaInvioVideo()),
+    h("section", { classe: "pannello", "aria-label": "I video fatti" },
+      h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "I video fatti"),
+        h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "video" }).catch((e) => { v.errore = e; render(); }) }, "Apri la cartella dei video")),
+      v.voci.length ? h("div", { classe: "elenco-video" }, v.voci.map(voceVideo)) : h("p", { classe: "tenue" }, "Nessun video ancora."))];
+}
+
 function render() {
   disegnaTestata();
   const main = document.getElementById("principale");
@@ -2131,7 +2350,8 @@ function render() {
   }
   const attivo = document.activeElement && document.activeElement.id;
   const scorrimento = window.scrollY;
-  const contenuto = S.scheda === "risultato" ? schermataRisultato()
+  const contenuto = S.scheda === "video" ? schermataVideo()
+    : S.scheda === "risultato" ? schermataRisultato()
     : S.scheda === "passi" ? schermataPassi()
     : S.scheda === "ritocca" ? schermataRitocca() : schermataGenera();
   main.replaceChildren(...[contenuto].flat(2).filter(Boolean));
@@ -2143,7 +2363,7 @@ function render() {
 
 function leggiScheda() {
   const s = (location.hash || "#genera").slice(1);
-  S.scheda = ["genera", "risultato", "passi", "ritocca"].includes(s) ? s : "genera";
+  S.scheda = ["genera", "risultato", "passi", "ritocca", "video"].includes(s) ? s : "genera";
 }
 
 window.addEventListener("hashchange", async () => {
@@ -2151,6 +2371,7 @@ window.addEventListener("hashchange", async () => {
   if (S.scheda !== "genera" && S.vista) await caricaRender();
   if ((S.scheda === "passi" || S.scheda === "ritocca") && S.vista) await caricaPassi();
   if (S.scheda === "ritocca") await prontoRitocca();
+  if (S.scheda === "video") await caricaVideo();
   render();
   window.scrollTo(0, 0);
 });
@@ -2181,6 +2402,7 @@ async function avvia() {
     await caricaVista(vistaAttiva ? vistaAttiva.nome : (S.studio.viste[0] ? S.studio.viste[0].nome : null));
     if (attivo) seguiLavoro(attivo);
     if (S.scheda === "ritocca") { await caricaPassi(); await prontoRitocca(); }
+    if (S.scheda === "video") await caricaVideo();
     if (S.scheda === "passi") {
       const modelli = [...new Set((S.passi.dati ? S.passi.dati.passi : []).map((x) => x.modello).filter(Boolean))];
       await Promise.all(modelli.map(destinazioneDi));

@@ -42,7 +42,15 @@ Rotte:
     POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
     POST /api/ritocca/componi              il prompt di un ritocco (aree e note), prima di Applica
     POST /api/ritocca/invia                tutte le note in un invio sul render di un passo
-    POST /api/apri-cartella                apre viste o render nel sistema
+    POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
+    GET  /api/video/catalogo               modello, modi, movimenti, durate e dove va il video
+    GET  /api/video                        i video della cartella
+    GET  /file/video/<id>                  il video finito (mp4)
+    GET  /file/immagine-video/<nome>       un render caricato per un video
+    POST /api/video/immagini               carica un render per un video (corpo: i byte)
+    POST /api/video/prova-a-secco          tutto tranne l'invio del video
+    POST /api/video/invia                  mette il video in coda
+    POST /api/video/<id>/annulla           toglie un video che non e' ancora partito
 """
 
 from __future__ import annotations
@@ -170,6 +178,14 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._file(studio.percorso_riferimento(nome))
             case ["file", "contesto", nome]:
                 self._file(studio.percorso_contesto(nome))
+            case ["api", "video", "catalogo"]:
+                self._json(studio.catalogo_video())
+            case ["api", "video"]:
+                self._json(studio.video())
+            case ["file", "video", identificativo]:
+                self._file(studio.file_video(identificativo))
+            case ["file", "immagine-video", nome]:
+                self._file(studio.percorso_immagine_video(nome))
             case ["file", "miniatura", preset]:
                 self._file(studio.file_miniatura(preset))
             case _:
@@ -230,6 +246,14 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_ritocco(self._corpo_json()))
             case ["api", "ritocca", "invia"]:
                 self._json(studio.invia_ritocco(self._corpo_json()))
+            case ["api", "video", "immagini"]:
+                self._json(studio.carica_immagine_video(self._corpo(), self.headers.get("X-Nome-File", "")))
+            case ["api", "video", "prova-a-secco"]:
+                self._json(studio.prova_a_secco_video(self._corpo_json()))
+            case ["api", "video", "invia"]:
+                self._json(studio.invia_video(self._corpo_json()))
+            case ["api", "video", identificativo, "annulla"]:
+                self._json(studio.annulla_video(identificativo))
             case ["api", "apri-cartella"]:
                 self._json(studio.apri_cartella(str(self._corpo_json().get("quale", ""))))
             case _:

@@ -129,6 +129,22 @@ class Provider(ABC):
         partito per un'immagine rimasta a casa e' una bugia.
         """
 
+    def fa_video(self) -> bool:
+        """Se questo servizio sa fare un video (Studio · Video)."""
+        return False
+
+    def controlla_video(self, immagini) -> None:
+        """Cosa fermerebbe un video prima di mandarlo. Qui niente: genera_video rifiuta comunque."""
+
+    def genera_video(self, modello: str, corpo: dict, immagini: tuple[bytes, ...]) -> tuple[bytes, dict]:
+        """I byte del video e i dettagli dell'invio. Solo i servizi che fanno video."""
+        from ..errori import ErroreProvider  # pylint: disable=import-outside-toplevel
+
+        raise ErroreProvider(
+            f"{self.destinazione} non fa video.",
+            "I video passano da Comfy Router: scegli il servizio comfy.",
+        )
+
     @abstractmethod
     def genera(self, richiesta: RichiestaGenerazione) -> Risultato:
         """Genera partendo dalla vista come riferimento strutturale."""

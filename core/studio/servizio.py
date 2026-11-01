@@ -26,6 +26,7 @@ from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagi
 from .. import contesto as modulo_contesto
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
+from .. import video as modulo_video
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
@@ -1297,10 +1298,160 @@ class Studio:
 
     # --- cartella --------------------------------------------------------
 
+    # --- video (Studio · Video) -------------------------------------------
+
+    def catalogo_video(self) -> dict:
+        """Modello, modi, movimenti, durate e dove va: tutto quello che la scheda Video mostra prima del clic."""
+        motore = self._crea_provider(comfy.ProviderComfy.nome)
+        return {
+            "modello": modulo_video.MODELLO,
+            "modello_nome": modulo_video.NOME_MODELLO,
+            "fornitore": modulo_video.FORNITORE,
+            "destinazione": motore.destinazione_per(modulo_video.MODELLO),
+            "senza_ripiego": comfy.FALLBACK == "false",
+            "fa_video": motore.fa_video(),
+            "avviso": (f"{modulo_video.MODELLO} non e' ancora stato provato con una chiamata vera: "
+                       "questo video e' la prova. Se il servizio lo rifiuta, l'errore lo dice."),
+            "costo": "non misurato: nessun video e' ancora stato fatto",
+            "modi": [{"id": k, "nome": n, "spiega": d, "minimo": modulo_video.QUANTE[k][0],
+                      "massimo": modulo_video.QUANTE[k][1]} for k, (n, d) in modulo_video.MODI.items()],
+            "movimenti": [{"id": k, "nome": n} for k, (n, _testo) in modulo_video.MOVIMENTI.items()],
+            "durate": list(config.VIDEO_DURATE_SECONDI),
+            "risoluzioni": list(config.VIDEO_RISOLUZIONI),
+            "origine": config.SCELTA,
+        }
+
+    def carica_immagine_video(self, dati: bytes, nome_originale: str = "") -> dict:
+        """Un render caricato per un video: JPEG o PNG, sotto il peso che si manda al servizio."""
+        massimo = config.COMFY_INVIO_MASSIMO_MB
+        if len(dati) > massimo * _BYTE_PER_MB:
+            raise RichiestaStudioNonValida(
+                f"L'immagine pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
+                "Riducila o salvala in JPEG, poi caricala di nuovo.",
+            )
+        tipo = comfy.tipo_mime(dati)
+        if tipo not in ("image/png", "image/jpeg"):
+            raise RichiestaStudioNonValida("Per il video serve un JPEG o un PNG.",
+                                           "Salva il render in JPEG o PNG, poi caricalo di nuovo.")
+        larghezza, altezza = modulo_immagine.dimensioni(dati)
+        estensione = ".jpg" if tipo == "image/jpeg" else ".png"
+        nome = f"vid-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta bastano a non confondere due immagini
+        cartella = modulo_video.cartelle(self.cartella)[modulo_video.IMMAGINI]
+        if not (cartella / nome).exists():
+            modulo_coda.scrivi_atomico(cartella / nome, dati)
+        return {"nome": nome, "da": nome_originale, "larghezza": larghezza, "altezza": altezza}
+
+    def percorso_immagine_video(self, nome: str) -> Path:
+        if not re.fullmatch(r"vid-[0-9a-f]{16}\.(jpg|png)", nome or ""):
+            raise RichiestaStudioNonValida(f"\"{nome}\" non e' un'immagine caricata per un video.",
+                                           "Caricala di nuovo con «Carica un render…».")
+        percorso = modulo_video.cartelle(self.cartella)[modulo_video.IMMAGINI] / nome
+        if not percorso.is_file():
+            raise FileNonTrovato(f"L'immagine {nome} non c'e' piu'.", "Caricala di nuovo.")
+        return percorso
+
+    def _immagine_video(self, voce: object) -> Path:
+        """Un posto della scheda Video: un render dello Studio o un'immagine caricata."""
+        if isinstance(voce, dict) and voce.get("render"):
+            return self.file_render(str(voce["render"]))
+        if isinstance(voce, dict) and voce.get("caricata"):
+            return self.percorso_immagine_video(str(voce["caricata"]))
+        raise RichiestaStudioNonValida("Un posto della scheda Video e' vuoto.",
+                                       "Carica un render, oppure togli il posto vuoto.")
+
+    def _richiesta_video(self, dati: dict) -> tuple[list[Path], dict]:
+        immagini = [self._immagine_video(v) for v in (dati.get("immagini") or [])]
+        try:
+            durata = int(dati.get("durata") or config.VIDEO_DURATE_SECONDI[0])
+        except (TypeError, ValueError):
+            durata = -1
+        scelte = {
+            "modo": str(dati.get("modo") or "primo"),
+            "movimento": str(dati.get("movimento") or "avanza"),
+            "testo": str(dati.get("testo") or ""),
+            "durata": durata,
+            "risoluzione": str(dati.get("risoluzione") or config.VIDEO_RISOLUZIONI[0]),
+            "audio": bool(dati.get("audio")),
+        }
+        return immagini, scelte
+
+    def prova_a_secco_video(self, dati: dict) -> dict:
+        """Cosa partirebbe e cosa lo fermerebbe, senza mandare."""
+        problemi = []
+        catalogo = self.catalogo_video()
+        prompt, quante = "", 0
+        try:
+            immagini, scelte = self._richiesta_video(dati)
+            quante = len(immagini)
+            richiesta = modulo_video.RichiestaVideo(identificativo="prova", immagini=tuple(map(str, immagini)), **scelte)
+            prompt = richiesta.prompt()
+            motore = self._crea_provider(comfy.ProviderComfy.nome)
+            motore.controlla_video([percorso.read_bytes() for percorso in immagini])
+            if not catalogo["fa_video"]:
+                problemi.append({"fatto": f"{motore.destinazione} non fa video.", "cosa_fare": "Usa il servizio comfy."})
+        except ErroreAirender as errore:
+            problemi.append(_errore_dict(errore))
+        if not self._coda_attiva():
+            problemi.append(_CODA_FERMA)
+        return {"inviato": False, "prompt": prompt, "caratteri": len(prompt), "immagini": quante,
+                "destinazione": catalogo["destinazione"], "problemi": problemi}
+
+    def invia_video(self, dati: dict) -> dict:
+        """Mette un video in coda. Solo se la destinazione e' quella che la pagina ha mostrato (regola 5)."""
+        catalogo = self.catalogo_video()
+        if dati.get("destinazione_mostrata") != catalogo["destinazione"]:
+            raise RichiestaStudioNonValida(
+                f"La pagina ha mostrato come destinazione {dati.get('destinazione_mostrata')!r}, ma le "
+                f"immagini partirebbero verso {catalogo['destinazione']}. Non ho inviato niente.",
+                "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
+            )
+        immagini, scelte = self._richiesta_video(dati)
+        richiesta = modulo_video.metti_in_coda(self.cartella, immagini, **scelte)
+        return {"identificativo": richiesta.identificativo, "destinazione": catalogo["destinazione"],
+                "coda_attiva": self._coda_attiva()}
+
+    def video(self) -> list[dict]:
+        """I video della cartella, il piu' recente per primo, come li mostra la scheda."""
+        voci = []
+        for voce in modulo_video.elenco(self.cartella):
+            richiesta = voce.get("richiesta") or {}
+            voci.append({
+                "identificativo": voce.get("identificativo"),
+                "stato": voce.get("stato"),
+                "aggiornato_il": voce.get("aggiornato_il"),
+                "fatto": voce.get("fatto"),
+                "cosa_fare": voce.get("cosa_fare"),
+                "pronto": voce.get("stato") == modulo_video.FATTO and bool(voce.get("video")),
+                "crediti_usati": voce.get("crediti_usati"),
+                "modo": modulo_video.MODI.get(richiesta.get("modo"), ("",))[0],
+                "movimento": modulo_video.MOVIMENTI.get(richiesta.get("movimento"), ("",))[0],
+                "durata": richiesta.get("durata"),
+                "risoluzione": richiesta.get("risoluzione"),
+                "immagini": len(richiesta.get("immagini") or []),
+            })
+        return voci
+
+    def file_video(self, identificativo: str) -> Path:
+        if not re.fullmatch(r"[0-9A-Za-z-]+", identificativo or ""):
+            raise RichiestaStudioNonValida("Questo video non esiste.", "Ricarica la scheda Video.")
+        percorso = modulo_video.cartelle(self.cartella)["video"] / f"{identificativo}.mp4"
+        if not percorso.is_file():
+            raise FileNonTrovato(f"Il video {identificativo} non c'e' nella cartella video.",
+                                 "Forse e' ancora in lavorazione, o e' stato spostato.")
+        return percorso
+
+    def annulla_video(self, identificativo: str) -> dict:
+        if modulo_video.annulla(self.cartella, identificativo):
+            return {"annullato": True}
+        raise RichiestaStudioNonValida("Il video e' gia' partito: il servizio lo fa comunque.",
+                                       "Aspetta che finisca; il costo e' gia' preso.")
+
     def apri_cartella(self, quale: str) -> dict:
         if quale == "esportati":
             percorso = self.cartella_esportati()
             percorso.mkdir(parents=True, exist_ok=True)
+        elif quale == "video":
+            percorso = modulo_video.cartelle(self.cartella)["video"]
         else:
             percorso = self.percorsi[modulo_coda.FATTO_DIR] if quale == "render" else self.cartella
         try:

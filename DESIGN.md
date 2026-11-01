@@ -623,6 +623,55 @@ Alla grandezza del render, senza ingrandire.
 
 Nel file non entrano prompt, ricetta o chiave: si riscrivono solo i pixel.
 
+## Studio · Video, costruita il 2026-11-01
+
+Decisione di Riccardo (2026-10-31): «I video li voglio che possa caricare i
+render fatti e costruirlo da quelle», con Seedance, l'ultimo modello. La scheda
+Video della rotaia si accende. Il modello è `byteplus/dreamina-seedance-2-5-260628`
+(Seedance 2.5) attraverso Comfy Router, preso dalla documentazione del Router e
+mai provato con una chiamata vera: lo si dice prima di ogni invio.
+
+**Colonna sinistra: le immagini**
+- **Come partire**, tre scelte:
+  - **Da un render**: il video comincia dal render e la camera si muove.
+  - **Da un render a un altro**: primo e ultimo fotogramma, per esempio
+    lo stesso edificio di giorno e di notte, o due punti di vista.
+  - **Più render come riferimento**, fino a 4: il modello li usa come
+    riferimento dell'edificio, ma non parte da nessuno di loro. È la scelta
+    che tiene meno la geometria, e lo dice.
+- Ogni posto si riempie con **Carica un render…** (JPEG o PNG, anche fatti
+  fuori da AIRENDER) oppure arriva già pieno da Risultato › **Fai un video da
+  qui**.
+- Il video prende la forma della prima immagine: con un primo fotogramma il
+  modello non accetta un altro formato.
+
+**Colonna destra: il movimento e l'invio**
+- **Movimento della camera**: Avanza piano, Gira attorno, Panoramica, Sale
+  come un drone, Camera ferma (si muovono solo luce, nuvole e persone). Più
+  **Cosa succede, a parole** (facoltativo).
+- **Durata** 5 o 10 secondi, **Risoluzione** 720p o 1080p, **Audio** spento
+  (si accende a mano: per un render d'architettura di solito non serve).
+- **Dove va**, prima del clic (regola 5): «Le immagini vanno a Comfy Router
+  (api.comfy.org) → byteplus/dreamina-seedance-2-5-260628 (ByteDance,
+  Seedance 2.5), senza ripiego su altri servizi», quante immagini partono, e
+  il costo «non misurato».
+- **Prova a secco** e **Genera video**.
+
+**I video fatti**, sotto: ognuno col suo lettore, le immagini da cui è nato,
+durata, risoluzione e costo letto dal servizio; **Apri la cartella dei video**.
+
+- **Vuoto:** nessuna immagine scelta: «Carica il render da cui partire, oppure
+  da Risultato premi Fai un video da qui.» Genera video è spento con la
+  ragione accanto. Nessun video fatto: «Nessun video ancora.»
+- **In corso:** il video in lavorazione in cima all'elenco con stato e tempo
+  («Seedance di solito ci mette qualche minuto»), Annulla finché non è
+  partito. Lo Studio e Allplan restano liberi; le immagini scelte restano.
+- **Errore:** la frase del motore (servizio, chiave, crediti, tempo scaduto)
+  con cosa fare, sul video fallito. Un'immagine troppo pesante o che non è un
+  JPEG/PNG si rifiuta al caricamento, non al clic.
+- **Pieno:** le immagini scelte, il movimento, Dove va e Genera video acceso;
+  sotto, i video fatti, il più recente per primo.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -674,6 +723,6 @@ contraddicono le nuove, valgono le nuove:
 
 - Schermata di configurazione della chiave API e del tetto di spesa (nello
   Studio c'è solo il segnaposto in grigio).
-- Qualunque cosa riguardi il video.
+- Il video oltre la scheda Video: montare più video, musica, titoli.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.

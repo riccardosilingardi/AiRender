@@ -694,3 +694,53 @@ ESPORTA_QUALITA_JPEG = _registra(Costante(
         "esatti sceglie PNG o PSD. Non confrontata a occhio su un render vero."
     ),
 ))
+
+# --- video (Studio · Video, 2026-11-01) --------------------------------------
+
+VIDEO_DURATE_SECONDI = _registra(Costante(
+    nome="VIDEO_DURATE_SECONDI",
+    valore=(5, 10),
+    origine=SCELTA,
+    ragione=(
+        "Le durate offerte nella scheda Video. Seedance 2.5 accetta da 4 a 30 "
+        "secondi (documentazione del Router); 5 e 10 bastano per un giro "
+        "attorno a un edificio e costano meno di un video lungo. Costo non "
+        "misurato: lo dira' il primo video."
+    ),
+    unita=" s",
+))
+
+VIDEO_RISOLUZIONI = _registra(Costante(
+    nome="VIDEO_RISOLUZIONI",
+    valore=("720p", "1080p"),
+    origine=SCELTA,
+    ragione=(
+        "Le risoluzioni offerte. Seedance 2.5 fa 480p, 720p e 1080p: 480p e' "
+        "troppo poco per mostrare un progetto; 720p e' il predefinito del "
+        "servizio e costa meno."
+    ),
+))
+
+VIDEO_RIFERIMENTI_MASSIMI = _registra(Costante(
+    nome="VIDEO_RIFERIMENTI_MASSIMI",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quanti render al massimo in «Piu' render come riferimento». Il "
+        "servizio non dichiara un limite chiaro per Seedance 2.5; 4 viste "
+        "dello stesso edificio bastano a descriverlo e tengono l'invio sotto "
+        "il peso massimo."
+    ),
+))
+
+VIDEO_ATTESA_MASSIMA_SECONDI = _registra(Costante(
+    nome="VIDEO_ATTESA_MASSIMA_SECONDI",
+    valore=1200,
+    origine=SCELTA,
+    ragione=(
+        "Tempo concesso a un video prima di dichiararlo non riuscito. Un video "
+        "ci mette minuti, non secondi (ATTESA_MASSIMA_SECONDI vale per le "
+        "immagini). Non misurato: nessun video e' ancora stato fatto."
+    ),
+    unita=" s",
+))
