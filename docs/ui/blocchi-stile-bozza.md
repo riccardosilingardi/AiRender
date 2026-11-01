@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 7 (2026-10-31)
+# Blocchi di stile — bozza 8 (2026-11-01)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -57,7 +57,7 @@ Ordine con una resa: regola fissa → scena → materiali (se la resa non li spe
 
 ## Ordine nel prompt
 
-Regola fissa (secondo la Fedeltà al disegno) → **Scena** (esterno o interno, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
+Regola fissa (secondo la Fedeltà al disegno) → **Scena** (esterno, interno o arredo, dallo switch) → **Materiali** (dell'utente) → Look → Luce → Cielo (esterni) oppure Fuori dalle finestre + Arredo (interni) oppure Sfondo (arredo) → Intorno → Verde (esterni) → Persone → Qualità → Cosa evitare.
 
 Un **passo** fatto su un render già generato (albero dei passi, piano «catena» del banco di prova) non rimanda tutto: regola fissa → scena → solo gli assi che cambiano → cosa evitare.
 
@@ -85,6 +85,7 @@ Esempio di materiali scritti dall'utente e tradotti:
 |---|---|---|---|
 | `esterno` | Esterno (dallo switch) | The subject is a building exterior. | 35 |
 | `interno` | Interno (dallo switch) | The subject is an interior space. | 33 |
+| `prodotto` | Arredo (dallo switch, bozza 8) | The subject is a single piece of designer furniture, photographed as a product; the room around it is not part of the design. | 125 |
 
 ## Look fotografico
 
@@ -203,6 +204,94 @@ Lunghezza misurata del prompt composto senza testo dell'utente. La skill indica 
 | Interno sera | Leica SL2 · neutro profondo | Sera, luci accese | Fuori: città | Nessuna | 835 |
 | Interno notte, lampade | Leica SL2 · neutro profondo | Notte con lampade | Fuori dalle finestre: neutro | Nessuna | 804 |
 | Interno vissuto | Fujifilm X100V · analogico 35mm | Pomeriggio caldo | Fuori: verde | In movimento | 925 |
+
+## Arredo come prodotto (bozza 8, 2026-11-01)
+
+Cosa cambia dalla bozza 7: oltre a Esterno e Interno c'è una terza scena, **Arredo**, per un pezzo d'arredo da solo che il designer vuole valorizzare come prodotto: sfondo neutro da studio, luce da still life, primo piano. Richiesta di Riccardo del 2026-11-01. Nella prompt library di Notion non c'è niente di adatto (sono tutti prompt di architettura), quindi i blocchi sono scritti da zero con lo schema della skill architectural-prompt-enhancer: fotocamera e ottica, luce con la sua qualità, materiali con la loro grana. Nessuno è provato con il modello.
+
+Nel codice l'identificativo della scena è `prodotto`, perché `arredo` è già l'asse degli oggetti negli interni.
+
+Cosa vale per questa scena:
+
+- **Regola fissa propria**: da preservare è il pezzo, non l'architettura, e lo sfondo può cambiare. Stessi tre gradi della Fedeltà al disegno, stessi nomi.
+- **Look, Luce e Qualità propri** (Qualità dice «furniture product photography» invece di «architectural photography»). Il look riprende Leica, GFX e Portra 160 dagli esterni.
+- **Sfondo** è l'asse nuovo della scena, al posto di cielo/intorno/verde e di fuori dalle finestre/arredo. Prende il posto di tutto quello che non è il pezzo; «Come nella vista» tiene la stanza di Allplan.
+- **Persone** non c'è: un prodotto si fotografa da solo.
+- **Cosa evitare proprio**, con gambe deformate, proporzioni cambiate e oggetti di scena aggiunti.
+- Il **primo piano** non è un blocco: la regola fissa tiene l'inquadratura, quindi lo dà la vista salvata in Allplan. La profondità di campo invece sì (look Macro 100mm), perché non sposta niente.
+- La resa **Plastico bianco** spegne anche lo sfondo: ha già il suo fondo grigio.
+
+### Scena
+
+Nella tabella «Scena» più sotto, riga `prodotto`.
+
+### Fedeltà al disegno · arredo
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `rigida` | Rigida | Edit this exact image. Keep the camera, framing and the furniture piece exactly as it is: same shape, proportions, joints and details; do not add, remove or reshape any part of it. Change only the look and the background described below. Match the drawing strictly: same silhouette, same number and position of legs, panels, cushions and handles; if in doubt, change less. | 372 |
+| `bilanciata` | Bilanciata | Edit this exact image. Keep the camera, framing and the furniture piece exactly as it is: same shape, proportions, joints and details; do not add, remove or reshape any part of it. Change only the look and the background described below. | 237 |
+| `libera` | Libera | Edit this image. Keep the camera, framing and the furniture piece's shape and proportions; you may refine materials and add plausible details such as seams, stitching, edge profiles and fixings. Change the look and the background described below. | 246 |
+
+### Look fotografico · arredo
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `hasselblad` | Hasselblad H6D · catalogo | Hasselblad H6D-100c product photograph, 120mm lens at f/11: true-to-life neutral colour, edge-to-edge sharpness, accurate material textures, clean highlights, no lens distortion. | 178 |
+| `phaseone` | Phase One · editoriale design | Phase One IQ4 editorial still life, 80mm lens: rich tonal depth, refined micro-contrast, restrained slightly warm colour, design magazine furniture photography. | 160 |
+| `macro` | Macro 100mm · dettaglio | Canon EOS R5 with 100mm macro lens at f/4: shallow depth of field with focus on the material and the joints, soft creamy falloff, tactile wood grain, fabric weave and metal finish. | 180 |
+| `leica` | Leica SL2 · neutro profondo | Leica SL2 full-frame photograph: rich tonal depth, refined micro-contrast, restrained warm colour, smooth highlight roll-off, detailed shadows, tactile textures. | 161 |
+| `gfx` | Fujifilm GFX100S · caldo naturale | Fujifilm GFX100S photograph: warm natural colour, earthy muted tones, softly luminous highlights, deep but detailed shadows, gentle contrast, olive greens, pale blues. | 167 |
+| `portra160` | Kodak Portra 160 · morbido | Kodak Portra 160 film colour: soft and restrained, slightly warm neutrals, cream highlights, muted greens, moderate elegant contrast, fine grain, gentle pastel midtones. | 169 |
+
+### Luce · arredo
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `softbox` | Softbox morbida | Large overhead softbox and two side softboxes: soft even studio light, gentle wraparound highlights, a soft contact shadow under the piece, no hard shadows. | 156 |
+| `finestra` | Finestra laterale | Soft directional daylight from a large window on one side: gentle gradient across the piece, soft shadow falling away from the light, natural modelling of the volumes. | 167 |
+| `radente` | Luce radente · texture | Low raking light from one side grazing the surfaces: it reveals wood grain, fabric weave and stitching, defined but soft shadows. | 129 |
+| `sole` | Sole netto · editoriale | Hard late-afternoon sunlight through a window: crisp graphic shadows of the piece and of the window frame on floor and wall, warm tone. | 135 |
+| `controluce` | Controluce, bordi accesi | Low-key studio light: a strong rim light from behind outlining the silhouette, a dim soft fill from the front, deep shadows, glowing edges. | 139 |
+
+### Sfondo · arredo
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `bianco` | Fondo bianco infinito | Background: a seamless pure white studio sweep as wall and floor, no horizon line; replace everything around the piece with it. | 127 |
+| `grigio` | Fondo grigio caldo | Background: a seamless matte warm light grey studio sweep as wall and floor, no horizon line; replace everything around the piece with it. | 138 |
+| `calce` | Parete in calce | Background: a plain wall in matte off-white lime plaster with a subtle troweled texture and a pale smooth concrete floor; nothing else around the piece. | 152 |
+| `scuro` | Fondo antracite | Background: a seamless matte charcoal studio backdrop as wall and floor, no horizon line; replace everything around the piece with it. | 134 |
+| `vista` | Come nella vista | Background: keep the wall and the floor as they are in the view; only refine their materials and light. | 103 |
+| `ambiente` | Stanza sfocata | Background: a softly out-of-focus minimal living room behind the piece, neutral tones, nothing in front of it; do not cover or hide any part of the piece. | 154 |
+
+### Qualità · arredo
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `base` | Base | Professional furniture product photography, natural detail. | 59 |
+| `32k` | Altissima definizione (da provare) | Professional furniture product photography, 32k, ultra-detailed, design magazine quality. | 89 |
+
+### Cosa evitare · arredo
+
+> Avoid: CGI or plastic look, warped or extra legs, changed proportions, added props or decor, HDR, oversharpening, clipped highlights, crushed blacks.
+
+### Preset arredo
+
+I prompt sono più lunghi di quelli architettonici (1010-1065 caratteri): la regola fissa dell'arredo è più lunga, perché deve dire che lo sfondo può cambiare. Da verificare con il banco di prova.
+
+| Preset | Look | Luce | Sfondo | Caratteri |
+|---|---|---|---|---|
+| Catalogo, fondo bianco | Hasselblad H6D · catalogo | Softbox morbida | Fondo bianco infinito | 1037 |
+| Studio, grigio caldo | Hasselblad H6D · catalogo | Finestra laterale | Fondo grigio caldo | 1059 |
+| Editoriale, ombre di sole | Phase One · editoriale design | Sole netto · editoriale | Parete in calce | 1023 |
+| Dettaglio materiale | Macro 100mm · dettaglio | Luce radente · texture | Fondo grigio caldo | 1023 |
+| Controluce, fondo scuro | Leica SL2 · neutro profondo | Controluce, bordi accesi | Fondo antracite | 1010 |
+| Ambientato, stanza sfocata | Fujifilm GFX100S · caldo naturale | Finestra laterale | Stanza sfocata | 1064 |
+
+### Esempio intero: arredo + materiali + Dettaglio materiale
+
+> Edit this exact image. Keep the camera, framing and the furniture piece exactly as it is: same shape, proportions, joints and details; do not add, remove or reshape any part of it. Change only the look and the background described below. The subject is a single piece of designer furniture, photographed as a product; the room around it is not part of the design. Materials: natural oak frame, cognac leather seat. Canon EOS R5 with 100mm macro lens at f/4: shallow depth of field with focus on the material and the joints, soft creamy falloff, tactile wood grain, fabric weave and metal finish. Low raking light from one side grazing the surfaces: it reveals wood grain, fabric weave and stitching, defined but soft shadows. Background: a seamless matte warm light grey studio sweep as wall and floor, no horizon line; replace everything around the piece with it. Professional furniture product photography, natural detail. Avoid: CGI or plastic look, warped or extra legs, changed proportions, added props or decor, HDR, oversharpening, clipped highlights, crushed blacks.
 
 ## 16k / 32k
 

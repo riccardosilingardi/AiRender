@@ -113,7 +113,9 @@ SCRIPT_2026 = "airender\\AirenderPalette.py"
 
 def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
         generato_da: str = "allplan/v2026/scrivi_palette_pyp.py") -> str:
-    esterno, interno = "Interno == 0", "Interno == 1"
+    # «Interno» e' il gruppo della scena: 0 esterno, 1 interno, 2 arredo. Il
+    # nome resta quello della v1, cosi' i valori salvati in Allplan valgono.
+    esterno, interno, arredo = "Interno == 0", "Interno == 1", "Interno == 2"
     parametri = [
         _nascosto("ImmaginiDaScript", "Integer", "0"),
         _nascosto("InCorso", "Integer", "0"),
@@ -133,15 +135,18 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
         _espansore(
             "Sezione2", "2 · Stile",
             _scelta("Resa", "Resa"),
-            _radio("Interno", "Vista", ["Esterno", "Interno"]),
+            _radio("Interno", "Vista", ["Esterno", "Interno", "Arredo"]),
             _scelta("PresetEsterno", "Preset", esterno),
             _scelta("PresetInterno", "Preset", interno),
+            _scelta("PresetArredo", "Preset", arredo),
             _scelta("LuceEsterno", "Ora", esterno),
             _scelta("LuceInterno", "Luce", interno),
+            _scelta("LuceArredo", "Luce", arredo),
+            _scelta("Sfondo", "Sfondo", arredo),
             _scelta("Cielo", "Cielo", esterno),
             _scelta("Intorno", "Intorno", esterno),
             _scelta("Verde", "Verde, alberi", esterno),
-            _scelta("Persone", "Persone"),
+            _scelta("Persone", "Persone", "Interno != 2"),
             _scelta("Fedelta", "Fedeltà al disegno"),
             _parametro("Materiali", "String", "Materiali", ""),
             _scelta("Modello", "Modello"),

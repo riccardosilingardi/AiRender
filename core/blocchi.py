@@ -16,8 +16,8 @@ blocco per blocco.
 
 L'ordine nel prompt e' fisso (PRD, sezione 5, riga del 2026-10-27):
 regola fissa -> scena -> materiali -> look -> luce -> cielo (esterni) oppure
-fuori dalle finestre + arredo (interni) -> intorno -> verde (esterni) ->
-persone -> qualita' -> cosa evitare.
+fuori dalle finestre + arredo (interni) oppure sfondo (arredo come prodotto,
+bozza 8) -> intorno -> verde (esterni) -> persone -> qualita' -> cosa evitare.
 
 Un blocco che aggiunge qualcosa all'immagine (contesto, verde, persone,
 oggetti) dice anche cosa non toccare: finisce con NON_COPRIRE. Senza, un
@@ -37,11 +37,16 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-7"
+VERSIONE = "bozza-8"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
-SCENE = (ESTERNO, INTERNO)
+# Un pezzo d'arredo da solo, fotografato come un prodotto (bozza 8, richiesta
+# di Riccardo del 2026-11-01): sfondo neutro da studio, primo piano. Il nome
+# per l'utente e' «Arredo»; l'identificativo e' «prodotto» perche' «arredo» e'
+# gia' l'asse degli oggetti negli interni.
+PRODOTTO = "prodotto"
+SCENE = (ESTERNO, INTERNO, PRODOTTO)
 
 
 class SceltaNonValida(ErroreAirender):
@@ -103,6 +108,27 @@ FEDELTA = _blocchi(
      "change the building's shape. Change the look described below."),
 )
 
+# La regola fissa di un pezzo d'arredo (bozza 8): da preservare e' il pezzo,
+# non l'architettura, e lo sfondo puo' cambiare. Stessi tre gradi, stessi nomi.
+FEDELTA_PRODOTTO = _blocchi(
+    ("rigida", "Rigida",
+     "Edit this exact image. Keep the camera, framing and the furniture piece "
+     "exactly as it is: same shape, proportions, joints and details; do not add, "
+     "remove or reshape any part of it. Change only the look and the background "
+     "described below. Match the drawing strictly: same silhouette, same number "
+     "and position of legs, panels, cushions and handles; if in doubt, change less."),
+    ("bilanciata", "Bilanciata",
+     "Edit this exact image. Keep the camera, framing and the furniture piece "
+     "exactly as it is: same shape, proportions, joints and details; do not add, "
+     "remove or reshape any part of it. Change only the look and the background "
+     "described below."),
+    ("libera", "Libera",
+     "Edit this image. Keep the camera, framing and the furniture piece's shape "
+     "and proportions; you may refine materials and add plausible details such "
+     "as seams, stitching, edge profiles and fixings. Change the look and the "
+     "background described below."),
+)
+
 # SCELTA: e' la regola con cui sono stati fatti tutti i render fino al
 # 2026-10-31. Cambia solo se il piano «fedelta» del banco dice che un'altra
 # tiene meglio la geometria senza perdere resa.
@@ -147,7 +173,7 @@ NOMI_RESE = {FOTO: "Fotorealistico", **{i: b.nome for i, b in RESA.items()}}
 # bianco o uno schizzo senza colore le contraddirebbero.
 SPENTI_DA_RESA = {
     FOTO: frozenset(),
-    "plastico": frozenset({"materiali", "look", "luce", "cielo", "fuori", "intorno", "verde", "persone", "qualita"}),
+    "plastico": frozenset({"materiali", "look", "luce", "cielo", "fuori", "intorno", "verde", "sfondo", "persone", "qualita"}),
     "schizzo": frozenset({"materiali", "look", "cielo", "qualita"}),
     "acquerello": frozenset({"look", "qualita"}),
     "cinema": frozenset({"look", "qualita"}),
@@ -180,13 +206,18 @@ def spenti(scelte: "Scelte") -> frozenset[str]:
     return SPENTI_DA_RESA[resa_valida(scelte.resa)]
 
 
-def _evitare(resa: str) -> Blocco:
+def _evitare(resa: str, scena: str = ESTERNO) -> Blocco:
+    if resa == FOTO and scena == PRODOTTO:
+        return COSA_EVITARE_PRODOTTO
     return EVITARE_DA_RESA.get(f"evitare-{resa}", COSA_EVITARE)
 
 
 SCENA = _blocchi(
     (ESTERNO, "Esterno", "The subject is a building exterior."),
     (INTERNO, "Interno", "The subject is an interior space."),
+    (PRODOTTO, "Arredo",
+     "The subject is a single piece of designer furniture, photographed as a "
+     "product; the room around it is not part of the design."),
 )
 
 LOOK = _blocchi(
@@ -335,6 +366,96 @@ ARREDO = {
     )),
 }
 
+# --- arredo come prodotto (bozza 8) ---------------------------------------------
+
+# Un pezzo solo, da catalogo o da rivista di design. Scritti con lo schema
+# dell'Arch prompt enhancer (fotocamera e ottica, luce con la sua qualita',
+# materiali con la loro grana), non presi da Notion: la prompt library di
+# Riccardo non ha prompt per un prodotto. Il primo piano non e' un blocco: la
+# regola fissa tiene l'inquadratura, quindi lo da' la vista di Allplan. La
+# profondita' di campo invece si', perche' non sposta niente.
+LOOK_PRODOTTO = {
+    **_blocchi(
+        ("hasselblad", "Hasselblad H6D · catalogo",
+         "Hasselblad H6D-100c product photograph, 120mm lens at f/11: true-to-life "
+         "neutral colour, edge-to-edge sharpness, accurate material textures, clean "
+         "highlights, no lens distortion."),
+        ("phaseone", "Phase One · editoriale design",
+         "Phase One IQ4 editorial still life, 80mm lens: rich tonal depth, refined "
+         "micro-contrast, restrained slightly warm colour, design magazine "
+         "furniture photography."),
+        ("macro", "Macro 100mm · dettaglio",
+         "Canon EOS R5 with 100mm macro lens at f/4: shallow depth of field with "
+         "focus on the material and the joints, soft creamy falloff, tactile wood "
+         "grain, fabric weave and metal finish."),
+    ),
+    **{i: LOOK[i] for i in ("leica", "gfx", "portra160")},
+}
+
+LUCE_PRODOTTO = _blocchi(
+    ("softbox", "Softbox morbida",
+     "Large overhead softbox and two side softboxes: soft even studio light, "
+     "gentle wraparound highlights, a soft contact shadow under the piece, no "
+     "hard shadows."),
+    ("finestra", "Finestra laterale",
+     "Soft directional daylight from a large window on one side: gentle "
+     "gradient across the piece, soft shadow falling away from the light, "
+     "natural modelling of the volumes."),
+    ("radente", "Luce radente · texture",
+     "Low raking light from one side grazing the surfaces: it reveals wood "
+     "grain, fabric weave and stitching, defined but soft shadows."),
+    ("sole", "Sole netto · editoriale",
+     "Hard late-afternoon sunlight through a window: crisp graphic shadows of "
+     "the piece and of the window frame on floor and wall, warm tone."),
+    ("controluce", "Controluce, bordi accesi",
+     "Low-key studio light: a strong rim light from behind outlining the "
+     "silhouette, a dim soft fill from the front, deep shadows, glowing edges."),
+)
+
+# Lo sfondo prende il posto di tutto quello che non e' il pezzo: la scena lo
+# dice («the room around it is not part of the design»). «Come nella vista»
+# serve quando in Allplan la stanza c'e' e va tenuta.
+SFONDO = {
+    **_blocchi(
+        ("bianco", "Fondo bianco infinito",
+         "Background: a seamless pure white studio sweep as wall and floor, no "
+         "horizon line; replace everything around the piece with it."),
+        ("grigio", "Fondo grigio caldo",
+         "Background: a seamless matte warm light grey studio sweep as wall and "
+         "floor, no horizon line; replace everything around the piece with it."),
+        ("calce", "Parete in calce",
+         "Background: a plain wall in matte off-white lime plaster with a subtle "
+         "troweled texture and a pale smooth concrete floor; nothing else around "
+         "the piece."),
+        ("scuro", "Fondo antracite",
+         "Background: a seamless matte charcoal studio backdrop as wall and floor, "
+         "no horizon line; replace everything around the piece with it."),
+        ("vista", "Come nella vista",
+         "Background: keep the wall and the floor as they are in the view; only "
+         "refine their materials and light."),
+    ),
+    "ambiente": Blocco(
+        "ambiente", "Stanza sfocata",
+        "Background: a softly out-of-focus minimal living room behind the piece, "
+        "neutral tones, nothing in front of it; do not cover or hide any part of "
+        "the piece.", aggiunge=True),
+}
+
+QUALITA_PRODOTTO = _blocchi(
+    ("base", "Base", "Professional furniture product photography, natural detail."),
+    ("32k", "Altissima definizione (da provare)",
+     "Professional furniture product photography, 32k, ultra-detailed, design "
+     "magazine quality."),
+)
+
+COSA_EVITARE_PRODOTTO = Blocco(
+    "evitare-prodotto",
+    "Cosa evitare · arredo",
+    "Avoid: CGI or plastic look, warped or extra legs, changed proportions, "
+    "added props or decor, HDR, oversharpening, clipped highlights, crushed "
+    "blacks.",
+)
+
 PERSONE = {
     "nessuna": Blocco("nessuna", "Nessuna", "No people."),
     **dict((
@@ -353,25 +474,35 @@ QUALITA = _blocchi(
 )
 
 # Asse -> (blocchi possibili, scene in cui vale). Un asse fuori dalla sua
-# scena si rifiuta: il cielo di un interno non esiste.
+# scena si rifiuta: il cielo di un interno non esiste. None vuol dire che i
+# blocchi dipendono dalla scena: vedi PER_SCENA.
 ASSI = {
-    "fedelta": (FEDELTA, SCENE),
-    "look": (LOOK, SCENE),
-    "luce": (None, SCENE),  # dipende dalla scena: vedi _blocchi_luce
+    "fedelta": (None, SCENE),
+    "look": (None, SCENE),
+    "luce": (None, SCENE),
     "cielo": (CIELO, (ESTERNO,)),
     "fuori": (FUORI, (INTERNO,)),
     "arredo": (ARREDO, (INTERNO,)),
+    "sfondo": (SFONDO, (PRODOTTO,)),
     "intorno": (INTORNO, (ESTERNO,)),
     "verde": (VERDE, (ESTERNO,)),
-    "persone": (PERSONE, SCENE),
-    "qualita": (QUALITA, SCENE),
+    "persone": (PERSONE, (ESTERNO, INTERNO)),
+    "qualita": (None, SCENE),
+}
+
+PER_SCENA = {
+    "fedelta": {ESTERNO: FEDELTA, INTERNO: FEDELTA, PRODOTTO: FEDELTA_PRODOTTO},
+    "look": {ESTERNO: LOOK, INTERNO: LOOK, PRODOTTO: LOOK_PRODOTTO},
+    "luce": {ESTERNO: LUCE_ESTERNI, INTERNO: LUCE_INTERNI, PRODOTTO: LUCE_PRODOTTO},
+    "qualita": {ESTERNO: QUALITA, INTERNO: QUALITA, PRODOTTO: QUALITA_PRODOTTO},
 }
 
 QUALITA_PREDEFINITA = "base"
 
 
-def _blocchi_luce(scena: str) -> dict[str, Blocco]:
-    return LUCE_ESTERNI if scena == ESTERNO else LUCE_INTERNI
+def _elenco(asse: str, scena: str) -> dict[str, Blocco]:
+    elenco, _scene = ASSI[asse]
+    return elenco if elenco is not None else PER_SCENA[asse][scena]
 
 
 @dataclass(frozen=True)
@@ -385,6 +516,7 @@ class Scelte:
     cielo: str | None = None
     fuori: str | None = None
     arredo: str | None = None
+    sfondo: str | None = None
     intorno: str | None = None
     verde: str | None = None
     persone: str | None = None
@@ -445,6 +577,12 @@ def _interno(identificativo, nome, look, luce, fuori, persone) -> PresetStile:
     ))
 
 
+def _prodotto(identificativo, nome, look, luce, sfondo) -> PresetStile:
+    return PresetStile(identificativo, nome, Scelte(
+        scena=PRODOTTO, look=look, luce=luce, sfondo=sfondo,
+    ))
+
+
 # Le combinazioni della bozza 4. Intorno ("niente"), verde ("nessuno") e arredo
 # ("nessuno") non sono nelle colonne delle tabelle, ma ci sono nelle lunghezze
 # che la bozza ha misurato: solo con loro i conti tornano al carattere. Lo
@@ -466,6 +604,12 @@ PRESET_STILE = {
         _interno("interno-sera", "Interno sera", "leica", "sera", "citta", "nessuna"),
         _interno("interno-notte", "Interno notte, lampade", "leica", "notte_int", "neutra", "nessuna"),
         _interno("interno-vissuto", "Interno vissuto", "x100v", "pomeriggio", "verde", "movimento"),
+        _prodotto("arredo-catalogo", "Catalogo, fondo bianco", "hasselblad", "softbox", "bianco"),
+        _prodotto("arredo-studio", "Studio, grigio caldo", "hasselblad", "finestra", "grigio"),
+        _prodotto("arredo-editoriale", "Editoriale, ombre di sole", "phaseone", "sole", "calce"),
+        _prodotto("arredo-dettaglio", "Dettaglio materiale", "macro", "radente", "grigio"),
+        _prodotto("arredo-controluce", "Controluce, fondo scuro", "leica", "controluce", "scuro"),
+        _prodotto("arredo-ambientato", "Ambientato, stanza sfocata", "gfx", "finestra", "ambiente"),
     )
 }
 
@@ -493,7 +637,7 @@ def _blocco(asse: str, valore: str, scena: str) -> Blocco:
             f"Togli {asse} dalle scelte, oppure cambia la scena in "
             f"{' o '.join(scene)}.",
         )
-    elenco = elenco if elenco is not None else _blocchi_luce(scena)
+    elenco = _elenco(asse, scena)
     try:
         return elenco[valore]
     except KeyError:
@@ -505,8 +649,7 @@ def _blocco(asse: str, valore: str, scena: str) -> Blocco:
 
 def voci(asse: str, scena: str) -> dict[str, Blocco]:
     """I blocchi possibili di un asse in una scena: quelli che lo Studio mostra."""
-    elenco, _scene = ASSI[asse]
-    return elenco if elenco is not None else _blocchi_luce(scena)
+    return _elenco(asse, scena)
 
 
 def blocco(asse: str, valore: str, scena: str) -> Blocco:
@@ -519,15 +662,12 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
     if scelte.scena not in SCENE:
         raise SceltaNonValida(
             f"La scena \"{scelte.scena}\" non esiste.",
-            "Scegli esterno o interno.",
+            "Scegli esterno, interno o arredo.",
         )
-    ordine = ["look", "luce"]
-    ordine += ["cielo"] if scelte.scena == ESTERNO else ["fuori", "arredo"]
-    ordine += ["intorno", "verde"] if scelte.scena == ESTERNO else []
-    ordine += ["persone", "qualita"]
-    # Un asse dell'altra scena, se compilato, si rifiuta invece di sparire
+    ordine = [a for a in ORDINE_ASSI if scelte.scena in ASSI[a][1]]
+    # Un asse di un'altra scena, se compilato, si rifiuta invece di sparire
     # in silenzio: l'utente crederebbe di averlo mandato.
-    for asse in ("cielo", "fuori", "arredo", "intorno", "verde"):
+    for asse in ORDINE_ASSI:
         if asse not in ordine and getattr(scelte, asse):
             _blocco(asse, getattr(scelte, asse), scelte.scena)
     resa = resa_valida(scelte.resa)
@@ -542,7 +682,7 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
             blocchi.append(_blocco(asse, valore, scelte.scena))
         elif valore:
             _blocco(asse, valore, scelte.scena)  # spento, ma deve comunque esistere
-    blocchi.append(_evitare(resa))
+    blocchi.append(_evitare(resa, scelte.scena))
     return blocchi
 
 
@@ -563,7 +703,7 @@ def componi(scelte: Scelte) -> str:
 
 
 # L'ordine degli assi nel prompt, per chi compone solo una parte (un passo).
-ORDINE_ASSI = ("look", "luce", "cielo", "fuori", "arredo", "intorno", "verde", "persone", "qualita")
+ORDINE_ASSI = ("look", "luce", "cielo", "fuori", "arredo", "sfondo", "intorno", "verde", "persone", "qualita")
 
 
 # --- passi: richieste a parole su un render (Studio · Passi) ---------------
@@ -607,11 +747,11 @@ def componi_richieste(scena: str, richieste) -> str:
     materiali: qui non c'e' nessun modello linguistico che le traduca.
     """
     if scena not in SCENE:
-        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno o interno.")
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno o arredo.")
     pulite = _pulisci_richieste(richieste)
     apertura = "Change:" if len(pulite) == 1 else "Changes:"
     return " ".join([REGOLA_PASSO.testo, SCENA[scena].testo,
-                     _frase_richieste(pulite, apertura), COSA_EVITARE.testo])
+                     _frase_richieste(pulite, apertura), _evitare(FOTO, scena).testo])
 
 
 def aggiungi_richieste(base: str, richieste) -> str:
@@ -630,7 +770,7 @@ def aggiungi_richieste(base: str, richieste) -> str:
 def _prima_di_evitare(base: str, frase: str) -> str:
     """La frase subito prima di «cosa evitare» (quello di sempre o quello della resa), o in fondo."""
     base = base.strip()
-    for evitare in (COSA_EVITARE, *EVITARE_DA_RESA.values()):
+    for evitare in (COSA_EVITARE, COSA_EVITARE_PRODOTTO, *EVITARE_DA_RESA.values()):
         if base.endswith(evitare.testo):
             testa = base[: -len(evitare.testo)].rstrip()
             return f"{testa} {frase} {evitare.testo}"
@@ -645,7 +785,7 @@ def componi_passo(scena: str, cambi: dict[str, str]) -> str:
     nuova, per esempio {"verde": "poco"}.
     """
     if scena not in SCENE:
-        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno o interno.")
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno o arredo.")
     if not cambi:
         raise SceltaNonValida(
             "Un passo senza richieste non cambia niente.",
@@ -659,7 +799,7 @@ def componi_passo(scena: str, cambi: dict[str, str]) -> str:
         )
     pezzi = [REGOLA_FISSA.testo, SCENA[scena].testo]
     pezzi += [_blocco(asse, cambi[asse], scena).testo for asse in ORDINE_ASSI if asse in cambi]
-    pezzi.append(COSA_EVITARE.testo)
+    pezzi.append(_evitare(FOTO, scena).testo)
     return " ".join(pezzi)
 
 

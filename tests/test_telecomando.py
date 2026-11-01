@@ -510,3 +510,17 @@ def test_la_risoluzione_scelta_in_palette_arriva_al_modello(cartella, chiamate, 
     telecomando.genera(vista, valori, dove)
     Coda(cartella, crea_provider=lambda _n: ProviderDiProva(chiamate), dire=lambda _t: None).esegui_uno()
     assert chiamate[0].dimensione_render == "4k"
+
+
+def test_la_terza_voce_della_vista_manda_un_arredo_con_il_suo_sfondo():
+    """Caso: «Arredo» nella palette parte come un interno, o con le persone nascoste."""
+    scelte = _valori(arredo=True, interno=True, preset_arredo="Dettaglio materiale",
+                     luce_arredo="Softbox morbida", sfondo="Fondo bianco infinito",
+                     persone="Poche", cielo="Neve").scelte()
+    assert scelte.scena == blocchi.PRODOTTO
+    assert (scelte.look, scelte.luce, scelte.sfondo) == ("macro", "softbox", "bianco")
+    assert scelte.persone is None and scelte.cielo is None
+    assert blocchi.componi(scelte)
+    voci = tc.voci_palette()
+    assert [n for _i, n in voci["PresetArredo"]] == [
+        p.nome for p in blocchi.PRESET_STILE.values() if p.scelte.scena == blocchi.PRODOTTO]

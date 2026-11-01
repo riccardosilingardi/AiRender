@@ -98,8 +98,11 @@ def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
     return {
         "PresetEsterno": _preset(blocchi.ESTERNO),
         "PresetInterno": _preset(blocchi.INTERNO),
+        "PresetArredo": _preset(blocchi.PRODOTTO),
         "LuceEsterno": _voci("luce", blocchi.ESTERNO),
         "LuceInterno": _voci("luce", blocchi.INTERNO),
+        "LuceArredo": _voci("luce", blocchi.PRODOTTO),
+        "Sfondo": _voci("sfondo", blocchi.PRODOTTO),
         "Cielo": _voci("cielo", blocchi.ESTERNO),
         "Intorno": _voci("intorno", blocchi.ESTERNO),
         "Verde": _voci("verde", blocchi.ESTERNO),
@@ -128,10 +131,16 @@ class ValoriPalette:
     """Quello che c'e' scritto nei campi della sezione Stile, come lo legge l'adattatore."""
 
     interno: bool = False
+    # Terza voce dello stesso gruppo «Vista» (bozza 8): un pezzo d'arredo come
+    # prodotto. Vince su «interno».
+    arredo: bool = False
     preset_esterno: str = ""
     preset_interno: str = ""
+    preset_arredo: str = ""
     luce_esterno: str = COME_IL_PRESET
     luce_interno: str = COME_IL_PRESET
+    luce_arredo: str = COME_IL_PRESET
+    sfondo: str = COME_IL_PRESET
     cielo: str = COME_IL_PRESET
     intorno: str = COME_IL_PRESET
     verde: str = COME_IL_PRESET
@@ -144,6 +153,8 @@ class ValoriPalette:
     risoluzione: str = RISOLUZIONI[0][1]
 
     def preset(self) -> str:
+        if self.arredo:
+            return _identificativo("PresetArredo", self.preset_arredo)
         if self.interno:
             return _identificativo("PresetInterno", self.preset_interno)
         return _identificativo("PresetEsterno", self.preset_esterno)
@@ -151,7 +162,12 @@ class ValoriPalette:
     def scelte(self) -> blocchi.Scelte:
         """Le scelte del preset con i cambi della palette sopra, come in Studio · Genera."""
         cambi: dict = {"materiali": " ".join((self.materiali or "").split())}
-        if self.interno:
+        if self.arredo:
+            luce = _identificativo("LuceArredo", self.luce_arredo)
+            sfondo = _identificativo("Sfondo", self.sfondo)
+            if sfondo:
+                cambi["sfondo"] = sfondo
+        elif self.interno:
             luce = _identificativo("LuceInterno", self.luce_interno)
         else:
             luce = _identificativo("LuceEsterno", self.luce_esterno)
@@ -164,7 +180,8 @@ class ValoriPalette:
                 cambi["intorno"] = intorno
             if verde:
                 cambi["verde"] = verde
-        persone = _identificativo("Persone", self.persone)
+        # Un arredo non ha persone: il campo e' nascosto e non parte.
+        persone = None if self.arredo else _identificativo("Persone", self.persone)
         if persone:
             cambi["persone"] = persone
         if luce:

@@ -122,7 +122,23 @@ function illustrazione(sc) {
   const finestra = buio ? "#F3C46A" : "#7FA4C8";
   const id = "g" + Math.random().toString(36).slice(2, 8);
   let corpo;
-  if (sc.scena === "interno") {
+  if (sc.scena === "prodotto") {
+    // Un pezzo solo su un fondo da studio: una sedia stilizzata.
+    const FONDI = { bianco: "#F7F7F5", grigio: "#CFCAC2", calce: "#E8E2D6", scuro: "#2E3033", vista: "#D9D2C5", ambiente: "#BFB6A8" };
+    const fondo = FONDI[sc.sfondo] || FONDI.grigio;
+    const scuro = sc.sfondo === "scuro" || sc.luce === "controluce";
+    const legno = scuro ? "#6B4A2E" : "#A9774A";
+    corpo = `<rect width="128" height="72" fill="${scuro ? "#2E3033" : fondo}"/>
+      ${sc.sfondo === "ambiente" ? `<rect x="8" y="10" width="34" height="30" fill="#D8CFC0" opacity=".7"/><rect x="92" y="18" width="26" height="40" fill="#A99E8E" opacity=".6"/>` : ""}
+      <ellipse cx="64" cy="62" rx="26" ry="3.5" fill="#000" opacity="${sc.luce === "softbox" ? ".12" : ".22"}"/>
+      ${sc.luce === "sole" ? `<path d="M70 62 L112 62 L104 52 L76 52 Z" fill="#000" opacity=".12"/>` : ""}
+      <rect x="46" y="20" width="5" height="42" rx="1" fill="${legno}"/>
+      <rect x="46" y="38" width="36" height="5" rx="1" fill="${legno}"/>
+      <rect x="77" y="38" width="5" height="24" rx="1" fill="${legno}"/>
+      <rect x="50" y="40" width="4" height="22" rx="1" fill="${legno}" opacity=".7"/>
+      <rect x="48" y="22" width="3" height="16" fill="#8A5A34" opacity=".5"/>
+      ${sc.luce === "controluce" ? `<path d="M46 20 V62 M46 38 H82" stroke="#F3E3C0" stroke-width="1" opacity=".8"/>` : ""}`;
+  } else if (sc.scena === "interno") {
     const parete = buio ? "#3A3530" : "#E9E4DC";
     corpo = `<rect width="128" height="72" fill="${parete}"/>
       <path d="M0 72 L28 50 H100 L128 72 Z" fill="${buio ? "#2A241F" : "#C9B79C"}"/>
@@ -564,18 +580,21 @@ function sintesi() {
   const pezzi = [resaScelta().nome, spento("look") ? null : (nomeVoce("look", s.look) || "").split(" · ")[0], spento("luce") ? null : nomeVoce("luce", s.luce)];
   if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`,
     `verde: ${(nomeVoce("verde", s.verde) || "—").toLowerCase()}`);
+  else if (s.scena === "prodotto") pezzi.push(spento("sfondo") ? null : nomeVoce("sfondo", s.sfondo));
   else pezzi.push(nomeVoce("fuori", s.fuori), nomeVoce("arredo", s.arredo));
-  pezzi.push(`persone: ${(nomeVoce("persone", s.persone) || "—").toLowerCase()}`);
+  if (s.scena !== "prodotto") pezzi.push(`persone: ${(nomeVoce("persone", s.persone) || "—").toLowerCase()}`);
   return pezzi.filter(Boolean).join(" · ");
 }
 
+const SCENE = [["esterno", "Esterno"], ["interno", "Interno"], ["prodotto", "Arredo"]];
+
 function colonnaStile() {
   const interno = S.scelte.scena === "interno";
+  const prodotto = S.scelte.scena === "prodotto";
   const scena = h("div", { classe: "riga" },
     h("span", { classe: "etichetta" }, "Scena"),
     h("div", { classe: "switch", role: "group", "aria-label": "Scena" },
-      h("button", { classe: "seg", "aria-pressed": String(!interno), onclick: () => scegliScena("esterno") }, "Esterno"),
-      h("button", { classe: "seg", "aria-pressed": String(interno), onclick: () => scegliScena("interno") }, "Interno")));
+      SCENE.map(([id, nome]) => h("button", { classe: "seg", "aria-pressed": String(S.scelte.scena === id), onclick: () => scegliScena(id) }, nome))));
   const preset = h("section", { classe: "pannello", "aria-label": "Parti da un preset" },
     h("div", { classe: "riga tra" }, h("h2", {}, "Parti da un preset"),
       h("span", { classe: "tenue piccolo" }, "Ogni preset ha un prompt curato e imposta i comandi qui sotto")),
@@ -599,13 +618,17 @@ function colonnaStile() {
     h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico"),
       h("p", { classe: "tenue piccolo" }, "Colore, contrasto, pellicola o digitale · solo per le rese fotografiche"),
       chipAsse("look")),
-    h("div", { classe: "gruppo" }, h("h3", {}, interno ? "3 · Luce" : "3 · Ora / Luce"), tessereAsse("luce")),
-    interno
+    h("div", { classe: "gruppo" }, h("h3", {}, S.scelte.scena === "esterno" ? "3 · Ora / Luce" : "3 · Luce"), tessereAsse("luce")),
+    prodotto
+      ? h("div", { classe: "gruppo" }, h("h3", {}, "4 · Sfondo"),
+          h("p", { classe: "tenue piccolo" }, "Prende il posto di tutto quello che non è il pezzo · il primo piano lo dà la vista di Allplan"),
+          tessereAsse("sfondo"))
+      : interno
       ? h("div", { classe: "gruppo" }, h("h3", {}, "4 · Fuori dalle finestre e arredo"),
           h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Fuori dalle finestre"), chipAsse("fuori")),
           h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Arredo"), chipAsse("arredo")))
       : h("div", { classe: "gruppo" }, h("h3", {}, "4 · Cielo e stagione"), tessereAsse("cielo")),
-    h("div", { classe: "gruppo" }, h("h3", {}, interno ? "5 · Persone" : "5 · Cosa può aggiungere il modello"),
+    prodotto ? null : h("div", { classe: "gruppo" }, h("h3", {}, interno ? "5 · Persone" : "5 · Cosa può aggiungere il modello"),
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Intorno all'edificio"), chipAsse("intorno")),
       interno ? null : h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Verde"), chipAsse("verde")),
       h("div", { classe: "sotto-gruppo" }, h("span", { classe: "etichetta" }, "Persone"), chipAsse("persone"))));
@@ -616,13 +639,16 @@ function colonnaInvio() {
   const interno = S.scelte.scena === "interno";
   const materiali = h("textarea", {
     id: "materiali", rows: "3", "aria-label": "Materiali a parole",
-    placeholder: interno ? "es. pavimento in rovere chiaro, pareti in calce bianca, cucina in acciaio"
+    placeholder: S.scelte.scena === "prodotto" ? "es. struttura in rovere naturale, seduta in cuoio cognac, piedini in ottone spazzolato"
+      : interno ? "es. pavimento in rovere chiaro, pareti in calce bianca, cucina in acciaio"
       : "es. intonaco bianco, infissi in rovere scuro, zoccolo in pietra grigia",
   });
   materiali.value = S.scelte.materiali || "";
   materiali.addEventListener("input", () => { S.scelte.materiali = materiali.value; aggiornaComposto(); });
 
-  const esempi = interno
+  const esempi = S.scelte.scena === "prodotto"
+    ? [["#A9774A", "Legno struttura", "rovere naturale oliato"], ["#8B4A2B", "Seduta", "cuoio cognac"], ["#C9A55C", "Piedini", "ottone spazzolato"]]
+    : interno
     ? [["#E8C547", "Intonaco interno", "calce bianca opaca"], ["#8B5A2B", "Pavimento legno", "rovere chiaro a plance larghe"], ["#5DA9E9", "Vetro", "vetro chiaro"]]
     : [["#E8C547", "Intonaco esterno", "intonaco a calce bianco"], ["#C8553D", "Copertura", "lamiera aggraffata antracite"], ["#5DA9E9", "Vetro", "vetro chiaro, riflette il cielo"]];
   const mappa = h("div", { classe: "pannello grigio", "aria-disabled": "true" },

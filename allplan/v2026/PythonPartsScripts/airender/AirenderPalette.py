@@ -232,12 +232,17 @@ class AirenderPalette(BaseScriptObject):
 
     def _valori(self) -> telecomando.ValoriPalette:
         e = self.build_ele
+        scena = int(e.Interno.value or 0)  # 0 esterno, 1 interno, 2 arredo
         return telecomando.ValoriPalette(
-            interno=int(e.Interno.value or 0) == 1,
+            interno=scena == 1,
+            arredo=scena == 2,
             preset_esterno=e.PresetEsterno.value,
             preset_interno=e.PresetInterno.value,
+            preset_arredo=e.PresetArredo.value,
             luce_esterno=e.LuceEsterno.value,
             luce_interno=e.LuceInterno.value,
+            luce_arredo=e.LuceArredo.value,
+            sfondo=e.Sfondo.value,
             cielo=e.Cielo.value,
             intorno=e.Intorno.value,
             verde=e.Verde.value,
