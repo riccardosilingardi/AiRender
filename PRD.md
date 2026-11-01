@@ -796,6 +796,30 @@ poggiano su cose non ancora provate:
 - **Costo di GPT Image 2 e Seedream 5.0** — non misurato: lo dice il primo
   render (`x-comfy-credits-used`).
 
+### Lasciato dalla sessione del 2026-11-01 (Studio · Video, Seedance 2.5)
+
+- **I nomi dei modelli esistono nel catalogo del Router** — verificato il
+  2026-11-01 da Riccardo con `py scripts\sonda_comfy.py --catalogo`:
+  `byteplus/dreamina-seedance-2-5-260628`, `openai/gpt-image-2` e
+  `byteplus/seedream-5-0-260128` ci sono con questo nome. Il catalogo non dà i
+  campi (ogni voce ha solo `billing`, `id`, `model`, `provider`,
+  `schema_etag`): i campi restano non verificati.
+- **Seedance 2.5 risponde al corpo scritto in `core/video.py`** — non
+  verificato. `content` con testo e immagini a ruolo (`first_frame`,
+  `last_frame`, `reference_image`), `duration`, `resolution`, `ratio`
+  «adaptive», `generate_audio`, `watermark`, e l'uscita in
+  `content.video_url`: tutto dalla pagina della documentazione del Router letta
+  il 2026-11-01. Il primo video vero è la prova, e la scheda lo dice.
+- **Il video tiene l'edificio** — non verificato. Con «Più render come
+  riferimento» il modello non parte da nessuna immagine: è la scelta che tiene
+  meno la geometria, e la scheda lo dice.
+- **Durata 5/10 s, 720p/1080p, attesa massima 20 minuti** — scelti, non
+  misurati (`core/config.py`).
+- **Costo di un video** — non misurato: lo dice il primo video.
+- **La scheda Video a video, su Windows** — provata solo in un browser senza
+  schermo qui (caricamento, prova a secco, invio, lettore col video finto).
+  Da guardare a occhio sul PC di Riccardo, col lettore che suona un mp4 vero.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di
@@ -877,3 +901,4 @@ cambio è in `DESIGN.md`.
 | Studio · Risultato | Decidere se è ancora il proprio edificio, confrontare render e modelli | "Nessun render ancora. Scegli uno stile in Genera e premi Genera." |
 | Studio · Passi | Ritrovare e rifare i passi di una vista | "Nessun passo ancora. Genera un render da Genera: sarà il passo 1." |
 | Studio · Ritocca | Disegnare aree a rettangolo o libere con note numerate, un solo Applica; il risultato è un passo nuovo | "Prima serve un render. Generane uno da Genera." |
+| Studio · Video (costruita il 2026-11-01, mai provata con Seedance vero) | Fare un video da uno o più render, caricati o da Risultato | "Carica il render da cui partire, oppure da Risultato premi Fai un video da qui." |

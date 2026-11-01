@@ -358,6 +358,17 @@ def test_geometry_drift_warn_avvisa_solo_sotto_la_soglia_ed_e_una_scelta():
     assert config.costante("GEOMETRY_DRIFT_WARN").origine == config.SCELTA
 
 
+def test_video_durate_risoluzioni_e_attesa_stanno_nei_limiti_di_seedance_e_sono_scelte():
+    """Caso: lo Studio offre una durata o una risoluzione che Seedance 2.5 rifiuta, o aspetta un video come un'immagine."""
+    assert all(4 <= d <= 30 for d in config.VIDEO_DURATE_SECONDI)
+    assert set(config.VIDEO_RISOLUZIONI) <= {"480p", "720p", "1080p"}
+    assert 1 <= config.VIDEO_RIFERIMENTI_MASSIMI <= 9
+    assert config.VIDEO_ATTESA_MASSIMA_SECONDI > config.ATTESA_MASSIMA_SECONDI
+    for nome in ("VIDEO_DURATE_SECONDI", "VIDEO_RISOLUZIONI", "VIDEO_RIFERIMENTI_MASSIMI",
+                 "VIDEO_ATTESA_MASSIMA_SECONDI"):
+        assert config.costante(nome).origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 
