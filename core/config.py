@@ -491,6 +491,35 @@ RITOCCO_MODO_AREE = _registra(Costante(
     ),
 ))
 
+# --- Inserisci nel contesto -------------------------------------------------
+
+CONTESTO_INQUADRATURA_PREDEFINITA = _registra(Costante(
+    nome="CONTESTO_INQUADRATURA_PREDEFINITA",
+    valore="zenitale",
+    origine=SCELTA,
+    ragione=(
+        "L'inquadratura con cui si apre la scena «Inserisci nel contesto»: "
+        "«zenitale» (vista dall'alto, come uno screenshot satellitare) o "
+        "«volo» (volo d'uccello, obliqua). Zenitale perche' e' il caso piu' "
+        "comune nel flusso di Riccardo (screenshot da Google Earth, "
+        "2026-11-01) e perche' la vista Allplan in pianta e' la piu' facile "
+        "da far combaciare. Nessuna delle due e' provata con il modello."
+    ),
+))
+
+CONTESTO_LUOGO_MASSIMO = _registra(Costante(
+    nome="CONTESTO_LUOGO_MASSIMO",
+    valore=200,
+    origine=SCELTA,
+    ragione=(
+        "Quanti caratteri al massimo per il luogo (indirizzo o coordinate) "
+        "che entra nel prompt di «Inserisci nel contesto». Un indirizzo con "
+        "coordinate sta in 100 caratteri; 200 lasciano margine senza far "
+        "diventare il campo un secondo prompt."
+    ),
+    unita=" caratteri",
+))
+
 # --- Banco di prova ----------------------------------------------------------
 
 DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
+from .. import contesto as modulo_contesto
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
 from .. import provider as registro
@@ -283,6 +284,68 @@ class Studio:
 
     # --- immagine di riferimento per lo stile -----------------------------
 
+    def carica_contesto(self, dati: bytes, nome_originale: str = "") -> dict:
+        """Salva l'immagine del contesto nella cartella dei contesti, chiamata con la sua impronta.
+
+        Come un riferimento: peso massimo quello che si manda a Comfy Router,
+        solo JPEG o PNG. Lo Studio non scarica immagini da mappe: il contesto
+        lo porta l'utente.
+        """
+        massimo = config.COMFY_INVIO_MASSIMO_MB
+        if len(dati) > massimo * _BYTE_PER_MB:
+            raise RichiestaStudioNonValida(
+                f"L'immagine del contesto pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
+                "Riducila o salvala in JPEG, poi caricala di nuovo.",
+            )
+        tipo = comfy.tipo_mime(dati)
+        if tipo not in ("image/png", "image/jpeg"):
+            raise RichiestaStudioNonValida(
+                "L'immagine del contesto dev'essere un JPEG o un PNG.",
+                "Salvala in JPEG o PNG (uno screenshot va bene), poi caricala di nuovo.",
+            )
+        larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
+        estensione = ".jpg" if tipo == "image/jpeg" else ".png"
+        nome = f"ctx-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta, come i riferimenti
+        cartella = modulo_contesto.cartella_contesti(self.cartella)
+        cartella.mkdir(parents=True, exist_ok=True)
+        if not (cartella / nome).exists():
+            modulo_coda.scrivi_atomico(cartella / nome, dati)
+        return {"nome": nome, "da": nome_originale, "larghezza": larghezza,
+                "altezza": altezza, "impronta": impronta(dati)}
+
+    def percorso_contesto(self, nome: str) -> Path:
+        """Il file di un contesto. Solo un nome della cartella dei contesti, mai un percorso."""
+        if not re.fullmatch(r"ctx-[0-9a-f]{16}\.(jpg|png)", nome or ""):
+            raise RichiestaStudioNonValida(
+                f"\"{nome}\" non e' il nome di un'immagine del contesto.",
+                "Caricala di nuovo in «Inserisci nel contesto».",
+            )
+        percorso = modulo_contesto.cartella_contesti(self.cartella) / nome
+        if not percorso.is_file():
+            raise FileNonTrovato(
+                f"L'immagine del contesto {nome} non c'e' piu' nella cartella dei contesti.",
+                "Caricala di nuovo, oppure togli il contesto.",
+            )
+        return percorso
+
+    def _contesto_scelto(self, dati: dict) -> modulo_contesto.Contesto | None:
+        """Il contesto della richiesta dello Studio, o None. Il file e' solo un nome della cartella."""
+        voce = dati.get("contesto")
+        if not voce:
+            return None
+        if not isinstance(voce, dict):
+            raise RichiestaStudioNonValida("Il contesto non e' arrivato per intero.", "Ricarica lo Studio.")
+        if dati.get("riferimento"):
+            raise RichiestaStudioNonValida(
+                "Il riferimento per lo stile e il contesto non partono insieme: sarebbero tre immagini.",
+                "Togli il riferimento per lo stile, oppure togli il contesto.",
+            )
+        percorso = self.percorso_contesto(str(voce.get("nome") or ""))
+        try:
+            return modulo_contesto.Contesto.da_dizionario({**voce, "file": str(percorso)})
+        except modulo_contesto.ContestoNonValido as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+
     def carica_riferimento(self, dati: bytes, nome_originale: str = "") -> dict:
         """Salva un'immagine di riferimento nella cartella dei riferimenti, chiamata con la sua impronta.
 
@@ -353,6 +416,15 @@ class Studio:
                 {"id": r, "nome": r.upper() + ("" if r == config.RISOLUZIONE_RENDER_PREDEFINITA else " · da provare")}
                 for r in config.RISOLUZIONI_RENDER
             ],
+            "contesto": {
+                "inquadrature": [{"id": i, "nome": b.nome} for i, b in blocchi.INQUADRATURE.items()],
+                "predefinita": config.CONTESTO_INQUADRATURA_PREDEFINITA,
+                "luogo_massimo": config.CONTESTO_LUOGO_MASSIMO,
+                # «Cerca sul web» (ricerca Google di Nano Banana): in grigio
+                # finche' una chiamata vera non dice che il Router lo lascia
+                # passare (scripts/sonda_comfy.py --ricerca-web).
+                "ricerca_web_verificata": False,
+            },
         }
 
     # --- i miei preset ------------------------------------------------
@@ -409,13 +481,14 @@ class Studio:
     def componi(self, dati: dict) -> dict:
         """Il prompt vero, il riassunto in italiano e quanti caratteri."""
         scelte = self._scelte(dati.get("scelte"))
-        prompt = blocchi.componi(scelte)
-        if dati.get("riferimento"):
+        contesto = self._contesto_scelto(dati)
+        prompt = contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte)
+        if dati.get("riferimento") and not contesto:
             prompt = blocchi.aggiungi_riferimento(prompt)
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
-            "riassunto": riassunto(scelte, dati.get("preset")),
+            "riassunto": riassunto_contesto(contesto) if contesto else riassunto(scelte, dati.get("preset")),
             "versione_blocchi": blocchi.VERSIONE,
         }
 
@@ -452,7 +525,7 @@ class Studio:
         }
 
     def destinazione(self, identificativo_modello: str, varianti: object = 1,
-                     riferimento: bool = False) -> dict:
+                     riferimento: bool = False, contesto: bool = False) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -474,14 +547,18 @@ class Studio:
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
             # Regola 5: quante immagini partono, detto prima del clic.
-            "immagini": 2 if riferimento else 1,
-            "cosa_parte": ("Partono due immagini: la vista e il riferimento per lo stile."
-                           if riferimento else "Parte una immagine: la vista."),
+            "immagini": 2 if (riferimento or contesto) else 1,
+            "cosa_parte": _cosa_parte(riferimento, contesto),
+            "contesto_non_accettato": (
+                f"{modello.nome} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due. "
+                "Scegli Nano Banana 2."
+                if contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "riferimento_non_accettato": (
                 f"{modello.nome} riceve una sola immagine per invio: il riferimento non partirebbe. "
                 "Toglilo, oppure scegli Nano Banana 2."
                 if riferimento and not motore.accetta_piu_immagini(modello.identificativo) else None),
-            "avviso_riferimento": motore.avviso_piu_immagini(modello.identificativo) if riferimento else None,
+            "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
+                                   if (riferimento or contesto) else None),
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -490,10 +567,11 @@ class Studio:
         """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
+        contesto = self._contesto_scelto(dati)
         riferimento = self._riferimento_scelto(dati)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None)
-        prompt = _prompt_a_mano(dati) or blocchi.componi(scelte)
+                                         riferimento=riferimento is not None, contesto=contesto is not None)
+        prompt = _prompt_a_mano(dati) or (contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte))
         if riferimento is not None:
             prompt = blocchi.aggiungi_riferimento(prompt)
         problemi = []
@@ -509,6 +587,9 @@ class Studio:
         if destinazione["riferimento_non_accettato"]:
             problemi.append({"fatto": destinazione["riferimento_non_accettato"],
                              "cosa_fare": "Togli il riferimento, oppure scegli Nano Banana 2."})
+        if destinazione["contesto_non_accettato"]:
+            problemi.append({"fatto": destinazione["contesto_non_accettato"],
+                             "cosa_fare": "Scegli Nano Banana 2, oppure togli il contesto."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -529,9 +610,10 @@ class Studio:
         """
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
+        contesto = self._contesto_scelto(dati)
         riferimento = self._riferimento_scelto(dati)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None)
+                                         riferimento=riferimento is not None, contesto=contesto is not None)
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -539,6 +621,7 @@ class Studio:
             prompt_a_mano=_prompt_a_mano(dati),
             varianti=destinazione["varianti"],
             riferimento=riferimento,
+            contesto=contesto,
         )
 
     def _riferimento_scelto(self, dati: dict) -> Path | None:
@@ -548,7 +631,8 @@ class Studio:
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
                        varianti: int = 1, parte_da: str | None = None,
                        partenza: Path | None = None, richieste=(), aree=(),
-                       modo_aree: str | None = None, riferimento: Path | None = None) -> dict:
+                       modo_aree: str | None = None, riferimento: Path | None = None,
+                       contesto: modulo_contesto.Contesto | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -563,6 +647,9 @@ class Studio:
         if destinazione.get("riferimento_non_accettato"):
             raise RichiestaStudioNonValida(f"Non mando: {destinazione['riferimento_non_accettato']}",
                                            "Togli il riferimento, oppure scegli Nano Banana 2.")
+        if destinazione.get("contesto_non_accettato"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['contesto_non_accettato']}",
+                                           "Scegli Nano Banana 2, oppure togli il contesto.")
         if partenza is None:
             # Da un render l'idoneita' non conta: giudica una vista di
             # Allplan, e quello che parte e' il render del passo.
@@ -582,6 +669,7 @@ class Studio:
                 aree=tuple(aree),
                 modo_aree=modo_aree,
                 riferimento=riferimento,
+                contesto=contesto,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -620,7 +708,8 @@ class Studio:
                 "Riaprila con Usa un'altra vista, poi genera da Genera.",
             )
         riferimento = Path(lavoro.riferimento) if lavoro.riferimento else None
-        destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None)
+        destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None,
+                                         contesto=lavoro.contesto is not None)
         return self._metti_in_coda(
             vista, lavoro.scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -634,6 +723,7 @@ class Studio:
             aree=lavoro.aree,
             modo_aree=lavoro.modo_aree,
             riferimento=riferimento,
+            contesto=lavoro.contesto,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -1363,6 +1453,26 @@ def _prompt_a_mano(dati: dict) -> str | None:
     if isinstance(testo, str) and testo.strip():
         return testo.strip()
     return None
+
+
+def _cosa_parte(riferimento: bool, contesto: bool) -> str:
+    """Quante immagini partono e quali, nelle stesse parole ogni volta (regola 5)."""
+    if contesto:
+        return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
+                "poi la vista.")
+    if riferimento:
+        return "Partono due immagini: la vista e il riferimento per lo stile."
+    return "Parte una immagine: la vista."
+
+
+def riassunto_contesto(contesto: modulo_contesto.Contesto) -> str:
+    """Cosa parte con «Inserisci nel contesto», in italiano."""
+    pezzi = ["Inserisci nel contesto", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
+    if contesto.luogo:
+        pezzi.append(f"luogo: {contesto.luogo}")
+    pezzi.append("lo screenshot diventa una foto" if contesto.pulisci_mappa
+                 else "fuori dall'area il contesto resta com'è")
+    return " · ".join(pezzi)
 
 
 def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:

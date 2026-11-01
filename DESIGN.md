@@ -550,6 +550,39 @@ non c'è: il riferimento si sceglie nello Studio.
   l'impronta del riferimento, non l'immagine; il file resta in
   `riferimenti/` nella cartella delle viste.
 
+## Inserisci nel contesto, costruita il 2026-11-01
+
+Il fotoinserimento: l'edificio di Allplan dentro un'immagine del luogo.
+In cima alla colonna destra di Studio · Genera. È il flusso di Riccardo
+(screenshot da Google Earth + vista dell'edificio + area selezionata + prompt)
+messo nello Studio. Lo Studio non scarica immagini da mappe: il contesto lo
+porta l'utente. Screenshot in `docs/ui/studio-contesto/`.
+
+- **Vuoto:** una riga dice cosa fa (screenshot satellitare, ortofoto o foto
+  da drone, che porti tu; disegni dove va l'edificio; zenitale o volo
+  d'uccello) e il campo per scegliere il file.
+- **Contesto senza area:** l'immagine, «Trascina sull'immagine il rettangolo
+  dove va l'edificio», Genera spento con la stessa ragione.
+- **Pieno:** l'immagine con il rettangolo numerato (trascinando di nuovo si
+  rifà), nome e misure, «cambia immagine», Togli il contesto; Inquadratura
+  Zenitale | Volo d'uccello con una riga su che vista catturare da Allplan;
+  Luogo facoltativo (indirizzo o coordinate, entra nel prompt com'è scritto);
+  «È uno screenshot di una mappa: rendilo una foto aerea», che quando è
+  acceso avvisa che la misura fuori dall'area non si fa; «Cerca sul web» in
+  grigio, Da provare. La colonna dello stile resta visibile ma spenta: con il
+  contesto partono solo i materiali. Il riferimento per lo stile non parte e
+  lo dice.
+- **In corso:** come Genera. Prima del clic, sotto la destinazione:
+  «Partono due immagini: prima il contesto con l'area segnata in magenta,
+  poi la vista.» e l'avviso giallo della prima prova con due immagini.
+- **Errore:** file non JPEG/PNG o troppo pesante rifiutato al caricamento;
+  con FLUX.1 Kontext (una sola immagine) Genera è spento con la ragione; se il
+  file del contesto sparisce prima dell'invio il lavoro si ferma senza mandare
+  niente.
+- **Risultato:** il render ha la forma del contesto. La tenuta degli spigoli
+  contro la vista non si calcola (il render non è la vista); al suo posto la
+  misura «fuori dall'area» contro il contesto, come nel Ritocca.
+
 ## Rese non fotografiche, costruite il 2026-10-31
 
 Le tessere della sezione 1 · Resa di Studio · Genera, e il menu Resa della

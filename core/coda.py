@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import aree as modulo_aree, battito as modulo_battito, blocchi, config, grana as modulo_grana, immagine as modulo_immagine
+from . import contesto as modulo_contesto
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
@@ -63,7 +64,11 @@ FORMATO_RIFERIMENTO = 4  # numero-non-configurabile: versione del formato di un 
 # Il formato 4 (prompt 11) aggiunge l'immagine di riferimento per lo stile.
 # Si scrive solo quando c'e' un riferimento: un motore vecchio rifiuta il 4
 # invece di mandare una sola immagine dopo che lo Studio ne ha annunciate due.
-FORMATI_LETTI = (1, 2, 3, 4)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_CONTESTO = 5  # numero-non-configurabile: versione del formato di un lavoro «Inserisci nel contesto»
+# Il formato 5 (2026-11-01) aggiunge il contesto: l'immagine del luogo con
+# l'area dove va l'edificio. Si scrive solo quando c'e' un contesto: un motore
+# vecchio rifiuta il 5 invece di mandare la vista da sola.
+FORMATI_LETTI = (1, 2, 3, 4, 5)  # numero-non-configurabile: i formati che questo motore sa leggere
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
 CARTELLA_RIFERIMENTI = "riferimenti"
@@ -242,6 +247,10 @@ class Lavoro:
     # Studio · Genera: il file dell'immagine di riferimento per lo stile, che
     # parte come seconda immagine. Solo da una vista, mai con le aree.
     riferimento: str | None = None
+    # Studio · Genera, «Inserisci nel contesto»: l'immagine del luogo con
+    # l'area dove va l'edificio. Parte per prima, la vista dopo. Solo da una
+    # vista, mai con aree, passi o riferimento.
+    contesto: modulo_contesto.Contesto | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
@@ -250,6 +259,8 @@ class Lavoro:
             object.__setattr__(self, "formato", FORMATO_RITOCCO)
         elif self.riferimento:
             object.__setattr__(self, "formato", FORMATO_RIFERIMENTO)
+        elif self.contesto:
+            object.__setattr__(self, "formato", FORMATO_CONTESTO)
 
     def prompt(self) -> str:
         """Il testo che parte.
@@ -261,6 +272,10 @@ class Lavoro:
         """
         if self.aree:
             return modulo_aree.prompt(self.modo_aree, self.aree)
+        if self.contesto:
+            if self.prompt_a_mano and self.prompt_a_mano.strip():
+                return self.prompt_a_mano.strip()
+            return self.contesto.prompt(self.scelte.materiali)
         if self.partenza:
             return blocchi.componi_richieste(self.scelte.scena, self.richieste)
         if self.prompt_a_mano and self.prompt_a_mano.strip():
@@ -288,6 +303,7 @@ class Lavoro:
             **({"aree": [a.a_dizionario() for a in self.aree], "modo_aree": self.modo_aree}
                if self.aree else {}),
             **({"riferimento": self.riferimento} if self.riferimento else {}),
+            **({"contesto": self.contesto.a_dizionario()} if self.contesto else {}),
         }
 
     @classmethod
@@ -334,6 +350,17 @@ class Lavoro:
                 "quale, o parte da un render invece che dalla vista.",
                 "Rimetti il lavoro in coda da Studio · Genera.",
             )
+        contesto = None
+        if dati.get("formato") == FORMATO_CONTESTO:
+            if partenza or riferimento or aree:
+                raise LavoroNonValido(
+                    "Il file del lavoro porta un contesto insieme a un passo, a delle aree o a un riferimento.",
+                    "Rimetti il lavoro in coda da Studio · Genera.",
+                )
+            try:
+                contesto = modulo_contesto.Contesto.da_dizionario(dati.get("contesto"))
+            except modulo_contesto.ContestoNonValido as errore:
+                raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
         return cls(
             identificativo=str(dati["identificativo"]),
             vista=str(dati["vista"]),
@@ -349,6 +376,7 @@ class Lavoro:
             aree=aree,
             modo_aree=modo_aree,
             riferimento=str(riferimento) if riferimento else None,
+            contesto=contesto,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -366,6 +394,10 @@ def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Ar
         return modulo_aree.da_elenco(dati.get("aree")), modulo_aree.controlla_modo(dati.get("modo_aree"))
     except modulo_aree.AreaNonValida as errore:
         raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
+
+
+def _quante_immagini(numero: int) -> str:
+    return "1 immagine lascia" if numero == 1 else f"{numero} immagini lasciano"
 
 
 def nuovo_identificativo(adesso: datetime | None = None) -> str:
@@ -415,6 +447,7 @@ def metti_in_coda(
     aree: tuple[modulo_aree.Area, ...] = (),
     modo_aree: str | None = None,
     riferimento: Path | None = None,
+    contesto: modulo_contesto.Contesto | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -441,6 +474,15 @@ def metti_in_coda(
                 "Togli il riferimento, oppure genera da Genera.",
             )
         riferimento = controlla_riferimento(radice, riferimento)
+    if contesto is not None:
+        if partenza or aree or riferimento is not None:
+            raise LavoroNonValido(
+                "«Inserisci nel contesto» parte solo dalla vista, senza passi, aree o riferimento per lo stile.",
+                "Togli il riferimento per lo stile, oppure togli il contesto.",
+            )
+        file_contesto = modulo_contesto.controlla_file(radice, Path(contesto.file))
+        contesto = modulo_contesto.Contesto(
+            str(file_contesto), contesto.area, contesto.inquadratura, contesto.pulisci_mappa, contesto.luogo)
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -465,7 +507,13 @@ def metti_in_coda(
         aree=tuple(aree),
         modo_aree=modo_aree if aree else None,
         riferimento=str(riferimento) if riferimento else None,
+        contesto=contesto,
     )
+    if contesto is not None and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due.",
+            "Scegli Nano Banana 2.",
+        )
     if riferimento is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
             f"{modello} riceve una sola immagine per invio: il riferimento per lo stile non partirebbe.",
@@ -615,7 +663,8 @@ class Coda:
             motore.avanzamento = avanzamento
             self._dire(
                 f"Lavoro {identificativo}: destinazione dell'invio "
-                f"{lavoro.destinazione}. 1 immagine lascia questa macchina."
+                f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
+                "questa macchina."
             )
             # Da qui l'immagine parte: lo stato lo dice prima, non dopo.
             avanzamento(INVIATO)
@@ -647,8 +696,16 @@ class Coda:
         ricetta = render.with_name(render.name + ".ricetta.json")
         scrivi_atomico(render, risultato.immagine)
         scrivi_atomico(ricetta, risultato.ricetta.a_json())
-        scrivi_misura(Path(lavoro.vista), render)
-        altro = {"fuori_aree": self._misura_fuori_aree(lavoro, risultato.immagine)} if lavoro.aree else {}
+        altro = {}
+        if lavoro.contesto:
+            # La tenuta degli spigoli confronta il render con la vista: qui il
+            # render e' il contesto, e il numero sarebbe falso (regola 3). Si
+            # misura invece quanto e' cambiato il contesto fuori dall'area.
+            altro = {"fuori_aree": self._misura_contesto(lavoro, risultato.immagine)}
+        else:
+            scrivi_misura(Path(lavoro.vista), render)
+            if lavoro.aree:
+                altro = {"fuori_aree": self._misura_fuori_aree(lavoro, risultato.immagine)}
         self._chiudi(
             preso, FATTO_DIR, FATTO,
             render=str(render),
@@ -699,6 +756,13 @@ class Coda:
         ingresso, in_piu = dati, ()
         if lavoro.aree:
             ingresso, in_piu = modulo_aree.prepara(dati, lavoro.aree, lavoro.modo_aree)
+        if lavoro.contesto:
+            luogo = modulo_contesto.controlla_file(self.radice, Path(lavoro.contesto.file)).read_bytes()
+            modulo_immagine.misura(luogo)  # solleva se non e' un'immagine
+            # Prima il contesto con l'area, poi la vista: il rapporto del
+            # render segue la prima immagine, e il render e' il contesto.
+            ingresso, in_piu = lavoro.contesto.prepara(luogo), (dati,)
+            motore.controlla_prima_dell_invio(lavoro.modello, ingresso)
         if lavoro.riferimento:
             riferimento = controlla_riferimento(self.radice, Path(lavoro.riferimento)).read_bytes()
             modulo_immagine.misura(riferimento)  # solleva se non e' un'immagine
@@ -730,6 +794,15 @@ class Coda:
             return modulo_aree.misura(Path(lavoro.partenza).read_bytes(), render, lavoro.aree)
         except (OSError, ErroreAirender) as errore:
             self._dire(f"Lavoro {lavoro.identificativo}: misura fuori dalle aree non riuscita, {errore}")
+            return None
+
+    def _misura_contesto(self, lavoro: Lavoro, render: bytes) -> dict | None:
+        """Quanto e' cambiato il contesto fuori dall'area. None se non si misura o non riesce."""
+        try:
+            luogo = Path(lavoro.contesto.file).read_bytes()
+            return lavoro.contesto.misura(luogo, render)
+        except (OSError, ErroreAirender) as errore:
+            self._dire(f"Lavoro {lavoro.identificativo}: misura fuori dall'area non riuscita, {errore}")
             return None
 
     @staticmethod

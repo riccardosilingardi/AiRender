@@ -3,6 +3,8 @@
     python scripts/sonda_comfy.py --solo-schema        # gratis: legge lo schema
     python scripts/sonda_comfy.py --catalogo           # gratis: elenca i modelli
     python scripts/sonda_comfy.py                      # schema + UNA generazione
+    python scripts/sonda_comfy.py --modello vertexai/gemini-3.1-flash-image --base64-nudo --ricerca-web
+                                                       # una generazione con la ricerca Google accesa
 
 Serve a una cosa sola: vedere come risponde davvero il Router prima di
 scrivere lo schema dei modelli in core/provider/comfy.py. Il corpo della
@@ -223,6 +225,22 @@ def corpo_candidato(modello: str, prompt: str, dati: bytes, nudo: bool) -> dict:
     )
 
 
+def con_ricerca_web(modello: str, corpo: dict) -> dict:
+    """Il corpo Gemini con la ricerca Google accesa («Cerca sul web» di Inserisci nel contesto).
+
+    "tools": [{"googleSearch": {}}] e' la forma di Vertex AI REST, la stessa
+    famiglia del corpo Gemini che passa dal Router. MAI provata attraverso il
+    Router: e' proprio quello che questa sonda deve dire (lo accetta? costa
+    di piu'? la risposta porta i suggerimenti di ricerca da mostrare?).
+    """
+    if FAMIGLIE.get(modello) != FAMIGLIA_GEMINI:
+        raise SystemExit(
+            f"--ricerca-web vale solo per i modelli Gemini, non per {modello}.\n"
+            "Cosa fare: lancia con --modello vertexai/gemini-3.1-flash-image."
+        )
+    return {**corpo, "tools": [{"googleSearch": {}}]}
+
+
 # --- rete --------------------------------------------------------------------
 
 
@@ -410,6 +428,8 @@ def genera(dire: Uscita, argomenti, chiave: str, apri, attendi=time.sleep,
     scelto = trova_preset(argomenti.preset)
     prompt = componi(scelto, argomenti.testo)
     corpo = corpo_candidato(modello, prompt, dati, argomenti.base64_nudo)
+    if getattr(argomenti, "ricerca_web", False):
+        corpo = con_ricerca_web(modello, corpo)
     chiave_idempotenza = argomenti.chiave_idempotenza or str(uuid.uuid4())
     query = urllib.parse.urlencode({"fallback_provider": "false"})
     indirizzo = f"{BASE}/{modello}/requests?{query}"
@@ -511,6 +531,8 @@ def costruisci_parser() -> argparse.ArgumentParser:
     parser.add_argument("--testo", default="", help="due parole in coda al prompt del preset")
     parser.add_argument("--uscita", default="sonda-comfy", help="cartella per schema, risposte e immagine")
     parser.add_argument("--solo-schema", action="store_true", help="legge lo schema e si ferma: gratis")
+    parser.add_argument("--ricerca-web", action="store_true",
+                        help="solo Gemini: accende la ricerca Google nel corpo (tools.googleSearch), mai provata")
     parser.add_argument("--catalogo", action="store_true", help="elenca i modelli del Router: gratis")
     parser.add_argument("--base64-nudo", action="store_true",
                         help="manda il base64 senza 'data:image/png;base64,' davanti")

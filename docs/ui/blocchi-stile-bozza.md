@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 8 (2026-11-01)
+# Blocchi di stile — bozza 9 (2026-11-01)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -23,6 +23,23 @@ Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è
 Solo quando in Studio · Genera c'è un'immagine di riferimento: parte come seconda immagine e questa frase entra subito prima di «cosa evitare». Non provata: il primo render con un riferimento è anche la prima volta che Nano Banana 2 riceve due immagini in una chiamata vera.
 
 > The second image is a style reference only: take from it the colour palette, the light and the look of the materials. Do not copy its geometry, camera, objects or composition; the building stays the one in the first image.
+
+## Inserisci nel contesto (bozza 9, 2026-11-01)
+
+Cosa cambia dalla bozza 7: una scena nuova di Studio · Genera, il fotoinserimento. Parte con due immagini: **prima il contesto** portato dall'utente (screenshot satellitare, ortofoto, foto da drone) con il contorno magenta numerato dell'area dove va l'edificio, **poi la vista Allplan**. Il contesto va per primo perché il rapporto del render segue la prima immagine. Il prompt non usa i blocchi di stile: la luce è quella del contesto. Riscritti dal prompt Notion di Riccardo («Transform this Google Maps satellite screenshot…») e dal suo flusso a parole (thread del 2026-11-01). Nessuno è provato con il modello.
+
+Ordine: regola → inquadratura → luogo (se c'è) → materiali (se ci sono) → fuori dall'area intatto **oppure** pulisci la mappa → cosa evitare.
+
+> Photo insertion. The first image is the real site; the second image is a view of the new building designed for it. Place the building from the second image into the first image, inside the numbered magenta outline, and remove the outline and its number from the result. Adapt the building's perspective, scale and orientation to the site, so it stands on the ground at a believable size next to the roads, trees and buildings around it. Keep the building's shape, proportions, openings and materials as designed; do not redesign it. Match the light, sun direction, shadows, colour, haze and grain of the site image, so the building looks photographed together with it.
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `zenitale` | Zenitale | The site image is a top-down aerial view: show the building from straight above, as roofs, terraces and the ground around it, with its shadow cast on the ground in the same direction as the other shadows. | 204 |
+| `volo` | Volo d'uccello | The site image is an oblique bird's-eye view: show the building from the same height and direction as the buildings around it, with its facades and roof foreshortened like theirs and its shadow in the same direction as the other shadows. | 237 |
+| `contesto-fuori` | Fuori dall'area il contesto resta com'e' | Outside the outline keep every pixel of the site image exactly as it is. | 72 |
+| `contesto-pulisci` | Pulisci lo screenshot della mappa | The site image is a map screenshot: remove every interface element (labels, street names, pins, icons, logos, buttons, compass, watermarks) and fill those spots with what would realistically be underneath. Turn the whole image into a photorealistic, high-resolution aerial photograph of the same place, keeping every road, building footprint, tree and field in its position, size and orientation; do not add or remove buildings. | 428 |
+
+Il luogo passa come lo scrive l'utente, anche in italiano: «The site is at <luogo>.»
 
 ## Rese (bozza 7, 2026-10-31)
 

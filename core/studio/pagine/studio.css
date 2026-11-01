@@ -371,3 +371,10 @@ select { min-height: 34px; padding: 0 10px; }
 }
 .elenco-verifiche { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--testo-2); }
 .vuoto-ritocco { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+/* Inserisci nel contesto: la stessa tela del Ritocca, con un rettangolo solo. */
+.tela-contesto { margin: 4px 0; }
+.link-file { color: var(--accento); cursor: pointer; text-decoration: underline; }
+.riga.grigio { opacity: .6; }
+#luogo-contesto { width: 100%; }
+.colonna-stile.spenta-contesto { opacity: .55; }

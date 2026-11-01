@@ -119,7 +119,7 @@ resta solo dove il modello non ha il materiale.
 ## 7 · Costruito e funzionante
 
 Il motore e lo Studio. Girano da riga di comando su qualunque macchina,
-senza Allplan. `pytest`: **390 test verdi**, nessuna chiamata di rete, nessuna
+senza Allplan. `pytest`: **522 test verdi**, nessuna chiamata di rete, nessuna
 chiave necessaria per farli girare.
 
 ```bash
@@ -755,6 +755,28 @@ poggiano su cose non ancora provate:
 - **`SelectAllElements` lascia selezionato tutto il modello** — non
   verificato. È l'unica chiamata della sonda che tocca qualcosa; se succede,
   basta un clic nel vuoto.
+
+### Lasciato dalla sessione del 2026-11-01 (inserisci nel contesto)
+
+- **Nano Banana 2 inserisce l'edificio nell'area del contesto** — mai
+  provato: blocchi scritti dal prompt Notion di Riccardo e dal suo flusso a
+  parole, non mandati. Per verificare: nello Studio carica uno screenshot del
+  luogo, disegna l'area, cattura da Allplan la vista in pianta (zenitale) o
+  dall'alto di sbieco (volo d'uccello) e Genera. Guarda se l'edificio sta
+  nell'area, alla scala giusta, e la misura «fuori dall'area».
+- **L'ordine contesto-poi-vista dà al render la forma del contesto** —
+  dedotto dal codice (il rapporto segue la prima immagine), non provato.
+- **«Cerca sul web» (ricerca Google di Nano Banana) passa dal Router** —
+  mai provato, comando in grigio. Per verificare:
+  `py scripts\sonda_comfy.py --modello vertexai/gemini-3.1-flash-image --base64-nudo --ricerca-web`
+  (una generazione, circa 17 crediti più l'eventuale ricerca). Se il Router
+  rifiuta `tools`, resta spento; se lo accetta, vanno letti costo e
+  suggerimenti di ricerca che i termini Google chiedono di mostrare.
+- **Lo screenshot da Google Earth si può usare** — non è una questione del
+  codice: i termini di Google Maps Platform vietano di usare quelle immagini
+  con modelli di AI. AIRENDER non le scarica; lo screenshot lo porta
+  l'utente, e per la vendita va detto (thread «Pianificare il
+  fotoinserimento», 2026-11-01).
 
 ### Usciti da questa sezione, con la loro verifica
 
