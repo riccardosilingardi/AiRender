@@ -147,3 +147,40 @@ def test_la_sonda_non_manda_niente_in_rete():
     for file in (SCRIPT, RADICE / "allplan" / "comune" / "sonda_materiali.py"):
         testo = file.read_text(encoding="utf-8")
         assert not re.search(r"urllib|http\.client|requests|socket|core\.provider", testo), file
+
+
+def test_proprieta_legge_i_valori_e_non_chiama_nessun_metodo():
+    """Caso del 2026-11-01: chiamare alla cieca i Get* di un elemento ha chiuso Allplan."""
+
+    class Comuni:
+        Layer = 3601
+        Color = 7
+
+        def GetSurface(self):  # noqa: N802  pylint: disable=invalid-name
+            raise AssertionError("non va chiamato")
+
+    letti = sonda.proprieta(Comuni())
+    assert letti == {"Color": "7", "Layer": "3601"}
+
+
+def test_il_diario_dice_l_ultima_chiamata_prima_di_un_crash(tmp_path):
+    diario = sonda.Diario(tmp_path / "s")
+    assert diario.ultima() == ""
+    diario.ricomincia()
+    diario.prima("elemento 0: GetDisplayName")
+    diario.prima("elemento 0 (Muro): GetAttributes")
+    # Allplan si chiude qui: alla riapertura il diario dice dove.
+    assert sonda.Diario(tmp_path / "s").ultima() == "elemento 0 (Muro): GetAttributes"
+    diario.ricomincia()
+    assert diario.ultima() == ""
+
+
+def test_la_lettura_degli_elementi_non_chiama_alla_cieca():
+    """L'adattatore legge con nomi precisi, annota ogni chiamata e non usa GetElement."""
+    testo = SCRIPT.read_text(encoding="utf-8")
+    inizio = testo.index("def _elementi")
+    fine = testo.index("def _attributi")
+    lettura = testo[inizio:fine]
+    assert "sonda.descrivi(" not in lettura
+    assert "GetElement(" not in lettura
+    assert lettura.count("self.diario.prima(") >= 5

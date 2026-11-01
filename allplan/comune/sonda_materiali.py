@@ -17,6 +17,7 @@ decide niente: scrive quello che ha visto in un file che Riccardo rimanda.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections import Counter
 from datetime import datetime
@@ -26,6 +27,7 @@ from typing import Any, Callable
 FILE_RISULTATI = "risultati-materiali.txt"
 FILE_ELEMENTI = "elementi.json"
 FILE_API = "api.txt"
+FILE_DIARIO = "diario-lettura.txt"
 VISTA_NORMALE = "vista-normale.png"
 VISTA_COLORMAP = "vista-colormap.png"
 
@@ -41,7 +43,9 @@ SALTA = re.compile(r"Geometr|Document|Parent|Child|Polyhedron|Vertic|Faces|Edges
 
 # Quanti elementi descrivere al massimo: abbastanza per un modello di prova,
 # non tanti da bloccare Allplan per minuti su un progetto vero.
-MASSIMO_ELEMENTI = 150  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+# Il 2026-11-01 la lettura di tutto un progetto vero ha fatto chiudere Allplan:
+# si leggono pochi elementi, scegliendoli fra quelli selezionati se ce ne sono.
+MASSIMO_ELEMENTI = 30  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
 # Quanti colori elencare per immagine: una vista con piu' materiali di cosi' e' gia' una risposta.
 COLORI_ELENCATI = 24  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
 # Oltre questa lunghezza un valore letto si tronca: serve vederlo, non archiviarlo.
@@ -70,6 +74,54 @@ class Registro:
         percorso = self.cartella / nome
         percorso.write_text(contenuto, encoding="utf-8")
         return percorso
+
+
+class Diario:
+    """Una riga scritta su disco PRIMA di ogni chiamata ad Allplan.
+
+    Se Allplan si chiude di colpo (un errore dentro Allplan, che Python non
+    puo' fermare), l'ultima riga del diario dice quale chiamata, su quale
+    elemento. Ogni riga si forza su disco subito.
+    """
+
+    def __init__(self, cartella: Path):
+        self.percorso = cartella / FILE_DIARIO
+        self.cartella = cartella
+
+    def ricomincia(self) -> None:
+        self.cartella.mkdir(parents=True, exist_ok=True)
+        self.percorso.write_text("", encoding="utf-8")
+
+    def prima(self, testo: str) -> None:
+        self.cartella.mkdir(parents=True, exist_ok=True)
+        with self.percorso.open("a", encoding="utf-8") as file:
+            file.write(testo + "\n")
+            file.flush()
+            os.fsync(file.fileno())
+
+    def ultima(self) -> str:
+        try:
+            righe = self.percorso.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return ""
+        return righe[-1] if righe else ""
+
+
+def proprieta(oggetto: Any) -> dict[str, str]:
+    """Solo i valori gia' pronti di un oggetto (le proprieta'), senza chiamare nessun metodo.
+
+    E' la lettura prudente: chiamare alla cieca i metodi Get* degli elementi
+    di Allplan ha fatto chiudere Allplan su un progetto vero.
+    """
+    letti: dict[str, str] = {}
+    for nome in dir(oggetto):
+        if nome.startswith("_") or SALTA.search(nome):
+            continue
+        ok, valore = prova(lambda n=nome: getattr(oggetto, n))
+        if ok and callable(valore):
+            continue
+        letti[nome] = corto(valore) if ok else valore
+    return letti
 
 
 def corto(valore: Any) -> str:
