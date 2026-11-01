@@ -142,3 +142,32 @@ Allplan solo in `v2027/pacchetto/PythonPartsScripts/riccardo_silingardi/airender
 Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-materiali`
 (`risultati-materiali.txt`, `diario-lettura.txt`, `api.txt`, `elementi.json`, le due immagini), e a
 parole come hai messo la color map (quale comando, quale opzione).
+
+## La sonda della color map: `AIRENDER sonda color map` (Allplan 2027, 2026-11-01)
+
+La color map fatta dai materiali di Allplan, non dalla segmentazione (decisione
+di Riccardo del 2026-11-01). Sugli elementi selezionati legge il materiale
+(SurfacePath, poi attributi 335 e 508), crea una superficie **nuova** a tinta
+unita per ogni materiale (`DocumentResourceService.CreateSurface`, in
+`Usr\Local\AIRENDER\sonda-colormap\superfici`), la assegna
+(`ElementsPropertyService.ModifySurface`), salva la finestra e poi rimette le
+superfici di prima. **Cambia il modello: solo su una copia.** Non modifica mai
+un file `.surf` esistente. Logica in `comune/sonda_colormap.py` (pytest),
+Allplan solo in `v2027/.../AirenderSondaColormap.py`.
+
+1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
+2. Fai una **copia** di un progetto piccolo con qualche materiale e aprila.
+3. Scheda Library › Privato › AIRENDER › **AIRENDER sonda color map**.
+4. Finestra 3D com'è di solito, **Salva vista normale**.
+5. Seleziona gli elementi che si vedono (in un progetto piccolo anche tutti),
+   **Leggi i materiali**. Ne legge al massimo 300, saltando quelli 2D; ogni
+   chiamata si scrive prima in `diario-lettura.txt`.
+6. Spunta **Ho aperto una COPIA del progetto**, **Colora per materiale**.
+   Senza la casella si ferma. Scrive `ripristino.json` prima di cambiare.
+7. Senza muovere la camera, **Salva color map**: scrive `legenda.json`
+   (colore → materiale Allplan) e quanta parte dell'immagine è vicina ai colori chiesti.
+8. **Rimetti le superfici**. Se qualcosa non torna, chiudi la copia senza salvare.
+9. **Apri la cartella**.
+
+Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-colormap`, e a
+parole se la vista si è colorata e se è tornata com'era.

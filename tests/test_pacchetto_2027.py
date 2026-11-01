@@ -126,7 +126,7 @@ def test_installa_copia_e_toglie_le_prove_vecchie(tmp_path):
 
     assert not (usr / "PythonPartsScripts" / "airender").exists()
     assert sorted(p.name for p in libreria.iterdir()) == [
-        "AirenderPalette.pyp", "AirenderSondaMateriali.pyp", "palette_nessuna.png"]
+        "AirenderPalette.pyp", "AirenderSondaColormap.pyp", "AirenderSondaMateriali.pyp", "palette_nessuna.png"]
     assert (script / "AirenderPalette.py").is_file()
     assert not (script / "core" / "rimasto.py").exists()
     assert (usr / "PythonPartsActionbar" / pacchetto.SVILUPPATORE / "airender" / "Airender_24.png").is_file()
