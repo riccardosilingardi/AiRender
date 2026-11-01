@@ -173,8 +173,13 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
         ),
         _espansore(
             "Sezione5", "In arrivo",
-            *[_parametro(f"InArrivo{i}", "Text", f"{voce}: in arrivo, non ancora attivo")
-              for i, voce in enumerate(("Cambia materiale", "Annota aree", "Livelli", "Video"))],
+            *[_parametro(f"InArrivo{i}", "Text", testo)
+              for i, testo in enumerate((
+                  "Cambia materiale: in arrivo, non ancora attivo",
+                  "Livelli: in arrivo, non ancora attivo",
+                  "Annota aree: nello Studio, scheda Ritocca",
+                  "Video: nello Studio, scheda Video",
+              ))],
         ),
         _parametro("Cartella", "String", "Cartella delle viste (vuota = Usr\\AIRENDER\\viste)", ""),
     ]
