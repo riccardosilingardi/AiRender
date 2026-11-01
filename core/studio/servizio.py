@@ -81,9 +81,13 @@ MODELLI = (
     Modello("bfl/flux-kontext-pro", "FLUX.1 Kontext Pro", "Black Forest Labs"),
     # Costo non ancora misurato: lo dira' il primo render.
     Modello("vertexai/gemini-3-pro-image", "Nano Banana Pro", "Google"),
+    # Aggiunti il 2026-11-01 dalla documentazione del Router, senza sonda:
+    # selezionabili, con l'avviso «non ancora provato» prima di ogni invio.
+    Modello("openai/gpt-image-2", "GPT Image 2", "OpenAI"),
+    Modello("byteplus/seedream-5-0-260128", "Seedream 5.0", "ByteDance"),
 )
-# Scritti a schermo e non selezionabili: il loro schema non e' verificato.
-MODELLI_NON_PROVATI = ("Seedream", "GPT Image")
+# Scritti a schermo e non selezionabili: oggi nessuno, restano per i prossimi.
+MODELLI_NON_PROVATI: tuple[str, ...] = ()
 
 # Come lo Studio chiama quello che una resa spegne.
 _NOMI_SPENTI = {

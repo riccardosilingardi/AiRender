@@ -30,6 +30,7 @@ come 70.
 from __future__ import annotations
 
 import base64
+import math
 import os
 import time
 import urllib.parse
@@ -91,6 +92,9 @@ class SchemaModello:
     verificato_il: str
     piu_immagini: bool = False
     piu_immagini_verificato_il: str = ""
+    # I rapporti che il modello accetta. Vuoto: qualunque rapporto (il corpo
+    # chiede la misura esatta in pixel), quindi niente cornice.
+    rapporti: tuple[str, ...] = ()
 
 
 # Rapporti che sia FLUX.1 Kontext sia Gemini accettano (schemi letti dalla
@@ -99,7 +103,7 @@ class SchemaModello:
 RAPPORTI = ("21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16")
 
 
-def rapporto_piu_vicino(dati: bytes) -> str:
+def rapporto_piu_vicino(dati: bytes, rapporti: tuple[str, ...] = RAPPORTI) -> str:
     larghezza, altezza = modulo_immagine.dimensioni(dati)
     voluto = larghezza / altezza
 
@@ -107,10 +111,11 @@ def rapporto_piu_vicino(dati: bytes) -> str:
         a, b = (int(x) for x in rapporto.split(":"))
         return abs(a / b - voluto)
 
-    return min(RAPPORTI, key=scarto)
+    return min(rapporti, key=scarto)
 
 
-def con_cornice(richiesta: RichiestaGenerazione) -> tuple[RichiestaGenerazione, "modulo_immagine.Cornice | None"]:
+def con_cornice(richiesta: RichiestaGenerazione,
+                rapporti: tuple[str, ...] = RAPPORTI) -> tuple[RichiestaGenerazione, "modulo_immagine.Cornice | None"]:
     """La richiesta con la vista (e le immagini in piu') al rapporto esatto che si mandera'.
 
     Il modello accetta solo i RAPPORTI fissi: una vista 1,63 partiva come 3:2
@@ -120,7 +125,7 @@ def con_cornice(richiesta: RichiestaGenerazione) -> tuple[RichiestaGenerazione, 
     allargano allo stesso modo, cosi' restano sovrapposte.
     """
     larghezza, altezza = modulo_immagine.dimensioni(richiesta.immagine)
-    a, b = (int(x) for x in rapporto_piu_vicino(richiesta.immagine).split(":"))
+    a, b = (int(x) for x in rapporto_piu_vicino(richiesta.immagine, rapporti).split(":"))
     voluto = a / b
     if abs(larghezza / altezza - voluto) / voluto <= config.CORNICE_TOLLERANZA:
         return richiesta, None
@@ -214,6 +219,77 @@ def _immagine_gemini(uscita: object) -> tuple[str, str]:
     raise _risultato_senza_immagine()
 
 
+# --- GPT Image e Seedream: dalla documentazione di Comfy Router ----------------
+# Letta il 2026-11-01 (docs.comfy.org/development/comfy-router/models, pagine
+# «code» di openai/gpt-image-1.5 e byteplus/seedream-5-0-260128). MAI ESEGUITO:
+# il primo render vero e' la prova, e lo Studio lo dice prima dell'invio.
+
+# GPT Image accetta solo queste misure (campo size): si manda la piu' vicina
+# alla vista, allargata con la cornice e poi tagliata, come per gli altri.
+MISURE_GPT = {"3:2": "1536x1024", "1:1": "1024x1024", "2:3": "1024x1536"}
+
+
+def _corpo_gpt(richiesta: RichiestaGenerazione) -> dict:
+    """Modifica d'immagine: la vista (e le immagini in piu') nel campo image, come data-URI.
+
+    Il Router prende gli URL solo dal suo archivio: il data-URI e' l'unica
+    forma che la documentazione dice funzionante da fuori.
+    """
+    immagini = (richiesta.immagine, *richiesta.immagini_in_piu)
+    return {
+        "prompt": richiesta.prompt,
+        "image": [immagine_data_uri(dati) for dati in immagini],
+        "size": MISURE_GPT[rapporto_piu_vicino(richiesta.immagine, tuple(MISURE_GPT))],
+        "quality": "high",
+        "output_format": "png",
+        "n": 1,
+    }
+
+
+# Seedream 5.0 chiede la misura in pixel (WxH): l'area deve stare fra circa
+# 2560x1440 e 3072x3072, il rapporto fra 1/16 e 16. Si chiede la forma esatta
+# della vista, quindi niente cornice.
+AREA_SEEDREAM = {"1k": 2560 * 1440, "2k": 2048 * 2048, "4k": 3072 * 3072}  # numero-non-configurabile: limiti di Seedream 5.0 (documentazione del Router)
+MULTIPLO_SEEDREAM = 16  # numero-non-configurabile: misure multiple di 16, come i modelli a diffusione si aspettano
+
+
+def misura_seedream(dati: bytes, risoluzione: str = "") -> str:
+    larghezza, altezza = modulo_immagine.dimensioni(dati)
+    area = AREA_SEEDREAM.get(risoluzione or "2k", AREA_SEEDREAM["2k"])
+    rapporto = larghezza / altezza
+    w = max(MULTIPLO_SEEDREAM, round(math.sqrt(area * rapporto) / MULTIPLO_SEEDREAM) * MULTIPLO_SEEDREAM)
+    h = max(MULTIPLO_SEEDREAM, round(area / w / MULTIPLO_SEEDREAM) * MULTIPLO_SEEDREAM)
+    return f"{w}x{h}"
+
+
+def _corpo_seedream(richiesta: RichiestaGenerazione) -> dict:
+    immagini = [immagine_data_uri(dati) for dati in (richiesta.immagine, *richiesta.immagini_in_piu)]
+    corpo = {
+        "prompt": richiesta.prompt,
+        "image": immagini[0] if len(immagini) == 1 else immagini,
+        "size": misura_seedream(richiesta.immagine, richiesta.dimensione_render),
+        "response_format": "b64_json",
+        "watermark": False,
+        "sequential_image_generation": "disabled",
+    }
+    if richiesta.seme is not None:
+        corpo["seed"] = richiesta.seme
+    return corpo
+
+
+def _immagine_dati(uscita: object) -> tuple[str, str]:
+    """Forma OpenAI, usata anche da Seedream: data[0].b64_json oppure data[0].url."""
+    try:
+        voce = uscita["data"][0]
+    except (KeyError, IndexError, TypeError):
+        raise _risultato_senza_immagine() from None
+    if isinstance(voce, dict) and voce.get("b64_json"):
+        return "base64", str(voce["b64_json"])
+    if isinstance(voce, dict) and voce.get("url"):
+        return "url", str(voce["url"])
+    raise _risultato_senza_immagine()
+
+
 def _risultato_senza_immagine() -> ErroreProvider:
     return ErroreProvider(
         "Comfy Router ha chiuso il lavoro senza un'immagine nel risultato.",
@@ -231,12 +307,14 @@ SCHEMI: dict[str, SchemaModello] = {
         corpo=_corpo_kontext,
         immagine=_immagine_kontext,
         verificato_il="2026-10-27",
+        rapporti=RAPPORTI,
     ),
     "vertexai/gemini-3.1-flash-image": SchemaModello(
         corpo=_corpo_gemini,
         immagine=_immagine_gemini,
         verificato_il="2026-10-27",
         piu_immagini=True,
+        rapporti=RAPPORTI,
     ),
     # Nano Banana Pro: aggiunto il 2026-10-31 su richiesta di Riccardo, PRIMA
     # della sonda. Il nome viene dalla documentazione di Comfy; il corpo e'
@@ -247,6 +325,22 @@ SCHEMI: dict[str, SchemaModello] = {
         corpo=_corpo_gemini,
         immagine=_immagine_gemini,
         verificato_il="",
+        rapporti=RAPPORTI,
+    ),
+    # GPT Image 2 e Seedream 5.0: aggiunti il 2026-11-01 su richiesta di
+    # Riccardo, dalla documentazione del Router e senza sonda (vedi sopra).
+    "openai/gpt-image-2": SchemaModello(
+        corpo=_corpo_gpt,
+        immagine=_immagine_dati,
+        verificato_il="",
+        piu_immagini=True,
+        rapporti=tuple(MISURE_GPT),
+    ),
+    "byteplus/seedream-5-0-260128": SchemaModello(
+        corpo=_corpo_seedream,
+        immagine=_immagine_dati,
+        verificato_il="",
+        piu_immagini=True,
     ),
 }
 
@@ -406,7 +500,7 @@ class ProviderComfy(Provider):
                 "Togli le immagini in piu' (maschera, mappa), oppure usa Nano Banana 2.",
             )
 
-        inviata, cornice = con_cornice(richiesta)
+        inviata, cornice = con_cornice(richiesta, schema.rapporti) if schema.rapporti else (richiesta, None)
         corpo = schema.corpo(inviata)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
         uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
@@ -426,7 +520,8 @@ class ProviderComfy(Provider):
             grana=richiesta.grana,
             dettaglio_grana=None,
             forza_struttura=None,
-            risoluzione=(richiesta.dimensione_render or "1k") if schema.corpo is _corpo_gemini else "",
+            risoluzione=((richiesta.dimensione_render or "1k") if schema.corpo is _corpo_gemini
+                         else str(corpo.get("size", ""))),
             aspetto="",
             generazione_fissa=False,
             impronta_sorgente=impronta(richiesta.immagine),
