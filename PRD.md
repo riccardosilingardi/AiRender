@@ -733,6 +733,29 @@ poggiano su cose non ancora provate:
 - **Dove salvare** — Riccardo non l'ha detto; scelta `esportati/` accanto
   alle viste.
 
+### Lasciato dalla sessione del 2026-10-31 (sonda dei materiali, prompt 15 fase A)
+
+- **Da un elemento di Allplan 2027 si legge il materiale assegnato** — non
+  verificato. La documentazione dell'API non si legge per intero da questo
+  ambiente: si vedono solo i nomi di classi come `SurfaceDefinition`,
+  `TextureMapping` e `ElementsSelectService.SelectAllElements`, e nessuna
+  firma. La sonda `AIRENDER sonda materiali` prova le letture possibili
+  (metodi `Get*` dell'elemento, proprietà comuni, attributi, elemento Python) e
+  scrive cosa torna. Un nome di materiale in `risultati-materiali.txt` vuol
+  dire sì.
+- **La color map di Allplan dà un colore pieno per materiale, alla stessa
+  grandezza della vista normale** — non verificato. Riccardo dice che la vista
+  si può mettere in color map. La sonda non sa farlo da script: la color map la
+  mette lui a mano, la sonda salva la finestra e conta i colori. Pochi colori
+  che coprono quasi tutta l'immagine vogliono dire sì.
+- **Il colore della color map si lega al nome del materiale** — non
+  verificato, ed è la domanda più difficile. Se Allplan non dà l'elenco
+  colore → materiale, serve un'altra strada, da decidere con l'uscita della
+  sonda.
+- **`SelectAllElements` lascia selezionato tutto il modello** — non
+  verificato. È l'unica chiamata della sonda che tocca qualcosa; se succede,
+  basta un clic nel vuoto.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di
