@@ -110,7 +110,10 @@ da qui:
 - **Esterno / Interno e il preset in Stile.** Il mockup non li ha; senza, la
   palette non saprebbe da quale combinazione partire. Sono lo switch e i preset
   dello Studio · Genera, con gli stessi nomi; Ora, Cielo e Intorno partono da
-  «Come il preset». Cielo e Intorno si vedono solo con Esterno.
+  «Come il preset». Cielo e Intorno si vedono solo con Esterno. Dal
+  2026-11-01 (bozza 8) il gruppo Vista ha una terza voce, **Arredo**: preset,
+  Luce e Sfondo dell'arredo, e Persone nascosto (condizione `Interno != 2`,
+  la prima con `!=`: da verificare che Allplan la accetti).
 - **Aggiorna.** Una palette di Allplan non si ridisegna da sola: lo stato del
   lavoro si rilegge dal disco a ogni clic, e Aggiorna serve a rileggerlo senza
   fare altro. «In corso da 0:12» è il tempo all'ultimo clic, non un orologio.
@@ -134,9 +137,12 @@ modello legge i colori della vista come materiali. Per colori veri, salva la
 vista con colori neutri.»
 
 **Colonna sinistra — lo stile**
-- Switch **Esterno / Interno**. È l'unico modo di dire cosa c'è nella vista:
-  non esiste un campo «Cosa c'è nella vista».
-- **Parti da un preset**: 8 preset esterni o 6 interni, secondo lo switch
+- Switch **Esterno / Interno / Arredo**. È l'unico modo di dire cosa c'è nella
+  vista: non esiste un campo «Cosa c'è nella vista». **Arredo** (dal
+  2026-11-01, bozza 8) è un pezzo d'arredo da solo fotografato come prodotto:
+  i Dettagli del preset hanno Resa, Look, Luce e **Sfondo**, senza Persone; il
+  primo piano lo dà l'inquadratura salvata in Allplan.
+- **Parti da un preset**: 8 preset esterni, 6 interni o 6 d'arredo, secondo lo switch
   (elenco in `docs/ui/blocchi-stile-bozza.md`). Le miniature sono
   **illustrazioni**, e lo dice la riga sopra la griglia: «Miniature
   illustrative: rendono l'idea, non sono render del modello». Si sostituiscono

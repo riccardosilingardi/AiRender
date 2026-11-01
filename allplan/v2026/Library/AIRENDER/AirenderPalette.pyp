@@ -157,6 +157,12 @@
 <Value>1</Value>
 <ValueType>RadioButton</ValueType>
 </Parameter>
+<Parameter>
+<Name>Interno2</Name>
+<Text>Arredo</Text>
+<Value>2</Value>
+<ValueType>RadioButton</ValueType>
+</Parameter>
 </Parameters>
 </Parameter>
 <Parameter>
@@ -176,6 +182,14 @@
 <Visible>Interno == 1</Visible>
 </Parameter>
 <Parameter>
+<Name>PresetArredo</Name>
+<Text>Preset</Text>
+<Value>Catalogo, fondo bianco</Value>
+<ValueList>Catalogo, fondo bianco|Studio, grigio caldo|Editoriale, ombre di sole|Dettaglio materiale|Controluce, fondo scuro|Ambientato, stanza sfocata</ValueList>
+<ValueType>StringComboBox</ValueType>
+<Visible>Interno == 2</Visible>
+</Parameter>
+<Parameter>
 <Name>LuceEsterno</Name>
 <Text>Ora</Text>
 <Value>Come il preset</Value>
@@ -190,6 +204,22 @@
 <ValueList>Come il preset|Mattino da finestra|Pomeriggio caldo|Giorno coperto|Sera, luci accese|Notte con lampade</ValueList>
 <ValueType>StringComboBox</ValueType>
 <Visible>Interno == 1</Visible>
+</Parameter>
+<Parameter>
+<Name>LuceArredo</Name>
+<Text>Luce</Text>
+<Value>Come il preset</Value>
+<ValueList>Come il preset|Softbox morbida|Finestra laterale|Luce radente · texture|Sole netto · editoriale|Controluce, bordi accesi</ValueList>
+<ValueType>StringComboBox</ValueType>
+<Visible>Interno == 2</Visible>
+</Parameter>
+<Parameter>
+<Name>Sfondo</Name>
+<Text>Sfondo</Text>
+<Value>Come il preset</Value>
+<ValueList>Come il preset|Fondo bianco infinito|Fondo grigio caldo|Parete in calce|Fondo antracite|Come nella vista|Stanza sfocata</ValueList>
+<ValueType>StringComboBox</ValueType>
+<Visible>Interno == 2</Visible>
 </Parameter>
 <Parameter>
 <Name>Cielo</Name>
@@ -221,6 +251,7 @@
 <Value>Come il preset</Value>
 <ValueList>Come il preset|Nessuna|Poche|In movimento</ValueList>
 <ValueType>StringComboBox</ValueType>
+<Visible>Interno != 2</Visible>
 </Parameter>
 <Parameter>
 <Name>Fedelta</Name>

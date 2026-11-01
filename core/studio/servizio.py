@@ -88,7 +88,7 @@ MODELLI_NON_PROVATI = ("Seedream", "GPT Image")
 _NOMI_SPENTI = {
     "materiali": "materiali a parole", "look": "look fotografico", "luce": "luce",
     "cielo": "cielo", "fuori": "fuori dalle finestre", "intorno": "intorno",
-    "verde": "verde", "persone": "persone", "qualita": "qualità",
+    "verde": "verde", "sfondo": "sfondo", "persone": "persone", "qualita": "qualità",
 }
 
 
@@ -108,6 +108,7 @@ _TITOLI_ASSI = {
     "cielo": "Cielo e stagione",
     "fuori": "Fuori dalle finestre",
     "arredo": "Arredo",
+    "sfondo": "Sfondo",
     "intorno": "Intorno all'edificio",
     "verde": "Verde",
     "persone": "Persone",
@@ -390,7 +391,7 @@ class Studio:
                 for b in blocchi.voci(asse, scena).values()
             ]
             titolo = _TITOLI_ASSI[asse]
-            if asse == "luce" and scena == blocchi.INTERNO:
+            if asse == "luce" and scena != blocchi.ESTERNO:
                 titolo = "Luce"
             assi.append({"id": asse, "titolo": titolo, "voci": voci})
         return assi
@@ -1368,8 +1369,8 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     """Le scelte in italiano, nell'ordine in cui partono i blocchi."""
     fedelta = scelte.fedelta or blocchi.FEDELTA_PREDEFINITA
     regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
-        else f"Fedeltà al disegno {blocchi.FEDELTA[fedelta].nome.lower()}"
-    pezzi = [regola, scelte.scena]
+        else f"Fedeltà al disegno {blocchi.blocco('fedelta', fedelta, scelte.scena).nome.lower()}"
+    pezzi = [regola, blocchi.SCENA[scelte.scena].nome.lower() if scelte.scena in blocchi.SCENA else scelte.scena]
     resa = blocchi.resa_valida(scelte.resa)
     via = blocchi.SPENTI_DA_RESA[resa]
     if scelte.materiali.strip() and "materiali" not in via:
@@ -1383,6 +1384,7 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
         "cielo": "cielo {}",
         "fuori": "{}",
         "arredo": "{}",
+        "sfondo": "{}",
         "intorno": "intorno: {}",
         "verde": "verde: {}",
         "persone": "persone: {}",

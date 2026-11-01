@@ -60,7 +60,7 @@ def test_le_condizioni_di_visibilita_nominano_campi_che_esistono():
     for nome, parametro in parametri.items():
         condizione = parametro.findtext("Visible")
         if condizione and condizione != "False":
-            campo = condizione.split("==")[0].strip()
+            campo = re.split(r"==|!=", condizione)[0].strip()
             assert campo in parametri, f"{nome}: {condizione}"
 
 
