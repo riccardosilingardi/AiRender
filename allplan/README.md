@@ -124,13 +124,16 @@ Allplan solo in `v2027/pacchetto/PythonPartsScripts/riccardo_silingardi/airender
 2. Apri un modello con qualche materiale assegnato (texture o superfici
    diverse), meglio piccolo.
 3. Scheda Library › Privato › AIRENDER › **AIRENDER sonda materiali**.
-4. **Elenca l'API**. Poi seleziona a mano pochi elementi con materiali
-   diversi (3-5 muri o solai) e premi **Leggi gli elementi**: legge quelli,
-   al massimo 30 (se non ne trova di selezionati, i primi 30 del modello).
-   Ogni chiamata si scrive prima in `diario-lettura.txt`: se Allplan si
-   chiude, l'ultima riga dice dove, e alla riapertura la sonda la copia nei
-   risultati. Il 2026-11-01 la versione di prima (tutti gli elementi, metodi
-   chiamati alla cieca) ha fatto chiudere Allplan su un progetto vero.
+4. **Elenca l'API**, poi **Leggi gli elementi**. Legge il nome di tutti gli
+   elementi, scrive quanti ce ne sono per tipo, poi ne descrive al massimo 30
+   saltando quelli 2D (linee, punti, testi, quote), 3 per tipo. Per ognuno
+   chiede la superficie assegnata (`GetElement` › `GetTextureDefinition` ›
+   `SurfacePath`, e le proprieta' dei muri e solai). Ogni chiamata si scrive
+   prima in `diario-lettura.txt` e `elementi.json` si riscrive a ogni
+   elemento: se Allplan si chiude, l'ultima riga del diario dice dove e gli
+   elementi gia' letti restano. Il 2026-11-01 la prima versione (metodi
+   chiamati alla cieca) ha fatto chiudere Allplan; la seconda ha retto ma ha
+   letto i primi 30 elementi, tutti 2D.
 5. Clicca nella finestra 3D com'e' di solito, **Salva vista normale**.
 6. Senza muovere la camera, metti la finestra in color map (un colore per
    materiale), **Salva color map**.

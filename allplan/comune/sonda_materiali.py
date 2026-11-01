@@ -76,6 +76,38 @@ class Registro:
         return percorso
 
 
+# Gli elementi 2D: non hanno materiale. La prima lettura (2026-11-01) ha preso
+# i primi 30 di 13570 ed erano quasi tutti linee e punti.
+NOMI_2D = re.compile(
+    r"^(linea|punto|testo|cerchio|arco|polilinea|polilinea 2d|spline|curva|retino|campitura|"
+    r"riempimento|quota|quotatura|simbolo|smart symbol|etichetta|freccia|testo variabile|"
+    r"line|point|text|circle|polyline|hatch(ing)?|pattern|fill(ing)?|dimension( line)?|label)$",
+    re.IGNORECASE)
+# Quanti elementi leggere per ogni tipo, per vedere tipi diversi e non 30 muri uguali.
+PER_TIPO = 3  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+
+
+def conta_tipi(nomi: list[str]) -> list[tuple[str, int]]:
+    """I tipi di elemento del modello col loro numero, il piu' frequente per primo."""
+    return Counter(nomi).most_common()
+
+
+def scegli_elementi(nomi: list[str], per_tipo: int = PER_TIPO, massimo: int | None = None) -> list[int]:
+    """Gli indici da leggere: pochi per ogni tipo che non e' 2D, fino a `massimo`."""
+    massimo = MASSIMO_ELEMENTI if massimo is None else massimo
+    presi: Counter = Counter()
+    scelti: list[int] = []
+    for indice, nome in enumerate(nomi):
+        pulito = nome.strip().strip("'\"")
+        if not pulito or NOMI_2D.match(pulito) or presi[pulito] >= per_tipo:
+            continue
+        presi[pulito] += 1
+        scelti.append(indice)
+        if len(scelti) >= massimo:
+            break
+    return scelti
+
+
 class Diario:
     """Una riga scritta su disco PRIMA di ogni chiamata ad Allplan.
 
