@@ -93,3 +93,33 @@ def test_telecomando_non_importa_allplan():
     testo = (RADICE / "allplan" / "comune" / "telecomando.py").read_text(encoding="utf-8")
     assert "NemAll_Python" not in testo
     assert "NemAll_Python" not in (V2026 / "scrivi_palette_pyp.py").read_text(encoding="utf-8")
+
+
+def test_la_palette_non_promette_funzioni_che_non_ci_sono():
+    """Caso (2026-11-01): Riccardo vede «Cambia materiale» e «Video» come «in arrivo»."""
+    testo = PYP.read_text(encoding="utf-8").lower()
+    assert "in arrivo" not in testo
+    assert "cambia materiale" not in testo
+
+
+def test_la_palette_dice_come_tornare_alla_library():
+    """Caso (2026-11-01): dalla palette non si trova la via per tornare alla Library."""
+    assert "premi Esc" in PYP.read_text(encoding="utf-8")
+
+
+def _ritorno_di_on_cancel(percorso: Path) -> str:
+    albero = ast.parse(percorso.read_text(encoding="utf-8"))
+    for nodo in ast.walk(albero):
+        if isinstance(nodo, ast.FunctionDef) and nodo.name == "on_cancel_function":
+            return ast.unparse(nodo)
+    return ""
+
+
+def test_esc_chiude_palette_e_sonda_senza_creare_niente():
+    """Esc deve chiudere, non creare elementi ne' ricominciare l'input."""
+    sonda = (RADICE / "allplan" / "v2027" / "pacchetto" / "PythonPartsScripts"
+             / "riccardo_silingardi" / "airender" / "AirenderSondaMateriali.py")
+    for percorso in (ADATTATORE, sonda):
+        corpo = _ritorno_di_on_cancel(percorso)
+        assert "OnCancelFunctionResult.CANCEL_INPUT" in corpo, percorso
+        assert "CREATE_ELEMENTS" not in corpo and "RESTART" not in corpo, percorso

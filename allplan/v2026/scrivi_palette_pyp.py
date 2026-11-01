@@ -41,6 +41,10 @@ EVENTI = {
     "ApriCartella": 1007,
     "VediTaglio": 1008,
 }
+# Allplan non mette un pulsante «indietro» nella palette di un PythonPart:
+# si chiude con Esc, che fa tornare la Library (on_cancel_function
+# nell'adattatore). Lo si scrive in cima, perche' non e' ovvio.
+TESTO_CHIUDI = "Per tornare alla Library premi Esc. I render in corso continuano."
 # 1002 era «Prova a secco», tolta dalla palette il 2026-10-31: non si riusa,
 # cosi' un .pyp vecchio rimasto in giro non fa partire un'altra azione.
 
@@ -122,6 +126,7 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
         _nascosto("LavoroAttivo", "String", ""),
         _nascosto("UltimaVista", "String", ""),
         _nascosto("UltimoRender", "String", ""),
+        _parametro("Chiudi", "Text", TESTO_CHIUDI),
         _espansore(
             "Sezione1", "1 · Vista",
             _sola_lettura("VistaNome", "Vista"),
@@ -172,13 +177,11 @@ def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
                   _pulsante("ApriCartella", "Apri cartella")),
         ),
         _espansore(
-            "Sezione5", "In arrivo",
-            *[_parametro(f"InArrivo{i}", "Text", testo)
+            "Sezione5", "Nello Studio",
+            *[_parametro(f"NelloStudio{i}", "Text", testo)
               for i, testo in enumerate((
-                  "Cambia materiale: in arrivo, non ancora attivo",
-                  "Livelli: in arrivo, non ancora attivo",
-                  "Annota aree: nello Studio, scheda Ritocca",
-                  "Video: nello Studio, scheda Video",
+                  "Annota aree e ritocchi: scheda Ritocca",
+                  "Video dai render: scheda Video",
               ))],
         ),
         _parametro("Cartella", "String", "Cartella delle viste (vuota = Usr\\AIRENDER\\viste)", ""),

@@ -25,6 +25,12 @@ from BaseScriptObject import BaseScriptObject, BaseScriptObjectData
 from BuildingElement import BuildingElement
 from CreateElementResult import CreateElementResult
 
+try:
+    # Esc chiude la palette e fa tornare la Library: on_cancel_function piu' sotto.
+    from ScriptObjectInteractors.OnCancelFunctionResult import OnCancelFunctionResult
+except ImportError:  # un framework senza questo modulo: resta il comportamento di Allplan
+    OnCancelFunctionResult = None
+
 _CARTELLA = Path(__file__).resolve().parent
 if str(_CARTELLA) not in sys.path:
     sys.path.insert(0, str(_CARTELLA))
@@ -138,6 +144,15 @@ class AirenderPalette(BaseScriptObject):
         # un modello cambiato si vede prima di Genera (regola 5).
         self._aggiorna_invio()
         return CreateElementResult()
+
+    def on_cancel_function(self):
+        """Esc: chiude la palette senza creare niente e torna alla Library.
+
+        I lavori gia' in coda continuano: li fa girare un processo a parte.
+        """
+        if OnCancelFunctionResult is None:
+            return super().on_cancel_function()
+        return OnCancelFunctionResult.CANCEL_INPUT
 
     # ------------------------------------------------------------ cartella
 
