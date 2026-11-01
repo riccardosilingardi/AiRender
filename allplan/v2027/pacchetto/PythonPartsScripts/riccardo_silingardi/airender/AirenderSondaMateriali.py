@@ -74,6 +74,11 @@ class AirenderSondaMateriali(BaseScriptObject):
         usr = Path(AllplanSettings.AllplanPaths.GetUsrPath())
         self.cartella = usr / "AIRENDER" / "sonda-materiali"
         self.registro = sonda.Registro(self.cartella)
+        self.diario = sonda.Diario(self.cartella)
+        precedente = self.diario.ultima()
+        if precedente and not precedente.startswith("fine"):
+            # L'ultima volta Allplan si e' chiuso a meta' lettura: questa e' la chiamata che l'ha fatto.
+            self.registro.scrivi("2 elementi", f"la lettura precedente si e' fermata su: {precedente}")
         self.analisi: dict[str, dict] = {}
         self.registro.scrivi(
             "avvio", f"Allplan {_VERSIONE_ALLPLAN['valore']} · Python {sys.version.split()[0]} · "
@@ -129,15 +134,26 @@ class AirenderSondaMateriali(BaseScriptObject):
             riga = self.registro.scrivi("2 elementi", "documento non trovato: nessuna lettura possibile")
             _messaggio(riga)
             return
-        ok, elementi = sonda.prova(lambda: AllplanBaseEle.ElementsSelectService.SelectAllElements(documento))
+        self.diario.ricomincia()
+        # Prima gli elementi selezionati da Riccardo; se non ce ne sono, tutti.
+        self.diario.prima("GetSelectedElements(documento)")
+        ok, elementi = sonda.prova(lambda: AllplanBaseEle.ElementsSelectService.GetSelectedElements(documento))
+        da = "selezionati"
+        if not ok or not list(elementi):
+            self.diario.prima("SelectAllElements(documento)")
+            ok, elementi = sonda.prova(lambda: AllplanBaseEle.ElementsSelectService.SelectAllElements(documento))
+            da = "tutti"
         if not ok:
-            riga = self.registro.scrivi("2 elementi", f"SelectAllElements(documento): {elementi}")
+            self.diario.prima("fine: nessun elemento letto")
+            riga = self.registro.scrivi("2 elementi", f"lettura degli elementi ({da}): {elementi}")
             _messaggio(riga)
             return
         elenco = list(elementi)
-        letti = [self._leggi(documento, adattatore) for adattatore in elenco[:sonda.MASSIMO_ELEMENTI]]
+        letti = [self._leggi(documento, adattatore, i)
+                 for i, adattatore in enumerate(elenco[:sonda.MASSIMO_ELEMENTI])]
+        self.diario.prima("fine: lettura completa")
         self.registro.scrivi_file(sonda.FILE_ELEMENTI, sonda.json_elementi(letti))
-        self.registro.scrivi("2 elementi", f"{len(elenco)} elementi nel documento, descritti {len(letti)} "
+        self.registro.scrivi("2 elementi", f"{len(elenco)} elementi ({da}), descritti {len(letti)} "
                                            f"in {sonda.FILE_ELEMENTI}")
         trovati = sonda.valori_di_materiale(letti)
         if trovati:
@@ -147,17 +163,26 @@ class AirenderSondaMateriali(BaseScriptObject):
         else:
             self.registro.scrivi("2 materiali", "nessun campo da materiale letto con successo")
             esito = "Nessun campo da materiale letto: va cercata un'altra strada (elenco in api.txt)."
-        _messaggio(f"{len(elenco)} elementi letti. {esito}\n\n"
-                   "Ora metti la finestra 3D com'e' di solito e premi «Salva vista normale».")
+        _messaggio(f"{len(elenco)} elementi ({da}), letti {len(letti)}. {esito}\n\n"
+                   "Se dopo resta selezionato tutto, clicca nel vuoto. "
+                   "Poi metti la finestra 3D com'e' di solito e premi «Salva vista normale».")
 
-    def _leggi(self, documento, adattatore) -> dict:
-        """Tutto quello che si legge di un elemento, senza cambiarlo."""
-        dati: dict = {"adattatore": sonda.descrivi(adattatore)}
+    def _leggi(self, documento, adattatore, indice: int) -> dict:
+        """Poche letture con nome, ognuna annotata nel diario prima di farla.
+
+        Niente chiamate alla cieca ai metodi Get* e niente GetElement: il
+        2026-11-01 hanno fatto chiudere Allplan su un progetto vero.
+        """
+        dati: dict = {}
+        for nome in ("GetDisplayName", "GetElementAdapterType"):
+            self.diario.prima(f"elemento {indice}: {nome}")
+            ok, valore = sonda.prova(getattr(adattatore, nome))
+            dati[nome] = sonda.corto(valore) if ok else valore
+        self.diario.prima(f"elemento {indice} ({dati.get('GetDisplayName', '')}): GetCommonProperties")
         ok, comuni = sonda.prova(adattatore.GetCommonProperties)
-        dati["proprieta_comuni"] = sonda.descrivi(comuni, 0) if ok else comuni
+        dati["proprieta_comuni"] = sonda.proprieta(comuni) if ok else comuni
+        self.diario.prima(f"elemento {indice} ({dati.get('GetDisplayName', '')}): GetAttributes")
         dati["attributi"] = self._attributi(documento, adattatore)
-        ok, elemento = sonda.prova(lambda: AllplanBaseEle.GetElement(adattatore))
-        dati["elemento_python"] = sonda.descrivi(elemento) if ok and elemento is not None else elemento
         return dati
 
     def _attributi(self, documento, adattatore) -> dict:

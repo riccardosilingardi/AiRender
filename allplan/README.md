@@ -123,15 +123,19 @@ Allplan solo in `v2027/pacchetto/PythonPartsScripts/riccardo_silingardi/airender
 1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
 2. Apri un modello con qualche materiale assegnato (texture o superfici
    diverse), meglio piccolo.
-3. Libreria › Privato › AIRENDER › **AIRENDER sonda materiali**.
-4. **Elenca l'API**, poi **Leggi gli elementi**. Su un progetto grande la
-   lettura puo' durare un po': ne descrive al massimo 150. Se dopo resta
-   selezionato tutto, clicca nel vuoto.
+3. Scheda Library › Privato › AIRENDER › **AIRENDER sonda materiali**.
+4. **Elenca l'API**. Poi seleziona a mano pochi elementi con materiali
+   diversi (3-5 muri o solai) e premi **Leggi gli elementi**: legge quelli,
+   al massimo 30 (se non ne trova di selezionati, i primi 30 del modello).
+   Ogni chiamata si scrive prima in `diario-lettura.txt`: se Allplan si
+   chiude, l'ultima riga dice dove, e alla riapertura la sonda la copia nei
+   risultati. Il 2026-11-01 la versione di prima (tutti gli elementi, metodi
+   chiamati alla cieca) ha fatto chiudere Allplan su un progetto vero.
 5. Clicca nella finestra 3D com'e' di solito, **Salva vista normale**.
 6. Senza muovere la camera, metti la finestra in color map (un colore per
    materiale), **Salva color map**.
 7. Rimetti la finestra com'era, **Apri la cartella**.
 
 Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-materiali`
-(`risultati-materiali.txt`, `api.txt`, `elementi.json`, le due immagini), e a
+(`risultati-materiali.txt`, `diario-lettura.txt`, `api.txt`, `elementi.json`, le due immagini), e a
 parole come hai messo la color map (quale comando, quale opzione).
