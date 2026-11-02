@@ -636,7 +636,7 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "Non misurata",
         "Misura grezza: ombre nuove, neve e vegetazione davanti contano come spigoli persi.",
         "Misura ora",
-        "Rifai con la stessa ricetta",
+        "Variante",
         "Prima serve un render. Generane uno da Genera.",            # Ritocca, vuoto
         "Disegna un'area, poi scrivi cosa cambiare nella sua nota.",
         "Un'area senza nota non dice al modello cosa fare.",

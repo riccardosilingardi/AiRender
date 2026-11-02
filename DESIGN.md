@@ -246,10 +246,10 @@ decisione che questa schermata deve far prendere.
 - **Com'è stato fatto** (la ricetta): stile, modello, le parole dell'utente,
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
-- **Adesso**: Rifai con la stessa ricetta, Apri cartella, Copia immagine,
-  **Esporta per il cliente** (dal 2026-10-31, vedi sotto).
-- **Cambia una parte**: **Annota per aree** apre Ritocca su questo render; in
-  grigio Cambia un materiale e Fai un video da qui.
+- **Sotto l'immagine** (dal 2026-11-02): **Ritocca · Variante · Video**, vedi
+  «Azioni sotto l'immagine».
+- **Adesso**: Apri cartella, Copia immagine, **Esporta per il cliente** (dal
+  2026-10-31, vedi sotto).
 
 - **Vuoto:** «Nessun render ancora. Scegli uno stile in Genera e premi
   Genera.» Niente slider, niente ricetta.
@@ -438,8 +438,9 @@ finto, non render veri. Dove lo Studio v1 si scosta dal mockup, e perché:
   ritagliata da un render del banco di prova (`scripts/miniatura_da_banco.py`):
   sotto la tessera c'è «render vero del <data>», e la riga sopra la griglia
   dice quante sono illustrazioni e quante render veri.
-- **Rifai con la stessa ricetta** chiede conferma, con destinazione e costo,
-  prima di rimettere il lavoro in coda: è un invio che si paga (regola 5).
+- **Rifai con la stessa ricetta** è diventato **Variante** sotto l'immagine
+  (2026-11-02): parte con un clic, e destinazione e costo sono scritti sotto i
+  pulsanti prima del clic (regola 5).
 - **Genera è spento mentre un lavoro è in corso**, con la ragione accanto: due
   invii di fila per un clic doppio si pagano due volte. Le scelte restano
   modificabili.
@@ -726,6 +727,45 @@ una auto mi ha fatto sparire quelle precedenti». Niente interfaccia a nodi.
   quella di prima.
 - Il pannello «Fuori dalle aree» dice «com'era prima» invece della misura;
   la misura del risultato intero resta nello stato del lavoro.
+
+## Azioni sotto l'immagine, meno parole e video, costruiti il 2026-11-02
+
+Proposte 3, 4 e 5 delle migliorie allo Studio, più due richieste di Riccardo
+sul video («devo poter caricare le immagini frame di riferimento, ad esempio
+inizio, fine e intermezzo», «le immagini del video le carichi direttamente dai
+render fatti», durata più lunga).
+
+**Azioni sotto l'immagine (Risultato)**
+- Tre pulsanti uguali per ogni render: **Ritocca** (apre Ritocca su questo
+  render), **Variante** (stessa ricetta, un'altra immagine), **Video**.
+- Sotto i pulsanti, sempre visibile: «Variante: va a <servizio> · costo».
+- Il risultato nasce accanto all'immagine da cui parte: la striscia dello
+  storico è in ordine d'albero, ogni immagine subito dopo quella da cui parte.
+  Finito, è già quello scelto.
+- **Video** apre un riquadro piccolo: movimento della camera, «Cosa succede» a
+  parole (facoltativo, entra nel prompt), dove va con modello «mai provato»,
+  durata e risoluzione (le prime della scheda Video), **Genera video**. Spento
+  finché non c'è un movimento, o se un video è già in lavorazione, con la
+  ragione accanto. Mandato: «Video in coda», e la tessera compare nella
+  striscia accanto all'immagine.
+- Al posto di «Cambia una parte» e di «Rifai con la stessa ricetta».
+
+**Meno parole**
+- Le spiegazioni lunghe diventano un «?» accanto all'etichetta: il testo
+  intero al passaggio del mouse o con Tab. Dove la spiegazione dice che un
+  numero o un testo è **scelto e non misurato**, resta una riga breve visibile
+  («Testi scelti, non ancora confrontati.», «Scelte nostre, non misurate.»).
+- Errori, rifiuti e stati vuoti non cambiano: si spiegano da soli.
+
+**Video**
+- Ogni posto si riempie con **Dai render** (la griglia dei render fatti, di
+  tutte le viste) o **Da file…**.
+- Nuovo modo **Inizio, intermezzo, fine** (3 render). Seedance 2.5 non ha un
+  fotogramma di mezzo: partono due video primo-ultimo (inizio→intermezzo,
+  intermezzo→fine) con la durata scelta ciascuno. Nell'elenco sono una voce
+  sola con un lettore che suona i due tratti di fila; nella cartella sono due
+  file, e lo si dice.
+- Durate: 5, 10, 15, 20, 30 secondi (Seedance arriva a 30).
 
 ## Schermate sostituite il 2026-10-27
 
