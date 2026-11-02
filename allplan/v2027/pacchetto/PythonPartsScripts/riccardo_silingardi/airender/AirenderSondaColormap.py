@@ -1,7 +1,12 @@
 """AIRENDER sonda color map: la color map fatta dai materiali di Allplan, sulla copia di un progetto.
 
-Non e' il prodotto: e' una prova usa e getta. Ogni pulsante fa un passo e
-scrive cosa ha visto in `Usr\\...\\AIRENDER\\sonda-colormap\\`. La logica che
+Non e' il prodotto: e' una prova usa e getta. Due pulsanti: «Colora» (salva la
+vista normale, legge tutti gli elementi 3D, colora per materiale) e «Salva e
+rimetti» (salva la color map, rimette le superfici). Tutto finisce in
+`Usr\\...\\AIRENDER\\sonda-colormap\\`.
+
+Niente selezione a mano: con la palette aperta Allplan non lascia selezionare
+(provato da Riccardo il 2026-11-02). La sonda prende tutti gli elementi. La logica che
 non ha bisogno di Allplan sta in `sonda_colormap.py` e si prova con pytest.
 
 QUESTA SONDA CAMBIA IL MODELLO: assegna superfici nuove agli elementi
@@ -26,6 +31,12 @@ from BaseScriptObject import BaseScriptObject, BaseScriptObjectData
 from BuildingElement import BuildingElement
 from CreateElementResult import CreateElementResult
 
+try:
+    # Esc chiude la palette e fa tornare la Library, come nelle altre palette (#40).
+    from ScriptObjectInteractors.OnCancelFunctionResult import OnCancelFunctionResult
+except ImportError:  # un framework senza questo modulo: resta il comportamento di Allplan
+    OnCancelFunctionResult = None
+
 _CARTELLA = Path(__file__).resolve().parent
 if str(_CARTELLA) not in sys.path:
     sys.path.insert(0, str(_CARTELLA))
@@ -33,12 +44,9 @@ if str(_CARTELLA) not in sys.path:
 import sonda_colormap as sonda  # noqa: E402  pylint: disable=wrong-import-position
 import sonda_materiali as base  # noqa: E402  pylint: disable=wrong-import-position
 
-EVENTO_NORMALE = 3101
-EVENTO_LEGGI = 3102
-EVENTO_COLORA = 3103
-EVENTO_COLORMAP = 3104
-EVENTO_RIMETTI = 3105
-EVENTO_CARTELLA = 3106
+EVENTO_COLORA = 3101
+EVENTO_SALVA_E_RIMETTI = 3102
+EVENTO_CARTELLA = 3103
 
 print("Load AirenderSondaColormap.py")
 
@@ -56,7 +64,7 @@ def create_script_object(build_ele: BuildingElement,
 
 
 class AirenderSondaColormap(BaseScriptObject):
-    """Sei pulsanti: vista normale, leggi, colora, color map, rimetti, cartella."""
+    """Tre pulsanti: colora, salva e rimetti, apri la cartella."""
 
     def __init__(self, build_ele: BuildingElement, script_object_data: BaseScriptObjectData):
         super().__init__(script_object_data)
@@ -79,13 +87,16 @@ class AirenderSondaColormap(BaseScriptObject):
     def execute(self) -> CreateElementResult:
         return CreateElementResult()
 
+    def on_cancel_function(self):
+        """Esc: chiude la palette e torna alla Library."""
+        if OnCancelFunctionResult is None:
+            return super().on_cancel_function()
+        return OnCancelFunctionResult.CANCEL_INPUT
+
     def on_control_event(self, event_id: int) -> None:
         azioni = {
-            EVENTO_NORMALE: lambda: self._salva(sonda.VISTA_NORMALE, "1 vista normale"),
-            EVENTO_LEGGI: self._leggi_materiali,
-            EVENTO_COLORA: self._colora,
-            EVENTO_COLORMAP: lambda: self._salva(sonda.VISTA_COLORMAP, "4 color map"),
-            EVENTO_RIMETTI: self._rimetti,
+            EVENTO_COLORA: self._colora_tutto,
+            EVENTO_SALVA_E_RIMETTI: self._salva_e_rimetti,
             EVENTO_CARTELLA: self._apri_cartella,
         }
         azione = azioni.get(event_id)
@@ -114,20 +125,32 @@ class AirenderSondaColormap(BaseScriptObject):
 
     # ------------------------------------------------------------ passo 2
 
-    def _leggi_materiali(self) -> None:
+    def _colora_tutto(self) -> None:
+        """Vista normale, lettura di tutti gli elementi 3D, una superficie a tinta unita per materiale."""
+        if not self._e_una_copia():
+            _messaggio("Fermato: la casella «Ho aperto una COPIA» non e' spuntata.\n\n"
+                       "Questa prova cambia le superfici degli elementi. Apri una COPIA del "
+                       "progetto, spunta la casella, poi premi di nuovo «Colora».")
+            return
         documento = self._documento()
         if documento is None:
-            _messaggio(self.registro.scrivi("2 leggi", "documento non trovato"))
+            _messaggio(self.registro.scrivi("colora", "documento non trovato"))
             return
+        if not self._salva(sonda.VISTA_NORMALE, "1 vista normale"):
+            return
+        if not self._leggi_materiali(documento):
+            return
+        self._colora(documento)
+
+    def _leggi_materiali(self, documento) -> bool:
         self.diario.ricomincia()
-        self.diario.prima("GetSelectedElements(documento)")
-        ok, selezionati = base.prova(lambda: AllplanBaseEle.ElementsSelectService.GetSelectedElements(documento))
-        elenco = list(selezionati) if ok else []
+        self.diario.prima("SelectAllElements(documento)")
+        ok, tutti = base.prova(lambda: AllplanBaseEle.ElementsSelectService.SelectAllElements(documento))
+        elenco = list(tutti) if ok else []
         if not elenco:
-            self.diario.prima("fine: niente selezionato")
-            _messaggio("Non c'e' niente di selezionato.\n\nCosa fare: seleziona gli elementi che "
-                       "si vedono nella vista (in un progetto piccolo anche tutti), poi premi di nuovo.")
-            return
+            self.diario.prima("fine: nessun elemento")
+            _messaggio(self.registro.scrivi("2 leggi", f"nessun elemento letto: {base.corto(tutti)}"))
+            return False
         self.diario.prima(f"GetDisplayName su {len(elenco)} elementi")
         nomi = []
         for adattatore in elenco:
@@ -146,13 +169,14 @@ class AirenderSondaColormap(BaseScriptObject):
             self.registro.scrivi("2 materiale", f"{gruppo.colore or 'senza colore'} {gruppo.materiale} "
                                                 f"({gruppo.da}, {len(gruppo.indici)} elementi)")
         mancanti = sonda.senza_materiale(self.letti)
-        if mancanti:
-            self.registro.scrivi("2 senza materiale", " · ".join(mancanti))
-        tralasciati = len(elenco) - len(scelti)
-        _messaggio(f"{len(elenco)} selezionati, letti {len(self.letti)} non 2D "
-                   f"({tralasciati} 2D o oltre il limite). Materiali trovati: {len(self.gruppi)}.\n"
-                   f"Senza materiale: {', '.join(mancanti) or 'nessuno'}.\n\n"
-                   "Se il progetto aperto e' una COPIA, spunta la casella e premi «Colora per materiale».")
+        self.registro.scrivi("2 leggi", f"{len(elenco)} elementi, {len(self.letti)} 3D letti, "
+                                        f"{len(self.gruppi)} materiali; senza materiale: "
+                                        f"{' · '.join(mancanti) or 'nessuno'}")
+        if not self.gruppi:
+            _messaggio(f"Letti {len(self.letti)} elementi 3D, ma nessuno ha un materiale leggibile.\n\n"
+                       "Premi «Apri la cartella» e mandami la cartella.")
+            return False
+        return True
 
     def _leggi(self, documento, adattatore, indice: int) -> dict:
         dati: dict = {}
@@ -199,16 +223,7 @@ class AirenderSondaColormap(BaseScriptObject):
 
     # ------------------------------------------------------------ passo 3
 
-    def _colora(self) -> None:
-        if not self._e_una_copia():
-            _messaggio("Fermato: la casella «Ho aperto una COPIA del progetto» non e' spuntata.\n\n"
-                       "Questa prova cambia le superfici degli elementi. Apri una copia del "
-                       "progetto, spunta la casella, poi premi di nuovo.")
-            return
-        if not self.gruppi:
-            _messaggio("Prima premi «Leggi i materiali» con gli elementi selezionati.")
-            return
-        documento = self._documento()
+    def _colora(self, documento) -> None:
         # Prima di cambiare qualcosa: come rimetterlo.
         self.registro.scrivi_file(sonda.FILE_RIPRISTINO, sonda.json_gruppi(self.gruppi))
         superfici = self.cartella / "superfici"
@@ -235,9 +250,10 @@ class AirenderSondaColormap(BaseScriptObject):
                                              f"ModifySurface {'ok' if riuscita else 'non riuscita'}: {base.corto(esito)}")
         self.diario.prima("fine: colora")
         self.registro.scrivi_file(sonda.FILE_RIPRISTINO, sonda.json_gruppi(self.gruppi))
-        _messaggio(f"Colorati {colorati} materiali su {len(self.gruppi)}.\n\n"
-                   "Guarda la finestra 3D: ogni materiale dovrebbe avere un colore pieno. "
-                   "Senza muovere la camera, premi «Salva color map».")
+        elenco = "\n".join(f"  {g.colore}  {g.materiale}" for g in self.gruppi if g.colore)
+        _messaggio(f"Colorati {colorati} materiali su {len(self.gruppi)}:\n{elenco}\n\n"
+                   "Guarda la finestra 3D: ogni materiale dovrebbe avere un colore pieno.\n"
+                   "Senza muovere la camera, premi «Salva e rimetti».")
 
     def _crea_superficie(self, documento, cartella: Path, nome: str, colore: str) -> str:
         definizione = AllplanBaseEle.SurfaceDefinition()
@@ -251,25 +267,30 @@ class AirenderSondaColormap(BaseScriptObject):
 
     # ------------------------------------------------------------ passi 1 e 4
 
-    def _salva(self, nome: str, passo: str) -> None:
+    def _salva(self, nome: str, passo: str) -> bool:
         percorso = self.cartella / nome
         self.cartella.mkdir(parents=True, exist_ok=True)
         riuscita = AllplanBaseEle.DrawingService.SaveWindowToImageFile(str(percorso))
         if not riuscita or not percorso.exists():
             riga = self.registro.scrivi(passo, f"SaveWindowToImageFile ha restituito {riuscita}, file assente")
             _messaggio(f"{riga}\n\nClicca una volta dentro la finestra 3D, poi premi di nuovo.")
-            return
+            return False
         ok, analisi = base.prova(lambda: base.colori(percorso))
-        riga = self.registro.scrivi(passo, base.descrivi_colori(analisi) if ok else f"colori non letti: {analisi}")
-        if nome == sonda.VISTA_NORMALE:
-            _messaggio(f"{riga}\n\nOra seleziona gli elementi della vista e premi «Leggi i materiali».")
+        self.registro.scrivi(passo, base.descrivi_colori(analisi) if ok else f"colori non letti: {analisi}")
+        return True
+
+    def _salva_e_rimetti(self) -> None:
+        if not any(g.superficie_nuova for g in self.gruppi):
+            _messaggio("Prima premi «Colora».")
             return
+        if not self._salva(sonda.VISTA_COLORMAP, "4 color map"):
+            return
+        percorso = self.cartella / sonda.VISTA_COLORMAP
         ok, vicini = base.prova(lambda: sonda.vicini_alla_tavolozza(percorso, [g.colore for g in self.gruppi]))
         if ok:
             self.registro.scrivi("4 tavolozza", sonda.descrivi_vicini(vicini))
         self.registro.scrivi_file(sonda.FILE_LEGENDA, sonda.legenda(self.gruppi, vicini if ok else None))
-        _messaggio(f"{riga}\n\n{sonda.descrivi_vicini(vicini) if ok else vicini}\n\n"
-                   "Ora premi «Rimetti le superfici», poi «Apri la cartella» e mandami tutta la cartella.")
+        self._rimetti()
 
     # ------------------------------------------------------------ passo 5
 
@@ -304,8 +325,9 @@ class AirenderSondaColormap(BaseScriptObject):
         self.diario.prima("fine: rimetti")
         avviso = (f"\n\nNon rimessi: {', '.join(non_rimessi)}. Chiudi la COPIA senza salvare."
                   if non_rimessi else "")
-        _messaggio(f"Rimesse le superfici di {rimessi} materiali.{avviso}\n\n"
-                   "Guarda se la vista e' tornata com'era e scrivimelo.")
+        _messaggio(f"Color map salvata. Rimesse le superfici di {rimessi} materiali.{avviso}\n\n"
+                   "Guarda se la vista e' tornata com'era, poi premi «Apri la cartella» "
+                   "e mandami la cartella sonda-colormap.")
 
     def _apri_cartella(self) -> None:
         self.cartella.mkdir(parents=True, exist_ok=True)

@@ -157,17 +157,18 @@ Allplan solo in `v2027/.../AirenderSondaColormap.py`.
 
 1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
 2. Fai una **copia** di un progetto piccolo con qualche materiale e aprila.
-3. Scheda Library › Privato › AIRENDER › **AIRENDER sonda color map**.
-4. Finestra 3D com'è di solito, **Salva vista normale**.
-5. Seleziona gli elementi che si vedono (in un progetto piccolo anche tutti),
-   **Leggi i materiali**. Ne legge al massimo 300, saltando quelli 2D; ogni
-   chiamata si scrive prima in `diario-lettura.txt`.
-6. Spunta **Ho aperto una COPIA del progetto**, **Colora per materiale**.
-   Senza la casella si ferma. Scrive `ripristino.json` prima di cambiare.
-7. Senza muovere la camera, **Salva color map**: scrive `legenda.json`
-   (colore → materiale Allplan) e quanta parte dell'immagine è vicina ai colori chiesti.
-8. **Rimetti le superfici**. Se qualcosa non torna, chiudi la copia senza salvare.
-9. **Apri la cartella**.
+   Il titolo della finestra di Allplan deve dire la copia, non il progetto vero.
+3. Finestra 3D com'è di solito.
+4. Scheda Library › Privato › AIRENDER › **AIRENDER sonda color map**.
+   Niente da selezionare: con la palette aperta Allplan non lascia
+   selezionare (provato il 2026-11-02), quindi la sonda prende tutti gli
+   elementi 3D del progetto (al massimo 2000, il 2D si salta).
+5. Spunta **Ho aperto una COPIA**, premi **Colora**. Salva la vista normale,
+   legge i materiali, scrive `ripristino.json`, poi colora. Senza la casella si ferma.
+6. Guarda la finestra. Senza muovere la camera premi **Salva e rimetti**: salva
+   la color map, scrive `legenda.json` (colore → materiale Allplan) e rimette
+   le superfici di prima. Se qualcosa non torna, chiudi la copia senza salvare.
+7. **Apri la cartella**.
 
 Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-colormap`, e a
 parole se la vista si è colorata e se è tornata com'era.

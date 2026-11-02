@@ -74,7 +74,7 @@ def test_quanta_immagine_e_vicina_ai_colori_chiesti(tmp_path):
                                   "elementi": 2, "parte_immagine": 0.5}
 
 
-def test_il_pyp_ha_la_casella_della_copia_e_i_sei_pulsanti_dello_script():
+def test_il_pyp_ha_la_casella_della_copia_e_i_tre_pulsanti_dello_script():
     radice = ET.parse(PYP).getroot()
     assert radice.findtext("Script/Name") == "riccardo_silingardi\\airender\\AirenderSondaColormap.py"
     parametri = {p.findtext("Name"): p for p in radice.iter("Parameter")}
@@ -82,7 +82,7 @@ def test_il_pyp_ha_la_casella_della_copia_e_i_sei_pulsanti_dello_script():
     assert parametri["Copia"].findtext("Value") == "False"
     eventi = sorted(int(p.findtext("EventId")) for p in parametri.values() if p.findtext("EventId"))
     testo = SCRIPT.read_text(encoding="utf-8")
-    assert eventi == list(range(3101, 3107))
+    assert eventi == list(range(3101, 3104))
     for evento in eventi:
         assert f"= {evento}" in testo
 

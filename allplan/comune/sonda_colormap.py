@@ -4,7 +4,7 @@ Decisione di Riccardo (2026-11-01): la color map si fa dai materiali di
 Allplan, non dalla segmentazione. La sonda prova la strada sulla COPIA di un
 progetto:
 
-1. legge il materiale di ogni elemento selezionato (SurfacePath, poi gli
+1. legge il materiale di ogni elemento 3D del progetto (SurfacePath, poi gli
    attributi 335 Nome_aspetto e 508 Materiale, come la sonda 2);
 2. crea una superficie NUOVA a tinta unita per ogni materiale
    (DocumentResourceService.CreateSurface) e la assegna ai suoi elementi
@@ -36,11 +36,12 @@ VISTA_COLORMAP = "vista-colormap.png"
 SENZA_MATERIALE = "(senza materiale)"
 PREFISSO_SUPERFICIE = "airender_colormap"
 
-# Quanti elementi selezionati leggere al massimo. La sonda 2 ne ha letti 30
-# senza problemi; la sonda 1 ha fatto chiudere Allplan su 150 elementi di un
-# progetto vero con chiamate alla cieca. Qui le chiamate hanno un nome e il
-# diario e' scritto prima di ognuna, ma si resta prudenti.
-MASSIMO_ELEMENTI = 300  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+# Quanti elementi 3D leggere al massimo. Con la palette aperta Allplan non
+# lascia selezionare (2026-11-02), quindi la sonda prende tutto il progetto e
+# salta il 2D. La sonda 2 ha letto 30 elementi senza problemi; la sonda 1 ha
+# fatto chiudere Allplan con chiamate alla cieca. Qui le chiamate hanno un nome
+# e il diario e' scritto prima di ognuna: su un progetto piccolo basta.
+MASSIMO_ELEMENTI = 2000  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
 # Distanza (somma delle differenze R, G, B) entro cui un pixel conta come
 # «colore della tavolozza»: luce e bordi sfumati lo spostano un po'.
 VICINO_ALLA_TAVOLOZZA = 60  # numero-non-configurabile: soglia a occhio della sonda usa e getta
