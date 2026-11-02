@@ -99,3 +99,26 @@ def test_la_sonda_non_cambia_niente_in_allplan():
 def test_la_logica_della_sonda_non_importa_allplan():
     testo = (RADICE / "allplan" / "comune" / "sonda_elenco.py").read_text(encoding="utf-8")
     assert "NemAll_Python" not in testo
+
+
+def test_i_valori_come_arrivano_da_allplan_il_2026_11_02():
+    """repr() raddoppia le barre e aggiunge gli apici; *varia* non e' un materiale."""
+    muro = {"GetDisplayName": "'Strato parete diritto'",
+            "attributi": {"335 Nome_aspetto": "'30yearedition materiali\\\\cemento faccia a vista\\\\exposed_concrete_02.surf'"},
+            "superficie": {}}
+    assert sonda.materiale_di(muro) == (
+        "exposed_concrete_02", "30yearedition materiali\\cemento faccia a vista\\exposed_concrete_02.surf", "335")
+    setto = {"GetDisplayName": "x", "attributi": {"508 Materiale": "'A.03.SETTO IN C.A.\\\\'"}, "superficie": {}}
+    assert sonda.materiale_di(setto) == ("A.03.SETTO IN C.A.", "A.03.SETTO IN C.A.", "508")
+    varia = {"GetDisplayName": "x", "attributi": {"335 Nome_aspetto": "'*varia*'", "508 Materiale": "'CLS'"},
+             "superficie": {}}
+    assert sonda.materiale_di(varia)[0::2] == ("CLS", "508")
+
+
+def test_il_limite_per_tipo_lascia_posto_agli_altri_tipi():
+    sys.path.insert(0, str(RADICE / "allplan" / "comune"))
+    import sonda_materiali as base  # pylint: disable=import-outside-toplevel
+
+    nomi = ["Sub-elemento facciata"] * 1040 + ["Parete diritta"] * 73
+    scelti = base.scegli_elementi(nomi, per_tipo=sonda.PER_TIPO, massimo=sonda.MASSIMO_ELEMENTI)
+    assert len(scelti) == sonda.PER_TIPO + 73

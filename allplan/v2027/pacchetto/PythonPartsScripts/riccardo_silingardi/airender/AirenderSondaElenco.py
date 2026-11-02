@@ -137,7 +137,10 @@ class AirenderSondaElenco(BaseScriptObject):
         materiali = sonda.elenca(letti)
         radici = self._radici()
         for posto, materiale in enumerate(materiali):
-            self._campione(posto, materiale, radici)
+            ok, errore = base.prova(lambda p=posto, m=materiale: self._campione(p, m, radici))
+            if not ok:  # un materiale che non va non ferma gli altri
+                materiale.note.append(str(errore))
+                self.registro.scrivi("campione", f"{materiale.materiale}: {errore}")
         self.diario.prima("fine: lettura completa")
         self.registro.scrivi_file(sonda.FILE_MATERIALI, sonda.json_materiali(materiali))
         mancanti = sonda.senza_materiale(letti)
@@ -171,7 +174,8 @@ class AirenderSondaElenco(BaseScriptObject):
         for adattatore in elenco:
             ok, nome = base.prova(adattatore.GetDisplayName)
             nomi.append(str(nome) if ok else "")
-        scelti = base.scegli_elementi(nomi, per_tipo=sonda.MASSIMO_ELEMENTI, massimo=sonda.MASSIMO_ELEMENTI)
+        scelti = base.scegli_elementi(nomi, per_tipo=sonda.PER_TIPO, massimo=sonda.MASSIMO_ELEMENTI)
+        self._completi: dict[str, int] = {}
         letti = [self._leggi(documento, elenco[indice], indice) for indice in scelti]
         self.registro.scrivi_file(sonda.FILE_ELEMENTI, base.json_elementi(letti))
         self.registro.scrivi("leggi", f"{len(elenco)} elementi nel modello, {len(letti)} 3D letti"
@@ -197,9 +201,16 @@ class AirenderSondaElenco(BaseScriptObject):
                     ok, percorso = base.prova(lambda: texture.SurfacePath)
                     superficie["SurfacePath"] = base.corto(percorso)
         dati["superficie"] = superficie
+        tipo = dati["GetDisplayName"]
+        if (sonda.materiale_di(dati)[0] == sonda.SENZA_MATERIALE
+                and self._completi.get(tipo, 0) < sonda.ATTRIBUTI_COMPLETI_PER_TIPO):
+            # Dove tengono il materiale facciate e macro? Tutti gli attributi, per pochi elementi.
+            self._completi[tipo] = self._completi.get(tipo, 0) + 1
+            self.diario.prima(f"elemento {indice} ({tipo}): GetAttributes, tutti")
+            dati["tutti_gli_attributi"] = self._attributi(documento, adattatore, tutti=True)
         return dati
 
-    def _attributi(self, documento, adattatore) -> dict:
+    def _attributi(self, documento, adattatore, tutti: bool = False) -> dict:
         stato = None
         for nome in ("eAttibuteReadState", "eAttributeReadState"):  # Allplan scrive la prima, con l'errore
             enum = getattr(AllplanBaseEle, nome, None)
@@ -216,7 +227,7 @@ class AirenderSondaElenco(BaseScriptObject):
             if not ok:
                 continue
             identificativo, valore = coppia
-            if str(identificativo) not in ("335", "508"):
+            if not tutti and str(identificativo) not in ("335", "508"):
                 continue  # qui servono solo i due attributi di materiale
             ok, nome = base.prova(
                 lambda i=identificativo: AllplanBaseEle.AttributeService.GetAttributeName(documento, i))
@@ -278,7 +289,11 @@ class AirenderSondaElenco(BaseScriptObject):
         """LoadSurfaceData riempie un SurfaceDefinition in memoria: e' una lettura."""
         for percorso in percorsi:
             self.diario.prima(f"LoadSurfaceData {percorso}")
-            definizione = AllplanBaseEle.SurfaceDefinition()
+            classe = _classe("SurfaceDefinition")
+            if classe is None:
+                materiale.note.append("SurfaceDefinition non trovata in BaseElements ne' in BasisElements")
+                return
+            definizione = classe()
             ok, esito = base.prova(lambda p=percorso: definizione.LoadSurfaceData(p))
             if not ok:
                 materiale.note.append(f"LoadSurfaceData({percorso}): {esito}")
@@ -293,6 +308,21 @@ class AirenderSondaElenco(BaseScriptObject):
     def _apri_cartella(self) -> None:
         self.cartella.mkdir(parents=True, exist_ok=True)
         os.startfile(str(self.cartella))  # pylint: disable=no-member  (solo Windows, come Allplan)
+
+
+def _classe(nome: str):
+    """Una classe che sta in BaseElements o in BasisElements secondo la versione.
+
+    Il 2026-11-02 nella 2027 SurfaceDefinition non era in BaseElements.
+    """
+    import importlib  # pylint: disable=import-outside-toplevel
+
+    for modulo in ("NemAll_Python_BaseElements", "NemAll_Python_BasisElements"):
+        ok, caricato = base.prova(lambda m=modulo: importlib.import_module(m))
+        classe = getattr(caricato, nome, None) if ok else None
+        if classe is not None:
+            return classe
+    return None
 
 
 def _rgb(colore) -> tuple[int, int, int] | None:

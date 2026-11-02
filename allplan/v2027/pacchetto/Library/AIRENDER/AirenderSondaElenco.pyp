@@ -4,7 +4,7 @@
 <Script>
 <Name>riccardo_silingardi\airender\AirenderSondaElenco.py</Name>
 <Title>AIRENDER elenco materiali</Title>
-<Version>0.1</Version>
+<Version>0.2</Version>
 </Script>
 <Page>
 <Name>Pagina</Name>
