@@ -1,0 +1,8 @@
+# Netlify legge questo file se la "Base directory" del sito e' server/.
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["listino.json"]

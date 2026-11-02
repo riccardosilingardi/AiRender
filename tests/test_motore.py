@@ -110,7 +110,8 @@ def test_nessuna_chiave_nel_repository():
     for percorso in sorted(RADICE.rglob("*")):
         if not percorso.is_file() or ".git/" in str(percorso):
             continue
-        if percorso.suffix not in (".py", ".md", ".json", ".txt", ".ini", ".example", ""):
+        if percorso.suffix not in (".py", ".md", ".json", ".txt", ".ini", ".example", "",
+                                   ".mjs", ".sql", ".toml", ".html"):
             continue
         testo = percorso.read_text(encoding="utf-8", errors="ignore")
         for riga in testo.splitlines():

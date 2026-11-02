@@ -23,6 +23,7 @@ from .lessico import controlla_etichetta
 # anche le proporzioni della vista (1376x768 contro 1392x752 di Kontext).
 # Un'immagine sola: il confronto va ripetuto su altre viste.
 MODELLI_PREDEFINITI = {
+    "airender": "vertexai/gemini-3.1-flash-image",
     "comfy": "vertexai/gemini-3.1-flash-image",
     "magnific": "realism",
 }
@@ -48,6 +49,10 @@ class Preset:
 
     def modello_per(self, provider: str) -> str:
         """Il modello che questo preset usa con quel servizio."""
+        # I crediti AIRENDER passano dallo stesso Comfy Router: un preset che
+        # dice il modello per "comfy" lo dice anche per "airender".
+        if provider == "airender" and provider not in self.modelli and "comfy" in self.modelli:
+            return self.modelli["comfy"]
         try:
             return self.modelli[provider]
         except KeyError:

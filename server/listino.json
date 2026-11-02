@@ -1,0 +1,116 @@
+{
+  "benvenuto": {
+    "render": 10,
+    "validita_mesi": 12
+  },
+  "iva": "esclusa",
+  "pesi": {
+    "vertexai/gemini-3-pro-image": {
+      "1K": 2,
+      "2K": 2,
+      "4K": 3
+    },
+    "vertexai/gemini-3.1-flash-image": {
+      "1K": 1,
+      "2K": 1,
+      "4K": 2
+    }
+  },
+  "piani": {
+    "base": {
+      "canali": [
+        "web"
+      ],
+      "dimensione_massima": "2K",
+      "modelli": [
+        "vertexai/gemini-3.1-flash-image"
+      ],
+      "nome": "Base",
+      "postazioni": 1,
+      "prezzo_anno": 190,
+      "prezzo_mese": 19,
+      "render_mese": 80,
+      "studio": false,
+      "tipo": "abbonamento"
+    },
+    "nessuno": {
+      "canali": [
+        "web"
+      ],
+      "dimensione_massima": "2K",
+      "modelli": [
+        "vertexai/gemini-3.1-flash-image"
+      ],
+      "nome": "Senza abbonamento",
+      "postazioni": 1,
+      "studio": false,
+      "tipo": "nessuno"
+    },
+    "pro": {
+      "canali": [
+        "web",
+        "plugin"
+      ],
+      "dimensione_massima": "4K",
+      "modelli": [
+        "vertexai/gemini-3.1-flash-image",
+        "vertexai/gemini-3-pro-image"
+      ],
+      "nome": "Pro",
+      "postazioni": 1,
+      "prezzo_anno": 390,
+      "prezzo_mese": 39,
+      "render_mese": 200,
+      "studio": true,
+      "tipo": "abbonamento"
+    },
+    "prova": {
+      "canali": [
+        "web",
+        "plugin"
+      ],
+      "dimensione_massima": "4K",
+      "modelli": [
+        "vertexai/gemini-3.1-flash-image",
+        "vertexai/gemini-3-pro-image"
+      ],
+      "nome": "Prova",
+      "postazioni": 1,
+      "prezzo": 15,
+      "render": 50,
+      "studio": true,
+      "tipo": "una_tantum",
+      "validita_mesi": 12
+    },
+    "studio": {
+      "canali": [
+        "web",
+        "plugin"
+      ],
+      "dimensione_massima": "4K",
+      "modelli": [
+        "vertexai/gemini-3.1-flash-image",
+        "vertexai/gemini-3-pro-image"
+      ],
+      "nome": "Studio",
+      "postazioni": 3,
+      "prezzo_anno": 990,
+      "prezzo_mese": 99,
+      "render_mese": 600,
+      "studio": true,
+      "tipo": "abbonamento"
+    }
+  },
+  "ricarica": {
+    "nome": "Ricarica",
+    "prezzo": 10,
+    "render": 100,
+    "validita_mesi": 12
+  },
+  "rivendita": {
+    "sconto_rivenditore": 30,
+    "sconto_segnalazione": 20
+  },
+  "valuta": "EUR",
+  "versione": "2026-11-02"
+}

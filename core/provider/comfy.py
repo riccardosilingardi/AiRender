@@ -389,6 +389,8 @@ class ProviderComfy(Provider):
     nome = "comfy"
     destinazione = "Comfy Router (api.comfy.org)"
     usa_forza_struttura = False
+    #: dove stanno le code dei modelli; il provider "airender" la cambia
+    base = BASE
 
     def __init__(
         self,
@@ -612,12 +614,12 @@ class ProviderComfy(Provider):
         massimo = config.ATTESA_MASSIMA_SECONDI if attesa_massima is None else attesa_massima
         query = urllib.parse.urlencode({"fallback_provider": FALLBACK})
         intestazioni = {
-            INTESTAZIONE_CHIAVE: self.chiave,
+            **self._intestazioni_chiave(),
             "Idempotency-Key": chiave_idempotenza,
             "Accept": "application/json",
         }
         stato, risposte, inviata = self._con_tentativi(
-            "POST", f"{BASE}/{modello}/requests?{query}", intestazioni, corpo
+            "POST", f"{self.base}/{modello}/requests?{query}", intestazioni, corpo
         )
         if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
             raise self._errore(stato, risposte, inviata, modello)
@@ -638,8 +640,8 @@ class ProviderComfy(Provider):
             dettagli["servito_da"] = servito_da
 
         # Le letture portano la chiave ma non l'idempotenza: non spendono.
-        lettura = {INTESTAZIONE_CHIAVE: self.chiave, "Accept": "application/json"}
-        lavoro = f"{BASE}/{modello}/requests/{urllib.parse.quote(str(richiesta_id), safe='')}"
+        lettura = {**self._intestazioni_chiave(), "Accept": "application/json"}
+        lavoro = f"{self.base}/{modello}/requests/{urllib.parse.quote(str(richiesta_id), safe='')}"
         scadenza = self._orologio() + massimo
 
         corpo_stato = inviata
@@ -658,11 +660,20 @@ class ProviderComfy(Provider):
                 continue
             if stato >= 400:  # numero-non-configurabile: confine HTTP fra ok ed errore
                 raise self._errore(stato, risposte, uscita, modello)
-            # Il Router dice quanto ha scalato sulla lettura del risultato
-            # (17.17 crediti per Nano Banana 2, sonda del 2026-10-27).
-            if risposte.get("x-comfy-credits-used"):
-                dettagli["crediti_usati"] = risposte["x-comfy-credits-used"]
+            dettagli.update(self._dettagli_risultato(risposte))
             return uscita, dettagli
+
+    def _intestazioni_chiave(self) -> dict:
+        """Come si presenta il plugin al servizio: qui la chiave Comfy dell'utente."""
+        return {INTESTAZIONE_CHIAVE: self.chiave}
+
+    def _dettagli_risultato(self, risposte: dict) -> dict:
+        """Cosa salvare nella ricetta dalle intestazioni del risultato."""
+        # Il Router dice quanto ha scalato sulla lettura del risultato
+        # (17.17 crediti per Nano Banana 2, sonda del 2026-10-27).
+        if risposte.get("x-comfy-credits-used"):
+            return {"crediti_usati": risposte["x-comfy-credits-used"]}
+        return {}
 
     def _con_tentativi(
         self, metodo: str, url: str, intestazioni: dict, corpo: dict | None = None

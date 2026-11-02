@@ -1,0 +1,10 @@
+{
+  "name": "airender-server",
+  "private": true,
+  "type": "module",
+  "description": "Server di vendita di AIRENDER: licenze, crediti, router verso Comfy. Nessuna dipendenza.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

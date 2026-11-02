@@ -12,7 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import config, grana as modulo_grana, immagine as modulo_immagine, provider as registro
+from . import config, grana as modulo_grana, immagine as modulo_immagine, licenza as modulo_licenza, provider as registro
 from .errori import (
     ChiaveMancante,
     ErroreAirender,
@@ -69,7 +69,7 @@ def costruisci_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--uscita", help="dove salvare il render")
     parser.add_argument(
-        "--provider", default=registro.PREDEFINITO, choices=registro.nomi(),
+        "--provider", default=registro.predefinito(), choices=registro.nomi(),
         help="quale servizio riceve l'immagine",
     )
     parser.add_argument(
@@ -83,6 +83,17 @@ def costruisci_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--elenca-preset", action="store_true", dest="elenca",
         help="elenca i preset inclusi e si ferma",
+    )
+    parser.add_argument(
+        "--licenza", metavar="AIR-XXXX-XXXX-XXXX-XXXX",
+        help=(
+            "incolla una volta il codice licenza ricevuto per email: da li' i "
+            "render passano dal server AIRENDER e si scalano dal tuo saldo"
+        ),
+    )
+    parser.add_argument(
+        "--saldo", action="store_true",
+        help="mostra piano, render disponibili e il link per ricaricare",
     )
     return parser
 
@@ -155,6 +166,18 @@ def esegui(argomenti, uscita_standard=None) -> int:
 
     if argomenti.elenca:
         return _mostra_preset()
+
+    if argomenti.licenza:
+        percorso = modulo_licenza.salva(argomenti.licenza)
+        dire(f"Codice licenza salvato in {percorso} (fuori dal plugin, solo per te).")
+        dire("Da ora i render passano dal server AIRENDER. Riavvia lo Studio o "
+             "Allplan se sono aperti.")
+        if not argomenti.saldo:
+            return USCITA_OK
+
+    if argomenti.saldo:
+        dire(modulo_licenza.racconta_saldo(modulo_licenza.saldo()))
+        return USCITA_OK
 
     if argomenti.rifai:
         return _riesegui(argomenti, dire)

@@ -547,7 +547,8 @@ class Studio:
         except (TypeError, ValueError):
             dei_materiali = 0
         motore = self._crea_provider(self.provider)
-        senza_ripiego = self.provider == comfy.ProviderComfy.nome and comfy.FALLBACK == "false"
+        # Anche "airender" passa dal Router, e il server forza il fallback spento.
+        senza_ripiego = isinstance(motore, comfy.ProviderComfy) and comfy.FALLBACK == "false"
         return {
             "modello": modello.identificativo,
             "modello_nome": modello.nome,

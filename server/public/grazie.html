@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRENDER · Grazie</title>
+<style>
+  :root { --sfondo:#f7f6f3; --testo:#1d1d1b; --tenue:#66645e; }
+  @media (prefers-color-scheme: dark) { :root { --sfondo:#161615; --testo:#ecebe6; --tenue:#a3a19a; } }
+  body { margin:0; background:var(--sfondo); color:var(--testo); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 64px 16px; }
+  p { color: var(--tenue); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pagamento ricevuto</h1>
+  <p id="testo">Fra qualche minuto ti arriva un'email con il codice licenza. Incollalo una volta nel plugin per Allplan: da lì in poi i render si scalano dal tuo saldo. La fattura elettronica arriva tramite SdI.</p>
+  <p><a href="/">Torna ai prezzi</a></p>
+</main>
+<script>
+  if (new URLSearchParams(location.search).get("prodotto") === "ricarica") {
+    document.getElementById("testo").textContent = "La ricarica è sul tuo saldo entro un minuto. Nel plugin premi Aggiorna per vederla. La fattura elettronica arriva tramite SdI.";
+  }
+</script>
+</body>
+</html>
