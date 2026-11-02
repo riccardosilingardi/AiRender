@@ -233,8 +233,30 @@ class AirenderPalette(BaseScriptObject):
             return
         ponte.scrivi_camera(vista, self._camera())
         self.build_ele.UltimaVista.value = str(vista)
+        self._leggi_materiali(vista)
         if self._valori().rapporto() is not None:
             self._vedi_taglio()  # con un formato fisso, si vede subito cosa resta fuori
+
+    def _leggi_materiali(self, vista: Path) -> None:
+        """I materiali del progetto, accanto alla vista, per la tabella dello Studio. Solo lettura.
+
+        Un errore qui non ferma la cattura: lo Studio scrive che i materiali
+        non si sono letti.
+        """
+        try:
+            import lettore_materiali  # pylint: disable=import-outside-toplevel
+            documento = None
+            # Come la sonda dell'elenco, che ha letto il 4253 il 2026-11-02.
+            for leggi in (lambda: self.document, lambda: self.coord_input.GetInputViewDocument()):
+                try:
+                    documento = leggi()
+                except Exception:  # pylint: disable=broad-exception-caught
+                    continue
+                if documento is not None:
+                    break
+            lettore_materiali.leggi_e_scrivi(documento, vista)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass  # lo scrive leggi_e_scrivi nel file dei materiali; lo Studio lo mostra
 
     def _camera(self) -> dict:
         """Da dove guarda la finestra. Ogni voce che fallisce resta scritta come errore."""

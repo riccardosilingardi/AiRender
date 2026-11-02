@@ -24,6 +24,7 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import contesto as modulo_contesto
+from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
 from .. import video as modulo_video
@@ -490,6 +491,8 @@ class Studio:
         prompt = contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte)
         if dati.get("riferimento") and not contesto:
             prompt = blocchi.aggiungi_riferimento(prompt)
+        cambi = self._cambi_scelti(dati) if not contesto else ()
+        prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(bool(dati.get("riferimento"))))
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
@@ -530,7 +533,8 @@ class Studio:
         }
 
     def destinazione(self, identificativo_modello: str, varianti: object = 1,
-                     riferimento: bool = False, contesto: bool = False) -> dict:
+                     riferimento: bool = False, contesto: bool = False,
+                     materiali_immagini: object = 0) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -538,6 +542,10 @@ class Studio:
         """
         modello = self._modello(identificativo_modello)
         quante = numero_varianti(varianti)
+        try:
+            dei_materiali = max(0, int(materiali_immagini or 0))
+        except (TypeError, ValueError):
+            dei_materiali = 0
         motore = self._crea_provider(self.provider)
         senza_ripiego = self.provider == comfy.ProviderComfy.nome and comfy.FALLBACK == "false"
         return {
@@ -552,8 +560,8 @@ class Studio:
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
             # Regola 5: quante immagini partono, detto prima del clic.
-            "immagini": 2 if (riferimento or contesto) else 1,
-            "cosa_parte": _cosa_parte(riferimento, contesto),
+            "immagini": (2 if (riferimento or contesto) else 1) + dei_materiali,
+            "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali),
             "contesto_non_accettato": (
                 f"{modello.nome} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due. "
                 "Scegli Nano Banana 2."
@@ -562,8 +570,12 @@ class Studio:
                 f"{modello.nome} riceve una sola immagine per invio: il riferimento non partirebbe. "
                 "Toglilo, oppure scegli Nano Banana 2."
                 if riferimento and not motore.accetta_piu_immagini(modello.identificativo) else None),
+            "materiali_non_accettati": (
+                f"{modello.nome} riceve una sola immagine per invio: le immagini dei materiali non partirebbero. "
+                "Scegli Nano Banana 2."
+                if dei_materiali and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
-                                   if (riferimento or contesto) else None),
+                                   if (riferimento or contesto or dei_materiali) else None),
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -574,11 +586,15 @@ class Studio:
         scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
         riferimento = self._riferimento_scelto(dati)
+        cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None, contesto=contesto is not None)
+                                         riferimento=riferimento is not None, contesto=contesto is not None,
+                                         materiali_immagini=modulo_materiali.quante_immagini(cambi))
         prompt = _prompt_a_mano(dati) or (contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte))
         if riferimento is not None:
             prompt = blocchi.aggiungi_riferimento(prompt)
+        if not _prompt_a_mano(dati):
+            prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(riferimento is not None))
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
@@ -595,6 +611,9 @@ class Studio:
         if destinazione["contesto_non_accettato"]:
             problemi.append({"fatto": destinazione["contesto_non_accettato"],
                              "cosa_fare": "Scegli Nano Banana 2, oppure togli il contesto."})
+        if destinazione["materiali_non_accettati"]:
+            problemi.append({"fatto": destinazione["materiali_non_accettati"],
+                             "cosa_fare": "Scegli Nano Banana 2, oppure togli la spunta dai materiali."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -617,8 +636,10 @@ class Studio:
         scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
         riferimento = self._riferimento_scelto(dati)
+        cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None, contesto=contesto is not None)
+                                         riferimento=riferimento is not None, contesto=contesto is not None,
+                                         materiali_immagini=modulo_materiali.quante_immagini(cambi))
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -627,17 +648,69 @@ class Studio:
             varianti=destinazione["varianti"],
             riferimento=riferimento,
             contesto=contesto,
+            materiali=cambi,
         )
 
     def _riferimento_scelto(self, dati: dict) -> Path | None:
         nome = dati.get("riferimento")
         return self.percorso_riferimento(str(nome)) if nome else None
 
+    # --- materiali del progetto Allplan ----------------------------------
+
+    def materiali_della_vista(self, nome: str) -> dict:
+        """I materiali che la palette ha letto quando ha catturato la vista."""
+        vista = self.percorso_vista(nome)
+        elenco = modulo_materiali.leggi_elenco(vista)
+        massimo = config.MATERIALI_CAMBIATI_MASSIMI
+        if elenco is None:
+            return {"letti": False, "materiali": [], "senza_materiale": [], "massimo": massimo,
+                    "letto_il": None, "errore": None}
+        return {
+            "letti": True,
+            "letto_il": elenco["letto_il"],
+            "errore": elenco["errore"],
+            "massimo": massimo,
+            "senza_materiale": elenco["senza_materiale"],
+            "materiali": [{**m.a_dizionario(),
+                           "anteprima": f"/file/materiale/{m.anteprima}" if m.anteprima else None}
+                          for m in elenco["materiali"]],
+        }
+
+    def percorso_anteprima_materiale(self, nome: str) -> Path:
+        return modulo_materiali.controlla_anteprima(self.cartella, nome)
+
+    def _cambi_scelti(self, dati: dict, vista: Path | None = None) -> tuple:
+        """I materiali spuntati, con anteprima e foto prese dalle loro cartelle, mai dalla pagina."""
+        scelti = dati.get("materiali") or []
+        if not scelti:
+            return ()
+        if not isinstance(scelti, list):
+            raise RichiestaStudioNonValida("I materiali da cambiare non sono arrivati bene.",
+                                           "Ricarica la pagina dello Studio.")
+        vista = vista or self.percorso_vista(str(dati.get("vista") or ""))
+        elenco = modulo_materiali.leggi_elenco(vista)
+        per_chiave = {m.chiave: m for m in (elenco["materiali"] if elenco else [])}
+        cambi = []
+        for voce in scelti:
+            chiave = str((voce or {}).get("chiave") or "")
+            materiale = per_chiave.get(chiave)
+            if materiale is None:
+                raise RichiestaStudioNonValida(
+                    f"Il materiale {chiave!r} non e' fra quelli letti per la vista {vista.name}.",
+                    "Cattura di nuovo la vista dalla palette, poi rifai la scelta.")
+            riferimento = voce.get("riferimento")
+            cambi.append(modulo_materiali.Cambio(
+                materiale.nome, str(voce.get("diventa") or ""),
+                str(self.percorso_anteprima_materiale(materiale.anteprima)) if materiale.anteprima else None,
+                str(self.percorso_riferimento(str(riferimento))) if riferimento else None))
+        return modulo_materiali.controlla_cambi(tuple(cambi))
+
     def _metti_in_coda(self, vista, scelte, destinazione, mostrata, preset, prompt_a_mano,
                        varianti: int = 1, parte_da: str | None = None,
                        partenza: Path | None = None, richieste=(), aree=(),
                        modo_aree: str | None = None, riferimento: Path | None = None,
-                       contesto: modulo_contesto.Contesto | None = None) -> dict:
+                       contesto: modulo_contesto.Contesto | None = None,
+                       materiali: tuple = ()) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -655,6 +728,9 @@ class Studio:
         if destinazione.get("contesto_non_accettato"):
             raise RichiestaStudioNonValida(f"Non mando: {destinazione['contesto_non_accettato']}",
                                            "Scegli Nano Banana 2, oppure togli il contesto.")
+        if destinazione.get("materiali_non_accettati"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['materiali_non_accettati']}",
+                                           "Scegli Nano Banana 2, oppure togli la spunta dai materiali.")
         if partenza is None:
             # Da un render l'idoneita' non conta: giudica una vista di
             # Allplan, e quello che parte e' il render del passo.
@@ -675,6 +751,7 @@ class Studio:
                 modo_aree=modo_aree,
                 riferimento=riferimento,
                 contesto=contesto,
+                materiali=tuple(materiali),
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -1610,8 +1687,14 @@ def _prompt_a_mano(dati: dict) -> str | None:
     return None
 
 
-def _cosa_parte(riferimento: bool, contesto: bool) -> str:
+def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0) -> str:
     """Quante immagini partono e quali, nelle stesse parole ogni volta (regola 5)."""
+    if materiali:
+        prima = "la vista e il riferimento per lo stile" if riferimento else "la vista"
+        quante = (2 if riferimento else 1) + materiali
+        immagini = "1 immagine" if materiali == 1 else f"{materiali} immagini"
+        return (f"Partono {quante} immagini: {prima}, poi {immagini} dei materiali da cambiare "
+                "(anteprime di Allplan e foto di riferimento).")
     if contesto:
         return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
                 "poi la vista.")

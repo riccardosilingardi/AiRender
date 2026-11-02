@@ -275,18 +275,23 @@ ognuno testo e immagine di riferimento → al modello la vista e le coppie
 «campione di Allplan → riferimento». La sonda `AIRENDER elenco materiali`
 prova la prima metà.
 
-- **Il `.surf` di un materiale si trova sul disco** partendo dal valore letto
-  (SurfacePath senza estensione, 335 relativo) — non verificato. Le cartelle
-  (`design` dentro progetto, Usr, Std) e i nomi di `AllplanPaths.Get*Path`
-  diversi da `GetUsrPath` sono supposti.
-- **`SurfaceDefinition.LoadSurfaceData` legge il colore** e i campi di `ARGB`
-  si chiamano Red/Green/Blue — non verificato, visti solo nell'elenco `api.txt`.
-- **Il `.surf` nomina la sua texture in chiaro** — non verificato: il formato
-  del file non è noto; la sonda ne copia uno per materiale per guardarlo.
-- **Il modello riconosce un materiale nella vista dal suo campione** — non
-  verificato, ed è la domanda del passo dopo. Due materiali che nella vista
-  sembrano uguali si confondono.
-- **Leggere 2000 elementi non blocca Allplan** — non verificato.
+Verificato con la sonda sul 4253 (2026-11-02): 2732 elementi 3D letti in
+pochi secondi senza blocchi, 38 materiali, 27 `.surf` trovati; il `.surf` è
+un TIFF con dentro il cubetto d'anteprima 120×120. `SurfaceDefinition` non si
+crea da Python: non serve, l'anteprima viene dal TIFF.
+
+Tabella materiali nello Studio (2026-11-02), non verificato:
+
+- **La lettura alla Cattura vista funziona dentro la palette** (`self.document`
+  o `GetInputViewDocument`) — provata solo nella sonda, che è un PythonPart a sé.
+- **Il modello riconosce un materiale nella vista dal suo cubetto** — non
+  verificato. Due materiali che nella vista sembrano uguali si confondono.
+- **Nano Banana 2 tramite Comfy Router riceve più di due immagini** (vista,
+  anteprime, foto) — provato solo con due.
+- **9 materiali del 4253 sono solo testo (508) e i `.surf` di metallo e CA
+  non si trovano**: partono senza anteprima, solo a parole.
+- **Le facciate (Facade_Path) non danno materiale**: compaiono fra gli
+  elementi senza materiale e non si possono cambiare dalla tabella.
 
 ### Color map, motore (2026-11-01)
 

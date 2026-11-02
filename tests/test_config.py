@@ -594,3 +594,9 @@ def test_colormap_zone_massime_sta_dentro_la_tavolozza():
 def test_colormap_colori_in_ingresso_bastano_per_oneformer_ma_rifiutano_una_foto():
     """Caso: si passa la vista al posto della segmentazione e nascono migliaia di zone."""
     assert 150 <= config.COLORMAP_COLORI_IN_INGRESSO_MASSIMI < 1000
+
+
+def test_materiali_cambiati_massimi_tengono_l_invio_sotto_le_immagini_di_gemini():
+    """Caso: si spuntano tanti materiali e l'invio supera le 14 immagini che Gemini accetta."""
+    # vista + riferimento per lo stile + due immagini per materiale
+    assert 2 + 2 * config.MATERIALI_CAMBIATI_MASSIMI <= 14

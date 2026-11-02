@@ -17,6 +17,7 @@ Rotte:
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
+    GET  /api/viste/<nome>/materiali       i materiali del progetto letti dalla palette con la vista
     GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
@@ -161,11 +162,14 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.render_della_vista(nome))
             case ["api", "viste", nome, "passi"]:
                 self._json(studio.passi(nome))
+            case ["api", "viste", nome, "materiali"]:
+                self._json(studio.materiali_della_vista(nome))
             case ["api", "destinazione"]:
                 self._json(studio.destinazione((domanda.get("modello") or [""])[0],
                                                (domanda.get("varianti") or ["1"])[0],
                                                (domanda.get("riferimento") or ["0"])[0] == "1",
-                                               contesto=(domanda.get("contesto") or ["0"])[0] == "1"))
+                                               contesto=(domanda.get("contesto") or ["0"])[0] == "1",
+                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0]))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
@@ -178,6 +182,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._file(studio.percorso_riferimento(nome))
             case ["file", "contesto", nome]:
                 self._file(studio.percorso_contesto(nome))
+            case ["file", "materiale", nome]:
+                self._file(studio.percorso_anteprima_materiale(nome))
             case ["api", "video", "catalogo"]:
                 self._json(studio.catalogo_video())
             case ["api", "video"]:
