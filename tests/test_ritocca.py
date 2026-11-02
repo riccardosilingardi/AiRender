@@ -190,7 +190,7 @@ def test_il_ritocco_e_un_passo_figlio_del_render_ritoccato_con_aree_e_modo(base,
     assert passo["modo_aree"] == config.RITOCCO_MODO_AREE
     assert passo["nome"].startswith("Ritocco · 2 note")
     assert passo["riassunto"] == "Ritocco del passo 1: area 1, infissi in legno scuro; area 2, una panchina in pietra"
-    assert passo["fuori_aree_testo"].startswith("Fuori dalle aree: differenza media")
+    assert passo["fuori_aree_testo"] == "Fuori dalle aree: com'era prima."
     assert passo["avviso"] is True  # e' la seconda generazione di fila
     # nel file dell'albero, leggibile a mano
     salvato = json.loads(modulo_passi.percorso(cartella / VISTA).read_text(encoding="utf-8"))
@@ -234,7 +234,60 @@ def test_un_render_di_dimensione_diversa_si_dice_nella_misura(cartella, chiamate
     Coda(cartella, crea_provider=lambda _n: ProviderCheRimpicciolisce(chiamate), dire=lambda _t: None).esegui_uno()
     passo = next(p for p in studio.passi(VISTA)["passi"] if p["identificativo"] == rit)
     assert passo["fuori_aree"]["ridimensionata"] is True
-    assert "160x100, non della dimensione di partenza" in passo["fuori_aree_testo"]
+    assert passo["fuori_aree"]["incollato"] is True
+    # il render incollato torna alla dimensione di partenza
+    assert Image.open(passo["percorso_render"]).size == (320, 200)
+    assert modulo_aree.testo_misura({**passo["fuori_aree"], "incollato": False}).count("160x100") == 1
+
+
+# --- incollatura: fuori dalle aree non sparisce niente (2026-11-02) ---------------
+
+
+def _pixel(percorso, x, y):
+    return Image.open(percorso).convert("RGB").getpixel((x, y))
+
+
+def test_il_ritocco_cambia_solo_dentro_le_aree_e_tiene_il_resto_del_render_di_partenza(base, cartella):
+    studio, coda, uno = base
+    rit = _ritocca(studio, uno)
+    coda.esegui_uno()
+    studio.passi(VISTA)  # allinea l'albero ai lavori
+    albero = modulo_passi.Albero.leggi(cartella / VISTA)
+    partenza, render = albero.passo(uno)["render"], albero.passo(rit)["render"]
+    stato = leggi_stato(cartella, rit)
+    # fuori dalle aree: il pixel del render di partenza, uguale
+    assert _pixel(render, 300, 20) == _pixel(partenza, 300, 20)
+    assert _pixel(render, 160, 180) == _pixel(partenza, 160, 180)
+    # dentro l'area 1 (rettangolo 0.1-0.4 x 0.1-0.5): quello del modello
+    assert _pixel(render, 80, 60) == _pixel(stato["modello_intero"], 80, 60)
+    assert _pixel(render, 80, 60) != _pixel(partenza, 80, 60)
+    assert stato["fuori_aree"]["incollato"] is True
+
+
+def test_un_secondo_ritocco_non_toglie_quello_che_il_primo_aveva_messo(base, cartella):
+    """Il caso di Riccardo: persone aggiunte, poi altre persone vicino a un'auto."""
+    studio, coda, uno = base
+    primo = _ritocca(studio, uno, aree=[AREE[0]])
+    coda.esegui_uno()
+    secondo = _ritocca(studio, primo, aree=[AREE[1]])
+    coda.esegui_uno()
+    studio.passi(VISTA)  # allinea l'albero ai lavori
+    albero = modulo_passi.Albero.leggi(cartella / VISTA)
+    dopo_primo, dopo_secondo = albero.passo(primo)["render"], albero.passo(secondo)["render"]
+    # l'area del primo ritocco resta com'era dopo il primo
+    assert _pixel(dopo_secondo, 80, 60) == _pixel(dopo_primo, 80, 60)
+    # l'area del secondo cambia
+    assert _pixel(dopo_secondo, 240, 150) != _pixel(dopo_primo, 240, 150)
+
+
+def test_il_risultato_intero_del_modello_resta_accanto_e_non_e_un_render(base, cartella):
+    studio, coda, uno = base
+    rit = _ritocca(studio, uno)
+    coda.esegui_uno()
+    stato = leggi_stato(cartella, rit)
+    intero = Path(stato["modello_intero"])
+    assert intero.is_file() and intero.name == f"{rit}.modello.png"
+    assert Path(stato["render"]).name == f"{rit}.png"
 
 
 def test_rifai_un_ritocco_tiene_aree_e_modo_anche_se_il_modo_cambia(base, cartella, chiamate, monkeypatch):

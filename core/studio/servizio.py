@@ -1115,11 +1115,14 @@ class Studio:
 
     # --- passi -----------------------------------------------------------
 
-    def _albero(self, vista: Path) -> modulo_passi.Albero:
-        """L'albero della vista, allineato ai lavori della cartella e scritto se e' cambiato."""
+    def _albero(self, vista: Path, lavori: list[dict] | None = None) -> modulo_passi.Albero:
+        """L'albero della vista, allineato ai lavori della cartella e scritto se e' cambiato.
+
+        `lavori` sono i lavori di questa vista, se chi chiama li ha gia' letti.
+        """
         with self._blocco_albero:
             albero = modulo_passi.Albero.leggi(vista)
-            lavori = self._lavori_della_vista(vista)
+            lavori = self._lavori_della_vista(vista) if lavori is None else lavori
             stati, ricette = {}, {}
             for dati in lavori:
                 identificativo = dati["identificativo"]
@@ -1148,6 +1151,87 @@ class Studio:
             "avviso_da_generazione": config.PASSI_AVVISO_DA_GENERAZIONE,
             "passi": righe,
         }
+
+    # --- storico ---------------------------------------------------------
+
+    def storico(self) -> dict:
+        """Tutte le immagini di tutte le viste, per la striscia in alto nello Studio.
+
+        Un gruppo per vista, la vista catturata per ultima per prima. Dentro
+        il gruppo: la cattura, poi i render, i ritocchi e i video nell'ordine
+        in cui sono nati. Una cattura nuova apre un gruppo nuovo: i gruppi di
+        prima restano come sono. Niente si cancella da qui.
+        """
+        lavori_per_vista: dict[str, list[dict]] = {}
+        for dati, _cartella in self._lavori():
+            try:
+                chiave = str(Path(dati.get("vista") or "").resolve())
+            except OSError:
+                continue
+            lavori_per_vista.setdefault(chiave, []).append(dati)
+        video_per_lavoro, video_sciolti = self._video_per_lavoro()
+        gruppi = []
+        for voce_vista in self.elenco_viste():
+            nome = voce_vista["nome"]
+            vista = self.cartella / nome
+            voci = [{"tipo": "cattura", "vista": nome, "identificativo": None,
+                     "etichetta": "Vista", "creato_il": voce_vista["modificata_il"],
+                     "stato": modulo_coda.FATTO, "attivo": False, "immagine": True}]
+            errore = None
+            try:
+                albero = self._albero(vista, lavori_per_vista.get(str(vista.resolve()), []))
+                passi = sorted(albero.passi, key=lambda p: (p.get("creato_il") or "", p["identificativo"]))
+            except ErroreAirender as problema:
+                passi, errore = [], _errore_dict(problema)
+            for passo in passi:
+                identificativo = passo["identificativo"]
+                render = Path(passo["render"]) if passo.get("render") else None
+                voci.append({
+                    "tipo": _tipo_passo(passo),
+                    "vista": nome,
+                    "identificativo": identificativo,
+                    "numero": str(passo.get("numero")),
+                    "da": albero.padre(passo),
+                    "etichetta": _ETICHETTE_STORICO.get(_tipo_passo(passo), "Render"),
+                    "creato_il": passo.get("creato_il"),
+                    "stato": passo.get("stato"),
+                    "attivo": passo.get("stato") in STATI_ATTIVI,
+                    "immagine": render is not None and self._render_valido(render),
+                })
+                voci.extend(video_per_lavoro.get(identificativo, []))
+            gruppi.append({"vista": nome, "catturata_il": voce_vista["modificata_il"],
+                           "voci": voci, "errore": errore})
+        if video_sciolti:
+            gruppi.append({"vista": None, "catturata_il": None, "voci": video_sciolti, "errore": None})
+        return {"gruppi": gruppi}
+
+    def _video_per_lavoro(self) -> tuple[dict[str, list[dict]], list[dict]]:
+        """I video, attaccati al render da cui partono; quelli da un'immagine caricata a parte."""
+        fatti = self.percorsi[modulo_coda.FATTO_DIR].resolve()
+        per_lavoro: dict[str, list[dict]] = {}
+        sciolti = []
+        for voce in sorted(modulo_video.elenco(self.cartella), key=lambda v: v.get("identificativo", "")):
+            immagini = (voce.get("richiesta") or {}).get("immagini") or []
+            voce_storico = {
+                "tipo": "video", "vista": None, "identificativo": voce.get("identificativo"),
+                "etichetta": "Video", "creato_il": voce.get("aggiornato_il"),
+                "stato": voce.get("stato"),
+                "attivo": voce.get("stato") in (modulo_video.IN_CODA, modulo_video.INVIATO),
+                "immagine": voce.get("stato") == modulo_video.FATTO and bool(voce.get("video")),
+            }
+            lavoro = None
+            if immagini:
+                try:
+                    primo = Path(immagini[0]).resolve()
+                    if primo.parent == fatti:
+                        lavoro = primo.stem
+                except OSError:
+                    lavoro = None
+            if lavoro:
+                per_lavoro.setdefault(lavoro, []).append(voce_storico)
+            else:
+                sciolti.append(voce_storico)
+        return per_lavoro, sciolti
 
     def _passo_dict(self, albero: modulo_passi.Albero, passo: dict, profondita: int) -> dict:
         identificativo = passo["identificativo"]
@@ -1570,6 +1654,10 @@ def _richieste_del_passo(passo: dict) -> list[str]:
     if passo.get("aree"):
         return [str(a.get("nota") or "") for a in passo["aree"] if isinstance(a, dict)]
     return list(passo.get("richieste") or [])
+
+
+# Come la striscia dello storico chiama ogni immagine: una o due parole.
+_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Modifica", "ritocco": "Ritocco"}
 
 
 def _tipo_passo(passo: dict) -> str:

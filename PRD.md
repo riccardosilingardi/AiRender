@@ -267,6 +267,20 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Storico e ritocco incollato nelle aree (2026-11-02)
+
+- **Il bordo sfumato del ritocco incollato non si nota** su un render vero —
+  non verificato. Provato solo con un provider finto (tinte piatte). Se il
+  modello sposta i toni di tutta l'immagine, l'area incollata può staccarsi
+  dal resto.
+- **Il risultato del modello si riporta alla dimensione di partenza** anche
+  con proporzioni diverse: viene stirato, non tagliato — non verificato se
+  Nano Banana cambia le proporzioni di un ritocco.
+- **La striscia dello storico resta fluida con molte immagini** — non
+  verificato: carica i render interi (niente miniature) e legge l'albero di
+  ogni vista quando cambia qualcosa. Provata con Chromium headless e 5
+  immagini, mai in Edge su Windows.
+
 ### Elenco materiali da Allplan, solo lettura (2026-11-02)
 
 Riccardo: AIRENDER non cambia mai i materiali di Allplan. Il flusso voluto è

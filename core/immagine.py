@@ -408,6 +408,26 @@ def differenza_fuori_dalle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto
     }
 
 
+def incolla_nelle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto]]) -> bytes:
+    """Il ritocco messo sull'immagine di prima: cambia solo dentro le aree.
+
+    `dopo` e' quello che ha mandato il modello, che di solito ridisegna tutta
+    l'immagine. Si riporta alla dimensione di `prima` e si incolla solo nelle
+    aree, allargate di RITOCCO_INCOLLA_MARGINE_PX e con il bordo sfumato di
+    RITOCCO_INCOLLA_SFUMATURA_PX. Fuori da li' i pixel sono quelli di prima,
+    uguali: quello che un ritocco precedente aveva messo non sparisce.
+    """
+    base = _apri(prima).convert("RGB")
+    nuova = _apri(dopo).convert("RGB")
+    if nuova.size != base.size:
+        nuova = nuova.resize(base.size, Image.Resampling.LANCZOS)
+    maschera = _dentro_aree(base.size, aree, config.RITOCCO_INCOLLA_MARGINE_PX)
+    sfumatura = config.RITOCCO_INCOLLA_SFUMATURA_PX
+    if sfumatura > 0:
+        maschera = maschera.filter(ImageFilter.GaussianBlur(radius=sfumatura))
+    return _png(Image.composite(nuova, base, maschera))
+
+
 def _spigoli(immagine: Image.Image) -> Image.Image:
     scala = config.SPIGOLI_LATO_PX / max(immagine.size)
     piccola = immagine.convert("L").resize(

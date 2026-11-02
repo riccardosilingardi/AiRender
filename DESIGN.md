@@ -689,6 +689,44 @@ durata, risoluzione e costo letto dal servizio; **Apri la cartella dei video**.
 - **Pieno:** le immagini scelte, il movimento, Dove va e Genera video acceso;
   sotto, i video fatti, il più recente per primo.
 
+## Storico e ritocco che tiene il resto, costruiti il 2026-11-02
+
+Decisione di Riccardo (2026-11-02): «Quando faccio una nuova cattura vista
+sparisce il render precedente e i passi, non va bene, deve rimanere storico» e
+«se avevo già aggiunto persone e gli dico di aggiungerne altre in un posto con
+una auto mi ha fatto sparire quelle precedenti». Niente interfaccia a nodi.
+
+**Storico: la striscia in alto, in ogni scheda**
+- Una tessera per immagine: ogni cattura, render, modifica, ritocco e video.
+  Un gruppo per vista, la vista catturata per ultima a sinistra; dentro il
+  gruppo l'ordine in cui sono nate. Etichette di una o due parole («Vista»,
+  «Render 1», «Ritocco 3», «Video»); il resto (stato, data) al passaggio del
+  mouse.
+- Un clic porta all'immagine: la cattura in Genera, un render o un ritocco in
+  Risultato (e diventa il passo scelto, quindi Ritocca parte da lì), un video
+  in Video.
+- Una cattura nuova dalla palette apre un gruppo nuovo con «Nuova»: i gruppi
+  di prima restano. In Genera, senza lavori in corso, la cattura nuova si
+  apre subito; altrove resta nella striscia e quello su cui si lavora non
+  cambia.
+- **Vuoto:** nessuna vista nella cartella: la striscia non c'è.
+- **In corso:** la tessera del lavoro c'è già, e pulsa finché non finisce.
+- **Errore:** la tessera dice «Errore» o «Annullato»; un file dei passi
+  rotto lascia nel suo gruppo solo la cattura, gli altri gruppi restano.
+- **Pieno:** tutte le immagini, quella aperta bordata.
+
+**Ritocco: cambiano solo le aree**
+- Il modello ridisegna tutta l'immagine. Il render del ritocco è il suo
+  risultato incollato **solo dentro le aree** (allargate di
+  `RITOCCO_INCOLLA_MARGINE_PX`, bordo sfumato di
+  `RITOCCO_INCOLLA_SFUMATURA_PX`, entrambi scelti) sul render da cui parte:
+  fuori, i pixel sono quelli di prima. Il risultato intero del modello resta
+  in `lavori/fatto/<id>.modello.png`.
+- Finito un ritocco, il prossimo parte da lì: dall'ultima immagine, non da
+  quella di prima.
+- Il pannello «Fuori dalle aree» dice «com'era prima» invece della misura;
+  la misura del risultato intero resta nello stato del lavoro.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,

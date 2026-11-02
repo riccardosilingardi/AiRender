@@ -369,6 +369,14 @@ def test_video_durate_risoluzioni_e_attesa_stanno_nei_limiti_di_seedance_e_sono_
         assert config.costante(nome).origine == config.SCELTA
 
 
+def test_ritocco_incolla_margine_e_sfumatura_coprono_il_bordo_del_modello_e_sono_scelte():
+    """Caso: una persona messa sul bordo di un'area esce tagliata, o il ritocco si spalma su tutta l'immagine."""
+    assert config.RITOCCO_INCOLLA_MARGINE_PX >= config.AREE_BORDO_ESCLUSO_PX
+    assert 0 < config.RITOCCO_INCOLLA_SFUMATURA_PX <= config.RITOCCO_INCOLLA_MARGINE_PX
+    for nome in ("RITOCCO_INCOLLA_MARGINE_PX", "RITOCCO_INCOLLA_SFUMATURA_PX"):
+        assert config.costante(nome).origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 

@@ -56,6 +56,9 @@ const S = {
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
   video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
            durata: null, risoluzione: null, audio: false, secco: null, errore: null, caricando: false },
+  // Lo storico: tutte le immagini di tutte le viste, nella striscia in alto.
+  // Una cattura nuova si aggiunge; niente di quello che c'era sparisce.
+  storico: { gruppi: [], firma: "", disegnata: "" },
 };
 
 // --- attrezzi ---------------------------------------------------------------
@@ -361,6 +364,7 @@ function seguiLavoro(lavoro) {
       const ora = await get(`/api/lavori/${S.lavoroAttivo.identificativo}`);
       const cambiato = ora.stato !== S.lavoroAttivo.stato;
       S.lavoroAttivo = ora;
+      if (cambiato) await caricaStorico();
       // In Passi il passo che nasce e' gia' nell'albero: il suo stato si aggiorna li'.
       if (cambiato && (S.scheda === "passi" || S.scheda === "ritocca")) await caricaPassi();
       if (!ora.attivo && S.ritocca.inviato === ora.identificativo) {
@@ -1728,9 +1732,9 @@ function daVerificare() {
   return h("section", { classe: "pannello", "aria-label": "Da verificare prima" },
     h("span", { classe: "etichetta" }, "Da verificare prima"),
     h("ol", { classe: "piccolo elenco-verifiche" },
-      h("li", {}, "Che Nano Banana 2 rispetti le aree e lasci uguale il resto: lo dice il piano «aree» del banco di prova, non ancora lanciato. Per ogni ritocco lo Studio misura quanto è cambiato fuori dalle aree."),
+      h("li", {}, "Fuori dalle aree resta il render di prima: lo Studio incolla il risultato solo nelle aree. Da vedere su un ritocco vero: che il bordo sfumato non si noti."),
       h("li", {}, `Le aree partono come ${modo.modo_nome}`, modo.origine === "SCELTA" ? ": scelta provvisoria, la fissa il piano «aree»." : "."),
-      h("li", {}, "Il modello rifà tutta l'immagine anche con le aree: per un cambio di materiale grande conviene rifare il render da Genera."),
+      h("li", {}, "Luce e riflessi fuori dalle aree non seguono il ritocco: per un cambio di materiale grande conviene rifare il render da Genera."),
       h("li", {}, "«Clicca una superficie» arriva con la mappa dei materiali da Allplan.")));
 }
 
@@ -1779,6 +1783,9 @@ async function fineRitocco(ora) {
   if (ora.stato === "fatto") {
     S.passi.scelto = ora.identificativo;
     r.esito = ora.identificativo;
+    // Il prossimo ritocco parte da qui, dall'ultima immagine: non da quella
+    // di prima, che non ha ancora quello che questo ritocco ha messo.
+    r.da = ora.identificativo;
     r.aree = []; r.composto = null; r.errore = null;
   } else {
     r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
@@ -1807,7 +1814,7 @@ function esitoRitocco() {
       h("section", { classe: "pannello", "aria-label": "Adesso" },
         h("span", { classe: "etichetta" }, "Adesso"),
         h("div", { classe: "azioni" },
-          h("button", { classe: "btn primario", onclick: () => { r.esito = null; cambiaBaseRitocco(passo.identificativo); } }, "Ritocca questo render"),
+          h("button", { classe: "btn primario", onclick: () => { r.esito = null; cambiaBaseRitocco(passo.identificativo); render(); } }, "Ritocca questo render"),
           h("button", { classe: "btn", onclick: () => { r.esito = null; r.da = padre ? padre.identificativo : null; render(); } }, "Torna al render di prima"),
           h("a", { classe: "btn", href: "#passi" }, "Vedi nei Passi"))),
       passo.avviso ? h("div", { classe: "avviso attenzione", role: "note" },
@@ -1822,7 +1829,10 @@ function pannelloFuoriAree(passo) {
   return h("section", { classe: "pannello", "aria-label": "Fuori dalle aree" },
     h("span", { classe: "etichetta" }, "Fuori dalle aree"),
     h("span", { classe: m && m.differenza_media !== null && m.differenza_media !== undefined ? "" : "misura" }, passo.fuori_aree_testo || "Fuori dalle aree: non misurato."),
-    h("p", { classe: "tenue piccolo" }, "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
+    m && m.incollato
+      ? h("p", { classe: "tenue piccolo", title: "Il modello ridisegna tutta l'immagine: il suo risultato si incolla solo nelle aree, con il bordo sfumato, sul render da cui parte. Il risultato intero del modello resta nella cartella dei lavori, accanto al render." },
+        "Cambiano solo le aree.")
+      : h("p", { classe: "tenue piccolo" }, "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
     passo.modo_aree_nome ? h("p", { classe: "tenue piccolo" }, `Aree mandate come ${passo.modo_aree_nome}.`) : null);
 }
 
@@ -2505,8 +2515,82 @@ function schermataVideo() {
       v.voci.length ? h("div", { classe: "elenco-video" }, v.voci.map(voceVideo)) : h("p", { classe: "tenue" }, "Nessun video ancora."))];
 }
 
+// --- storico --------------------------------------------------------------------
+// La striscia in alto, uguale in ogni scheda: una tessera per immagine, un
+// gruppo per vista. Un clic porta all'immagine: la cattura in Genera, un
+// render o un ritocco in Risultato, un video in Video.
+
+async function caricaStorico() {
+  try { S.storico.gruppi = (await get("/api/storico")).gruppi; } catch (e) { /* la prossima volta */ }
+}
+
+// Quello che, se cambia, vuol dire che lo storico va riletto.
+function firmaStudio(ora) {
+  return JSON.stringify([ora.viste.map((v) => v.nome), (ora.lavori_attivi || []).map((l) => [l.identificativo, l.stato])]);
+}
+
+function voceScelta(v) {
+  if (v.tipo === "cattura") return S.scheda === "genera" && S.vista === v.vista;
+  if (v.tipo === "video") return false;
+  if (S.vista !== v.vista) return false;
+  if (S.scheda === "risultato") return S.risultato.scelto === v.identificativo;
+  if (S.scheda === "passi") return S.passi.scelto === v.identificativo;
+  if (S.scheda === "ritocca") return (S.ritocca.esito || S.ritocca.da) === v.identificativo;
+  return false;
+}
+
+async function apriDalloStorico(v) {
+  if (v.tipo === "video") { location.hash = "#video"; return; }
+  if (v.vista && v.vista !== S.vista) await caricaVista(v.vista);
+  if (v.tipo === "cattura") {
+    if (location.hash !== "#genera") location.hash = "#genera"; else render();
+    return;
+  }
+  S.risultato.scelto = v.identificativo; S.risultato.rifai = false; S.risultato.esportato = null;
+  if (S.risultato.confronto === v.identificativo) S.risultato.confronto = "vista";
+  S.passi.scelto = v.identificativo;
+  await caricaRicetta();
+  if (location.hash !== "#risultato") location.hash = "#risultato"; else render();
+}
+
+function tesseraStorico(v) {
+  let quadro;
+  if (v.tipo === "cattura") quadro = h("img", { src: `/file/vista/${enc(v.vista)}`, alt: "", loading: "lazy", decoding: "async" });
+  else if (v.tipo === "video" && v.immagine) quadro = h("video", { src: `/file/video/${enc(v.identificativo)}`, preload: "metadata", muted: true });
+  else if (v.immagine) quadro = h("img", { src: `/file/render/${enc(v.identificativo)}`, alt: "", loading: "lazy", decoding: "async" });
+  else quadro = h("span", { classe: "piccolo" }, v.attivo ? "…" : "—");
+  const nuova = v.tipo === "cattura" && !S.viste_viste.has(v.vista);
+  const fallito = v.stato === "errore" || v.stato === "annullato";
+  const titolo = [v.etichetta, v.numero ? `passo ${v.numero}` : null, v.stato !== "fatto" ? v.stato : null, data(v.creato_il)].filter(Boolean).join(" · ");
+  const voce = h("button", {
+    classe: `voce-storico${v.attivo ? " attivo" : ""}`, title: titolo,
+    "aria-current": String(voceScelta(v)), "aria-label": titolo,
+    onclick: () => apriDalloStorico(v),
+  },
+    h("span", { classe: "quadro" }, quadro),
+    nuova ? h("span", { classe: "segno" }, "Nuova") : fallito ? h("span", { classe: "segno errore" }, v.stato === "errore" ? "Errore" : "Annullato") : null,
+    h("span", { classe: "didascalia" }, v.numero ? `${v.etichetta} ${v.numero}` : v.etichetta));
+  return voce;
+}
+
+function disegnaStorico() {
+  const nav = document.getElementById("storico");
+  if (!nav) return;
+  const gruppi = S.storico.gruppi || [];
+  // Si ridisegna solo se e' cambiato qualcosa: le immagini non si ricaricano
+  // a ogni giro e la striscia non salta.
+  const firma = JSON.stringify([gruppi, S.scheda, S.vista, S.risultato.scelto, S.passi.scelto, S.ritocca.da, S.ritocca.esito, [...S.viste_viste]]);
+  if (firma === S.storico.disegnata) return;
+  S.storico.disegnata = firma;
+  const scorrimento = nav.scrollLeft;
+  nav.replaceChildren(...gruppi.map((g) => h("div", { classe: "gruppo-storico", role: "group", "aria-label": g.vista ? `Vista ${g.vista}` : "Video da immagini caricate" },
+    g.voci.map(tesseraStorico))));
+  nav.scrollLeft = scorrimento;
+}
+
 function render() {
   disegnaTestata();
+  disegnaStorico();
   const main = document.getElementById("principale");
   if (!S.studio || !S.catalogo || !S.scelte) {
     main.replaceChildren(S.errore ? avviso("errore", S.errore.fatto, S.errore.cosa_fare) : h("p", { classe: "tenue" }, "Apro lo Studio…"));
@@ -2544,10 +2628,19 @@ window.addEventListener("hashchange", async () => {
 async function controllaStudio() {
   try {
     const ora = await get("/api/studio");
+    const prima = S.studio ? S.studio.viste.map((v) => v.nome) : [];
+    const nuove = ora.viste.filter((v) => !prima.includes(v.nome));
     const cambiato = !S.studio || ora.coda_attiva !== S.studio.coda_attiva || ora.viste.length !== S.studio.viste.length;
     S.studio = ora;
+    const firma = firmaStudio(ora);
+    const videoInCorso = S.storico.gruppi.some((g) => g.voci.some((v) => v.tipo === "video" && v.attivo));
+    if (firma !== S.storico.firma || videoInCorso) { S.storico.firma = firma; await caricaStorico(); }
     if (!S.vista && ora.viste.length) { await caricaVista(ora.viste[0].nome); return; }
-    if (cambiato) render();
+    // Una cattura nuova dalla palette: in Genera, senza lavori in corso, la
+    // si apre subito. Altrove resta nella striscia con «Nuova», e quello
+    // su cui si sta lavorando non cambia.
+    if (nuove.length && S.scheda === "genera" && !S.lavoroAttivo) { await caricaVista(nuove[0].nome); return; }
+    render();
   } catch (e) { /* la prossima volta */ }
 }
 
@@ -2565,6 +2658,10 @@ async function avvia() {
     const vistaAttiva = attivo && S.studio.viste.find((v) => v.nome === attivo.vista);
     await caricaVista(vistaAttiva ? vistaAttiva.nome : (S.studio.viste[0] ? S.studio.viste[0].nome : null));
     if (attivo) seguiLavoro(attivo);
+    // Le viste che c'erano gia' all'apertura non sono «nuove».
+    for (const v of S.studio.viste) S.viste_viste.add(v.nome);
+    S.storico.firma = firmaStudio(S.studio);
+    await caricaStorico();
     if (S.scheda === "ritocca") { await caricaPassi(); await prontoRitocca(); }
     if (S.scheda === "video") await caricaVideo();
     if (S.scheda === "passi") {
