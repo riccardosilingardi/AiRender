@@ -550,6 +550,36 @@ AREE_BORDO_ESCLUSO_PX = _registra(Costante(
     unita=" px",
 ))
 
+RITOCCO_INCOLLA_MARGINE_PX = _registra(Costante(
+    nome="RITOCCO_INCOLLA_MARGINE_PX",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "Studio · Ritocca: di quanto si allarga ogni area quando il risultato "
+        "del modello si incolla sull'immagine di prima. Il modello sfuma la "
+        "modifica sul bordo dell'area (vedi AREE_BORDO_ESCLUSO_PX, stesso "
+        "valore): senza margine una persona messa sul bordo resterebbe "
+        "tagliata. Decisione di Riccardo del 2026-11-02: fuori dalle aree non "
+        "deve sparire niente. Mai tarato su un ritocco vero."
+    ),
+    unita=" px",
+))
+
+RITOCCO_INCOLLA_SFUMATURA_PX = _registra(Costante(
+    nome="RITOCCO_INCOLLA_SFUMATURA_PX",
+    valore=6,
+    origine=SCELTA,
+    ragione=(
+        "Studio · Ritocca: raggio della sfocatura del bordo della zona "
+        "incollata. Un bordo netto lascia una cucitura visibile fra il ritocco "
+        "e l'immagine di prima; troppo largo e il ritocco si mescola col resto. "
+        "Piu' largo di MASCHERA_SFUMATURA_PX perche' qui si incolla un'immagine "
+        "che il modello ha ridisegnato tutta, con toni che possono scostarsi. "
+        "Mai tarato su un ritocco vero."
+    ),
+    unita=" px",
+))
+
 CONTORNO_AREE_PX = _registra(Costante(
     nome="CONTORNO_AREE_PX",
     valore=6,

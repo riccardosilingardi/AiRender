@@ -143,6 +143,11 @@ def misura(prima: bytes, dopo: bytes, aree: tuple[Area, ...]) -> dict:
     return risultato
 
 
+def incolla(prima: bytes, dopo: bytes, aree: tuple[Area, ...]) -> bytes:
+    """Il render del ritocco: il risultato del modello solo dentro le aree, il resto com'era prima."""
+    return modulo_immagine.incolla_nelle_aree(prima, dopo, poligoni(aree, modulo_immagine.dimensioni(prima)))
+
+
 def _numero(valore: float, cifre: int = 1) -> str:
     return f"{valore:.{cifre}f}".replace(".", ",")
 
@@ -153,6 +158,10 @@ def _percento(quota: float) -> str:
 
 def testo_misura(valore: dict | None) -> str:
     """La misura fuori dalle aree in una frase, o «non misurato». Sempre lo stesso arrotondamento."""
+    if valore and valore.get("incollato"):
+        # Il render e' il ritocco incollato sull'immagine di prima: fuori
+        # dalle aree i pixel sono quelli di prima per costruzione.
+        return "Fuori dalle aree: com'era prima."
     if not valore or valore.get("differenza_media") is None:
         return "Fuori dalle aree: non misurato."
     testo = (f"Fuori dalle aree: differenza media {_numero(valore['differenza_media'])} su 255 · "

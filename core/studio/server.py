@@ -14,6 +14,7 @@ Rotte:
     GET  /pagine/<file>                    foglio di stile e script
     GET  /api/studio                       cartella, coda, viste, lavori attivi
     GET  /api/catalogo                     preset, assi, modelli
+    GET  /api/storico                      tutte le immagini di tutte le viste, per la striscia
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
@@ -155,6 +156,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.catalogo())
             case ["api", "miei-preset"]:
                 self._json(studio.miei_preset())
+            case ["api", "storico"]:
+                self._json(studio.storico())
             case ["api", "viste", nome]:
                 self._json(studio.descrivi_vista(nome))
             case ["api", "viste", nome, "render"]:

@@ -141,6 +141,7 @@ def _adesso() -> str:
 
 
 SUFFISSO_MISURA = ".misura.json"
+SUFFISSO_MODELLO = ".modello"  # il risultato intero del modello in un ritocco, accanto al render incollato
 
 
 def percorso_misura(render: Path) -> Path:
@@ -692,11 +693,23 @@ class Coda:
             self._dire(f"Lavoro {identificativo}: errore imprevisto, {errore}")
             return
 
-        render = self.percorsi[FATTO_DIR] / f"{identificativo}.{risultato.formato}"
-        ricetta = render.with_name(render.name + ".ricetta.json")
-        scrivi_atomico(render, risultato.immagine)
-        scrivi_atomico(ricetta, risultato.ricetta.a_json())
+        immagine, formato = risultato.immagine, risultato.formato
         altro = {}
+        if lavoro.aree and not lavoro.contesto:
+            # Un ritocco: il modello ridisegna tutta l'immagine, e fuori dalle
+            # aree puo' togliere quello che un ritocco di prima aveva messo.
+            # Il render e' il suo risultato incollato solo nelle aree sul
+            # render di partenza; quello del modello resta accanto, intero.
+            incollato = self._incolla(lavoro, immagine)
+            if incollato is not None:
+                grezzo = self.percorsi[FATTO_DIR] / f"{identificativo}{SUFFISSO_MODELLO}.{formato}"
+                scrivi_atomico(grezzo, immagine)
+                immagine, formato = incollato, "png"
+                altro["modello_intero"] = str(grezzo)
+        render = self.percorsi[FATTO_DIR] / f"{identificativo}.{formato}"
+        ricetta = render.with_name(render.name + ".ricetta.json")
+        scrivi_atomico(render, immagine)
+        scrivi_atomico(ricetta, risultato.ricetta.a_json())
         if lavoro.contesto:
             # La tenuta degli spigoli confronta il render con la vista: qui il
             # render e' il contesto, e il numero sarebbe falso (regola 3). Si
@@ -705,7 +718,12 @@ class Coda:
         else:
             scrivi_misura(Path(lavoro.vista), render)
             if lavoro.aree:
-                altro = {"fuori_aree": self._misura_fuori_aree(lavoro, risultato.immagine)}
+                # La misura e' su quello che ha mandato il modello: dice quanto
+                # avrebbe cambiato fuori dalle aree senza l'incollatura.
+                misura = self._misura_fuori_aree(lavoro, risultato.immagine)
+                if misura is not None and "modello_intero" in altro:
+                    misura["incollato"] = True
+                altro["fuori_aree"] = misura
         self._chiudi(
             preso, FATTO_DIR, FATTO,
             render=str(render),
@@ -794,6 +812,18 @@ class Coda:
             return modulo_aree.misura(Path(lavoro.partenza).read_bytes(), render, lavoro.aree)
         except (OSError, ErroreAirender) as errore:
             self._dire(f"Lavoro {lavoro.identificativo}: misura fuori dalle aree non riuscita, {errore}")
+            return None
+
+    def _incolla(self, lavoro: Lavoro, risultato: bytes) -> bytes | None:
+        """Il ritocco incollato sul render di partenza, o None se non riesce.
+
+        Il render e' gia' pagato: se l'incollatura non riesce si tiene quello
+        del modello com'e', e lo Studio non scrive «com'era prima».
+        """
+        try:
+            return modulo_aree.incolla(Path(lavoro.partenza).read_bytes(), risultato, lavoro.aree)
+        except (OSError, ErroreAirender) as errore:
+            self._dire(f"Lavoro {lavoro.identificativo}: incollatura nelle aree non riuscita, {errore}")
             return None
 
     def _misura_contesto(self, lavoro: Lavoro, render: bytes) -> dict | None:
