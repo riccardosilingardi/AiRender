@@ -42,7 +42,7 @@ CARTELLA_SCRIPT = Path("PythonPartsScripts") / SVILUPPATORE / PLUGIN
 # I file che la palette importa e che vivono fuori dalla cartella della
 # versione: si copiano accanto all'adattatore, come faceva installa.ps1.
 FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "sonda_materiali.py",
-               "sonda_colormap.py")
+               "sonda_elenco.py")
 # Le voci in cima all'.allep, nell'ordine del workflow del PythonParts SDK.
 VOCI_ALLEP = ("Library", "PythonPartsScripts", "PythonPartsActionbar",
               "install-config.yml", "requirements.in")
@@ -53,7 +53,8 @@ SOLO_NEL_PACCHETTO = ("install-config.yml", "requirements.in")
 # lasciato e che nella 2027 confonde: la cartella script vecchia e le palette
 # di prova. La cartella delle viste (Usr\AIRENDER) non si tocca mai.
 VECCHI_SCRIPT = Path("PythonPartsScripts") / "airender"
-VECCHI_NELLA_LIBRERIA = ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_*.png")
+VECCHI_NELLA_LIBRERIA = ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_*.png",
+                         "AirenderSondaColormap.pyp")  # la sonda che cambiava le superfici, tolta il 2026-11-02
 
 
 # Coda e Studio girano staccati da Allplan con la cartella dello script come

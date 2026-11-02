@@ -267,6 +267,27 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Elenco materiali da Allplan, solo lettura (2026-11-02)
+
+Riccardo: AIRENDER non cambia mai i materiali di Allplan. Il flusso voluto è
+elenco dei materiali del modello → l'utente sceglie quali cambiare → per
+ognuno testo e immagine di riferimento → al modello la vista e le coppie
+«campione di Allplan → riferimento». La sonda `AIRENDER elenco materiali`
+prova la prima metà.
+
+- **Il `.surf` di un materiale si trova sul disco** partendo dal valore letto
+  (SurfacePath senza estensione, 335 relativo) — non verificato. Le cartelle
+  (`design` dentro progetto, Usr, Std) e i nomi di `AllplanPaths.Get*Path`
+  diversi da `GetUsrPath` sono supposti.
+- **`SurfaceDefinition.LoadSurfaceData` legge il colore** e i campi di `ARGB`
+  si chiamano Red/Green/Blue — non verificato, visti solo nell'elenco `api.txt`.
+- **Il `.surf` nomina la sua texture in chiaro** — non verificato: il formato
+  del file non è noto; la sonda ne copia uno per materiale per guardarlo.
+- **Il modello riconosce un materiale nella vista dal suo campione** — non
+  verificato, ed è la domanda del passo dopo. Due materiali che nella vista
+  sembrano uguali si confondono.
+- **Leggere 2000 elementi non blocca Allplan** — non verificato.
+
 ### Color map, motore (2026-11-01)
 
 - **`core/colormap.py` funziona su una segmentazione vera** — non verificato.
