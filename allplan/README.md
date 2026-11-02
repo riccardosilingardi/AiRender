@@ -157,7 +157,7 @@ Logica in `comune/sonda_elenco.py` (pytest), Allplan solo in
 1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
 2. Apri il progetto, finestra 3D com'è di solito.
 3. Library › Privato › AIRENDER › **AIRENDER elenco materiali**.
-4. **Leggi i materiali**. Prende tutti gli elementi 3D (al massimo 2000, il 2D
+4. **Leggi i materiali**. Prende tutti gli elementi 3D (al massimo 4000, 150 per tipo, il 2D
    si salta); ogni chiamata si scrive prima in `diario-lettura.txt`.
 5. **Apri la cartella**.
 

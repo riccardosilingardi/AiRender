@@ -39,7 +39,16 @@ SENZA_MATERIALE = "(senza materiale)"
 # Quanti elementi 3D leggere al massimo. Con la palette aperta Allplan non
 # lascia selezionare (2026-11-02), quindi la sonda prende tutto il progetto e
 # salta il 2D. Il diario e' scritto prima di ogni chiamata.
-MASSIMO_ELEMENTI = 2000  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+MASSIMO_ELEMENTI = 4000  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+# Quanti elementi leggere per ogni tipo: il 2026-11-02 sul 4253 i primi 2000
+# erano per meta' «Sub-elemento facciata» (1040), tutti senza materiale, e il
+# limite e' arrivato prima di leggere il resto. 2000 elementi in 8 secondi.
+PER_TIPO = 150  # numero-non-configurabile: limite della sonda usa e getta, non del prodotto
+# Per i tipi senza materiale si scrivono tutti gli attributi dei primi elementi:
+# servono a capire dove facciate e macro tengono il loro materiale.
+ATTRIBUTI_COMPLETI_PER_TIPO = 3  # numero-non-configurabile: limite della sonda usa e getta
+# Valori dell'attributo 335 che non sono un materiale.
+NON_MATERIALI = ("*varia*",)
 # Lato del campione quadrato, in pixel: basta per riconoscere un materiale.
 LATO_CAMPIONE = 256  # numero-non-configurabile: misura della sonda usa e getta
 # Le sottocartelle in cui Allplan tiene le superfici, dentro Std, Usr e il progetto.
@@ -63,19 +72,32 @@ class Materiale:
     note: list[str] = field(default_factory=list)
 
 
+def pulisci(valore: Any) -> str:
+    """Il valore come Allplan lo ha dato: senza apici e senza le barre raddoppiate da repr().
+
+    Il 2026-11-02 i valori sono arrivati come "'nemetschek\\\\_aspetti\\\\metallo.surf'"
+    e "'A.03.SETTO IN C.A.\\\\'".
+    """
+    testo = str(valore or "").strip().strip("'\"")
+    while "\\\\" in testo:
+        testo = testo.replace("\\\\", "\\")
+    return testo.rstrip("\\").strip()
+
+
 def materiale_di(letto: dict[str, Any]) -> tuple[str, str, str]:
     """(nome leggibile, valore originale, da dove) del materiale di un elemento letto."""
-    superficie = (letto.get("superficie") or {}).get("SurfacePath", "")
+    superficie = pulisci((letto.get("superficie") or {}).get("SurfacePath", ""))
     nome = nome_materiale(superficie)
     if nome and not str(superficie).startswith("errore"):
-        return nome, str(superficie).strip("'\""), "SurfacePath"
+        return nome, superficie, "SurfacePath"
     attributi = letto.get("attributi") or {}
     for numero in ("335", "508"):
         for chiave, valore in attributi.items():
             if str(chiave).split(" ", 1)[0] == numero:
-                nome = nome_materiale(valore)
-                if nome:
-                    return nome, str(valore).strip("'\""), numero
+                pulito = pulisci(valore)
+                nome = nome_materiale(pulito)
+                if nome and pulito.lower() not in NON_MATERIALI:
+                    return nome, pulito, numero
     return SENZA_MATERIALE, "", ""
 
 
