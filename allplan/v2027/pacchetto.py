@@ -42,7 +42,7 @@ CARTELLA_SCRIPT = Path("PythonPartsScripts") / SVILUPPATORE / PLUGIN
 # I file che la palette importa e che vivono fuori dalla cartella della
 # versione: si copiano accanto all'adattatore, come faceva installa.ps1.
 FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "sonda_materiali.py",
-               "sonda_elenco.py")
+               "sonda_elenco.py", "materiali_allplan.py")
 # Le voci in cima all'.allep, nell'ordine del workflow del PythonParts SDK.
 VOCI_ALLEP = ("Library", "PythonPartsScripts", "PythonPartsActionbar",
               "install-config.yml", "requirements.in")

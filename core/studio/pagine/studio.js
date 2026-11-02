@@ -24,6 +24,9 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
+  // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
+  // quelli spuntati ({ chiave: { diventa, riferimento } }), la ricerca.
+  mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null },
   // Inserisci nel contesto: l'immagine del luogo portata dall'utente, il
   // rettangolo dove va l'edificio (coordinate da 0 a 1), l'inquadratura,
   // «pulisci la mappa» e il luogo a parole.
@@ -291,7 +294,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer() });
+      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -307,15 +310,19 @@ async function caricaVista(nome) {
   S.secco = null;
   S.risultato = { ...S.risultato, lavori: [], scelto: null, ricetta: null, caricato: false, confronto: "vista", rifai: false };
   S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
+  S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null };
   if (!nome) { render(); return; }
   try { S.descrizione = await get(`/api/viste/${enc(nome)}`); } catch (e) { S.errore = e; }
+  try { S.mat.dati = await get(`/api/viste/${enc(nome)}/materiali`); } catch (e) { S.mat.errore = e; }
+  await caricaDestinazione();
+  aggiornaComposto();
   await caricaRender();
   if (S.scheda === "passi") await caricaPassi();
   render();
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -396,6 +403,7 @@ async function genera() {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
+      materiali: materialiPerServer(),
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -410,7 +418,7 @@ async function provaASecco() {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome,
-      contesto: contestoPerServer(),
+      contesto: contestoPerServer(), materiali: materialiPerServer(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -660,17 +668,7 @@ function colonnaInvio() {
   materiali.value = S.scelte.materiali || "";
   materiali.addEventListener("input", () => { S.scelte.materiali = materiali.value; aggiornaComposto(); });
 
-  const esempi = S.scelte.scena === "prodotto"
-    ? [["#A9774A", "Legno struttura", "rovere naturale oliato"], ["#8B4A2B", "Seduta", "cuoio cognac"], ["#C9A55C", "Piedini", "ottone spazzolato"]]
-    : interno
-    ? [["#E8C547", "Intonaco interno", "calce bianca opaca"], ["#8B5A2B", "Pavimento legno", "rovere chiaro a plance larghe"], ["#5DA9E9", "Vetro", "vetro chiaro"]]
-    : [["#E8C547", "Intonaco esterno", "intonaco a calce bianco"], ["#C8553D", "Copertura", "lamiera aggraffata antracite"], ["#5DA9E9", "Vetro", "vetro chiaro, riflette il cielo"]];
-  const mappa = h("div", { classe: "pannello grigio", "aria-disabled": "true" },
-    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Dalla mappa materiali di Allplan"), presto()),
-    h("p", { classe: "piccolo tenue" }, "Righe di esempio, non calcolato."),
-    h("div", { classe: "mappa" }, h("span"), h("span", {}, "Allplan"), h("span", {}, "diventa"), h("span", {}, "rif."),
-      esempi.flatMap(([c, n, d]) => [h("span", { classe: "tinta", stile: `background:${c}` }), h("span", {}, n), h("span", {}, d), h("span", {}, "+")])),
-    h("p", { classe: "piccolo tenue" }, "Ogni riga: materiale di Allplan, il suo colore nella mappa, cosa deve diventare a parole e, se vuoi, una foto del materiale. Serve prima: verificare che Allplan dia una vista colorata per materiale con la stessa camera (PRD §9)."));
+  const mappa = pannelloMateriali();
 
   const prompt = h("textarea", { id: "prompt", classe: "prompt", "aria-label": "Prompt completo, in inglese" });
   prompt.value = S.promptAMano !== null ? S.promptAMano : (S.composto ? S.composto.prompt : "");
@@ -743,6 +741,93 @@ function colonnaInvio() {
       h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
       spento("materiali") ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, `Con la resa ${resaScelta().nome} i materiali non partono.`) : null),
     S.modo === "contesto" ? null : mappa, cosaParte, scelteInvio, pannelloInvio());
+}
+
+// --- materiali di questo progetto -----------------------------------------
+// L'elenco lo scrive la palette quando cattura la vista, leggendo Allplan
+// senza cambiare niente. Ogni riga spuntata parte con l'anteprima di Allplan,
+// il testo e, se c'e', la foto di riferimento.
+
+function materialiPerServer() {
+  if (S.modo === "contesto") return [];
+  return Object.entries(S.mat.scelti).map(([chiave, v]) => ({ chiave, diventa: v.diventa || "", riferimento: v.riferimento ? v.riferimento.nome : null }));
+}
+function immaginiMateriali() {
+  if (S.modo === "contesto" || !S.mat.dati) return 0;
+  return Object.entries(S.mat.scelti).reduce((n, [chiave, v]) => {
+    const m = S.mat.dati.materiali.find((x) => x.chiave === chiave);
+    return n + (m && m.anteprima ? 1 : 0) + (v.riferimento ? 1 : 0);
+  }, 0);
+}
+async function materialiCambiati() {
+  S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+async function spuntaMateriale(chiave, acceso) {
+  if (acceso) S.mat.scelti[chiave] = S.mat.scelti[chiave] || { diventa: "", riferimento: null };
+  else delete S.mat.scelti[chiave];
+  await materialiCambiati();
+}
+async function riferimentoMateriale(chiave, file) {
+  if (!file) return;
+  try {
+    S.mat.scelti[chiave].riferimento = await post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  await materialiCambiati();
+}
+function pannelloMateriali() {
+  const d = S.mat.dati;
+  const testa = h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Materiali di questo progetto"));
+  if (!S.vista) return h("section", { classe: "pannello", "aria-label": "Materiali di questo progetto" }, testa,
+    h("p", { classe: "piccolo tenue" }, "Cattura una vista dalla palette."));
+  if (S.mat.errore) return h("section", { classe: "pannello" }, testa, avviso("errore", S.mat.errore.fatto, S.mat.errore.cosa_fare));
+  if (!d) return h("section", { classe: "pannello" }, testa, h("p", { classe: "piccolo tenue" }, "Leggo i materiali…"));
+  if (!d.letti) return h("section", { classe: "pannello", "aria-label": "Materiali di questo progetto" }, testa,
+    h("p", { classe: "piccolo tenue" }, "Materiali non letti: cattura di nuovo la vista dalla palette."));
+  if (d.errore) return h("section", { classe: "pannello" }, testa,
+    avviso("errore", `I materiali non si sono letti: ${d.errore}`, "Cattura di nuovo la vista. Se si ripete, manda diario-materiali.txt."));
+  if (!d.materiali.length) return h("section", { classe: "pannello" }, testa,
+    h("p", { classe: "piccolo tenue" }, "Nessun materiale nel progetto. Scrivili a parole."));
+  const scelti = Object.keys(S.mat.scelti).length;
+  const filtro = S.mat.cerca.trim().toLowerCase();
+  const trovati = d.materiali.filter((m) => !filtro || m.nome.toLowerCase().includes(filtro));
+  const mostrati = S.mat.tutti || filtro ? trovati : trovati.slice(0, 8);  // numero-non-configurabile: righe visibili prima di «Mostra tutti»
+  const cerca = h("input", { classe: "campo", type: "search", placeholder: "Cerca un materiale…", "aria-label": "Cerca un materiale", value: S.mat.cerca });
+  cerca.addEventListener("input", () => { S.mat.cerca = cerca.value; render(); const c = document.querySelector("[aria-label='Cerca un materiale']"); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); } });
+  const righe = mostrati.map((m) => {
+    const scelta = S.mat.scelti[m.chiave];
+    const cubo = m.anteprima ? h("img", { classe: "cubo", src: m.anteprima, alt: `Anteprima di Allplan: ${m.nome}` })
+      : h("div", { classe: "cubo vuoto" }, "nessuna anteprima");
+    const pieno = Object.keys(S.mat.scelti).length >= d.massimo && !scelta;
+    const spunta = h("input", { type: "checkbox", checked: !!scelta, disabled: pieno, onchange: (e) => spuntaMateriale(m.chiave, e.target.checked) });
+    let sotto = null;
+    if (scelta) {
+      const diventa = h("input", { classe: "campo", placeholder: "diventa…", "aria-label": `${m.nome} diventa`, value: scelta.diventa });
+      diventa.addEventListener("input", () => { scelta.diventa = diventa.value; S.secco = null; aggiornaComposto(); });
+      const file = h("input", { type: "file", accept: "image/jpeg,image/png", hidden: true, onchange: (e) => riferimentoMateriale(m.chiave, e.target.files[0]) });
+      const rif = scelta.riferimento
+        ? h("span", { classe: "riga" }, h("img", { classe: "rif-materiale", src: `/file/riferimento/${enc(scelta.riferimento.nome)}`, alt: "Foto di riferimento" }),
+            h("button", { classe: "btn link piccolo", onclick: () => { scelta.riferimento = null; materialiCambiati(); } }, "Togli"))
+        : h("button", { classe: "btn piccolo", onclick: () => file.click() }, "+ Riferimento");
+      sotto = h("div", { classe: "diventa" }, diventa, rif, file);
+    }
+    return h("div", { classe: scelta ? "materiale scelto" : "materiale" }, cubo,
+      h("div", { classe: "nome-materiale" }, h("b", { title: m.chiave }, m.nome), h("span", { classe: "tenue piccolo" }, `${m.elementi} elementi`)),
+      h("label", { classe: "piccolo riga" }, spunta, "Cambia"), sotto);
+  });
+  const conRif = Object.values(S.mat.scelti).filter((v) => v.riferimento).length;
+  return h("section", { classe: "pannello materiali", "aria-label": "Materiali di questo progetto" }, testa,
+    h("p", { classe: "piccolo tenue" }, `${d.materiali.length} materiali · letti ${data(d.letto_il)} · max ${d.massimo} da cambiare`),
+    cerca, righe,
+    !S.mat.tutti && !filtro && trovati.length > mostrati.length
+      ? h("button", { classe: "btn link piccolo", onclick: () => { S.mat.tutti = true; render(); } }, `Mostra tutti i ${trovati.length}`) : null,
+    d.senza_materiale.some((s) => /facciata/i.test(s))
+      ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Facciate: scrivile in «Materiali a parole».") : null,
+    h("p", { classe: "piccolo tenue", title: "Al modello partono la vista e, per ogni riga spuntata, l'anteprima di Allplan, il testo e la foto. Due materiali che nella vista sembrano uguali possono confondersi." }, "Allplan non viene toccato. ⓘ"),
+    scelti ? h("p", { classe: "piccolo" }, h("b", {}, `${scelti === 1 ? "1 materiale" : `${scelti} materiali`} da cambiare`), conRif ? ` · ${conRif === 1 ? "1 foto" : `${conRif} foto`} di riferimento` : "") : null);
 }
 
 // Immagine di riferimento per lo stile: parte come seconda immagine, solo con

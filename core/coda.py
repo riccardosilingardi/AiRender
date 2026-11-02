@@ -44,6 +44,7 @@ from typing import Callable
 
 from . import aree as modulo_aree, battito as modulo_battito, blocchi, config, grana as modulo_grana, immagine as modulo_immagine
 from . import contesto as modulo_contesto
+from . import materiali as modulo_materiali
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
@@ -68,7 +69,11 @@ FORMATO_CONTESTO = 5  # numero-non-configurabile: versione del formato di un lav
 # Il formato 5 (2026-11-01) aggiunge il contesto: l'immagine del luogo con
 # l'area dove va l'edificio. Si scrive solo quando c'e' un contesto: un motore
 # vecchio rifiuta il 5 invece di mandare la vista da sola.
-FORMATI_LETTI = (1, 2, 3, 4, 5)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_MATERIALI = 6  # numero-non-configurabile: versione del formato di un lavoro con materiali da cambiare
+# Il formato 6 (2026-11-02) aggiunge i materiali di Allplan da cambiare, con
+# anteprima e foto di riferimento. Si scrive solo quando ce ne sono: un motore
+# vecchio rifiuta il 6 invece di mandare la vista senza le immagini annunciate.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6)  # numero-non-configurabile: i formati che questo motore sa leggere
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
 CARTELLA_RIFERIMENTI = "riferimenti"
@@ -251,12 +256,17 @@ class Lavoro:
     # l'area dove va l'edificio. Parte per prima, la vista dopo. Solo da una
     # vista, mai con aree, passi o riferimento.
     contesto: modulo_contesto.Contesto | None = None
+    # Studio · Genera: i materiali di Allplan da cambiare. Partono dopo la
+    # vista e dopo il riferimento per lo stile. Solo da una vista.
+    materiali: tuple[modulo_materiali.Cambio, ...] = ()
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
         if self.aree:
             object.__setattr__(self, "formato", FORMATO_RITOCCO)
+        elif self.materiali:
+            object.__setattr__(self, "formato", FORMATO_MATERIALI)
         elif self.riferimento:
             object.__setattr__(self, "formato", FORMATO_RIFERIMENTO)
         elif self.contesto:
@@ -283,7 +293,8 @@ class Lavoro:
         else:
             base = blocchi.componi(self.scelte)
         testo = blocchi.aggiungi_richieste(base, self.richieste)
-        return blocchi.aggiungi_riferimento(testo) if self.riferimento else testo
+        testo = blocchi.aggiungi_riferimento(testo) if self.riferimento else testo
+        return modulo_materiali.prompt(testo, self.materiali, prima_immagine=modulo_materiali.prima_immagine(bool(self.riferimento)))
 
     def a_dizionario(self) -> dict:
         return {
@@ -304,6 +315,7 @@ class Lavoro:
                if self.aree else {}),
             **({"riferimento": self.riferimento} if self.riferimento else {}),
             **({"contesto": self.contesto.a_dizionario()} if self.contesto else {}),
+            **({"materiali": [c.a_dizionario() for c in self.materiali]} if self.materiali else {}),
         }
 
     @classmethod
@@ -343,7 +355,22 @@ class Lavoro:
                 "Rimetti il passo in coda dallo Studio · Passi.",
             )
         aree, modo_aree = _aree_del_lavoro(dati, partenza)
-        riferimento = dati.get("riferimento") if dati.get("formato") == FORMATO_RIFERIMENTO else None
+        riferimento = (dati.get("riferimento") if dati.get("formato") == FORMATO_RIFERIMENTO
+                       or (dati.get("formato") == FORMATO_MATERIALI and dati.get("riferimento")) else None)
+        materiali: tuple[modulo_materiali.Cambio, ...] = ()
+        if dati.get("formato") == FORMATO_MATERIALI:
+            elenco = dati.get("materiali")
+            if partenza or aree or not isinstance(elenco, list) or not elenco:
+                raise LavoroNonValido(
+                    "Il file del lavoro dice che porta materiali da cambiare, ma non ne elenca, "
+                    "o parte da un render invece che dalla vista.",
+                    "Rimetti il lavoro in coda da Studio · Genera.",
+                )
+            try:
+                materiali = modulo_materiali.controlla_cambi(
+                    tuple(modulo_materiali.Cambio.da_dizionario(v) for v in elenco))
+            except modulo_materiali.MaterialeNonValido as errore:
+                raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
         if dati.get("formato") == FORMATO_RIFERIMENTO and (not riferimento or partenza):
             raise LavoroNonValido(
                 "Il file del lavoro dice che porta un riferimento per lo stile, ma non dice "
@@ -377,6 +404,7 @@ class Lavoro:
             modo_aree=modo_aree,
             riferimento=str(riferimento) if riferimento else None,
             contesto=contesto,
+            materiali=materiali,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -448,6 +476,7 @@ def metti_in_coda(
     modo_aree: str | None = None,
     riferimento: Path | None = None,
     contesto: modulo_contesto.Contesto | None = None,
+    materiali: tuple[modulo_materiali.Cambio, ...] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -483,6 +512,14 @@ def metti_in_coda(
         file_contesto = modulo_contesto.controlla_file(radice, Path(contesto.file))
         contesto = modulo_contesto.Contesto(
             str(file_contesto), contesto.area, contesto.inquadratura, contesto.pulisci_mappa, contesto.luogo)
+    if materiali:
+        if partenza or aree or contesto is not None:
+            raise LavoroNonValido(
+                "I materiali da cambiare partono solo con un render dalla vista, "
+                "non da un passo, un ritocco o «Inserisci nel contesto».",
+                "Togli la spunta dai materiali, oppure genera da Genera.",
+            )
+        materiali = tuple(_cambio_controllato(radice, c) for c in modulo_materiali.controlla_cambi(tuple(materiali)))
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -508,7 +545,14 @@ def metti_in_coda(
         modo_aree=modo_aree if aree else None,
         riferimento=str(riferimento) if riferimento else None,
         contesto=contesto,
+        materiali=tuple(materiali),
     )
+    if materiali and modulo_materiali.quante_immagini(tuple(materiali)) \
+            and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: le anteprime dei materiali non partirebbero.",
+            "Scegli Nano Banana 2.",
+        )
     if contesto is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
             f"{modello} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due.",
@@ -525,6 +569,14 @@ def metti_in_coda(
     scrivi_stato(radice, lavoro.identificativo, IN_CODA, destinazione=destinazione)
     scrivi_json(percorsi[IN_ATTESA_DIR] / f"{lavoro.identificativo}.json", lavoro.a_dizionario())
     return lavoro
+
+
+def _cambio_controllato(radice: Path, cambio: modulo_materiali.Cambio) -> modulo_materiali.Cambio:
+    """Il cambio con i file controllati: anteprima dalla cartella delle anteprime, foto dai riferimenti."""
+    anteprima = (str(modulo_materiali.controlla_anteprima(radice, Path(cambio.anteprima).name).resolve())
+                 if cambio.anteprima else None)
+    riferimento = str(controlla_riferimento(radice, Path(cambio.riferimento))) if cambio.riferimento else None
+    return modulo_materiali.Cambio(cambio.nome, cambio.diventa, anteprima, riferimento)
 
 
 def chiedi_annullamento(radice: Path, identificativo: str) -> Path:
@@ -767,6 +819,12 @@ class Coda:
             riferimento = controlla_riferimento(self.radice, Path(lavoro.riferimento)).read_bytes()
             modulo_immagine.misura(riferimento)  # solleva se non e' un'immagine
             in_piu = (*in_piu, riferimento)
+        for cambio in lavoro.materiali:
+            # Rilette dalle loro cartelle: un file sparito ferma il lavoro prima dell'invio.
+            for percorso in _cambio_controllato(self.radice, cambio).immagini():
+                immagine = Path(percorso).read_bytes()
+                modulo_immagine.misura(immagine)  # solleva se non e' un'immagine
+                in_piu = (*in_piu, immagine)
         # La grana non entra nei blocchi: i modelli del Router non hanno un
         # dettaglio della grana, e la ricetta lo scrive come assente.
         livello = modulo_grana.MEDIA

@@ -784,3 +784,19 @@ COLORMAP_COLORI_IN_INGRESSO_MASSIMI = _registra(Costante(
         "bordi. OneFormer ADE20K ha 150 classi, quindi 256 basta e avanza."
     ),
 ))
+
+
+# --- materiali del progetto Allplan (2026-11-02) -------------------------------
+
+MATERIALI_CAMBIATI_MASSIMI = _registra(Costante(
+    nome="MATERIALI_CAMBIATI_MASSIMI",
+    valore=5,
+    origine=SCELTA,
+    ragione=(
+        "Quanti materiali di Allplan si cambiano al massimo in un invio. Ogni "
+        "materiale porta fino a due immagini (l'anteprima di Allplan e la "
+        "foto di riferimento): con 5 materiali, la vista e il riferimento per "
+        "lo stile sono 12 immagini, sotto le 14 che Gemini dichiara per un "
+        "invio. Non misurato quanti materiali il modello tiene distinti."
+    ),
+))

@@ -168,11 +168,21 @@ vista con colori neutri.»
 **Colonna destra — cosa parte**
 - **Materiali a parole** (attivo): testo libero, «intonaco a calce bianco,
   infissi in rovere scuro».
-- **Dalla mappa materiali di Allplan** (in grigio, «In arrivo»): una riga per
-  materiale con colore nella mappa | materiale Allplan | diventa (a parole) |
-  immagine di riferimento facoltativa. Le righe mostrate sono marcate
-  «esempio, non calcolato». Serve prima la verifica della vista a colori per
-  materiale (PRD, sezione 9).
+- **Materiali del progetto** (2026-11-02): la tabella dei materiali che la
+  palette ha letto quando ha catturato la vista. AIRENDER non cambia mai i
+  materiali di Allplan: li legge e basta. Una riga per materiale: cubetto
+  d'anteprima del .surf (vuoto se il .surf non si trova), nome, numero di
+  elementi, spunta **Cambia**. Con la spunta compaiono «diventa» (a parole,
+  obbligatorio) e **+ Riferimento** (foto facoltativa). Al massimo
+  `MATERIALI_CAMBIATI_MASSIMI` spunte (scelto). Ricerca e «Mostra tutti» oltre
+  le prime righe; sotto, gli elementi senza materiale (es. facciate).
+  - *Vuoto:* «Materiali non letti: cattura di nuovo la vista dalla palette.»
+    Nessuna riga d'esempio.
+  - *In corso:* «Carico i materiali…».
+  - *Errore:* il messaggio scritto dalla palette, con cosa fare.
+  - *Pieno:* la tabella e una riga «N da cambiare, M immagini in più».
+  Con FLUX.1 Kontext (una sola immagine) le anteprime non partono: lo dice e
+  Genera si spegne finché non si cambia modello o si tolgono le spunte.
 - **Cosa parte, in breve**: il riassunto delle scelte in italiano.
 - **Mostra e modifica il prompt completo**: il testo vero che parte al
   modello, in inglese, modificabile, con il numero di caratteri. Se l'utente
