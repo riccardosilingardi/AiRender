@@ -47,12 +47,16 @@ MODI = {
     "primo": ("Da un render", "Il video comincia dal render e la camera si muove."),
     "primo-ultimo": ("Da un render a un altro",
                      "Primo e ultimo fotogramma: il modello inventa il passaggio fra i due."),
+    "sequenza": ("Inizio, intermezzo, fine",
+                 "Tre render: il video passa dal primo al secondo e dal secondo al terzo. "
+                 "Seedance non ha un fotogramma di mezzo: partono due video, uno per tratto, "
+                 "che lo Studio mostra uno dopo l'altro."),
     "riferimenti": ("Più render come riferimento",
                     "Il modello li usa per capire l'edificio ma non parte da nessuno: "
                     "è la scelta che tiene meno la geometria."),
 }
 # Quante immagini vuole ogni modo: (minimo, massimo).
-QUANTE = {"primo": (1, 1), "primo-ultimo": (2, 2), "riferimenti": (1, config.VIDEO_RIFERIMENTI_MASSIMI)}  # numero-non-configurabile: primo e ultimo fotogramma sono uno ciascuno
+QUANTE = {"primo": (1, 1), "primo-ultimo": (2, 2), "sequenza": (3, 3), "riferimenti": (1, config.VIDEO_RIFERIMENTI_MASSIMI)}  # numero-non-configurabile: primo e ultimo fotogramma sono uno ciascuno
 
 # Il movimento della camera, scritto in inglese come il resto dei prompt.
 MOVIMENTI = {
@@ -90,10 +94,18 @@ class RichiestaVideo:
     audio: bool = False
     modello: str = MODELLO
     creato_il: str = field(default_factory=_adesso)
+    # «Inizio, intermezzo, fine»: ogni tratto e' un video primo-ultimo con lo
+    # stesso identificativo di sequenza e il suo numero (1, 2).
+    sequenza: str = ""
+    tratto: int = 0
 
     def __post_init__(self) -> None:
         if self.modo not in MODI:
             raise VideoNonValido(f"Il modo «{self.modo}» non esiste.", f"Scegli fra {', '.join(MODI)}.")
+        if self.modo == "sequenza":
+            # Non parte mai come un video solo: si divide in due tratti primo-ultimo.
+            raise VideoNonValido("«Inizio, intermezzo, fine» parte come due video, non come uno.",
+                                 "Mettilo in coda con metti_in_coda_sequenza.")
         if self.movimento not in MOVIMENTI:
             raise VideoNonValido(f"Il movimento «{self.movimento}» non esiste.",
                                  f"Scegli fra {', '.join(MOVIMENTI)}.")
@@ -200,6 +212,21 @@ def metti_in_coda(radice: Path, immagini: list[Path], **scelte) -> RichiestaVide
     scrivi_stato(radice, richiesta.identificativo, IN_CODA, richiesta=asdict(richiesta),
                  destinazione=f"{comfy.ProviderComfy.destinazione} → {richiesta.modello}")
     return richiesta
+
+
+def metti_in_coda_sequenza(radice: Path, immagini: list[Path], **scelte) -> list[RichiestaVideo]:
+    """Inizio, intermezzo, fine: due video primo-ultimo, il secondo parte da dove finisce il primo."""
+    if len(immagini) != 3:  # numero-non-configurabile: inizio, intermezzo, fine
+        raise VideoNonValido(
+            f"«{MODI['sequenza'][0]}» vuole 3 immagini, ne hai scelte {len(immagini)}.",
+            "Scegli il render di inizio, quello di mezzo e quello di fine.",
+        )
+    scelte = {**scelte, "modo": "primo-ultimo"}
+    sequenza = nuovo_identificativo()
+    return [
+        metti_in_coda(radice, [immagini[0], immagini[1]], sequenza=sequenza, tratto=1, **scelte),
+        metti_in_coda(radice, [immagini[1], immagini[2]], sequenza=sequenza, tratto=2, **scelte),
+    ]
 
 
 def annulla(radice: Path, identificativo: str) -> bool:

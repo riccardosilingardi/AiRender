@@ -729,13 +729,14 @@ ESPORTA_QUALITA_JPEG = _registra(Costante(
 
 VIDEO_DURATE_SECONDI = _registra(Costante(
     nome="VIDEO_DURATE_SECONDI",
-    valore=(5, 10),
+    valore=(5, 10, 15, 20, 30),
     origine=SCELTA,
     ragione=(
         "Le durate offerte nella scheda Video. Seedance 2.5 accetta da 4 a 30 "
-        "secondi (documentazione del Router); 5 e 10 bastano per un giro "
-        "attorno a un edificio e costano meno di un video lungo. Costo non "
-        "misurato: lo dira' il primo video."
+        "secondi (documentazione del Router). Il 2026-11-02 Riccardo ha chiesto "
+        "video piu' lunghi: si offre fino al massimo del servizio, 30. Piu' "
+        "lungo costa di piu' e la geometria ha piu' tempo per sciogliersi. "
+        "Costo non misurato: lo dira' il primo video."
     ),
     unita=" s",
 ))

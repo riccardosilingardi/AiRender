@@ -460,3 +460,25 @@ select { min-height: 34px; padding: 0 10px; }
 @media (max-width: 900px) {
   .griglia-contesto, .scelta-modo { grid-template-columns: 1fr; }
 }
+
+/* --- spiegazioni al passaggio del mouse (proposta 5) ------------------------ */
+
+.spiega {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 16px; height: 16px; margin-left: 6px; border-radius: 50%;
+  border: 1px solid var(--bordo-forte); color: var(--tenue); background: transparent;
+  font-size: 10px; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: help;
+}
+.spiega:hover, .spiega:focus-visible { border-color: var(--accento); color: var(--accento); outline: none; }
+
+/* --- azioni sotto l'immagine (proposte 3 e 4) -------------------------------- */
+
+.barra-azioni { display: flex; flex-direction: column; gap: 8px; }
+.barra-azioni .azioni .btn { min-width: 96px; justify-content: center; }
+.barra-azioni .dove { font-size: 12px; color: var(--tenue); }
+.barra-azioni .dove b { color: var(--testo-2); font-weight: 600; }
+.video-veloce {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--bordo); border-radius: 10px; background: var(--pannello);
+}
+.griglia-render-video { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow-y: auto; }

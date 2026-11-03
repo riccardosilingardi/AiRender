@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 
 from core import video as modulo_video
-from test_passi import (VISTA, _coda, _genera, _passo, _studio,  # noqa: F401
+from test_passi import (NANO, VISTA, _coda, _genera, _passo, _studio,  # noqa: F401
                         cartella, chiamate)
 from test_ritocca import AREE, _ritocca
 from test_studio import _chiedi, vista_shaded
@@ -100,3 +100,16 @@ def test_la_rotta_dello_storico_risponde(cartella, chiamate):
         servito.server_close()
     assert stato == 200 and tipo.startswith("application/json")
     assert len(json.loads(corpo)["gruppi"][0]["voci"]) == 2
+
+
+def test_una_variante_sta_subito_dopo_l_immagine_da_cui_parte(cartella, chiamate):
+    """Proposta 3 (2026-11-02): il risultato accanto all'immagine, non in fondo alla striscia."""
+    studio, coda = _studio(cartella, chiamate), _coda(cartella, chiamate)
+    uno = _genera(studio); coda.esegui_uno()
+    rit = _ritocca(studio, uno, aree=[AREE[0]]); coda.esegui_uno()
+    due = _genera(studio); coda.esegui_uno()
+    # «Variante» del ritocco: stessa ricetta, stesso punto di partenza
+    variante = studio.rifai(rit, {"destinazione_mostrata": studio.destinazione(NANO)["destinazione"]})["identificativo"]
+    coda.esegui_uno()
+    ordine = [v["identificativo"] for v in studio.storico()["gruppi"][0]["voci"]]
+    assert ordine == [None, uno, rit, variante, due]

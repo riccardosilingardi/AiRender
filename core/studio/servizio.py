@@ -1158,8 +1158,8 @@ class Studio:
         """Tutte le immagini di tutte le viste, per la striscia in alto nello Studio.
 
         Un gruppo per vista, la vista catturata per ultima per prima. Dentro
-        il gruppo: la cattura, poi i render, i ritocchi e i video nell'ordine
-        in cui sono nati. Una cattura nuova apre un gruppo nuovo: i gruppi di
+        il gruppo: la cattura, poi i render, i ritocchi e i video in ordine
+        d'albero: ognuno subito dopo l'immagine da cui parte. Una cattura nuova apre un gruppo nuovo: i gruppi di
         prima restano come sono. Niente si cancella da qui.
         """
         lavori_per_vista: dict[str, list[dict]] = {}
@@ -1180,7 +1180,9 @@ class Studio:
             errore = None
             try:
                 albero = self._albero(vista, lavori_per_vista.get(str(vista.resolve()), []))
-                passi = sorted(albero.passi, key=lambda p: (p.get("creato_il") or "", p["identificativo"]))
+                # In ordine d'albero: ogni immagine subito dopo quella da cui
+                # parte, cosi' un ritocco o una variante stanno accanto.
+                passi = [passo for passo, _profondita in albero.in_ordine()]
             except ErroreAirender as problema:
                 passi, errore = [], _errore_dict(problema)
             for passo in passi:
@@ -1544,7 +1546,16 @@ class Studio:
         try:
             immagini, scelte = self._richiesta_video(dati)
             quante = len(immagini)
-            richiesta = modulo_video.RichiestaVideo(identificativo="prova", immagini=tuple(map(str, immagini)), **scelte)
+            if scelte["modo"] == "sequenza":
+                # Due tratti primo-ultimo: il prompt e' lo stesso per entrambi.
+                if quante != 3:  # numero-non-configurabile: inizio, intermezzo, fine
+                    raise modulo_video.VideoNonValido(
+                        f"«{modulo_video.MODI['sequenza'][0]}» vuole 3 immagini, ne hai scelte {quante}.",
+                        "Scegli il render di inizio, quello di mezzo e quello di fine.")
+                richiesta = modulo_video.RichiestaVideo(identificativo="prova", immagini=tuple(map(str, immagini[:2])),
+                                                        **{**scelte, "modo": "primo-ultimo"})
+            else:
+                richiesta = modulo_video.RichiestaVideo(identificativo="prova", immagini=tuple(map(str, immagini)), **scelte)
             prompt = richiesta.prompt()
             motore = self._crea_provider(comfy.ProviderComfy.nome)
             motore.controlla_video([percorso.read_bytes() for percorso in immagini])
@@ -1567,6 +1578,10 @@ class Studio:
                 "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
             )
         immagini, scelte = self._richiesta_video(dati)
+        if scelte["modo"] == "sequenza":
+            tratti = modulo_video.metti_in_coda_sequenza(self.cartella, immagini, **{k: v for k, v in scelte.items() if k != "modo"})
+            return {"identificativo": tratti[0].identificativo, "tratti": [t.identificativo for t in tratti],
+                    "destinazione": catalogo["destinazione"], "coda_attiva": self._coda_attiva()}
         richiesta = modulo_video.metti_in_coda(self.cartella, immagini, **scelte)
         return {"identificativo": richiesta.identificativo, "destinazione": catalogo["destinazione"],
                 "coda_attiva": self._coda_attiva()}
@@ -1589,6 +1604,8 @@ class Studio:
                 "durata": richiesta.get("durata"),
                 "risoluzione": richiesta.get("risoluzione"),
                 "immagini": len(richiesta.get("immagini") or []),
+                "sequenza": richiesta.get("sequenza") or None,
+                "tratto": richiesta.get("tratto") or None,
             })
         return voci
 
