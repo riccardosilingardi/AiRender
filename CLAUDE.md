@@ -54,7 +54,9 @@ Cresce col progetto. Dopo un mese sarà la sezione più preziosa del repository.
 - **Comfy Router ripiega su un altro provider se non glielo si vieta.** Il
   fallback è acceso per default e qualunque valore diverso da `false` lo lascia
   acceso. Senza `fallback_provider=false` la destinazione annunciata può essere
-  falsa.
+  falsa. E non basta: la catena Gemini di `vertexai` può passare la chiamata a
+  un altro fornitore che nessuna intestazione nomina (API reference del Router,
+  `X-Comfy-Router-Provider`; `docs/termini-comfy-rivendita.md`).
 - **Il modello legge i colori della vista come materiali.** Allplan colora le
   superfici per layer o per stile, non per materiale: una falda viola diventa
   lamiera viola. Il prompt non basta a impedirlo; la vista va salvata con colori

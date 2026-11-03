@@ -77,8 +77,10 @@ AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgr
 ## Da verificare prima del lancio
 
 - Termini di Comfy sulla rivendita di generazioni fatte con una chiave sola
-  (alternativa: Vertex AI diretto, stesso corpo Gemini).
-- GDPR: DPA con Supabase, Netlify, Stripe, Resend; le viste passano dal
+  (alternativa: Vertex AI diretto, stesso corpo Gemini). Ricerca, rischi e
+  domanda da mandare a Comfy in `docs/termini-comfy-rivendita.md`: nessuna
+  fattura prima della risposta scritta.
+- GDPR: DPA con Comfy (e i suoi fornitori), Supabase, Netlify, Stripe, Resend; le viste passano dal
   server ma non si salvano, tranne i risultati sopra 4,5 MB (Storage, link di
   24 ore: va aggiunta una pulizia programmata).
 - Regime fiscale di Riccardo (forfettario o no): decide IVA e natura

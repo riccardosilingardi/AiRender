@@ -268,6 +268,28 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Termini di Comfy e rivendita (2026-11-03)
+
+Tutto in `docs/termini-comfy-rivendita.md`. Restano aperti:
+
+- **I Termini di servizio di Comfy permettono di servire clienti propri con
+  una chiave sola** — non letti: `comfy.org` è bloccato dalla rete della
+  sessione. L'accordo Enterprise, letto solo in estratti, vieta di concedere i
+  prodotti Comfy in uso a terzi. Per verificare: Riccardo apre i termini e
+  rimanda le sezioni (`docs/termini-comfy-rivendita.md`, 1.1), e manda a
+  Comfy la domanda della sezione 6. **Nessuna fattura prima della risposta.**
+- **La destinazione «Google» è vera** — non garantita nemmeno con la coda e
+  `fallback_provider=false`. L'API reference del Router dice che la catena
+  Gemini di `vertexai` può passare la chiamata a un altro fornitore che
+  nessuna intestazione nomina. Quali fornitori: non scritto. La frase a
+  schermo va corretta in un PR suo.
+- **Comfy ha un DPA e una lista di subresponsabili** — non letto. Manca
+  dall'elenco dei DPA in `server/README.md`.
+- **GPT Image 2 via Router ha l'uso commerciale** — OpenAI non è nella tabella
+  dei fornitori di Comfy.
+- **Le 24 ore di conservazione dei Partner Node valgono anche per il Router**
+  — non scritto.
+
 ### Licenze e crediti AIRENDER (2026-11-02)
 
 - **Niente del server è mai girato su Netlify, Supabase, Stripe, Fatture in
@@ -285,7 +307,10 @@ la verifica si nomina qui.
   nello Storage di Supabase con un link firmato. Mai provato con un 4K vero,
   né il tempo di risposta delle funzioni (10 s per default) sull'invio.
 - **I termini di Comfy permettono di rivendere** generazioni fatte con una
-  chiave sola: non letto. Alternativa: Vertex AI diretto.
+  chiave sola: ancora non letti. Dal 2026-11-03 c'è la ricerca, con la
+  documentazione del Router letta per intero, in `docs/termini-comfy-rivendita.md`
+  (blocco «Termini di Comfy e rivendita» qui sopra). Alternativa: Vertex AI
+  diretto, i cui termini permettono un'applicazione usata da terzi.
 - **Scelte di questa sessione da confermare con Riccardo:** la Prova ha le
   funzioni di Pro e apre il plugin; l'annuale accredita 12 mesi di render in
   un lotto; i render del mese non si sommano al mese dopo; a fine
@@ -498,7 +523,11 @@ FLUX.1 Kontext Pro e per Nano Banana 2, sulla cattura vera
   vicino), come nelle chiamate vere.
 - **`fallback_provider=false` vale anche sulla rotta della coda** — nelle
   risposte non è comparsa `X-Comfy-Router-Fallback-Provider`, il che è
-  coerente ma non prova che il parametro sia letto.
+  coerente ma non prova che il parametro sia letto. Dal 2026-11-03 la
+  documentazione risponde: «the queue has no fallback loop, so
+  `fallback_provider` never changes the leg that runs». Sulla coda il
+  ripiego non c'è. Letto, non provato con una chiamata. Resta la catena
+  interna di `vertexai` (`docs/termini-comfy-rivendita.md`, 1.3).
 - **Un errore dentro un `COMPLETED`** — mai visto: il nome del campo (`error`,
   `error_type`) resta un'ipotesi.
 - **Il 402 `insufficient_credits` non addebita niente**, e **cosa si paga se il
@@ -626,7 +655,10 @@ Allplan. Da verificare sul PC di Riccardo, in quest'ordine:
 - **`PictureButtonList` regge una griglia di 12+ miniature senza rallentare la
   palette** — verifica su macchina.
 - **Le condizioni dei provider consentono la rivendita dell'accesso** — da
-  leggere prima di emettere la prima fattura, non dopo.
+  leggere prima di emettere la prima fattura, non dopo. Dal 2026-11-03: Google
+  Cloud letto per intero (sì a un'applicazione usata da terzi, no a rivendere
+  il servizio); BFL, OpenAI e BytePlus solo in estratti; Comfy non letto.
+  Dettagli in `docs/termini-comfy-rivendita.md`, sezione 2.
 
 ### Lasciato dalla sessione del 2026-10-27 (lo Studio nei documenti)
 
