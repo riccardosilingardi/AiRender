@@ -281,7 +281,11 @@ vietato «sublicense the Comfy Products for use by a third party», anche
 «indirectly», e ogni uso «not expressly permitted». Vendere le immagini si
 può (l'Output è del cliente Comfy); far generare i propri clienti no, senza
 un Order Form o un'autorizzazione scritta. **Nessuna fattura del modello
-attuale prima dell'autorizzazione.**
+attuale prima dell'autorizzazione.** La documentazione tecnica di Comfy
+descrive proprio questo schema come normale (API v2: «your own backend, which
+already holds the API key»), ma non è contratto. E dice: «Router is not
+generally available yet» (pagina viva, 2026-11-03). Il motore predefinito
+scelto il 2026-10-21 poggia quindi su un prodotto non ancora definitivo.
 
 Restano aperti:
 

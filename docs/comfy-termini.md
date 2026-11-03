@@ -26,18 +26,29 @@ propri.
 | **D.** Server MCP | Dipende da chi lo usa | Se lo usi solo tu, è come A. Se lo usano i clienti con la licenza AIRENDER, è come B. Se è aperto a chiunque, è come C, e in più Comfy vende già un suo «Comfy MCP» (§3 (v)) |
 | **E.** ComfyUI open source su un tuo server con GPU, con modelli aperti, senza Partner Nodes | **I Termini di Comfy non si applicano** | ComfyUI è «Comfy OSS», escluso dai Termini (§2 Comfy OSS), e la GPL-3.0 non pone obblighi a chi lo usa come servizio senza distribuirlo. Valgono però le licenze dei singoli modelli. Nano Banana, GPT Image e Seedream qui non ci sono: sono solo Partner Nodes (sezione 5) |
 
-**Su B c'è un argomento contrario, ma debole.** Il chiamante è solo il tuo
-server, il cliente non vede né Comfy né la chiave, quindi «l'uso è tuo».
-Contro:
+**Su B il contratto e la documentazione di Comfy non dicono la stessa
+cosa.** Il contratto non lo permette:
 
 - il diritto è dato a te e ai tuoi «Users», che il testo definisce come
   dipendenti e collaboratori;
 - il divieto copre anche l'uso «indirectly» da parte di terzi;
 - il punto (vii) chiude tutto ciò che non è espressamente permesso.
 
-Le pagine marketing di Comfy («APIs behind customer-facing products») non
-cambiano il contratto: il §12 Entire Agreement esclude «sales materials or
-presentations».
+La documentazione tecnica, invece, descrive proprio lo schema di AIRENDER
+come un uso normale. Per la Comfy API v2 dice: «Any application that shows
+outputs to its own users…», e «Fetch `Output.url` from your own backend,
+which already holds the API key, and stream the bytes to your user» (sezione
+4). Anche le pagine marketing parlano di API «behind customer-facing
+products». È il segnale più forte che Comfy considera accettabile servire i
+propri utenti, ma ha tre limiti:
+
+- è documentazione, non contratto;
+- il §12 Entire Agreement mette da parte «statements, sales materials or
+  presentations»;
+- parla dei workflow, non del Router.
+
+Per questo serve ancora che Comfy lo metta per iscritto. Ma è probabile che
+dica di sì, e la mail può citare queste frasi.
 
 **Cosa rischi, se lo fai lo stesso:**
 
@@ -72,7 +83,7 @@ pubblici che generano i siti.
 | [Enterprise Customer Agreement](https://comfy.org/enterprise-msa/) | «Effective Date: May 22, 2026», modello | Stesso commit, chiavi `enterprise-msa.*` | Non confrontato con il sito vivo |
 | [Comfy Router](https://comfy.org/platform/router) | — | Stesso commit, `pages/platform/router.astro` e chiavi `platform.router.*` | Non confrontato |
 | [Comfy API](https://comfy.org/platform/comfy-api), [Comfy MCP](https://comfy.org/mcp), FAQ prezzi ed Enterprise | — | Stesso commit | Non confrontato |
-| docs.comfy.org: Partner Nodes, Model Providers, Credits, Data Retention, Concurrency, Router | — | Repository ufficiale `Comfy-Org/docs`, commit [`adfc0fd`](https://github.com/Comfy-Org/docs/tree/adfc0fded5825c21b091009736e98fe91e165085), ancora l'ultimo il 2026-11-03 | È il sorgente da cui il sito è generato |
+| docs.comfy.org: Partner Nodes, Model Providers, Credits, Data Retention, Concurrency, Router, API v2 | — | Repository ufficiale `Comfy-Org/docs`, commit [`adfc0fd`](https://github.com/Comfy-Org/docs/tree/adfc0fded5825c21b091009736e98fe91e165085), ancora l'ultimo il 2026-11-03 | È il sorgente da cui il sito è generato. Due pagine confrontate con i PDF della pagina viva caricati da Riccardo il 2026-11-03: «Comfy Router capabilities and limits» (21:03 UTC) e «Comfy API v2 Overview» (21:02 UTC). **Stesso testo.** Mancano solo le parti che la modalità lettura del browser non stampa: blocchi di codice, riquadri «Note», schede «Next» |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI): `LICENSE` e `README.md` | GPL-3.0 | Repository ufficiale, commit [`2c75dc1`](https://github.com/Comfy-Org/ComfyUI/tree/2c75dc1b379a59e0880619d029607af5169a62ef) del 2026-11-03 | È il repository stesso |
 
 Il commit `cca126a` è l'ultimo in cui il sito era pubblico. Il commit
@@ -675,6 +686,73 @@ ricarica, 10 da 100 $ spesi in tutto. E Comfy può portarlo a 0.
 > Retained for as long as necessary to operate, analyze, and improve the
 > service
 
+### Comfy API v2 Overview (confrontata con la pagina viva)
+
+<https://docs.comfy.org/api-reference/v2/overview>, per i workflow. È la
+pagina che descrive come un'applicazione serve i propri utenti:
+
+> Three different lifetimes govern "the URL for my output" and they are not
+> the same number. Any application that shows outputs to its own users has to
+> plan for all three.
+
+> The practical consequence: `Output.url` is not a shareable link. Put it in an
+> `<img src>` that your users' browsers load and they get a `401`, because
+> their browser does not carry your API key. The signed URL is the one you can
+> hand out.
+
+> ### Showing an Output in Your Own Product
+>
+> To still be showing an output a day later, do one of these:
+>
+> - **Re-host the bytes.** Download the output once and copy it into your own
+>   storage. Most applications end up here.
+> - **Re-mint on demand.** […]
+> - **Proxy it.** Fetch `Output.url` from your own backend, which already
+>   holds the API key, and stream the bytes to your user.
+
+E sul Router, in fondo alla stessa pagina:
+
+> Comfy API v2 runs workflows as durable jobs you submit and poll. For direct
+> model calls (one partner model, one request, the model's native input and
+> output), see the Comfy Router. Review the Router limitations first. Router
+> is not generally available yet.
+
+Sulla strada E, cioè ComfyUI open source (sezione 5):
+
+> **Open-source ComfyUI, via the proxy.** A self-hosted ComfyUI speaks v2
+> through comfy-api-proxy, a small open-source service that runs alongside
+> it:
+
+**Come lo leggo.**
+
+- **Lo schema di AIRENDER è descritto come uso normale.** «Your own backend,
+  which already holds the API key», «stream the bytes to your user»: server
+  con la chiave, immagini girate al cliente. È proprio AIRENDER, ma per i
+  workflow e non per il Router. Come detto nella Risposta, non cambia il
+  contratto. È però l'argomento migliore per la richiesta a Comfy.
+- **Il Router non è ancora disponibile a tutti in forma definitiva.**
+  Insieme al §2 Modification, che permette a Comfy di cambiare o chiudere
+  qualunque prodotto «with or without notice», è un rischio in più per un
+  servizio a pagamento costruito sopra. La API v2 invece promette che le
+  modifiche dentro v2 sono solo aggiunte (riquadro «Note» del sorgente: «Changes
+  within v2 are additive; breaking changes ship as v3»).
+- **ComfyUI open source parla la stessa API dei workflow** di Comfy Cloud,
+  attraverso un proxy open source. Passare dall'uno all'altro costerebbe poco
+  nel codice. Non si applica ai modelli dei Partner Nodes.
+
+### Comfy Router: capabilities and limits (confrontata con la pagina viva)
+
+<https://docs.comfy.org/development/comfy-router/limitations>. Niente su
+rivendita o terzi. Per AIRENDER conta questa frase, già usata in
+`docs/termini-comfy-rivendita.md`:
+
+> The request-rate limit applies to invocation and catalog/schema reads,
+> including requests refused before generation. It follows the authenticated
+> caller, not the source IP.
+
+Con una chiave sola, il «caller» è uno: tutti i clienti AIRENDER dividono lo
+stesso limite.
+
 ### Chiave
 
 <https://docs.comfy.org/development/api-development/getting-an-api-key>
@@ -847,13 +925,18 @@ prova.
   Per verificare: il banco di prova (`scripts/confronta_modelli.py`) su una
   GPU in affitto, con le stesse viste.
 
-- **Il testo vivo di Enterprise MSA, Router, Comfy API, Comfy MCP e FAQ del
-  sito:** letto al 2026-10-26 dal repository, non confrontato con le pagine di
-  oggi. Per i Termini il confronto c'è, ed è completo: la pagina viva
-  coincide. Per verificare: stampa in PDF anche
-  <https://comfy.org/enterprise-msa/> e <https://comfy.org/platform/router>,
-  come hai fatto per i Termini, e rimandali indietro. Li confronto parola per
-  parola.
+- **Il testo vivo di Enterprise MSA, pagina prodotto del Router
+  (`comfy.org/platform/router`), Comfy API, Comfy MCP e FAQ del sito:** letto
+  al 2026-10-26 dal repository, non confrontato con le pagine di oggi. Sono
+  invece confrontati, e uguali, i Termini e due pagine di docs.comfy.org
+  (Router capabilities and limits, API v2 Overview). Per verificare: stampa
+  in PDF anche <https://comfy.org/enterprise-msa/> e
+  <https://comfy.org/platform/router>. Attenzione: sono pagine di
+  `comfy.org`, non di `docs.comfy.org`. Rimandale indietro e le confronto
+  parola per parola.
+- **Il Router diventa disponibile a tutti, e quando:** la documentazione dice
+  solo «not generally available yet». Va chiesto a Comfy insieme
+  all'autorizzazione.
 - **Che il caso B violi i Termini:** è una lettura del testo, non una
   sentenza. Il contratto è retto dalla legge della California e le
   controversie vanno in arbitrato JAMS a San Francisco (§11). Solo un legale,

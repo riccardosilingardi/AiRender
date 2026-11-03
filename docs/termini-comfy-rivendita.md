@@ -379,9 +379,13 @@ Da mandare a `support@comfy.org`, oppure dal modulo
 >
 > 1. Your Terms of Service grant use "for your internal business purposes"
 >    (Section 2) and exclude sublicensing "for use by a third party" and any
->    purpose "not expressly permitted" (Section 3 (i) and (vii)). Will you give
->    us a written authorization, or an Order Form clause, that permits this
->    use? Which agreement do we need (Enterprise, reseller, other)?
+>    purpose "not expressly permitted" (Section 3 (i) and (vii)). Your Comfy API
+>    v2 documentation describes exactly our pattern ("Fetch `Output.url` from
+>    your own backend, which already holds the API key, and stream the bytes
+>    to your user"). Will you give us a written authorization, or an Order
+>    Form clause, that permits the same use of Router? Which agreement do we
+>    need (Enterprise, reseller, other)? Your docs also say "Router is not
+>    generally available yet": when is general availability expected?
 > 2. Your API reference says that `X-Comfy-Router-Provider` is "not necessarily
 >    the vendor that produced the output, since a proxy-level cascade inside a
 >    native leg (the `vertexai` Gemini image chain, for one) can hand the call
