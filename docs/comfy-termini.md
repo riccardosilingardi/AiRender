@@ -82,7 +82,8 @@ pubblici che generano i siti.
 | [Terms of Service](https://www.comfy.org/terms-of-service) | «Effective Date: May 13, 2026» | Repository ufficiale `Comfy-Org/ComfyUI_frontend`, commit [`cca126a`](https://github.com/Comfy-Org/ComfyUI_frontend/blob/cca126acd1734b4cfd9ad26a00491cd98a7cf107/apps/website/src/locales/en/main.json) del 2026-10-26, chiavi `tos.*` | **Identico parola per parola alla pagina viva.** Il confronto è con i due PDF caricati da Riccardo il 2026-11-03. Quello completo, delle 20:48 UTC, coincide per intero: 5.239 parole su 5.239, dalla data fino a «legal@comfy.org». Quello in modalità lettura, delle 20:46, coincide per la parte che contiene |
 | [Enterprise Customer Agreement](https://comfy.org/enterprise-msa/) | «Effective Date: May 22, 2026», modello | Stesso commit, chiavi `enterprise-msa.*` | **Identico parola per parola alla pagina viva**: 4.976 parole su 4.976, confrontate con il PDF di Riccardo del 2026-11-03, 21:10 UTC |
 | [Comfy Router](https://comfy.org/platform/router) | — | Stesso commit, `pages/platform/router.astro` e chiavi `platform.router.*` | **Confrontato con la pagina viva** (PDF del 2026-11-03, 21:12 UTC). Tutte le frasi citate qui ci sono, parola per parola, tranne la risposta della FAQ 10 su BYOK: nella stampa manca (sezione 3) |
-| [Comfy API](https://comfy.org/platform/comfy-api), [Comfy MCP](https://comfy.org/mcp), FAQ prezzi ed Enterprise | — | Stesso commit | Non confrontato |
+| [Comfy Enterprise](https://comfy.org/enterprise/) | — | Solo il PDF della pagina viva del 2026-11-03, 21:24 UTC | **Riscritta dopo il 2026-10-26**: 38 frasi della pagina viva non esistono nel sorgente pubblico. Non c'è un sorgente con cui confrontarla: le citazioni vengono dal PDF |
+| [Comfy API](https://comfy.org/platform/comfy-api), [Comfy MCP](https://comfy.org/mcp), FAQ prezzi | — | Stesso commit | Non confrontato |
 | docs.comfy.org: Partner Nodes, Model Providers, Credits, Data Retention, Concurrency, Router, API v2 | — | Repository ufficiale `Comfy-Org/docs`, commit [`adfc0fd`](https://github.com/Comfy-Org/docs/tree/adfc0fded5825c21b091009736e98fe91e165085), ancora l'ultimo il 2026-11-03 | È il sorgente da cui il sito è generato. Due pagine confrontate con i PDF della pagina viva caricati da Riccardo il 2026-11-03: «Comfy Router capabilities and limits» (21:03 UTC) e «Comfy API v2 Overview» (21:02 UTC). **Stesso testo.** Mancano solo le parti che la modalità lettura del browser non stampa: blocchi di codice, riquadri «Note», schede «Next» |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI): `LICENSE` e `README.md` | GPL-3.0 | Repository ufficiale, commit [`2c75dc1`](https://github.com/Comfy-Org/ComfyUI/tree/2c75dc1b379a59e0880619d029607af5169a62ef) del 2026-11-03 | È il repository stesso |
 
@@ -91,8 +92,9 @@ successivo, `59201a9` («chore(website): remove the migrated website from the
 frontend (#21861)»), lo ha spostato in `Comfy-Org/comfy-website`, che è
 privato. I PDF della pagina viva confermano che dal 26 ottobre a oggi Termini
 e accordo Enterprise non sono cambiati di una parola. Sulla pagina del Router
-è cambiata una sola cosa: la FAQ su BYOK. Comfy API, Comfy MCP e le FAQ di
-prezzi ed Enterprise del sito restano senza conferma.
+è cambiata una sola cosa: la FAQ su BYOK. La pagina commerciale Enterprise
+(`comfy.org/enterprise`, diversa dall'accordo) invece è stata riscritta.
+Comfy API, Comfy MCP e le FAQ prezzi restano senza conferma.
 
 Negli indirizzi email del sorgente, `{'@'}` è l'escape di vue-i18n per `@`.
 Qui sotto è scritto `@`.
@@ -584,7 +586,56 @@ ottenere un sì. Contrattualmente non conta (§12 Entire Agreement). Il fatto
 che Comfy venda un suo MCP rende un MCP pubblico costruito sui crediti Comfy
 un «product or service competitive» (§3 (v)).
 
-### FAQ prezzi ed Enterprise del sito
+### Pagina Comfy Enterprise (pagina viva, 2026-11-03)
+
+<https://comfy.org/enterprise/>. È la pagina commerciale, non l'accordo. Il
+testo qui sotto viene dal PDF stampato da Riccardo: dopo il 2026-10-26 la
+pagina è stata riscritta, e non c'è un sorgente pubblico con cui confrontarla.
+Niente su rivendita o clienti terzi. Le frasi che contano:
+
+> Procurement
+> A DPA and enterprise agreement are available.
+> Processing is in the United States on Google Cloud.
+
+> SOC 2
+> Type II report available on request.
+
+> Data control
+> For local deployments, Comfy Workflows and outputs stay where they run.
+> Comfy does not train on customer data.
+
+> Model policy and BYOK
+> Choose the partner, open, and private models teams can use. Bring supported
+> provider keys and existing contracts.
+
+> On Cloud, every model is licensed for commercial use. On local, licenses vary
+> by provider and commercial terms are available on request. Comfy is also an
+> official reseller for MiniMax commercial licenses.
+
+> Bring one known-good environment or the production requirement your team
+> needs to scale. We will map deployment, governance, capacity, commercial
+> terms, and the right implementation path.
+
+**Come lo leggo.**
+
+- **Un DPA esiste.** Risponde in parte al rischio 4 di
+  `docs/termini-comfy-rivendita.md`: l'accordo sul trattamento dei dati c'è,
+  almeno con l'Enterprise. Il trattamento avviene negli Stati Uniti, su Google
+  Cloud, quindi è un trasferimento fuori dall'UE da dichiarare ai clienti.
+  Il DPA non è stato letto.
+- **BYOK fa parte dell'offerta Enterprise** («Bring supported provider
+  keys»). La pagina non dice quali chiavi né se valgono nel Router, che lo
+  mette ancora in roadmap.
+- **La pagina parla di «teams» e «organization», cioè di uso interno**, in
+  linea con il §2 dei Termini. Dice però che i termini commerciali si
+  definiscono caso per caso («We will map … commercial terms»). È lì che va
+  chiesta la clausola per servire i propri clienti.
+
+### FAQ prezzi ed Enterprise del sito (al 2026-10-26)
+
+Queste FAQ erano nel sorgente del 2026-10-26. **Nella pagina Enterprise viva
+non ci sono più**, perché è stata riscritta. Se restino nella pagina prezzi
+non è stato verificato.
 
 > **Does Comfy support BYOK (bring your own key)? Can I bring my own provider
 > key?** Yes. We support BYOK for **Runway and Google Gemini** today, and we
@@ -889,9 +940,13 @@ prova.
 - **La rivendita Serteco**, se le licenze vendute danno ai clienti
   generazioni Comfy: è lo stesso caso B, con un intermediario in più.
 - **BYOK Gemini:** la tua chiave Google dentro il Router. Solo «on request»
-  per Enterprise, secondo la FAQ prezzi del sito al 2026-10-26. Sulla pagina
-  viva del Router, il 2026-11-03, è solo nella roadmap («Coming soon»). Non
-  cambia i divieti del §3: cambia solo chi fattura i modelli.
+  per Enterprise, secondo la FAQ prezzi del sito al 2026-10-26. La pagina
+  Enterprise viva lo conferma in generale («Bring supported provider keys and
+  existing contracts»). Sulla pagina viva del Router, invece, il 2026-11-03 è
+  solo nella roadmap («Coming soon»). Non cambia i divieti del §3: cambia solo
+  chi fattura i modelli.
+- **Il DPA:** esiste («A DPA and enterprise agreement are available»,
+  pagina Enterprise viva). Va chiesto e letto prima di dichiararlo ai clienti.
 - **Un limite di concorrenza personalizzato** e **la residenza dei dati in
   UE**: «enterprise arrangement» (Concurrency; Model Providers).
 - **La certezza del fornitore per i modelli `vertexai`:** non è nei testi.
@@ -940,15 +995,20 @@ prova.
   Per verificare: il banco di prova (`scripts/confronta_modelli.py`) su una
   GPU in affitto, con le stesse viste.
 
-- **Il testo vivo di Comfy API, Comfy MCP e FAQ di prezzi ed Enterprise del
-  sito:** letto al 2026-10-26 dal repository, non confrontato con le pagine
-  di oggi. Sono confrontati, e uguali, i Termini, l'accordo Enterprise, la
-  pagina del Router (salvo la FAQ 10) e due pagine di docs.comfy.org.
-- **BYOK su Enterprise è ancora offerto:** la FAQ prezzi lo diceva il
-  2026-10-26, mentre la pagina viva del Router lo dà solo in roadmap. Che la
-  FAQ 10 sia stata tolta, e non solo saltata dalla stampa, è probabile ma non
-  provato. Per verificare: aprire la FAQ «Can I bring my own provider key?»
-  in fondo a <https://comfy.org/platform/router>.
+- **Il testo vivo di Comfy API, Comfy MCP e FAQ prezzi del sito:** letto al
+  2026-10-26 dal repository, non confrontato con le pagine di oggi. Sono
+  confrontati, e uguali, i Termini, l'accordo Enterprise, la pagina del
+  Router (salvo la FAQ 10) e due pagine di docs.comfy.org. La pagina
+  commerciale Enterprise è stata confrontata ed è cambiata: le sue citazioni
+  vengono solo dal PDF.
+- **BYOK nel Router:** la pagina Enterprise viva lo offre in generale, la
+  pagina viva del Router lo mette in roadmap. Che la FAQ 10 del Router sia
+  stata tolta, e non solo saltata dalla stampa, è probabile ma non provato.
+  Per verificare: aprire la FAQ «Can I bring my own provider key?» in fondo a
+  <https://comfy.org/platform/router>.
+- **Il DPA di Comfy:** esiste, ma non è stato letto. Chi lo firma (solo
+  Enterprise o anche self-serve), quali subresponsabili, quali clausole per il
+  trasferimento negli USA: non si sa.
 - **Il Router diventa disponibile a tutti, e quando:** la documentazione dice
   solo «not generally available yet». Va chiesto a Comfy insieme
   all'autorizzazione.

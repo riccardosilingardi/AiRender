@@ -306,7 +306,10 @@ Restano aperti:
   Gemini di `vertexai` può passare la chiamata a un altro fornitore che
   nessuna intestazione nomina. Quali fornitori: non scritto. La frase a
   schermo va corretta in un PR suo.
-- **Comfy ha un DPA e una lista di subresponsabili** — non letto. Manca
+- **Comfy ha un DPA e una lista di subresponsabili** — il DPA esiste (pagina
+  Enterprise viva, 2026-11-03: «A DPA and enterprise agreement are
+  available»; «Processing is in the United States on Google Cloud»). Non è
+  stato letto, e non si sa se vale anche fuori dall'Enterprise. Manca
   dall'elenco dei DPA in `server/README.md`.
 - **GPT Image 2 via Router ha l'uso commerciale** — OpenAI non è nella tabella
   dei fornitori di Comfy.
