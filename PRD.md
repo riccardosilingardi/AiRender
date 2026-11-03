@@ -296,8 +296,11 @@ Restano aperti:
 - **ComfyUI open source con modelli aperti su una GPU propria** è fuori dai
   Termini (GPL-3.0, «Comfy OSS»): le licenze dei modelli e la tenuta della
   geometria non sono verificate (`docs/comfy-termini.md`, sezione 5).
-- **Le pagine Enterprise MSA e Router di oggi sono uguali a quelle lette**
-  — lette al 2026-10-26 dal repository, non confrontate con il sito vivo.
+- **BYOK (chiave Google propria nel Router) è offerto su Enterprise** — la
+  FAQ prezzi lo diceva il 2026-10-26; la pagina viva del Router, il
+  2026-11-03, lo mette solo in roadmap («Coming soon»). Accordo Enterprise e
+  pagina del Router sono stati confrontati con il sito vivo: uguali, tranne
+  questa FAQ.
 - **La destinazione «Google» è vera** — non garantita nemmeno con la coda e
   `fallback_provider=false`. L'API reference del Router dice che la catena
   Gemini di `vertexai` può passare la chiamata a un altro fornitore che
