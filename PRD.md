@@ -297,6 +297,17 @@ la verifica si nomina qui.
   Licenza e saldo (codice, saldo, Ricarica, Gestisci) non è progettata:
   `DESIGN.md`, Non ancora progettato. Per ora tutto da riga di comando.
 
+### Azioni sotto l'immagine e video a tratti (2026-11-02)
+
+- **Seedance 2.5 accetta 15, 20 e 30 secondi** e quanto costano — non
+  verificato: il limite 4–30 s viene dalla documentazione del Router, nessun
+  video è ancora stato fatto.
+- **Due tratti primo-ultimo si raccordano bene sull'intermezzo** — non
+  verificato. Il movimento della camera può cambiare passo fra un tratto e
+  l'altro. I due file non si uniscono: serve un programma di montaggio.
+- **Il «?» delle spiegazioni si legge bene in Edge** — provato solo in
+  Chromium headless.
+
 ### Storico e ritocco incollato nelle aree (2026-11-02)
 
 - **Il bordo sfumato del ritocco incollato non si nota** su un render vero —

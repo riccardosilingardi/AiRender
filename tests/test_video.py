@@ -250,3 +250,43 @@ def test_le_rotte_video_del_server(tmp_path):
     finally:
         servito.shutdown()
         servito.server_close()
+
+
+# --- inizio, intermezzo, fine e durate lunghe (2026-11-02) ------------------------
+
+
+def test_inizio_intermezzo_fine_parte_come_due_video_che_si_toccano_nel_mezzo(tmp_path):
+    """Caso: Seedance non ha un fotogramma di mezzo; il secondo tratto deve partire da dove finisce il primo."""
+    immagini = []
+    for nome in ("a", "b", "c"):
+        (tmp_path / f"{nome}.png").write_bytes(b"x")
+        immagini.append(tmp_path / f"{nome}.png")
+    tratti = video.metti_in_coda_sequenza(tmp_path, immagini, movimento="gira", durata=10)
+    assert [t.modo for t in tratti] == ["primo-ultimo", "primo-ultimo"]
+    assert tratti[0].immagini[1] == tratti[1].immagini[0] == str(immagini[1])
+    assert tratti[0].sequenza == tratti[1].sequenza and [t.tratto for t in tratti] == [1, 2]
+    with pytest.raises(video.VideoNonValido):
+        video.metti_in_coda_sequenza(tmp_path, immagini[:2])
+    with pytest.raises(video.VideoNonValido):
+        video.RichiestaVideo(identificativo="x", immagini=tuple(map(str, immagini)), modo="sequenza")
+
+
+def test_si_puo_chiedere_fino_a_trenta_secondi():
+    """Caso: Riccardo chiede video piu' lunghi; Seedance 2.5 arriva a 30 secondi."""
+    assert max(config.VIDEO_DURATE_SECONDI) == 30
+    video.RichiestaVideo(identificativo="x", immagini=("a",), durata=30)
+
+
+def test_lo_studio_manda_inizio_intermezzo_fine_come_due_tratti(tmp_path):
+    studio = _studio(tmp_path, [])
+    nomi = [studio.carica_immagine_video(PNG + bytes([i]))["nome"] for i in range(3)]
+    immagini = [{"caricata": n} for n in nomi]
+    secco = studio.prova_a_secco_video({"immagini": immagini, "modo": "sequenza"})
+    assert secco["immagini"] == 3 and "first frame to the last frame" in secco["prompt"]
+    assert studio.prova_a_secco_video({"immagini": immagini[:2], "modo": "sequenza"})["problemi"]
+    risposta = studio.invia_video({"immagini": immagini, "modo": "sequenza", "durata": 15,
+                                   "destinazione_mostrata": studio.catalogo_video()["destinazione"]})
+    voci = sorted(studio.video(), key=lambda v: v["tratto"])
+    assert [v["identificativo"] for v in voci] == risposta["tratti"]
+    assert {v["sequenza"] for v in voci} != {None} and len({v["sequenza"] for v in voci}) == 1
+    assert [v["durata"] for v in voci] == [15, 15]

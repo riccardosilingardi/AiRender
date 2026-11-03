@@ -55,10 +55,12 @@ const S = {
   // Studio · Video: il catalogo letto dal server, come partire, i posti
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
   video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
-           durata: null, risoluzione: null, audio: false, secco: null, errore: null, caricando: false },
+           durata: null, risoluzione: null, audio: false, secco: null, errore: null, caricando: false, scegliPer: null },
   // Lo storico: tutte le immagini di tutte le viste, nella striscia in alto.
   // Una cattura nuova si aggiunge; niente di quello che c'era sparisce.
   storico: { gruppi: [], firma: "", disegnata: "" },
+  // Le azioni sotto l'immagine in Risultato: per quale render, il video in un clic.
+  azioni: { per: null, video: false, movimento: null, mandato: false, errore: null },
 };
 
 // --- attrezzi ---------------------------------------------------------------
@@ -118,6 +120,15 @@ function data(iso) {
 function avviso(tipo, fatto, cosaFare) {
   return h("div", { classe: `avviso ${tipo}`, role: tipo === "errore" ? "alert" : null },
     h("b", {}, fatto), cosaFare ? h("span", { classe: "cosa-fare" }, cosaFare) : null);
+}
+// Una spiegazione che non occupa la pagina: un «?» accanto all'etichetta,
+// il testo al passaggio del mouse o con il tasto Tab (proposta 5, 2026-11-02).
+function spiega(testo) {
+  return h("span", { classe: "spiega", tabindex: "0", role: "note", title: testo, "aria-label": testo }, "?");
+}
+// Una riga breve con la spiegazione intera dietro il «?».
+function nota(breve, testo) {
+  return h("p", { classe: "tenue piccolo" }, breve, " ", spiega(testo));
 }
 function presto(testo) { return h("span", { classe: "presto" }, testo || "In arrivo"); }
 
@@ -346,6 +357,7 @@ async function caricaRender() {
 async function caricaRicetta() {
   const scelto = lavoroScelto();
   S.risultato.ricetta = null;
+  if (scelto && scelto.modello) await destinazioneDi(scelto.modello);
   if (scelto && scelto.render) {
     try { S.risultato.ricetta = await get(`/api/lavori/${scelto.identificativo}/ricetta`); } catch (e) { S.risultato.ricetta = { errore: e }; }
   }
@@ -541,8 +553,7 @@ function pannelloViste() {
   return h("div", { classe: "pannello" },
     h("span", { classe: "etichetta" }, "Viste nella cartella"),
     S.studio.viste.length ? elenco : h("p", { classe: "tenue" }, "La cartella non ha ancora viste."),
-    h("span", { classe: "etichetta" }, "Oppure un file"),
-    h("p", { classe: "tenue piccolo" }, "Lo Studio ne mette una copia nella cartella delle viste, con un nome nuovo."),
+    h("span", { classe: "etichetta" }, "Oppure un file", spiega("Lo Studio ne mette una copia nella cartella delle viste, con un nome nuovo.")),
     file);
 }
 
@@ -641,13 +652,11 @@ function colonnaStile() {
         : "Miniature illustrative. Le rese non fotografiche sono testi scelti, non ancora provati con il modello."),
       h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
         (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
-    h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico"),
-      h("p", { classe: "tenue piccolo" }, "Colore, contrasto, pellicola o digitale · solo per le rese fotografiche"),
+    h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico", spiega("Colore, contrasto, pellicola o digitale · solo per le rese fotografiche")),
       chipAsse("look")),
     h("div", { classe: "gruppo" }, h("h3", {}, S.scelte.scena === "esterno" ? "3 · Ora / Luce" : "3 · Luce"), tessereAsse("luce")),
     prodotto
-      ? h("div", { classe: "gruppo" }, h("h3", {}, "4 · Sfondo"),
-          h("p", { classe: "tenue piccolo" }, "Prende il posto di tutto quello che non è il pezzo · il primo piano lo dà la vista di Allplan"),
+      ? h("div", { classe: "gruppo" }, h("h3", {}, "4 · Sfondo", spiega("Prende il posto di tutto quello che non è il pezzo · il primo piano lo dà la vista di Allplan")),
           tessereAsse("sfondo"))
       : interno
       ? h("div", { classe: "gruppo" }, h("h3", {}, "4 · Fuori dalle finestre e arredo"),
@@ -727,9 +736,9 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
-    h("p", { classe: "tenue piccolo" }, "Vale per Nano Banana e Seedream; GPT Image ha misure sue. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
+    nota("2K e 4K: costo non ancora provato.", "Vale per Nano Banana e Seedream; GPT Image ha misure sue. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
     ...(S.modo === "contesto" ? [] : [h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
-    h("p", { classe: "tenue piccolo" }, "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
+    nota("Testi scelti, non ancora confrontati.", "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -873,7 +882,7 @@ function pannelloRiferimento() {
   file.addEventListener("change", () => scegliRiferimento(file.files && file.files[0]));
   if (!S.riferimento) {
     return [titolo,
-      h("p", { classe: "tenue piccolo" }, "Una foto da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG."),
+      nota("Solo colori, luce e materiali.", "Una foto da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG."),
       file];
   }
   const r = S.riferimento;
@@ -882,7 +891,7 @@ function pannelloRiferimento() {
       h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
       h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
       h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
-    h("p", { classe: "tenue piccolo" }, "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
+    nota("Solo palette, luce e materiali.", "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
 }
 
 // Inserisci nel contesto: il fotoinserimento. L'utente porta l'immagine del
@@ -1006,7 +1015,7 @@ function sezioneContesto() {
           h("b", {}, "Scegli la foto del luogo"),
           h("span", { classe: "tenue piccolo" }, "Uno screenshot di Google Earth, un'ortofoto, una foto da drone o una foto da terra, anche uno Street View. JPEG o PNG."),
           h("span", { classe: "nascosto" }, file)),
-        h("p", { classe: "tenue piccolo" }, "AIRENDER non scarica mappe: la foto la porti tu."));
+        nota("La foto la porti tu.", "AIRENDER non scarica mappe: la foto la porti tu."));
 
   // 2 · com'e' stata scattata la foto.
   const inq = c ? c.inquadratura : cat.predefinita;
@@ -1058,17 +1067,15 @@ function colonnaContesto() {
   return h("div", { classe: "colonna-stile" },
     h("section", { classe: "pannello", "aria-label": "Facoltativo" },
       h("h2", {}, "Facoltativo"),
-      h("span", { classe: "etichetta" }, "Materiali a parole"),
-      h("p", { classe: "tenue piccolo" }, "La vista di Allplan è grigia: senza materiali il modello li sceglie da solo. Scrivili come vuoi, anche in italiano."),
+      h("span", { classe: "etichetta" }, "Materiali a parole", spiega("La vista di Allplan è grigia: senza materiali il modello li sceglie da solo. Scrivili come vuoi, anche in italiano.")),
       materiali,
-      h("span", { classe: "etichetta" }, "Dove si trova"), luogo,
-      h("p", { classe: "tenue piccolo" }, "Indirizzo o coordinate: aiutano il modello a capire il posto. Entrano nel prompt come li scrivi."),
+      h("span", { classe: "etichetta" }, "Dove si trova", spiega("Indirizzo o coordinate: aiutano il modello a capire il posto. Entrano nel prompt come li scrivi.")), luogo,
       terra ? null : h("label", { classe: "riga" }, pulisci,
         h("span", { classe: "piccolo" }, "È uno screenshot con scritte e icone (Google Earth, Maps): toglile e rendilo una foto aerea")),
       c && c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null,
       h("label", { classe: "riga grigio", "aria-disabled": "true" }, cerca,
         h("span", { classe: "piccolo" }, "Cerca il luogo sul web"), presto("Da provare"))),
-    h("p", { classe: "tenue piccolo" }, "Qui preset e stile non servono: luce, cielo e colore li prende dalla foto del luogo. Per scegliere lo stile torna a «Render della vista»."));
+    nota("Luce e cielo dalla foto.", "Qui preset e stile non servono: luce, cielo e colore li prende dalla foto del luogo. Per scegliere lo stile torna a «Render della vista»."));
 }
 
 function motivoGeneraSpento() {
@@ -1229,7 +1236,7 @@ function confronto(l) {
     palco = h("div", { classe: "solo" }, h("img", { src: srcB, alt: `Render ${l.modello_nome}` }));
   }
   return h("div", { classe: "palco" },
-    h("div", { classe: "riga tra" }, h("div", {}, h("h1", {}, "È ancora il tuo edificio?"), h("p", { classe: "tenue" }, sottotitolo)), modi),
+    h("div", { classe: "riga tra" }, h("h1", { title: sottotitolo }, "È ancora il tuo edificio?"), modi),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Confronta con"), h("div", { stile: "min-width:260px" }, scegliA)),
     palco,
     r.modo === "scorri" ? h("div", { classe: "riga tra" },
@@ -1241,15 +1248,14 @@ function confronto(l) {
 function elencoRender() {
   const r = S.risultato;
   return h("section", { classe: "pannello", "aria-label": "Render di questa vista" },
-    h("span", { classe: "etichetta" }, "Render di questa vista"),
+    h("span", { classe: "etichetta" }, "Render di questa vista", spiega("Per un A/B fra modelli: genera la stessa vista con un altro modello, poi scegli «Confronta con».")),
     r.lavori.length ? h("div", { classe: "elenco-render" }, r.lavori.map((l) => h("button", {
       "aria-current": String(l.identificativo === r.scelto),
       disabled: l.attivo,
       onclick: async () => { r.scelto = l.identificativo; r.rifai = false; r.esportato = null; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
     },
     l.render ? h("img", { src: `/file/render/${l.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto", stile: "width:64px;height:40px" }),
-    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."),
-    h("p", { classe: "tenue piccolo" }, "Per un A/B fra modelli: genera la stessa vista con un altro modello, poi scegli «Confronta con»."));
+    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."));
 }
 
 // La misura degli spigoli: un numero solo se il motore l'ha fatta, altrimenti
@@ -1259,7 +1265,7 @@ const SPIEGA_SPIGOLI = "Quota degli spigoli della vista Allplan ritrovati nel re
 function percento(q) { return `${Math.round(q * 100)}%`; }
 
 function corpoTenuta(t, identificativo, nota) {
-  const figli = [h("span", { classe: "etichetta" }, "Tenuta della geometria")];
+  const figli = [h("span", { classe: "etichetta" }, "Tenuta della geometria", nota ? null : spiega(SPIEGA_SPIGOLI))];
   if (!t) {
     figli.push(h("span", { classe: "misura" }, "Non misurata"), h("p", { classe: "tenue piccolo" }, "Si misura quando il render è pronto."));
   } else if (t.spigoli === null || t.spigoli === undefined) {
@@ -1273,7 +1279,7 @@ function corpoTenuta(t, identificativo, nota) {
       figli.push(avviso("attenzione", `Sotto il ${percento(t.soglia)}: la geometria può essersi mossa.`, "Guardalo con la linea del prima/dopo. Soglia scelta, non ancora tarata su render veri."));
     }
   }
-  figli.push(h("p", { classe: "tenue piccolo" }, nota || SPIEGA_SPIGOLI));
+  if (nota) figli.push(h("p", { classe: "tenue piccolo" }, nota));
   return h("section", { classe: "pannello", "aria-label": "Tenuta della geometria" }, ...figli);
 }
 
@@ -1324,12 +1330,6 @@ function nomeVoceScena(scena, idAsse, valore) {
 function adesso(l) {
   const r = S.risultato;
   const dest = S.catalogo.modelli.find((m) => m.id === l.modello);
-  const conferma = r.rifai ? h("div", { classe: "avviso" },
-    h("b", {}, "Rifai con la stessa ricetta"),
-    h("span", {}, `La vista va di nuovo a ${l.destinazione}. ${S.destinazione && S.destinazione.modello === l.modello ? `Costo: ${S.destinazione.costo}.` : ""}`),
-    h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => rifai(l), disabled: !!S.lavoroAttivo || (dest && !dest.verificato) }, "Conferma e rifai"),
-      h("button", { classe: "btn", onclick: () => { r.rifai = false; render(); } }, "Lascia stare"))) : null;
   const copia = async () => {
     try {
       const blob = await (await fetch(`/file/render/${l.identificativo}`)).blob();
@@ -1343,11 +1343,10 @@ function adesso(l) {
   return h("section", { classe: "pannello", "aria-label": "Adesso" },
     h("span", { classe: "etichetta" }, "Adesso"),
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => { r.rifai = true; render(); }, disabled: !!S.lavoroAttivo }, "Rifai con la stessa ricetta"),
       h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella"),
       l.render ? h("button", { classe: "btn", onclick: copia }, "Copia immagine") : null,
       l.render ? h("button", { classe: "btn", "aria-expanded": String(r.esporta), onclick: () => { r.esporta = !r.esporta; r.esportato = null; render(); } }, "Esporta per il cliente") : null),
-    conferma, r.esporta && l.render ? pannelloEsporta(l) : null);
+    r.esporta && l.render ? pannelloEsporta(l) : null);
 }
 
 // Esporta per il cliente: JPEG, PNG o PSD con un livello per passaggio, nella
@@ -1384,13 +1383,96 @@ function pannelloEsporta(l) {
         (e.livelli ? ` · ${e.livelli.length} livelli: ${e.livelli.join(", ")}` : ""))) : null);
 }
 
-function cambiaParte(l) {
-  return h("section", { classe: "pannello", "aria-label": "Cambia una parte" },
-    h("span", { classe: "etichetta" }, "Cambia una parte"),
+// --- da questa immagine: Ritocca · Variante · Video (proposte 3 e 4) ---------------
+// Sotto l'immagine, le stesse tre azioni per ogni render. Il risultato nasce
+// accanto a questa immagine nella striscia dello storico e, finito, e' gia'
+// quello scelto. Il video chiede solo il movimento della camera: durata e
+// risoluzione sono le prime della scheda Video, dove si cambiano.
+
+function palcoConAzioni(l) {
+  const palco = confronto(l);
+  palco.append(barraAzioni(l));
+  return palco;
+}
+
+function barraAzioni(l) {
+  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null };
+  const az = S.azioni;
+  const d = S.passi.dest[l.modello];
+  const m = S.catalogo.modelli.find((x) => x.id === l.modello);
+  const occupato = !!S.lavoroAttivo;
+  const righe = [h("div", { classe: "azioni" },
+    h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }),
+      title: "Disegna un'area e scrivi cosa cambiare. Fuori dall'area resta tutto com'è." }, "Ritocca"),
+    h("button", { classe: "btn", onclick: () => rifai(l), disabled: occupato || !d || (m && !m.verificato) || null,
+      title: occupato ? "Un lavoro è in corso: Variante si accende quando finisce." : "Stessa ricetta, un'altra immagine. Arriva accanto a questa, già scelta." }, "Variante"),
+    h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
+      title: "Un video che parte da questa immagine." }, "Video"))];
+  if (d) righe.push(h("p", { classe: "dove" }, "Variante: va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""));
+  if (az.video) righe.push(videoVeloce(l));
+  if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
+  return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
+}
+
+async function apriVideoVeloce() {
+  const az = S.azioni;
+  az.video = !az.video; az.errore = null;
+  if (az.video && !S.video.catalogo) {
+    try { S.video.catalogo = await get("/api/video/catalogo"); } catch (e) { az.errore = e; }
+  }
+  render();
+}
+
+function videoInCorso() {
+  return S.storico.gruppi.some((g) => g.voci.some((v) => v.tipo === "video" && v.attivo));
+}
+
+function videoVeloce(l) {
+  const az = S.azioni;
+  const c = S.video.catalogo;
+  if (!c) return h("p", { classe: "tenue piccolo" }, "Leggo dove va il video…");
+  if (az.mandato) {
+    return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, "Video in coda."),
+      h("span", { classe: "piccolo tenue" }, "Lo trovi nella striscia in alto, accanto a questa immagine."));
+  }
+  const spento = !c.fa_video ? "Il servizio scelto non fa video."
+    : videoInCorso() ? "Un video è già in lavorazione: aspetta che finisca."
+    : !az.movimento ? "Scegli il movimento." : null;
+  return h("div", { classe: "video-veloce" },
+    h("span", { classe: "etichetta" }, "Movimento della camera"),
+    h("div", { classe: "scelte-chip", role: "group", "aria-label": "Movimento della camera" },
+      c.movimenti.map((x) => h("button", { classe: "chip", "aria-pressed": String(az.movimento === x.id),
+        onclick: () => { az.movimento = x.id; render(); } }, x.nome))),
+    h("span", { classe: "etichetta" }, "Cosa succede", spiega("Facoltativo. Entra nel prompt del video com'è scritto, dopo il movimento della camera.")),
+    testoVideoVeloce(),
+    h("p", { classe: "dove" }, "Va a ", h("b", {}, c.destinazione), ` · ${c.modello_nome}, mai provato · ${c.durate[0]} s · ${c.risoluzioni[0]}`,
+      spiega(`${c.avviso} Costo: ${c.costo}. Durata e risoluzione si cambiano nella scheda Video.`)),
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn", disabled: true }, "Cambia un materiale ", presto()),
-      h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }) }, "Annota per aree"),
-      h("button", { classe: "btn", onclick: () => videoDa(l.identificativo) }, "Fai un video da qui")));
+      h("button", { classe: "btn primario", onclick: () => videoInUnClic(l), disabled: !!spento || null }, "Genera video"),
+      spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
+}
+
+function testoVideoVeloce() {
+  const az = S.azioni;
+  const campo = h("textarea", { id: "testo-video-veloce", rows: "2", "aria-label": "Cosa succede, a parole",
+    placeholder: "Per esempio: si accendono le luci delle finestre, passa qualche persona" }, az.testo || "");
+  campo.addEventListener("input", () => { az.testo = campo.value; });
+  return campo;
+}
+
+async function videoInUnClic(l) {
+  const az = S.azioni;
+  const c = S.video.catalogo;
+  az.errore = null;
+  try {
+    await post("/api/video/invia", {
+      immagini: [{ render: l.identificativo }], modo: "primo", movimento: az.movimento, testo: az.testo || "",
+      durata: c.durate[0], risoluzione: c.risoluzioni[0], audio: false, destinazione_mostrata: c.destinazione,
+    });
+    az.mandato = true;
+    await caricaStorico();
+  } catch (e) { az.errore = e; }
+  render();
 }
 
 function schermataRisultato() {
@@ -1428,8 +1510,8 @@ function schermataRisultato() {
   return [...sopra,
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
-      confronto(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l), cambiaParte(l),
+      palcoConAzioni(l),
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l),
         altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }
@@ -1832,7 +1914,7 @@ function pannelloFuoriAree(passo) {
     m && m.incollato
       ? h("p", { classe: "tenue piccolo", title: "Il modello ridisegna tutta l'immagine: il suo risultato si incolla solo nelle aree, con il bordo sfumato, sul render da cui parte. Il risultato intero del modello resta nella cartella dei lavori, accanto al render." },
         "Cambiano solo le aree.")
-      : h("p", { classe: "tenue piccolo" }, "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
+      : nota("Soglie scelte, non tarate.", "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
     passo.modo_aree_nome ? h("p", { classe: "tenue piccolo" }, `Aree mandate come ${passo.modo_aree_nome}.`) : null);
 }
 
@@ -2074,7 +2156,7 @@ function colonnaAlbero() {
         h("a", { classe: "btn link piccolo", href: "#genera", title: "Dalla vista si parte da Genera: lì scegli lo stile." }, "Nuovo passo da qui")),
       passi.map(rigaPasso)),
     passi.length
-      ? h("p", { classe: "tenue piccolo" }, "Ogni passo parte da quello sopra di lui. Un passo nuovo fatto da un punto qualsiasi apre un ramo lì sotto.")
+      ? nota("Ogni passo parte da quello sopra.", "Ogni passo parte da quello sopra di lui. Un passo nuovo fatto da un punto qualsiasi apre un ramo lì sotto.")
       : h("div", { classe: "vuoto-passi" },
         h("p", {}, "Nessun passo ancora. Genera un render da Genera: sarà il passo 1."),
         h("a", { classe: "btn", href: "#genera" }, "Vai a Genera")));
@@ -2375,9 +2457,26 @@ function postoVideo(indice, titolo) {
     voce ? h("img", { src: srcPosto(voce), alt: titolo }) : h("div", { classe: "posto-vuoto" }, "Nessuna immagine"),
     voce ? h("span", { classe: "piccolo tenue" }, voce.render ? `Render ${voce.render}` : (voce.da || voce.caricata)) : null,
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn", onclick: () => file.click(), disabled: v.caricando }, voce ? "Cambia…" : "Carica un render…"),
+      h("button", { classe: v.scegliPer === indice ? "btn primario" : "btn", "aria-expanded": String(v.scegliPer === indice),
+        onclick: () => { v.scegliPer = v.scegliPer === indice ? null : indice; render(); } }, "Dai render"),
+      h("button", { classe: "btn", onclick: () => file.click(), disabled: v.caricando }, "Da file…"),
       voce ? h("button", { classe: "btn", onclick: togli }, "Togli") : null),
     file);
+}
+
+// I render fatti, di tutte le viste, da scegliere per un posto del video:
+// le stesse immagini della striscia dello storico, senza viste e video.
+function sceltaDaiRender(indice) {
+  const v = S.video;
+  const voci = S.storico.gruppi.flatMap((g) => g.voci).filter((x) => x.immagine && x.tipo !== "cattura" && x.tipo !== "video");
+  if (!voci.length) return h("p", { classe: "tenue piccolo" }, "Nessun render ancora: generane uno da Genera.");
+  return h("div", { classe: "griglia-render-video", role: "group", "aria-label": "Scegli un render" },
+    voci.slice().reverse().map((x) => h("button", {
+      classe: "voce-storico", title: `${x.etichetta}${x.numero ? " " + x.numero : ""} · ${x.vista}`,
+      "aria-current": String(!!(v.posti[indice] && v.posti[indice].render === x.identificativo)),
+      onclick: () => { v.posti[indice] = { render: x.identificativo }; v.scegliPer = null; v.secco = null; render(); },
+    }, h("span", { classe: "quadro" }, h("img", { src: `/file/render/${enc(x.identificativo)}`, alt: "", loading: "lazy" })),
+      h("span", { classe: "didascalia" }, x.numero ? `${x.etichetta} ${x.numero}` : x.etichetta))));
 }
 
 function corpoVideo() {
@@ -2390,7 +2489,7 @@ function motivoVideoSpento() {
   const v = S.video;
   const m = videoModo();
   const pieni = v.posti.filter(Boolean).length;
-  if (!pieni) return "Carica il render da cui partire, oppure da Risultato premi Fai un video da qui.";
+  if (!pieni) return "Carica il render da cui partire, oppure in Risultato premi Video sotto l'immagine.";
   if (m && pieni < m.minimo) return `«${m.nome}» vuole ${m.minimo} immagini: ne manca ${m.minimo - pieni}.`;
   if (!v.catalogo.fa_video) return "Il servizio scelto non fa video.";
   if (v.voci.some((x) => x.stato === "in coda" || x.stato === "inviato")) return "Un video è già in lavorazione: aspetta che finisca o annullalo.";
@@ -2423,19 +2522,21 @@ function colonnaImmaginiVideo() {
   const c = v.catalogo;
   const m = videoModo();
   const titoli = v.modo === "primo-ultimo" ? ["Primo fotogramma", "Ultimo fotogramma"]
+    : v.modo === "sequenza" ? ["Inizio", "Intermezzo", "Fine"]
     : v.modo === "primo" ? ["Il render da cui parte"] : v.posti.map((_, i) => `Riferimento ${i + 1}`);
   return h("div", { classe: "colonna-stile" },
     h("section", { classe: "pannello", "aria-label": "Come partire" },
-      h("span", { classe: "etichetta" }, "Come partire"),
+      h("span", { classe: "etichetta" }, "Come partire", m ? spiega(m.spiega) : null),
       h("div", { classe: "switch", role: "group", "aria-label": "Come partire" },
         c.modi.map((x) => h("button", { classe: "seg", "aria-pressed": String(v.modo === x.id),
           onclick: () => { v.modo = x.id; v.posti = postiPer(x.id, v.posti); v.secco = null; render(); } }, x.nome))),
-      h("p", { classe: "tenue piccolo" }, m ? m.spiega : ""),
       h("div", { classe: "posti-video" }, titoli.map((t, i) => postoVideo(i, t))),
+      v.scegliPer !== null && v.scegliPer < titoli.length
+        ? [h("span", { classe: "etichetta" }, `Scegli: ${titoli[v.scegliPer]}`), sceltaDaiRender(v.scegliPer)] : null,
       v.modo === "riferimenti" && v.posti.length < m.massimo
         ? h("div", { classe: "azioni" }, h("button", { classe: "btn", onclick: () => { v.posti.push(null); render(); } }, `Aggiungi un riferimento (fino a ${m.massimo})`))
         : null,
-      h("p", { classe: "tenue piccolo" }, "JPEG o PNG, anche fatti fuori da AIRENDER. Il video prende la forma della prima immagine.")));
+      nota("JPEG o PNG.", "JPEG o PNG, anche fatti fuori da AIRENDER. Il video prende la forma della prima immagine.")));
 }
 
 function colonnaInvioVideo() {
@@ -2448,7 +2549,7 @@ function colonnaInvioVideo() {
   const spento = motivoVideoSpento();
   const pieni = v.posti.filter(Boolean).length;
   const invio = h("section", { classe: "pannello", "aria-label": "Invio del video" },
-    h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : `Le ${pieni || "immagini"} immagini vanno`} a `, h("b", {}, c.destinazione),
+    h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : pieni ? `Le ${pieni} immagini vanno` : "Le immagini vanno"} a `, h("b", {}, c.destinazione),
       ` (${c.fornitore}, ${c.modello_nome})`, c.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
     h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, c.costo)),
     avviso("attenzione", c.avviso, "Il primo video è la prova: se va, lo segno come provato."));
@@ -2483,7 +2584,7 @@ function colonnaInvioVideo() {
         c.risoluzioni.map((r) => h("button", { classe: "seg", "aria-pressed": String(v.risoluzione === r),
           onclick: () => { v.risoluzione = r; v.secco = null; render(); } }, r))),
       h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio (per un render d'architettura di solito non serve)")),
-      h("p", { classe: "tenue piccolo" }, "Durate, risoluzioni e audio spento sono scelte nostre, non misurate.")),
+      nota("Scelte nostre, non misurate.", "Durate, risoluzioni e audio spento sono scelte nostre, non misurate.")),
     invio);
 }
 
@@ -2503,6 +2604,46 @@ function voceVideo(x) {
   return h("div", { classe: "pannello voce-video" }, ...righe);
 }
 
+// «Inizio, intermezzo, fine» sono due video: si mostrano come una voce sola,
+// con un lettore che passa dal primo tratto al secondo.
+function vociVideo(voci) {
+  const fatte = new Set();
+  const uscita = [];
+  for (const x of voci) {
+    if (!x.sequenza) { uscita.push(voceVideo(x)); continue; }
+    if (fatte.has(x.sequenza)) continue;
+    fatte.add(x.sequenza);
+    const tratti = voci.filter((y) => y.sequenza === x.sequenza).sort((a, b) => (a.tratto || 0) - (b.tratto || 0));
+    uscita.push(voceSequenza(tratti));
+  }
+  return uscita;
+}
+
+function voceSequenza(tratti) {
+  const pronti = tratti.every((t) => t.pronto);
+  const primo = tratti[0];
+  const righe = [
+    h("div", { classe: "riga tra" },
+      h("b", {}, `Inizio, intermezzo, fine · ${primo.movimento || "Video"} · ${tratti.length} × ${primo.durata || "?"} s · ${primo.risoluzione || ""}`),
+      h("span", { classe: "tag-stato" }, pronti ? "fatto" : tratti.map((t) => t.stato).join(" · "))),
+  ];
+  if (pronti) {
+    const lettore = h("video", { src: `/file/video/${enc(tratti[0].identificativo)}`, controls: true, preload: "metadata", classe: "lettore-video" });
+    let quale = 0;
+    lettore.addEventListener("ended", () => {
+      quale = (quale + 1) % tratti.length;
+      lettore.src = `/file/video/${enc(tratti[quale].identificativo)}`;
+      if (quale) lettore.play();
+    });
+    righe.push(lettore, nota("Due file, uno per tratto.", "Seedance non ha un fotogramma di mezzo: sono due video, il secondo parte da dove finisce il primo. Lo Studio li suona uno dopo l'altro; nella cartella dei video sono due file."));
+  }
+  for (const t of tratti) {
+    if (t.stato === "errore") righe.push(avviso("errore", `Tratto ${t.tratto}: ${t.fatto || "non è andato."}`, t.cosa_fare));
+    if (t.stato === "in coda") righe.push(h("div", { classe: "azioni" }, h("button", { classe: "btn", onclick: () => annullaVideo(t.identificativo) }, `Annulla il tratto ${t.tratto}`)));
+  }
+  return h("div", { classe: "pannello voce-video" }, ...righe);
+}
+
 function schermataVideo() {
   const v = S.video;
   const sopra = v.errore ? [avviso("errore", v.errore.fatto, v.errore.cosa_fare)] : [];
@@ -2512,7 +2653,7 @@ function schermataVideo() {
     h("section", { classe: "pannello", "aria-label": "I video fatti" },
       h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "I video fatti"),
         h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "video" }).catch((e) => { v.errore = e; render(); }) }, "Apri la cartella dei video")),
-      v.voci.length ? h("div", { classe: "elenco-video" }, v.voci.map(voceVideo)) : h("p", { classe: "tenue" }, "Nessun video ancora."))];
+      v.voci.length ? h("div", { classe: "elenco-video" }, vociVideo(v.voci)) : h("p", { classe: "tenue" }, "Nessun video ancora."))];
 }
 
 // --- storico --------------------------------------------------------------------
