@@ -1007,8 +1007,14 @@ prova.
   Per verificare: aprire la FAQ «Can I bring my own provider key?» in fondo a
   <https://comfy.org/platform/router>.
 - **Il DPA di Comfy:** esiste, ma non è stato letto. Chi lo firma (solo
-  Enterprise o anche self-serve), quali subresponsabili, quali clausole per il
+  Enterprise o anche self-serve) e quali clausole valgono per il
   trasferimento negli USA: non si sa.
+- **I subresponsabili di Comfy:** l'elenco è nel Trust Center di Comfy,
+  <https://app.vanta.com/comfy.org/trust/o6nu46b16iu3e7fhc41hnz/subprocessors>.
+  Non letto: `app.vanta.com` è bloccato dalla rete di questa sessione. Per
+  verificare: stampare la pagina in PDF, come le altre, e rimandarla
+  indietro. Va confrontato con i fornitori dei modelli (Google, BFL, OpenAI,
+  BytePlus) e con l'elenco dei DPA in `server/README.md`.
 - **Il Router diventa disponibile a tutti, e quando:** la documentazione dice
   solo «not generally available yet». Va chiesto a Comfy insieme
   all'autorizzazione.
