@@ -4,28 +4,35 @@ Letto il 2026-11-03, prima della prima fattura. Non è un parere legale: dice
 cosa c'è scritto, dove, e cosa non si è potuto leggere. Ogni citazione porta
 il modo in cui è stata letta (vedi «Cosa si è letto, e come»).
 
+> **Aggiornato la sera del 2026-11-03.** I Termini di servizio e l'accordo
+> Enterprise di Comfy sono stati letti per intero e alla lettera: il testo, le
+> clausole e cosa è permesso, vietato o da concordare per iscritto sono in
+> **`docs/comfy-termini.md`**. Sui termini di Comfy vale quel file. Questo resta
+> la fonte per i fornitori a monte, i rischi, la mail a Comfy e l'alternativa
+> Vertex AI.
+
 ---
 
 ## In breve
 
-1. **Non si può ancora dire che la rivendita sia permessa.** I Termini di
-   servizio di Comfy (`comfy.org/terms-of-service`) non si sono potuti leggere:
-   la rete di questa sessione blocca `comfy.org`, e la ricerca web non ne
-   restituisce il testo. Nessuna clausola letta dice di sì. Nessuna clausola
-   letta sul Router dice di no.
-2. **I segnali visti vanno verso il no, se manca un accordo.** L'accordo
-   Enterprise di Comfy, letto solo in estratti, dà un diritto «non-sublicensable»
-   ai dipendenti e collaboratori del cliente. Vieta anche di «sublicense the
-   Comfy Products for use by a third party». La licenza MiniMax venduta da
-   Comfy esclude chi gestisce un «API aggregator, inference-as-a-service, or
-   model-routing platform».
-3. **AIRENDER si difende se vende un'applicazione, non l'accesso al Router.**
-   Google e OpenAI scrivono questa distinzione nei loro termini: integrare il
-   servizio in un programma proprio che ha valore autonomo è permesso,
-   rivendere il servizio no. Plugin, Studio, preset e controllo della geometria
-   sono quel valore. Il server però espone `/v2/models/*` «con lo stesso
-   protocollo del Router» (`server/README.md`). Ha quindi la forma di un proxy,
-   e questa è la parte da non pubblicizzare né aprire ad altri.
+1. **Nella forma di oggi, la rivendita non è permessa senza
+   un'autorizzazione scritta di Comfy.** I Termini, letti per intero
+   (`docs/comfy-termini.md`), danno il diritto d'uso solo «for your internal
+   business purposes». Vietano di concedere i prodotti Comfy «directly or
+   indirectly» in uso a terzi, e vietano ogni uso «not expressly permitted».
+   Vendere le immagini che generi tu, invece, si può: l'Output è tuo.
+2. **Anche l'accordo Enterprise vieta le stesse cose.** La differenza è che
+   si firma, e un Order Form può contenere la clausola che manca. La licenza
+   MiniMax venduta da Comfy esclude chi gestisce un «API aggregator,
+   inference-as-a-service, or model-routing platform».
+3. **Con Google e OpenAI un'applicazione propria basta, con Comfy no.** I
+   loro termini permettono di integrare il servizio in un programma con valore
+   autonomo, usato da terzi; vietano solo di rivendere il servizio. I Termini di
+   Comfy non fanno questa distinzione: anche un'applicazione come AIRENDER
+   (plugin, Studio, preset, controllo della geometria) ha bisogno
+   dell'autorizzazione scritta. In più il server espone `/v2/models/*` «con lo
+   stesso protocollo del Router» (`server/README.md`): ha la forma di un
+   proxy, ed è la parte da non pubblicizzare né aprire ad altri.
 4. **Prima della prima fattura serve una risposta scritta di Comfy.** La
    domanda è pronta da mandare, nella sezione 6.
 5. **Scoperta nuova, che conta più della rivendita: la destinazione «Google»
@@ -57,9 +64,9 @@ servire clienti propri che pagano?
 
 | Documento | Data | Come è stato letto |
 |---|---|---|
-| Termini di servizio Comfy | — | **Non letto.** `comfy.org` è bloccato dalla rete della sessione e la ricerca web non ne restituisce il testo |
-| Informativa privacy Comfy | — | **Non letta**, stesso motivo |
-| Enterprise Customer Agreement Comfy | in vigore dal 2026-05-22 | **Indiretto**: estratti restituiti dal motore di ricerca |
+| Termini di servizio Comfy | in vigore dal 2026-05-13 | **Integrale**, in `docs/comfy-termini.md`: dal sorgente pubblico del sito, confrontato parola per parola con la pagina viva |
+| Informativa privacy Comfy | — | **Non letta** |
+| Enterprise Customer Agreement Comfy | in vigore dal 2026-05-22 | **Integrale**, in `docs/comfy-termini.md`: dal sorgente del sito al 2026-10-26 |
 | Licenza commerciale MiniMax venduta da Comfy | — | **Indiretto** |
 | Documentazione del Router e dei Partner Node (docs.comfy.org) | commit `adfc0fd` di `Comfy-Org/docs`, ramo `main`, letto il 2026-11-03 | **Integrale**, dal sorgente pubblico su GitHub che genera il sito |
 | Google Cloud Platform Terms of Service | modificati il 2026-10-12 | **Integrale** |
@@ -78,60 +85,13 @@ sulla pagina.
 
 ## 1 · Comfy
 
-### 1.1 Termini di servizio: non letti
+### 1.1 e 1.2 Termini di servizio e accordo Enterprise
 
-È il documento che decide la questione, e manca. La ricerca web ne dà solo
-frammenti: società del Delaware (Comfy Organization, Inc.), arbitrato
-individuale, Comfy Cloud descritto come beta. Un riassunto di terzi dice che
-non usano input e output per addestrare modelli. Niente su rivendita o terzi.
-
-**Verifica per Riccardo** (dal suo PC, dove `comfy.org` si apre):
-
-1. Apri <https://www.comfy.org/terms-of-service> e cerca nel testo, una alla
-   volta, queste parole: `resell`, `sublicense`, `third part`, `make available`,
-   `service bureau`, `on behalf of`, `internal`, `end user`, `Partner Node`,
-   `API`, `credits`, `refund`.
-2. Rimanda indietro il testo delle sezioni trovate (copia e incolla) e la data
-   in cima alla pagina. Fai lo stesso con <https://www.comfy.org/privacy-policy>,
-   cercando `processor`, `DPA`, `subprocessor`, `transfer`, `retention`.
-3. Come leggerlo:
-   - **Divieto di rendere i servizi disponibili a terzi, senza eccezione per le
-     applicazioni:** il modello di vendita attuale non regge senza un accordo
-     scritto.
-   - **Un'eccezione per «applications» o «end users»:** regge, alle condizioni
-     scritte lì.
-   - **Silenzio:** vale la risposta alla sezione 6.
-
-### 1.2 Accordo Enterprise (indiretto)
-
-Estratti restituiti dalla ricerca su <https://comfy.org/enterprise-msa/>, in
-vigore dal 2026-05-22:
-
-- Concessione: «Comfy grants Customer and Customer's Users a non-exclusive,
-  non-sublicensable, non-transferable right», per gli scopi interni del
-  cliente secondo l'ordine (il riassunto dice «internal business purposes»).
-- Utenti: «"User" means Customer's or Customer's Affiliates' employees and
-  contractors who are authorized by Customer to access and use the Comfy
-  Products.»
-- Restrizioni: «Customer agrees that it will not, directly or indirectly: (i)
-  sublicense the Comfy Products for use by a third party».
-- Crediti: definitivi e non rimborsabili, salvo errori di fatturazione
-  documentati (riassunto, non citazione).
-- Partner Node: l'uso è soggetto ai termini del fornitore terzo. Comfy non
-  risponde delle pratiche sui dati dei fornitori e non passa ai fornitori
-  l'identità del cliente (riassunto). L'uso è misurato e fatturato da Comfy.
-- Addestramento: «Comfy will not use Input or Output to train generative AI or
-  diffusion models.» Comfy può però raccogliere metadati d'uso limitati.
-
-**Cosa vuol dire.** Questo è il contratto che Comfy fa con le aziende. Se anche
-questo limita l'uso ai dipendenti e collaboratori del cliente, è poco probabile
-che i termini per tutti siano più larghi. Non è però una conclusione: un
-accordo Enterprise si negozia, e una clausola che permetta di servire i propri
-clienti si può chiedere.
-
-Un segnale nella stessa direzione: la pagina prezzi di Comfy Cloud conta gli
-«utenti con licenza» (fino a 10 nel piano Professional). Comfy ragiona per
-persone autorizzate, non per volume di chiamate (indiretto).
+Letti per intero il 2026-11-03: testo, clausole e conclusioni in
+**`docs/comfy-termini.md`**. In una riga: il diritto d'uso vale solo «for your
+internal business purposes». È vietato «sublicense the Comfy Products for use
+by a third party», anche «indirectly», e ogni uso «not expressly permitted».
+Servire i propri clienti richiede un Order Form o un'autorizzazione scritta.
 
 ### 1.3 Documentazione del Router (letta per intero)
 
@@ -224,8 +184,10 @@ riceve un errore.
 
 - **24 ore per i file dei Partner Node:** «All Partner Node media files are
   automatically deleted 24 hours after they are created.» (Data Retention dei
-  Partner Node) La pagina parla dei Partner Node: non è scritto che valga
-  identica per il Router, anche se il backend è lo stesso.
+  Partner Node) Per il Router lo dice la sua pagina prodotto: «Inputs are kept
+  for 24 hours after upload and outputs for 24 hours after generation. Then
+  they’re deleted.» (comfy.org/platform/router, FAQ; `docs/comfy-termini.md`,
+  sezione 3)
 - **Ma il contenuto in generale resta di più:** la pagina generale sulla
   conservazione dei dati dice per «Customer content — Prompts, workflows,
   outputs, and other content you create or upload»: «Retained for as long as
@@ -342,7 +304,7 @@ In ordine di peso.
 
 | # | Rischio | Perché | Cosa fare |
 |---|---|---|---|
-| 1 | Comfy sospende l'account perché i servizi sono resi a terzi | Termini non letti; l'accordo Enterprise vieta di concederli in uso a terzi | Risposta scritta di Comfy (sezione 6) **prima della prima fattura**. Se dice di no: accordo Enterprise, oppure Vertex AI diretto (sezione 5) |
+| 1 | Comfy sospende l'account perché i servizi sono resi a terzi | I Termini limitano l'uso agli scopi interni e vietano l'uso da parte di terzi, anche indiretto (`docs/comfy-termini.md`) | Autorizzazione scritta di Comfy (sezione 6) **prima della prima fattura** del modello attuale. Se dice di no: Vertex AI diretto (sezione 5) |
 | 2 | La destinazione annunciata è falsa | Catena `vertexai` che passa a fornitori non nominati (1.3) | Chiedere a Comfy chi c'è nella catena e se si può fermarla su Google. Finché non risponde, la frase a schermo non può dire «Google» come certezza: per esempio «Comfy Router (Comfy Org, USA), che lo passa a Google Vertex AI o a un fornitore della sua catena per questo modello». È una modifica all'interfaccia, da fare in un PR suo |
 | 3 | Il server ha la forma di un proxy del Router | Stesso protocollo su `/v2/models/*` | Non documentarlo né venderlo come API: solo per plugin e web app. Tenere chiusi per piano i modelli e i parametri (in parte c'è già). Nei termini AIRENDER, vietare l'uso del server fuori dalle app |
 | 4 | Comfy manca dagli accordi sul trattamento dei dati | Il server README elenca i DPA con Supabase, Netlify, Stripe e Resend, non con Comfy. I dati vanno negli USA e da lì a Google, BFL, OpenAI o BytePlus. Conservazione «as long as necessary…» | Chiedere a Comfy DPA e subresponsabili (sezione 6). Nominarli nell'informativa AIRENDER, con il paese |
@@ -355,8 +317,8 @@ In ordine di peso.
 
 ## 4 · Prima della prima fattura
 
-- [ ] Termini di servizio e informativa di Comfy letti da Riccardo (1.1), testo
-      incollato in questo file.
+- [x] Termini di servizio di Comfy letti per intero (`docs/comfy-termini.md`).
+- [ ] Informativa privacy di Comfy letta.
 - [ ] Risposta scritta di Comfy alla sezione 6, salvata accanto a questo file.
 - [ ] Decisione: Router con il consenso di Comfy, accordo Enterprise, oppure
       Vertex AI diretto.
@@ -415,8 +377,11 @@ Da mandare a `support@comfy.org`, oppure dal modulo
 > directly: they only use our application, and we charge them in our own
 > credits. A partner company also resells licences to our application.
 >
-> 1. Do your Terms of Service allow this use? If not, which agreement do we
->    need (Enterprise, reseller, other)?
+> 1. Your Terms of Service grant use "for your internal business purposes"
+>    (Section 2) and exclude sublicensing "for use by a third party" and any
+>    purpose "not expressly permitted" (Section 3 (i) and (vii)). Will you give
+>    us a written authorization, or an Order Form clause, that permits this
+>    use? Which agreement do we need (Enterprise, reseller, other)?
 > 2. Your API reference says that `X-Comfy-Router-Provider` is "not necessarily
 >    the vendor that produced the output, since a proxy-level cascade inside a
 >    native leg (the `vertexai` Gemini image chain, for one) can hand the call
@@ -425,8 +390,9 @@ Da mandare a `support@comfy.org`, oppure dal modulo
 >    our customers, some under NDA, to name the destination before sending.
 > 3. Is a Data Processing Agreement (GDPR, with Standard Contractual Clauses)
 >    available for Router customers, with a subprocessor list? How long are
->    Router inputs and outputs retained: the 24 hours of the Partner Node page,
->    or longer? Is anything used for training? Can processing stay in the EU?
+>    Router inputs and outputs retained: the 24 hours stated on the Router page,
+>    or "for as long as your account remains active" (Terms, Section 2)? Can
+>    processing stay in the EU?
 > 4. Is commercial use of the outputs confirmed for these models when called
 >    through Router? OpenAI is not listed on your Model Providers page.
 > 5. Can our Partner Node concurrency limit be raised with a custom limit as
@@ -450,11 +416,12 @@ Da mandare a `support@comfy.org`, oppure dal modulo
 
 ## 7 · NON VERIFICATO
 
-- **I Termini di servizio e l'informativa privacy di Comfy:** non letti.
-  `comfy.org` è bloccato dalla rete di questa sessione.
-- **L'accordo Enterprise, la licenza MiniMax e i termini di BFL, OpenAI e
-  BytePlus:** letti solo in estratti dal motore di ricerca. Il testo attorno
-  alle frasi citate non si è visto.
+- **L'informativa privacy di Comfy:** non letta. I Termini e l'accordo
+  Enterprise sono stati letti per intero più tardi, lo stesso giorno
+  (`docs/comfy-termini.md`).
+- **La licenza MiniMax e i termini di BFL, OpenAI e BytePlus:** letti solo in
+  estratti dal motore di ricerca. Il testo attorno alle frasi citate non si è
+  visto.
 - **La Prohibited Use Policy di Google:** non letta.
 - **La documentazione del Router vale per l'API che AIRENDER usa oggi:** letta
   al commit `adfc0fd`, ma le pagine non hanno data. Il motore di ricerca
@@ -464,8 +431,6 @@ Da mandare a `support@comfy.org`, oppure dal modulo
 - **La coda non ha ripiego:** lo dice la documentazione. Nessuna chiamata lo ha
   provato.
 - **I fornitori della catena `vertexai`:** non sono scritti da nessuna parte.
-- **Le 24 ore di conservazione valgono per il Router:** scritte per i Partner
-  Node.
 - **La licenza commerciale «Cloud» della tabella copre anche il Router:**
   non scritto.
 - **Fuori dal perimetro di questo documento**, da guardare con un consulente:

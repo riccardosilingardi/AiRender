@@ -270,14 +270,30 @@ la verifica si nomina qui.
 
 ### Termini di Comfy e rivendita (2026-11-03)
 
-Tutto in `docs/termini-comfy-rivendita.md`. Restano aperti:
+Termini di Comfy in `docs/comfy-termini.md`; fornitori, rischi e mail in
+`docs/termini-comfy-rivendita.md`.
 
-- **I Termini di servizio di Comfy permettono di servire clienti propri con
-  una chiave sola** — non letti: `comfy.org` è bloccato dalla rete della
-  sessione. L'accordo Enterprise, letto solo in estratti, vieta di concedere i
-  prodotti Comfy in uso a terzi. Per verificare: Riccardo apre i termini e
-  rimanda le sezioni (`docs/termini-comfy-rivendita.md`, 1.1), e manda a
-  Comfy la domanda della sezione 6. **Nessuna fattura prima della risposta.**
+**Verificato, e uscito da qui:** i Termini di servizio (in vigore dal
+2026-05-13) sono stati letti per intero. Il testo viene dal sorgente pubblico
+del sito ed è identico parola per parola alla pagina viva (PDF di Riccardo,
+2026-11-03). Il diritto d'uso è «for your internal business purposes». È
+vietato «sublicense the Comfy Products for use by a third party», anche
+«indirectly», e ogni uso «not expressly permitted». Vendere le immagini si
+può (l'Output è del cliente Comfy); far generare i propri clienti no, senza
+un Order Form o un'autorizzazione scritta. **Nessuna fattura del modello
+attuale prima dell'autorizzazione.**
+
+Restano aperti:
+
+- **Comfy autorizza per iscritto il modello AIRENDER** (cliente che genera
+  dall'app, con la chiave di Riccardo). Per verificare: mail della sezione 6
+  di `docs/termini-comfy-rivendita.md`, con la clausola proposta nella
+  sezione 7 di `docs/comfy-termini.md`.
+- **ComfyUI open source con modelli aperti su una GPU propria** è fuori dai
+  Termini (GPL-3.0, «Comfy OSS»): le licenze dei modelli e la tenuta della
+  geometria non sono verificate (`docs/comfy-termini.md`, sezione 5).
+- **Le pagine Enterprise MSA e Router di oggi sono uguali a quelle lette**
+  — lette al 2026-10-26 dal repository, non confrontate con il sito vivo.
 - **La destinazione «Google» è vera** — non garantita nemmeno con la coda e
   `fallback_provider=false`. L'API reference del Router dice che la catena
   Gemini di `vertexai` può passare la chiamata a un altro fornitore che
@@ -287,8 +303,10 @@ Tutto in `docs/termini-comfy-rivendita.md`. Restano aperti:
   dall'elenco dei DPA in `server/README.md`.
 - **GPT Image 2 via Router ha l'uso commerciale** — OpenAI non è nella tabella
   dei fornitori di Comfy.
-- **Le 24 ore di conservazione dei Partner Node valgono anche per il Router**
-  — non scritto.
+- **Le 24 ore di conservazione valgono anche per il Router** — la pagina del
+  Router lo dice («Inputs are kept for 24 hours after upload and outputs for
+  24 hours after generation»), ma i Termini dicono «for as long as your
+  account remains active». Quale vale non è chiaro.
 
 ### Licenze e crediti AIRENDER (2026-11-02)
 
@@ -307,10 +325,10 @@ Tutto in `docs/termini-comfy-rivendita.md`. Restano aperti:
   nello Storage di Supabase con un link firmato. Mai provato con un 4K vero,
   né il tempo di risposta delle funzioni (10 s per default) sull'invio.
 - **I termini di Comfy permettono di rivendere** generazioni fatte con una
-  chiave sola: ancora non letti. Dal 2026-11-03 c'è la ricerca, con la
-  documentazione del Router letta per intero, in `docs/termini-comfy-rivendita.md`
-  (blocco «Termini di Comfy e rivendita» qui sopra). Alternativa: Vertex AI
-  diretto, i cui termini permettono un'applicazione usata da terzi.
+  chiave sola: letti il 2026-11-03 (`docs/comfy-termini.md`). **No**, non senza
+  un'autorizzazione scritta di Comfy: uso solo «for your internal business
+  purposes». Blocco «Termini di Comfy e rivendita» qui sopra. Alternativa:
+  Vertex AI diretto, i cui termini permettono un'applicazione usata da terzi.
 - **Scelte di questa sessione da confermare con Riccardo:** la Prova ha le
   funzioni di Pro e apre il plugin; l'annuale accredita 12 mesi di render in
   un lotto; i render del mese non si sommano al mese dopo; a fine
@@ -657,8 +675,10 @@ Allplan. Da verificare sul PC di Riccardo, in quest'ordine:
 - **Le condizioni dei provider consentono la rivendita dell'accesso** — da
   leggere prima di emettere la prima fattura, non dopo. Dal 2026-11-03: Google
   Cloud letto per intero (sì a un'applicazione usata da terzi, no a rivendere
-  il servizio); BFL, OpenAI e BytePlus solo in estratti; Comfy non letto.
-  Dettagli in `docs/termini-comfy-rivendita.md`, sezione 2.
+  il servizio); BFL, OpenAI e BytePlus solo in estratti; Comfy letto per
+  intero (uso solo interno, servire terzi richiede un accordo scritto).
+  Dettagli in `docs/termini-comfy-rivendita.md`, sezione 2, e
+  `docs/comfy-termini.md`.
 
 ### Lasciato dalla sessione del 2026-10-27 (lo Studio nei documenti)
 
