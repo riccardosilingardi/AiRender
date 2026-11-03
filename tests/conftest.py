@@ -29,9 +29,12 @@ def niente_rete(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def niente_chiave_nell_ambiente(monkeypatch):
-    for nome in magnific.VARIABILI_CHIAVE + comfy.VARIABILI_CHIAVE:
+def niente_chiave_nell_ambiente(monkeypatch, tmp_path_factory):
+    for nome in magnific.VARIABILI_CHIAVE + comfy.VARIABILI_CHIAVE + ("AIRENDER_LICENZA", "AIRENDER_SERVER"):
         monkeypatch.delenv(nome, raising=False)
+    # Il codice licenza incollato sta nella cartella dell'utente: i test ne
+    # usano una vuota, mai quella vera.
+    monkeypatch.setenv("APPDATA", str(tmp_path_factory.mktemp("appdata")))
 
 
 def _byte(immagine: Image.Image, formato: str = "PNG") -> bytes:

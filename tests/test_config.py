@@ -608,3 +608,19 @@ def test_materiali_cambiati_massimi_tengono_l_invio_sotto_le_immagini_di_gemini(
     """Caso: si spuntano tanti materiali e l'invio supera le 14 immagini che Gemini accetta."""
     # vista + riferimento per lo stile + due immagini per materiale
     assert 2 + 2 * config.MATERIALI_CAMBIATI_MASSIMI <= 14
+
+
+# --- vendita -------------------------------------------------------------------
+
+
+def test_server_airender_e_un_indirizzo_https_senza_barra_finale():
+    """Caso: l'indirizzo del server finisce con / e le chiamate diventano //v2/models."""
+    assert config.SERVER_AIRENDER.startswith("https://")
+    assert not config.SERVER_AIRENDER.endswith("/")
+
+
+def test_server_invio_massimo_mb_in_base64_sta_sotto_i_6_mb_di_netlify():
+    """Caso: una vista passa il controllo del plugin ma la funzione Netlify la rifiuta a 6 MB."""
+    assert config.SERVER_INVIO_MASSIMO_MB * 4 / 3 < 6
+    assert config.costante("SERVER_INVIO_MASSIMO_MB").origine == config.VINCOLO
+    # LISTINO ha i suoi casi in tests/test_listino.py

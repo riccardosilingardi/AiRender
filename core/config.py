@@ -831,3 +831,103 @@ MATERIALI_CAMBIATI_MASSIMI = _registra(Costante(
         "invio. Non misurato quanti materiali il modello tiene distinti."
     ),
 ))
+
+
+# --- vendita: licenze e crediti AIRENDER (2026-11-02) --------------------------
+#
+# Il listino vive qui e solo qui. Il server (server/) lo legge da
+# server/listino.json, che si riscrive con `python scripts/scrivi_listino.py`
+# e che tests/test_listino.py confronta con questo: se divergono, la suite
+# lo dice.
+
+NANO_BANANA_2 = "vertexai/gemini-3.1-flash-image"
+NANO_BANANA_PRO = "vertexai/gemini-3-pro-image"
+
+LISTINO = _registra(Costante(
+    nome="LISTINO",
+    valore={
+        "versione": "2026-11-02",
+        "valuta": "EUR",
+        "iva": "esclusa",
+        # Quanti render costa un invio, per modello e grandezza. Un modello che
+        # non e' qui non parte coi crediti AIRENDER: serve la chiave propria.
+        "pesi": {
+            NANO_BANANA_2: {"1K": 1, "2K": 1, "4K": 2},
+            NANO_BANANA_PRO: {"1K": 2, "2K": 2, "4K": 3},
+        },
+        "benvenuto": {"render": 10, "validita_mesi": 12},
+        "piani": {
+            "prova": {
+                "nome": "Prova", "tipo": "una_tantum", "prezzo": 15,
+                "render": 50, "validita_mesi": 12, "postazioni": 1,
+                "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
+                "canali": ["web", "plugin"], "studio": True,
+            },
+            "base": {
+                "nome": "Base", "tipo": "abbonamento", "prezzo_mese": 19, "prezzo_anno": 190,
+                "render_mese": 80, "postazioni": 1,
+                "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
+                "canali": ["web"], "studio": False,
+            },
+            "pro": {
+                "nome": "Pro", "tipo": "abbonamento", "prezzo_mese": 39, "prezzo_anno": 390,
+                "render_mese": 200, "postazioni": 1,
+                "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
+                "canali": ["web", "plugin"], "studio": True,
+            },
+            "studio": {
+                "nome": "Studio", "tipo": "abbonamento", "prezzo_mese": 99, "prezzo_anno": 990,
+                "render_mese": 600, "postazioni": 3,
+                "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
+                "canali": ["web", "plugin"], "studio": True,
+            },
+            # Abbonamento finito: restano i crediti di ricarica e benvenuto,
+            # con le funzioni di Base.
+            "nessuno": {
+                "nome": "Senza abbonamento", "tipo": "nessuno", "postazioni": 1,
+                "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
+                "canali": ["web"], "studio": False,
+            },
+        },
+        "ricarica": {"nome": "Ricarica", "prezzo": 10, "render": 100, "validita_mesi": 12},
+        "rivendita": {"sconto_segnalazione": 20, "sconto_rivenditore": 30},
+    },
+    origine=SCELTA,
+    ragione=(
+        "Prezzi e pesi decisi il 2026-11-02 nel thread di vendita: ipotesi da "
+        "pilota, non misurati sul mercato. I pesi seguono il costo vero: Nano "
+        "Banana 2 circa 0,08 USD a render (17,17 crediti Comfy, misurato), Pro "
+        "circa il doppio, 4K circa una volta e mezza (prezzi Google, da "
+        "verificare). Annuale = 10 mensilita'. Scelte di questa sessione, da "
+        "confermare con Riccardo: la Prova ha le funzioni di Pro e apre anche "
+        "il plugin (chi usa Allplan deve poterlo provare); l'annuale accredita "
+        "12 mesi di render in un lotto solo, validi 12 mesi; i render del piano "
+        "non si sommano da un mese all'altro; il plugin Allplan e' nei canali "
+        "da Pro in su, la web app in tutti."
+    ),
+))
+
+SERVER_AIRENDER = _registra(Costante(
+    nome="SERVER_AIRENDER",
+    valore="https://airender.netlify.app",
+    origine=SCELTA,
+    ragione=(
+        "Indirizzo del server AIRENDER (funzioni Netlify) che riceve la vista "
+        "con il codice licenza e la passa al Comfy Router con la chiave di "
+        "Riccardo. Il dominio vero non c'e' ancora: si cambia qui o con la "
+        "variabile d'ambiente AIRENDER_SERVER."
+    ),
+))
+
+SERVER_INVIO_MASSIMO_MB = _registra(Costante(
+    nome="SERVER_INVIO_MASSIMO_MB",
+    valore=4,
+    origine=VINCOLO,
+    ragione=(
+        "Una funzione Netlify accetta al massimo 6 MB di corpo (docs.netlify.com, "
+        "limiti delle funzioni). La vista viaggia in base64, che pesa un terzo "
+        "in piu': 4 MB di immagine diventano circa 5,4 MB di richiesta. Mai "
+        "provato con una vista vera a 4K."
+    ),
+    unita=" MB",
+))

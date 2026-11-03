@@ -817,7 +817,12 @@ contraddicono le nuove, valgono le nuove:
 ## Non ancora progettato
 
 - Schermata di configurazione della chiave API e del tetto di spesa (nello
-  Studio c'è solo il segnaposto in grigio).
+  Studio c'è solo il segnaposto in grigio). Dal 2026-11-02 diventa **Licenza
+  e saldo**: incolla il codice AIR-…, piano, render disponibili e scadenza,
+  pulsanti Ricarica e Gestisci abbonamento (i link li dà `/api/saldo`), e la
+  chiave Comfy propria come opzione. Il server c'è (`server/`); i quattro
+  stati vanno scritti prima di costruirla. Per ora: `python -m core.cli
+  --licenza` e `--saldo`.
 - Il video oltre la scheda Video: montare più video, musica, titoli.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.

@@ -98,7 +98,8 @@ Riscritto il 2026-10-28 con lo Studio v1 (sezione 5, riga del 2026-10-27).
 | 2026-09-14 | Weavy escluso come motore | Nessuna API pubblica per applicazioni terze. Resta strumento manuale | |
 | 2026-09-14 | Livello linguistico nel plugin, non nel grafo | Chiamata diretta all'API del modello linguistico: più economico, e permette di cambiare motore immagine senza toccare la parte che parla con l'utente | |
 | 2026-09-14 | Due modalità: **ritocco** (maschera) e **variante** (rigenerazione a stesso seed) | Il riempimento mascherato non ricalcola riflessi e luce di rimbalzo. Un cambio radicale di materiale richiede di rilanciare la base | |
-| 2026-09-14 | BYOK, chiave del cliente | Un modello a crediti richiede backend, fatturazione e antifrode: è un'azienda, non un MVP | |
+| 2026-09-14 | BYOK, chiave del cliente | Un modello a crediti richiede backend, fatturazione e antifrode: è un'azienda, non un MVP | **Sì, 2026-11-02.** Un account Comfy per ogni cliente è una barriera troppo alta (Riccardo). Vedi la riga del 2026-11-02; BYOK resta come opzione (`--provider comfy`) |
+| 2026-11-02 | **Crediti AIRENDER: licenza + saldo, server su Netlify.** Il cliente compra su una pagina prezzi (Stripe Checkout), riceve per email un codice `AIR-…`, lo incolla una volta (`python -m core.cli --licenza`). Il plugin manda la vista al server AIRENDER (`server/`), che controlla piano e saldo, la passa al Comfy Router con la chiave di Riccardo e **scala solo se il render torna con un'immagine**. Supabase tiene licenze, lotti di crediti con scadenza, render e movimenti; Fatture in Cloud fa la fattura elettronica SdI. Listino in `core/config.py` (`LISTINO`): Prova 15 € 50 render 12 mesi, Base 19 €/mese 80 render, Pro 39 €/mese 200, Studio 99 €/mese 600 e 3 postazioni, annuale = 10 mensilità, Ricarica 10 € per 100; pesi NB2 1 (4K 2), Pro 2 (4K 3); 10 render di benvenuto. Una licenza è l'account (email + codice) e vale anche per la futura web app: il **plugin Allplan è nei piani da Pro in su**, la web app in tutti | Decisione di Riccardo nel thread di vendita (Serteco). Stripe + Fatture in Cloud al posto di Lemon Squeezy perché i clienti sono studi italiani B2B che vogliono la fattura SdI. Il server parla lo stesso protocollo del Router, così il motore cambia solo indirizzo e intestazione (`core/provider/airender.py`). Rivendita Serteco: licenze attivate a mano (`scripts/licenze.py`), fattura Serteco; segnalazioni con codici sconto Stripe | |
 
 ## 6 · Fonti dati
 
@@ -266,6 +267,35 @@ per PR (regola di `CLAUDE.md`).
 
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
+
+### Licenze e crediti AIRENDER (2026-11-02)
+
+- **Niente del server è mai girato su Netlify, Supabase, Stripe, Fatture in
+  Cloud o Resend.** Provati: le funzioni SQL su un Postgres 16 vero (riserva,
+  addebito dal lotto che scade prima, annullo, scadenze, postazioni, saldo
+  insufficiente, idempotenza) e la logica delle funzioni con database e rete
+  finti (`server/test/`, 30 test). Le forme delle chiamate a Stripe, Fatture
+  in Cloud e Resend vengono dalla documentazione: la prima prova vera è il
+  punto 7 di `server/README.md`, in modalità test di Stripe.
+- **La fattura elettronica è giusta per l'Agenzia delle Entrate** (campi,
+  natura IVA, codice destinatario, privato senza partita IVA, cliente
+  estero): non verificato. `FIC_INVIA_SDI` è spento per default.
+- **Netlify regge vista e risultato.** Corpo massimo 6 MB: la vista è
+  limitata a 4 MB (`SERVER_INVIO_MASSIMO_MB`), il risultato sopra 4,5 MB va
+  nello Storage di Supabase con un link firmato. Mai provato con un 4K vero,
+  né il tempo di risposta delle funzioni (10 s per default) sull'invio.
+- **I termini di Comfy permettono di rivendere** generazioni fatte con una
+  chiave sola: non letto. Alternativa: Vertex AI diretto.
+- **Scelte di questa sessione da confermare con Riccardo:** la Prova ha le
+  funzioni di Pro e apre il plugin; l'annuale accredita 12 mesi di render in
+  un lotto; i render del mese non si sommano al mese dopo; a fine
+  abbonamento la licenza resta con le funzioni di Base per i crediti
+  rimasti; email col codice via Resend; dominio `airender.netlify.app`
+  segnaposto.
+- **Il prezzo nello Studio e nella palette** dice ancora «circa N crediti»
+  Comfy anche con la licenza: va detto in render del saldo. E la schermata
+  Licenza e saldo (codice, saldo, Ricarica, Gestisci) non è progettata:
+  `DESIGN.md`, Non ancora progettato. Per ora tutto da riga di comando.
 
 ### Azioni sotto l'immagine e video a tratti (2026-11-02)
 

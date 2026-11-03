@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRENDER · Prezzi</title>
+<style>
+  :root { --sfondo:#f7f6f3; --carta:#fff; --testo:#1d1d1b; --tenue:#66645e; --linea:#e2dfd8; --accento:#2f5d50; }
+  @media (prefers-color-scheme: dark) { :root { --sfondo:#161615; --carta:#20201e; --testo:#ecebe6; --tenue:#a3a19a; --linea:#363531; --accento:#7fb5a3; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--sfondo); color:var(--testo); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 8px; }
+  p.sotto { color: var(--tenue); margin: 0 0 32px; max-width: 60ch; }
+  .interruttore { display:inline-flex; border:1px solid var(--linea); border-radius:999px; padding:3px; margin-bottom:24px; background:var(--carta); }
+  .interruttore button { border:0; background:none; color:var(--testo); padding:6px 16px; border-radius:999px; font:inherit; cursor:pointer; }
+  .interruttore button[aria-pressed="true"] { background:var(--accento); color:var(--carta); }
+  .griglia { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap:16px; }
+  .piano { background:var(--carta); border:1px solid var(--linea); border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:12px; }
+  .piano.evidenza { border-color: var(--accento); border-width: 2px; }
+  .piano h2 { margin:0; font-size:1.2rem; }
+  .prezzo { font-size:2rem; font-weight:600; }
+  .prezzo small { font-size:.9rem; font-weight:400; color:var(--tenue); }
+  ul { margin:0; padding-left:18px; color:var(--tenue); }
+  .piano a { margin-top:auto; text-align:center; background:var(--accento); color:var(--carta); text-decoration:none; padding:10px; border-radius:8px; font-weight:600; }
+  .extra { margin-top:32px; display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
+  .nota { color:var(--tenue); font-size:.9rem; margin-top:32px; }
+  .vuoto { color:var(--tenue); }
+</style>
+</head>
+<body>
+<main id="prezzi">
+  <h1>AIRENDER</h1>
+  <p class="sotto">Dalla vista di Allplan a un'immagine da presentare, senza cambiare la geometria. Paghi in render: nessun account da aprire presso altri servizi, la ricarica si fa da qui.</p>
+  <div class="interruttore" role="group" aria-label="Periodo">
+    <button type="button" data-periodo="mese" aria-pressed="true">Mensile</button>
+    <button type="button" data-periodo="anno" aria-pressed="false">Annuale · 2 mesi gratis</button>
+  </div>
+  <div class="griglia" id="piani"><p class="vuoto">Carico il listino…</p></div>
+  <div class="extra" id="extra"></div>
+  <p class="nota" id="nota"></p>
+</main>
+<script>
+  const euro = (n) => n.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  let listino = null;
+  let periodo = "mese";
+
+  function voci(p, l) {
+    const v = [];
+    v.push(p.canali.includes("plugin") ? "Plugin per Allplan e web app" : "Web app (il plugin per Allplan è da Pro in su)");
+    v.push(p.modelli.length > 1 ? "Nano Banana 2 e Nano Banana Pro" : "Nano Banana 2");
+    v.push(`Fino a ${p.dimensione_massima}`);
+    if (p.studio) v.push("Studio: ritocchi, passi, video");
+    v.push(p.postazioni > 1 ? `${p.postazioni} postazioni` : "1 postazione");
+    return v.map((t) => `<li>${t}</li>`).join("");
+  }
+
+  function disegna() {
+    const l = listino;
+    const abbonamenti = ["base", "pro", "studio"].map((nome) => {
+      const p = l.piani[nome];
+      const prezzo = periodo === "anno" ? p.prezzo_anno : p.prezzo_mese;
+      const render = periodo === "anno" ? `${p.render_mese * 12} render l'anno` : `${p.render_mese} render al mese`;
+      return `<section class="piano${nome === "pro" ? " evidenza" : ""}">
+        <h2>${p.nome}</h2>
+        <div class="prezzo">${euro(prezzo)} <small>/ ${periodo} + IVA</small></div>
+        <div>${render}</div>
+        <ul>${voci(p, l)}</ul>
+        <a href="/api/acquista?prodotto=${nome}_${periodo}">Scegli ${p.nome}</a>
+      </section>`;
+    }).join("");
+    document.getElementById("piani").innerHTML = abbonamenti;
+
+    const prova = l.piani.prova, r = l.ricarica;
+    document.getElementById("extra").innerHTML = `
+      <section class="piano">
+        <h2>${prova.nome}</h2>
+        <div class="prezzo">${euro(prova.prezzo)} <small>una volta + IVA</small></div>
+        <div>${prova.render} render validi ${prova.validita_mesi} mesi, senza abbonamento</div>
+        <ul>${voci(prova, l)}</ul>
+        <a href="/api/acquista?prodotto=prova">Prova AIRENDER</a>
+      </section>
+      <section class="piano">
+        <h2>${r.nome}</h2>
+        <div class="prezzo">${euro(r.prezzo)} <small>+ IVA</small></div>
+        <div>${r.render} render in più, validi ${r.validita_mesi} mesi</div>
+        <ul><li>Per chi ha già una licenza: si compra dal pulsante Ricarica nel plugin</li></ul>
+      </section>`;
+
+    const nb = l.pesi["vertexai/gemini-3.1-flash-image"], pro = l.pesi["vertexai/gemini-3-pro-image"];
+    document.getElementById("nota").textContent =
+      `Un render con Nano Banana 2 vale ${nb["1K"]} fino a 2K e ${nb["4K"]} a 4K; con Nano Banana Pro vale ${pro["1K"]}, ${pro["4K"]} a 4K. ` +
+      `Il credito si scala solo se il render riesce. All'attivazione hai ${l.benvenuto.render} render di benvenuto. ` +
+      `I render del piano valgono per il periodo pagato e non si sommano al successivo. Prezzi IVA esclusa, fattura elettronica.`;
+  }
+
+  document.querySelectorAll("[data-periodo]").forEach((b) => b.addEventListener("click", () => {
+    periodo = b.dataset.periodo;
+    document.querySelectorAll("[data-periodo]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    if (listino) disegna();
+  }));
+
+  fetch("/api/listino").then((r) => r.json()).then((l) => { listino = l; disegna(); })
+    .catch(() => { document.getElementById("piani").innerHTML = '<p class="vuoto">Il listino non si è caricato. Ricarica la pagina.</p>'; });
+</script>
+</body>
+</html>
