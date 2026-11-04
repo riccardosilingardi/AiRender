@@ -287,7 +287,7 @@ def test_se_il_render_di_partenza_sparisce_la_coda_non_manda_niente(cartella, ch
     stato = leggi_stato(cartella, lavoro.identificativo)
     assert stato["stato"] == ERRORE and not chiamate
     assert "punto di partenza non c'e' piu'" in stato["fatto"]
-    assert "Rifai pulito dalla vista" in stato["cosa_fare"]
+    assert "Rifai tutto dalla vista" in stato["cosa_fare"]
 
 
 def test_un_lavoro_del_formato_1_si_legge_ancora_e_parte_dalla_vista(cartella, chiamate):
@@ -359,7 +359,7 @@ def test_rifai_un_passo_senza_partenza_propone_rifai_pulito(catena, cartella):
     Path(albero.passo(ids["2"])["render"]).unlink()
     with pytest.raises(FileNonTrovato) as errore:
         studio.rifai(ids["3"], {"destinazione_mostrata": _dest(studio)})
-    assert "Rifai pulito dalla vista" in errore.value.cosa_fare
+    assert "Rifai tutto dalla vista" in errore.value.cosa_fare
     tre = _per_numero(studio.passi(VISTA), "3")
     assert tre["partenza_mancante"] is True
 
@@ -392,7 +392,7 @@ def test_rifai_pulito_parte_dalla_vista_ed_e_un_ramo_nuovo_sotto_lo_0(catena, ca
     assert chiamate[-1].prompt == mostrato  # parte il prompt che si e' visto
     riga = next(p for p in studio.passi(VISTA)["passi"] if p["identificativo"] == nuovo)
     assert riga["da_numero"] == "0" and riga["generazioni"] == 1 and not riga["avviso"]
-    assert riga["tipo"] == "pulito" and riga["nome"].startswith("Pulito dalla vista")
+    assert riga["tipo"] == "pulito" and riga["nome"].startswith("Tutto dalla vista")
 
 
 def test_rifai_pulito_di_un_passo_dalla_vista_non_ha_niente_da_unire(catena):
@@ -400,7 +400,7 @@ def test_rifai_pulito_di_un_passo_dalla_vista_non_ha_niente_da_unire(catena):
     studio, _coda_, ids = catena
     with pytest.raises(RichiestaStudioNonValida) as errore:
         studio.componi_pulito({"vista": VISTA, "passo": ids["1"]})
-    assert "Rifai questo passo" in errore.value.cosa_fare
+    assert "Variante" in errore.value.cosa_fare
 
 
 def test_rifai_pulito_con_il_prompt_scritto_a_mano_lo_tiene(cartella, chiamate):
@@ -489,5 +489,5 @@ def test_la_pagina_ha_la_scheda_passi_attiva(server):
 def test_la_regola_del_passo_e_quella_della_bozza():
     """Caso: la regola dei passi riscritta nel codice e non nella bozza."""
     bozza = (Path(__file__).resolve().parent.parent / "docs" / "ui" / "blocchi-stile-bozza.md").read_text(encoding="utf-8")
-    assert "bozza 11" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-11"
+    assert "bozza 12" in bozza.splitlines()[0] and blocchi.VERSIONE == "bozza-12"
     assert f"> {blocchi.REGOLA_PASSO.testo}" in bozza

@@ -20,33 +20,32 @@ quello 2026 (un test lo tiene uguale), il `.pyp` lo scrive
 prove della 2026 (AIRENDER prova e sonda). Passi per Riccardo:
 [`docs/installa-2027.md`](../docs/installa-2027.md).
 
-## La palette v1: `AIRENDER` (Allplan 2026, prompt 7)
+## La palette: `AIRENDER` (dal 2026-11-04 cattura e basta)
 
-Il telecomando di `DESIGN.md`: Vista, Stile, Invio, Ultimo render. Genera non
-blocca Allplan: scrive un lavoro nella coda e torna. Se sulla cartella non
-gira una coda, la palette avvia lo Studio senza finestra, che la fa partire.
-Logica in `comune/telecomando.py` (pytest), Allplan solo in
-`v2026/PythonPartsScripts/airender/AirenderPalette.py`. Il `.pyp` si genera:
-dopo un cambio dei blocchi, `python allplan/v2026/scrivi_palette_pyp.py`.
+Decisione di Riccardo del 2026-11-04: la palette serve solo a catturare.
+Vista (Cattura vista, Dimensione, Formato, Vedi cosa ha tagliato) e Studio
+(Apri nello Studio, Apri cartella). Stile, invio, render, ritocchi e video si
+fanno nello Studio. Con un formato fisso la vista si taglia subito alla
+cattura: nella cartella delle viste c'e' solo la parte che resta, e la
+finestra intera scurita sta in `anteprime/`. Ogni cattura legge anche i
+materiali del progetto, per la tabella dello Studio.
+Logica in `comune/telecomando.py` (pytest), Allplan solo negli
+`AirenderPalette.py` di ogni versione. Il `.pyp` si genera:
+`python allplan/v2026/scrivi_palette_pyp.py` e `python allplan/v2027/scrivi_palette_pyp.py`.
 
-Come provarla, la prima volta (mai aperta in Allplan prima):
+Come provarla (Allplan 2027):
 
-1. Rilancia `installa.ps1`, riavvia Allplan.
-2. Libreria › Privato › AIRENDER › **AIRENDER**. Se non si apre, copia il
-   messaggio della finestra *Trace*.
+1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan.
+2. Library › Privato › AIRENDER › **AIRENDER**.
 3. Clicca nella finestra 3D, **Cattura vista**: in Vista compaiono nome,
    dimensioni ed esito.
-4. In Stile cambia **Modello**: «La vista va a» e Costo cambiano subito, o
-   solo al clic successivo? Scrivimelo.
-5. **Prova a secco**: finestra con destinazione, costo e prompt.
-6. Solo se vuoi spendere (circa 17 crediti, `COMFY_API_KEY` impostata):
-   **Genera render**. Allplan deve restare libero subito; Stato dice «In
-   corso da…», Genera diventa Annulla. Premi **Aggiorna** ogni tanto.
-7. **Apri nello Studio**: si apre la finestra dello Studio sulla stessa
-   cartella?
+4. Scegli un **Formato** fisso, per esempio 16:9, e cattura di nuovo: si apre
+   la finestra intera con scurito quello che è stato tagliato.
+5. **Apri nello Studio**: la vista è lì, già tagliata.
+6. **Esc**: la palette si chiude e torni alla Library?
 
-Da rimandare: uno screenshot della palette dopo il punto 3 e dopo il punto 6,
-il testo delle finestre di messaggio e qualunque errore della *Trace*.
+Da rimandare: uno screenshot della palette dopo il punto 3, e a parole se Esc
+al punto 6 ti riporta alla Library.
 
 ## `AIRENDER prova` (Allplan 2026)
 
@@ -112,55 +111,10 @@ screenshot della palette dopo il punto 4, uno della finestra di Edge, e a parole
 se Allplan rispondeva al punto 5. Il processo di prova si spegne da solo dopo
 tre minuti.
 
-## La sonda dei materiali: `AIRENDER sonda materiali` (Allplan 2027, prompt 15)
+## Le sonde dei materiali (tolte il 2026-11-04)
 
-Una palette usa e getta per sapere se la mappa dei materiali (PRD sezione 8)
-si può fare: se Allplan dice di ogni elemento il materiale assegnato e se la
-color map dà un colore pieno per materiale. Non cambia il modello e non manda
-niente a nessun servizio. Logica in `comune/sonda_materiali.py` (pytest),
-Allplan solo in `v2027/pacchetto/PythonPartsScripts/riccardo_silingardi/airender/AirenderSondaMateriali.py`.
-
-1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
-2. Apri un modello con qualche materiale assegnato (texture o superfici
-   diverse), meglio piccolo.
-3. Scheda Library › Privato › AIRENDER › **AIRENDER sonda materiali**.
-4. **Elenca l'API**, poi **Leggi gli elementi**. Legge il nome di tutti gli
-   elementi, scrive quanti ce ne sono per tipo, poi ne descrive al massimo 30
-   saltando quelli 2D (linee, punti, testi, quote), 3 per tipo. Per ognuno
-   chiede la superficie assegnata (`GetElement` › `GetTextureDefinition` ›
-   `SurfacePath`, e le proprieta' dei muri e solai). Ogni chiamata si scrive
-   prima in `diario-lettura.txt` e `elementi.json` si riscrive a ogni
-   elemento: se Allplan si chiude, l'ultima riga del diario dice dove e gli
-   elementi gia' letti restano. Il 2026-11-01 la prima versione (metodi
-   chiamati alla cieca) ha fatto chiudere Allplan; la seconda ha retto ma ha
-   letto i primi 30 elementi, tutti 2D.
-5. Clicca nella finestra 3D com'e' di solito, **Salva vista normale**.
-6. Senza muovere la camera, metti la finestra in color map (un colore per
-   materiale), **Salva color map**.
-7. Rimetti la finestra com'era, **Apri la cartella**.
-
-Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-materiali`
-(`risultati-materiali.txt`, `diario-lettura.txt`, `api.txt`, `elementi.json`, le due immagini), e a
-parole come hai messo la color map (quale comando, quale opzione).
-
-## La sonda dell'elenco materiali: `AIRENDER elenco materiali` (Allplan 2027, 2026-11-02)
-
-**Solo lettura: non cambia niente in Allplan** (regola di Riccardo del
-2026-11-02, sostituisce la sonda color map che assegnava superfici). Legge il
-materiale di ogni elemento 3D (SurfacePath, poi attributi 335 e 508), trova il
-file `.surf` di ogni materiale nelle cartelle di progetto, Usr e Std, e ne fa
-un campione: la texture se il `.surf` ne nomina una, altrimenti il colore
-(`SurfaceDefinition.LoadSurfaceData`, che riempie un oggetto in memoria).
-Logica in `comune/sonda_elenco.py` (pytest), Allplan solo in
-`v2027/.../AirenderSondaElenco.py`.
-
-1. `py allplan\v2027\pacchetto.py --installa`, riavvia Allplan 2027.
-2. Apri il progetto, finestra 3D com'è di solito.
-3. Library › Privato › AIRENDER › **AIRENDER elenco materiali**.
-4. **Leggi i materiali**. Prende tutti gli elementi 3D (al massimo 4000, 150 per tipo, il 2D
-   si salta); ogni chiamata si scrive prima in `diario-lettura.txt`.
-5. **Apri la cartella**.
-
-Da rimandare: tutta la cartella `Usr\Local\AIRENDER\sonda-elenco`
-(`materiali.json`, `campioni\`, `surf\`, `vista.png`, `risultati-materiali.txt`,
-`diario-lettura.txt`).
+`AIRENDER sonda materiali` e `AIRENDER elenco materiali` servivano a capire
+come leggere i materiali da Allplan. Hanno fatto il loro lavoro: ora li legge
+**Cattura vista** della palette (`lettore_materiali.py`, `comune/materiali_allplan.py`).
+`pacchetto.py --installa` toglie dalla Library i loro `.pyp` rimasti. Il
+codice e' nella storia di git.

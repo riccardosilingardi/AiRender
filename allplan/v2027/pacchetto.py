@@ -13,7 +13,7 @@ Allplan, mette il pulsante AIRENDER nell'Actionbar/Toolscape.
 `--installa` e' la strada sicura, gia' provata con la 2026: copia gli stessi
 file, nelle stesse cartelle, nella Usr. AIRENDER si apre allora da
 Library › Privato › AIRENDER. Toglie anche i file delle prove vecchie
-(AIRENDER prova, AIRENDER sonda), che nella 2027 non servono.
+(AIRENDER prova, AIRENDER sonda, le sonde dei materiali), che non servono piu'.
 
 Nessun import di Allplan: gira con un Python qualunque e si prova con pytest.
 """
@@ -41,8 +41,7 @@ CARTELLA_SCRIPT = Path("PythonPartsScripts") / SVILUPPATORE / PLUGIN
 
 # I file che la palette importa e che vivono fuori dalla cartella della
 # versione: si copiano accanto all'adattatore, come faceva installa.ps1.
-FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "sonda_materiali.py",
-               "sonda_elenco.py", "materiali_allplan.py")
+FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "materiali_allplan.py")
 # Le voci in cima all'.allep, nell'ordine del workflow del PythonParts SDK.
 VOCI_ALLEP = ("Library", "PythonPartsScripts", "PythonPartsActionbar",
               "install-config.yml", "requirements.in")
@@ -54,7 +53,9 @@ SOLO_NEL_PACCHETTO = ("install-config.yml", "requirements.in")
 # di prova. La cartella delle viste (Usr\AIRENDER) non si tocca mai.
 VECCHI_SCRIPT = Path("PythonPartsScripts") / "airender"
 VECCHI_NELLA_LIBRERIA = ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_*.png",
-                         "AirenderSondaColormap.pyp")  # la sonda che cambiava le superfici, tolta il 2026-11-02
+                         "AirenderSondaColormap.pyp",  # la sonda che cambiava le superfici, tolta il 2026-11-02
+                         # le sonde dei materiali, tolte il 2026-11-04: li legge Cattura vista
+                         "AirenderSondaElenco.pyp", "AirenderSondaMateriali.pyp")
 
 
 # Coda e Studio girano staccati da Allplan con la cartella dello script come

@@ -195,7 +195,7 @@ def test_comfy_dice_chi_riceve_piu_immagini_e_che_nano_banana_non_e_mai_stato_pr
     motore = comfy.ProviderComfy(chiave="finta")
     assert motore.accetta_piu_immagini("vertexai/gemini-3.1-flash-image")
     assert not motore.accetta_piu_immagini("bfl/flux-kontext-pro")
-    assert not motore.accetta_piu_immagini("vertexai/gemini-3-pro-image")
+    assert motore.accetta_piu_immagini("vertexai/gemini-3-pro-image")  # acceso il 2026-11-04: Pro rifiutava materiali e riferimento
     assert comfy.SCHEMI["vertexai/gemini-3.1-flash-image"].piu_immagini_verificato_il == ""
     assert "questo render e' la prova" in motore.avviso_piu_immagini("vertexai/gemini-3.1-flash-image")
     assert motore.avviso_piu_immagini("bfl/flux-kontext-pro") is None

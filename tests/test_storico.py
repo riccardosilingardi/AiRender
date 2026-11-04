@@ -41,7 +41,7 @@ def test_una_cattura_nuova_si_aggiunge_e_i_render_di_prima_restano(cartella, chi
     assert [v["tipo"] for v in vecchia] == ["cattura", "stile", "passo"]
     assert [v["identificativo"] for v in vecchia[1:]] == [uno, due]
     assert all(v["immagine"] for v in vecchia)
-    assert [v["etichetta"] for v in vecchia] == ["Vista", "Render", "Modifica"]
+    assert [v["etichetta"] for v in vecchia] == ["Vista", "Render", "Cambia"]
 
 
 def test_i_ritocchi_stanno_nel_gruppo_della_vista_in_ordine(cartella, chiamate):

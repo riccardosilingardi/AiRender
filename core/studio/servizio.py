@@ -324,7 +324,7 @@ class Studio:
         if not re.fullmatch(r"ctx-[0-9a-f]{16}\.(jpg|png)", nome or ""):
             raise RichiestaStudioNonValida(
                 f"\"{nome}\" non e' il nome di un'immagine del contesto.",
-                "Caricala di nuovo in «Inserisci nel contesto».",
+                "Caricala di nuovo in «Fotoinserimento».",
             )
         percorso = modulo_contesto.cartella_contesti(self.cartella) / nome
         if not percorso.is_file():
@@ -564,7 +564,7 @@ class Studio:
             "immagini": (2 if (riferimento or contesto) else 1) + dei_materiali,
             "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali),
             "contesto_non_accettato": (
-                f"{modello.nome} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due. "
+                f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
                 "Scegli Nano Banana 2."
                 if contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "riferimento_non_accettato": (
@@ -778,7 +778,7 @@ class Studio:
         lavoro, _cartella = self._lavoro(identificativo)
         if lavoro.contesto is not None:
             raise RichiestaStudioNonValida(
-                "Un'immagine di «Inserisci nel contesto» non si porta su un'altra vista: "
+                "Un'immagine di «Fotoinserimento» non si porta su un'altra vista: "
                 "la sua prima immagine e' il luogo, non la vista.",
                 "Scegli un render nato da una vista Allplan.")
         render = self._render(identificativo)
@@ -855,7 +855,7 @@ class Studio:
             raise FileNonTrovato(
                 "Il punto di partenza di questo passo non c'e' piu': il suo render e' "
                 "stato tolto dalla cartella dei lavori.",
-                "Usa «Rifai pulito dalla vista»: riparte dalla vista Allplan con le "
+                "Usa «Rifai tutto dalla vista»: riparte dalla vista Allplan con le "
                 "stesse richieste.",
             )
         vista = Path(lavoro.vista)
@@ -980,7 +980,9 @@ class Studio:
             "modello_nome": modello.nome if modello else dati.get("modello"),
             "preset": dati.get("preset"),
             "preset_nome": (
-                "Passo: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
+                "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
+                if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
+                else "Cambia: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
                 else preset.nome if preset else "Scelte libere"
             ),
             "parte_da": dati.get("parte_da"),
@@ -1445,7 +1447,7 @@ class Studio:
         if len(strada) < 2:
             raise RichiestaStudioNonValida(
                 "Questo passo e' partito dalla vista: non ci sono richieste da unire.",
-                "Per rifarlo uguale usa «Rifai questo passo».",
+                "Per rifarlo uguale usa Variante, sotto l'immagine.",
             )
         base = strada[0]
         if not base.get("scelte"):
@@ -1553,9 +1555,9 @@ class Studio:
             "destinazione": motore.destinazione_per(modulo_video.MODELLO),
             "senza_ripiego": comfy.FALLBACK == "false",
             "fa_video": motore.fa_video(),
-            "avviso": (f"{modulo_video.MODELLO} non e' ancora stato provato con una chiamata vera: "
-                       "questo video e' la prova. Se il servizio lo rifiuta, l'errore lo dice."),
-            "costo": "non misurato: nessun video e' ancora stato fatto",
+            "avviso": (f"{modulo_video.MODELLO} non è ancora stato provato con una chiamata vera: "
+                       "il primo video è la prova. Se il servizio lo rifiuta, l'errore lo dice."),
+            "costo": "non ancora misurato, nessun video fatto",
             "modi": [{"id": k, "nome": n, "spiega": d, "minimo": modulo_video.QUANTE[k][0],
                       "massimo": modulo_video.QUANTE[k][1]} for k, (n, d) in modulo_video.MODI.items()],
             "movimenti": [{"id": k, "nome": n} for k, (n, _testo) in modulo_video.MOVIMENTI.items()],
@@ -1754,7 +1756,7 @@ def _richieste_del_passo(passo: dict) -> list[str]:
 
 
 # Come la striscia dello storico chiama ogni immagine: una o due parole.
-_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Modifica", "ritocco": "Ritocco"}
+_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco"}
 
 
 def _tipo_passo(passo: dict) -> str:
@@ -1783,7 +1785,7 @@ def _nome_passo(passo: dict) -> str:
         breve = modulo_passi.nome_breve((passo.get("richieste") or [""])[0])
         return breve[:1].upper() + breve[1:] if breve else "Passo senza richiesta"
     if tipo == "pulito":
-        return f"Pulito dalla vista · {_nome_stile(passo)}"
+        return f"Tutto dalla vista · {_nome_stile(passo)}"
     return _nome_stile(passo)
 
 
@@ -1889,8 +1891,8 @@ def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0) -> str:
 
 
 def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") -> str:
-    """Cosa parte con «Inserisci nel contesto», in italiano."""
-    pezzi = ["Inserisci nel contesto", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
+    """Cosa parte con «Fotoinserimento», in italiano."""
+    pezzi = ["Fotoinserimento", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
     pezzi.append(f"materiali: {materiali.strip()}" if materiali and materiali.strip()
                  else "materiali: li sceglie il modello")
     if contesto.luogo:

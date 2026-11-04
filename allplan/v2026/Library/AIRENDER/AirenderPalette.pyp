@@ -17,25 +17,7 @@
 <Visible>False</Visible>
 </Parameter>
 <Parameter>
-<Name>InCorso</Name>
-<Value>0</Value>
-<ValueType>Integer</ValueType>
-<Visible>False</Visible>
-</Parameter>
-<Parameter>
-<Name>LavoroAttivo</Name>
-<Value></Value>
-<ValueType>String</ValueType>
-<Visible>False</Visible>
-</Parameter>
-<Parameter>
 <Name>UltimaVista</Name>
-<Value></Value>
-<ValueType>String</ValueType>
-<Visible>False</Visible>
-</Parameter>
-<Parameter>
-<Name>UltimoRender</Name>
 <Value></Value>
 <ValueType>String</ValueType>
 <Visible>False</Visible>
@@ -47,7 +29,7 @@
 </Parameter>
 <Parameter>
 <Name>Sezione1</Name>
-<Text>1 · Vista</Text>
+<Text>Vista</Text>
 <ValueType>Expander</ValueType>
 <Parameters>
 <Parameter>
@@ -124,7 +106,7 @@
 <Parameters>
 <Parameter>
 <Name>VediTaglio</Name>
-<Text>Vedi cosa taglia</Text>
+<Text>Vedi cosa ha tagliato</Text>
 <EventId>1008</EventId>
 <ValueType>Button</ValueType>
 </Parameter>
@@ -134,246 +116,13 @@
 </Parameter>
 <Parameter>
 <Name>Sezione2</Name>
-<Text>2 · Stile</Text>
+<Text>Studio</Text>
 <ValueType>Expander</ValueType>
 <Parameters>
 <Parameter>
-<Name>Resa</Name>
-<Text>Resa</Text>
-<Value>Fotorealistico</Value>
-<ValueList>Fotorealistico|Plastico bianco|Schizzo a matita|Acquerello|Cinematografico</ValueList>
-<ValueType>StringComboBox</ValueType>
-</Parameter>
-<Parameter>
-<Name>Interno</Name>
-<Text>Vista</Text>
-<Value>0</Value>
-<ValueType>RadioButtonGroup</ValueType>
-<Parameters>
-<Parameter>
-<Name>Interno0</Name>
-<Text>Esterno</Text>
-<Value>0</Value>
-<ValueType>RadioButton</ValueType>
-</Parameter>
-<Parameter>
-<Name>Interno1</Name>
-<Text>Interno</Text>
-<Value>1</Value>
-<ValueType>RadioButton</ValueType>
-</Parameter>
-<Parameter>
-<Name>Interno2</Name>
-<Text>Arredo</Text>
-<Value>2</Value>
-<ValueType>RadioButton</ValueType>
-</Parameter>
-</Parameters>
-</Parameter>
-<Parameter>
-<Name>PresetEsterno</Name>
-<Text>Preset</Text>
-<Value>Rivista d'architettura</Value>
-<ValueList>Rivista d'architettura|Luce naturale calda|Pellicola morbida|Urbano editoriale|Ora blu|Notte con luna|Giornata di pioggia|Autunno nebbioso</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>PresetInterno</Name>
-<Text>Preset</Text>
-<Value>Interno rivista</Value>
-<ValueList>Interno rivista|Interno caldo|Interno pellicola morbida|Interno sera|Interno notte, lampade|Interno vissuto</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 1</Visible>
-</Parameter>
-<Parameter>
-<Name>PresetArredo</Name>
-<Text>Preset</Text>
-<Value>Catalogo, fondo bianco</Value>
-<ValueList>Catalogo, fondo bianco|Studio, grigio caldo|Editoriale, ombre di sole|Dettaglio materiale|Controluce, fondo scuro|Ambientato, stanza sfocata</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 2</Visible>
-</Parameter>
-<Parameter>
-<Name>LuceEsterno</Name>
-<Text>Ora</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Mezzogiorno|Estate luminosa|Giorno|Ora d'oro|Ora blu|Notte con luna</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>LuceInterno</Name>
-<Text>Luce</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Mattino da finestra|Pomeriggio caldo|Giorno coperto|Sera, luci accese|Notte con lampade</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 1</Visible>
-</Parameter>
-<Parameter>
-<Name>LuceArredo</Name>
-<Text>Luce</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Softbox morbida|Finestra laterale|Luce radente · texture|Sole netto · editoriale|Controluce, bordi accesi</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 2</Visible>
-</Parameter>
-<Parameter>
-<Name>Sfondo</Name>
-<Text>Sfondo</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Fondo bianco infinito|Fondo grigio caldo|Parete in calce|Fondo antracite|Come nella vista|Stanza sfocata</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 2</Visible>
-</Parameter>
-<Parameter>
-<Name>Cielo</Name>
-<Text>Cielo</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Sereno|Coperto|Pioggia|Autunno nebbioso|Neve</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>Intorno</Name>
-<Text>Intorno</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Niente, sfondo neutro|Città|Periferia|Campagna</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>Verde</Name>
-<Text>Verde, alberi</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Nessuno|Poco|Rigoglioso</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>Persone</Name>
-<Text>Persone</Text>
-<Value>Come il preset</Value>
-<ValueList>Come il preset|Nessuna|Poche|In movimento</ValueList>
-<ValueType>StringComboBox</ValueType>
-<Visible>Interno != 2</Visible>
-</Parameter>
-<Parameter>
-<Name>Fedelta</Name>
-<Text>Fedeltà al disegno</Text>
-<Value>Bilanciata</Value>
-<ValueList>Bilanciata|Rigida|Libera</ValueList>
-<ValueType>StringComboBox</ValueType>
-</Parameter>
-<Parameter>
-<Name>Materiali</Name>
-<Text>Materiali</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-</Parameter>
-<Parameter>
-<Name>Modello</Name>
-<Text>Modello</Text>
-<Value>Nano Banana 2</Value>
-<ValueList>Nano Banana 2|FLUX.1 Kontext Pro|Nano Banana Pro|GPT Image 2|Seedream 5.0</ValueList>
-<ValueType>StringComboBox</ValueType>
-</Parameter>
-<Parameter>
-<Name>Risoluzione</Name>
-<Text>Risoluzione del render</Text>
-<Value>1K · provata</Value>
-<ValueList>1K · provata|2K · da provare|4K · da provare</ValueList>
-<ValueType>StringComboBox</ValueType>
-</Parameter>
-</Parameters>
-</Parameter>
-<Parameter>
-<Name>Sezione3</Name>
-<Text>3 · Invio</Text>
-<ValueType>Expander</ValueType>
-<Parameters>
-<Parameter>
-<Name>Destinazione</Name>
-<Text>La vista va a</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
-</Parameter>
-<Parameter>
-<Name>NotaInvio</Name>
-<Text>Ripiego</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
-</Parameter>
-<Parameter>
-<Name>Costo</Name>
-<Text>Costo</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
-</Parameter>
-<Parameter>
-<Name>Stato</Name>
-<Text>Stato</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
-</Parameter>
-<Parameter>
-<Name>RigaInvio</Name>
-<Text>Motore</Text>
-<ValueType>Row</ValueType>
-<Parameters>
-<Parameter>
-<Name>Genera</Name>
-<Text>Genera render</Text>
-<EventId>1003</EventId>
-<ValueType>Button</ValueType>
-<Visible>InCorso == 0</Visible>
-</Parameter>
-<Parameter>
-<Name>Annulla</Name>
-<Text>Annulla</Text>
-<EventId>1004</EventId>
-<ValueType>Button</ValueType>
-<Visible>InCorso == 1</Visible>
-</Parameter>
-</Parameters>
-</Parameter>
-<Parameter>
-<Name>RigaAggiorna</Name>
-<Text>Stato del lavoro</Text>
-<ValueType>Row</ValueType>
-<Parameters>
-<Parameter>
-<Name>Aggiorna</Name>
-<Text>Aggiorna</Text>
-<EventId>1005</EventId>
-<ValueType>Button</ValueType>
-</Parameter>
-</Parameters>
-</Parameter>
-</Parameters>
-</Parameter>
-<Parameter>
-<Name>Sezione4</Name>
-<Text>4 · Ultimo render</Text>
-<ValueType>Expander</ValueType>
-<Parameters>
-<Parameter>
-<Name>Ultimo</Name>
-<Text>Ultimo</Text>
-<Value></Value>
-<ValueType>String</ValueType>
-<Enable>False</Enable>
-</Parameter>
-<Parameter>
-<Name>UltimoImmagine</Name>
-<Value>palette_nessuna.png</Value>
-<Orientation>Middle</Orientation>
-<ValueType>Picture</ValueType>
-<Visible>ImmaginiDaScript == 1</Visible>
+<Name>NelloStudio</Name>
+<Text>Stile, render, ritocchi e video si fanno nello Studio.</Text>
+<ValueType>Text</ValueType>
 </Parameter>
 <Parameter>
 <Name>RigaStudio</Name>
@@ -393,23 +142,6 @@
 <ValueType>Button</ValueType>
 </Parameter>
 </Parameters>
-</Parameter>
-</Parameters>
-</Parameter>
-<Parameter>
-<Name>Sezione5</Name>
-<Text>Nello Studio</Text>
-<ValueType>Expander</ValueType>
-<Parameters>
-<Parameter>
-<Name>NelloStudio0</Name>
-<Text>Annota aree e ritocchi: scheda Ritocca</Text>
-<ValueType>Text</ValueType>
-</Parameter>
-<Parameter>
-<Name>NelloStudio1</Name>
-<Text>Video dai render: scheda Video</Text>
-<ValueType>Text</ValueType>
 </Parameter>
 </Parameters>
 </Parameter>

@@ -45,12 +45,12 @@ def controlla_file(radice: Path, file: Path) -> Path:
     if percorso.parent != cartella_contesti(radice).resolve():
         raise ContestoNonValido(
             "L'immagine del contesto non sta nella cartella dei contesti dello Studio.",
-            "Caricala di nuovo in «Inserisci nel contesto».",
+            "Caricala di nuovo in «Fotoinserimento».",
         )
     if not percorso.is_file():
         raise FileNonTrovato(
             f"L'immagine del contesto non c'e' piu': {percorso.name}. Non ho inviato niente.",
-            "Caricala di nuovo in «Inserisci nel contesto», oppure togli il contesto.",
+            "Caricala di nuovo in «Fotoinserimento», oppure togli il contesto.",
         )
     return percorso
 
@@ -71,7 +71,7 @@ class Contesto:
         if not self.file:
             raise ContestoNonValido(
                 "Manca l'immagine del contesto.",
-                "Carica l'immagine del luogo in «Inserisci nel contesto».",
+                "Carica l'immagine del luogo in «Fotoinserimento».",
             )
         try:
             area = modulo_aree.Area("rettangolo", tuple(tuple(p) for p in self.area), NOTA_AREA)

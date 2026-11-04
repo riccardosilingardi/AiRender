@@ -321,10 +321,15 @@ SCHEMI: dict[str, SchemaModello] = {
     # quello di Nano Banana 2 (stessa famiglia Gemini su Vertex AI), non
     # verificato. Se il Router lo rifiuta, l'errore lo dice e si rifa' la
     # sonda: scripts/sonda_comfy.py --modello vertexai/gemini-3-pro-image.
+    # Piu' immagini acceso il 2026-11-04: Riccardo genera con Pro da giorni
+    # (il corpo regge) e Gemini 3 Pro Image prende fino a 14 immagini di
+    # riferimento. Spento, Pro rifiutava materiali, riferimento e «Altra
+    # vista». Con piu' immagini non e' ancora provato: lo dice l'avviso.
     "vertexai/gemini-3-pro-image": SchemaModello(
         corpo=_corpo_gemini,
         immagine=_immagine_gemini,
         verificato_il="",
+        piu_immagini=True,
         rapporti=RAPPORTI,
     ),
     # GPT Image 2 e Seedream 5.0: aggiunti il 2026-11-01 su richiesta di

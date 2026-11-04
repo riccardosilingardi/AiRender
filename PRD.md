@@ -268,6 +268,15 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Cambia: tutta l'immagine a parole (2026-11-04)
+
+Le scorciatoie di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci
+accese) e la regola del passo della bozza 12, che lascia cambiare la luce
+quando la richiesta parla di luce, ora o tempo, sono provate solo con il
+provider finto e in Chromium senza modello. Mai visto se Nano Banana fa un
+interno notturno tenendo arredo e architettura. Verifica: un render di giorno,
+Cambia → Notte → Applica, e i due affiancati.
+
 ### Altra vista: fotogrammi coerenti da più viste (2026-11-04)
 
 «Altra vista» sotto l'immagine porta stile, modello, richieste e note dei
@@ -434,7 +443,7 @@ Tabella materiali nello Studio (2026-11-02), non verificato:
 
 ### Palette: Esc per tornare alla Library (2026-11-01)
 
-- **Esc chiude palette e sonda e fa tornare la Library** — non verificato in
+- **Esc chiude la palette e fa tornare la Library** — non verificato in
   Allplan. Gli adattatori ora rispondono a `on_cancel_function` con
   `OnCancelFunctionResult.CANCEL_INPUT`, importato da
   `ScriptObjectInteractors.OnCancelFunctionResult`. Nome del modulo e del

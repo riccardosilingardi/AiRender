@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 11 (2026-11-04)
+# Blocchi di stile — bozza 12 (2026-11-04)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -95,7 +95,9 @@ Cosa cambia dalla bozza 4: Studio · Passi manda **richieste a parole** («due a
 
 Un passo su un render parte con la sua regola fissa, che non dice «cambia solo il look» ma «cambia solo quello che ti chiedo» (SCELTA, non provata):
 
-> Edit this exact image. Keep the camera, framing, proportions, light and every building element exactly as they are; do not add, remove or reshape any architecture. Make only the change described below and leave everything else as it is.
+> Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Keep the light as it is unless the change below is about light, time of day or weather. Make only the change described below and leave everything else as it is.
+
+Bozza 12 (2026-11-04): la luce resta com'è *a meno che* la richiesta sia sulla luce, sull'ora o sul tempo. Prima la regola diceva «keep the light» e contraddiceva «Cambia · Notte».
 
 Ordine: regola del passo → scena → `Change: <richiesta>; do not cover or hide any building element.` → cosa evitare. Con più richieste, `Changes: <prima>; <seconda>; …`.
 
