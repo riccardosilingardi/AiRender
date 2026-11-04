@@ -32,6 +32,7 @@ Qui non c'e' nessun import di Allplan, come in tutto core/.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import secrets
@@ -49,6 +50,7 @@ from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta
 from .preset import MODELLI_PREDEFINITI
+from .provider import geometria as modulo_geometria
 from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
 
 FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
@@ -87,7 +89,13 @@ FORMATO_ESEMPI = 9  # numero-non-configurabile: versione del formato di un lavor
 # Il formato 9 (2026-11-04) aggiunge gli esempi di stile: render d'esempio
 # dopo il riferimento per lo stile, solo dalla vista. Legge anche materiali e
 # Rif. se ci sono.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_GEOMETRIA = 10  # numero-non-configurabile: versione del formato di un lavoro con «Tieni la geometria»
+# Il formato 10 (2026-11-04) avvolge un lavoro di Genera dalla vista: prima
+# parte un workflow col ControlNet sugli spigoli, poi il suo render va a Nano
+# Banana. Il file scrive anche il formato del lavoro avvolto (`formato_base`) e
+# la seconda destinazione. Un motore vecchio rifiuta il 10 invece di mandare
+# solo a Nano Banana quello che l'utente ha chiesto di mandare prima altrove.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)  # numero-non-configurabile: i formati che questo motore sa leggere
 TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
@@ -162,6 +170,7 @@ def _adesso() -> str:
 
 SUFFISSO_MISURA = ".misura.json"
 SUFFISSO_MODELLO = ".modello"  # il risultato intero del modello in un ritocco, accanto al render incollato
+SUFFISSO_GEOMETRIA = ".geometria"  # la bozza della prima passata col ControlNet, accanto al render
 
 
 def percorso_misura(render: Path) -> Path:
@@ -300,24 +309,34 @@ class Lavoro:
     # Studio · Genera, «Stile da esempi»: render d'esempio dopo il
     # riferimento per lo stile (che e' il primo esempio). Solo dalla vista.
     esempi: tuple[str, ...] = ()
+    # Studio · Genera, «Tieni la geometria»: la destinazione della prima
+    # passata col ControlNet, mostrata prima dell'invio come l'altra (regola
+    # 5). Vuota, il lavoro va solo al modello. Solo dalla vista.
+    destinazione_geometria: str | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "formato",
+                           FORMATO_GEOMETRIA if self.destinazione_geometria else self.formato_proprio())
+
+    def formato_proprio(self) -> int:
+        """Il formato del lavoro senza «Tieni la geometria»."""
         if self.finale:
-            object.__setattr__(self, "formato", FORMATO_FINALE)
-        elif self.esempi:
-            object.__setattr__(self, "formato", FORMATO_ESEMPI)
-        elif self.inserti:
-            object.__setattr__(self, "formato", FORMATO_INSERTI)
-        elif self.aree:
-            object.__setattr__(self, "formato", FORMATO_RITOCCO)
-        elif self.materiali:
-            object.__setattr__(self, "formato", FORMATO_MATERIALI)
-        elif self.riferimento:
-            object.__setattr__(self, "formato", FORMATO_RIFERIMENTO)
-        elif self.contesto:
-            object.__setattr__(self, "formato", FORMATO_CONTESTO)
+            return FORMATO_FINALE
+        if self.esempi:
+            return FORMATO_ESEMPI
+        if self.inserti:
+            return FORMATO_INSERTI
+        if self.aree:
+            return FORMATO_RITOCCO
+        if self.materiali:
+            return FORMATO_MATERIALI
+        if self.riferimento:
+            return FORMATO_RIFERIMENTO
+        if self.contesto:
+            return FORMATO_CONTESTO
+        return FORMATO if self.formato == FORMATO_GEOMETRIA else self.formato
 
     def prompt(self) -> str:
         """Il testo che parte.
@@ -327,8 +346,16 @@ class Lavoro:
         gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti i
         blocchi, piu' le richieste se ce ne sono.
         """
-        return blocchi.aggiungi_inserti(self._prompt_senza_inserti(), self.prima_immagine_inserti(),
-                                        len(self.inserti))
+        testo = self._prompt_senza_inserti()
+        if self.destinazione_geometria:
+            testo = f"{testo}\n\n{modulo_geometria.REGOLA_PROMPT}"
+        return blocchi.aggiungi_inserti(testo, self.prima_immagine_inserti(), len(self.inserti))
+
+    def prompt_geometria(self) -> str:
+        """Il testo della prima passata: lo stile senza le regole delle immagini in piu'."""
+        if self.prompt_a_mano and self.prompt_a_mano.strip():
+            return blocchi.aggiungi_richieste(self.prompt_a_mano.strip(), self.richieste)
+        return blocchi.aggiungi_richieste(blocchi.componi(self.scelte), self.richieste)
 
     def prima_immagine_inserti(self) -> int:
         """Il numero della prima immagine dei Rif.: dopo partenza, maschera, riferimento e materiali."""
@@ -384,6 +411,8 @@ class Lavoro:
             **({"inserti": list(self.inserti)} if self.inserti else {}),
             **({"finale": dict(self.finale)} if self.finale else {}),
             **({"esempi": list(self.esempi)} if self.esempi else {}),
+            **({"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria}
+               if self.destinazione_geometria else {}),
         }
 
     @classmethod
@@ -400,6 +429,8 @@ class Lavoro:
                 "Aggiorna il motore e la palette alla stessa versione, poi "
                 "rimetti il lavoro in coda.",
             )
+        if dati.get("formato") == FORMATO_GEOMETRIA:
+            return cls._da_dizionario_geometria(dati)
         mancanti = [
             k for k in ("identificativo", "vista", "provider", "modello", "destinazione")
             if not dati.get(k)
@@ -520,6 +551,21 @@ class Lavoro:
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
+    @classmethod
+    def _da_dizionario_geometria(cls, dati: dict) -> "Lavoro":
+        """Un lavoro del formato 10: si legge quello avvolto, poi si rimette la prima passata."""
+        base, destinazione = dati.get("formato_base"), dati.get("destinazione_geometria")
+        if (base not in FORMATI_LETTI or base in (FORMATO_GEOMETRIA, FORMATO_FINALE, FORMATO_RITOCCO, FORMATO_CONTESTO)
+                or not isinstance(destinazione, str) or not destinazione.strip()
+                or any(dati.get(k) for k in ("partenza", "parte_da", "aree", "contesto", "finale"))):
+            raise LavoroNonValido(
+                "Il file del lavoro chiede «Tieni la geometria» ma non dice dove va la prima passata, "
+                "o non parte dalla vista.",
+                "Rimetti il lavoro in coda da Studio · Genera.",
+            )
+        avvolto = cls.da_dizionario({**dati, "formato": base})
+        return dataclasses.replace(avvolto, destinazione_geometria=destinazione)
+
 
 def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
     """Le aree di un lavoro del formato 3, o nessuna. Un lavoro con aree che non tornano non parte."""
@@ -617,6 +663,7 @@ def metti_in_coda(
     inserti: tuple[Path, ...] | list[Path] = (),
     finale: dict | None = None,
     esempi: tuple[Path, ...] | list[Path] = (),
+    destinazione_geometria: str | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -698,6 +745,12 @@ def metti_in_coda(
                 "«Finale» parte da un render, da solo: niente richieste, aree, riferimenti o materiali.",
                 "Fai prima il passo che ti serve, poi il Finale sul suo render.",
             )
+    if destinazione_geometria and (partenza or aree or contesto is not None or finale is not None):
+        raise LavoroNonValido(
+            "«Tieni la geometria» parte solo con un render dalla vista: ridisegna tutto dagli spigoli, "
+            "e da un passo perderebbe quello che il passo aveva gia' fatto.",
+            "Togli la spunta, oppure usala in Genera.",
+        )
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -728,6 +781,7 @@ def metti_in_coda(
         inserti=tuple(str(i) for i in inserti),
         finale=finale,
         esempi=tuple(str(e) for e in esempi),
+        destinazione_geometria=destinazione_geometria or None,
     )
     if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
@@ -803,6 +857,11 @@ def dire_sicuro(testo: str) -> None:
         pass  # uscita chiusa: il messaggio e' solo informativo
 
 
+def _geometria_reale(controlla: Callable[[], None]) -> "modulo_geometria.Geometria":
+    from .provider.trasporto import TrasportoHTTP  # pylint: disable=import-outside-toplevel
+    return modulo_geometria.Geometria(TrasportoHTTP(), controlla=controlla)
+
+
 class Coda:
     """Prende un lavoro alla volta da in-attesa/ e lo porta fino in fondo."""
 
@@ -812,10 +871,12 @@ class Coda:
         crea_provider: Callable[[str], Provider] = registro.crea,
         dire: Callable[[str], None] = dire_sicuro,
         attesa: Callable[[float], None] = time.sleep,
+        crea_geometria: Callable[[Callable[[], None]], "modulo_geometria.Geometria"] | None = None,
     ) -> None:
         self.radice = Path(radice)
         self.percorsi = cartelle(self.radice)
         self._crea_provider = crea_provider
+        self._crea_geometria = crea_geometria or _geometria_reale
         self._dire = dire
         self._attesa = attesa
 
@@ -885,6 +946,7 @@ class Coda:
 
     def _lavora(self, identificativo: str, preso: Path) -> None:
         stato_attuale = {"valore": IN_CODA}
+        altro_geometria: dict = {}
         try:
             lavoro = self._leggi(preso)
             self._controlla_annullamento(identificativo, stato_attuale["valore"])
@@ -900,6 +962,8 @@ class Coda:
                 self._controlla_annullamento(identificativo, stato)
 
             motore.avanzamento = avanzamento
+            if lavoro.destinazione_geometria:
+                richiesta, altro_geometria = self._prima_passata(lavoro, richiesta, motore, avanzamento)
             self._dire(
                 f"Lavoro {identificativo}: destinazione dell'invio "
                 f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
@@ -932,7 +996,7 @@ class Coda:
             return
 
         immagine, formato = risultato.immagine, risultato.formato
-        altro = {}
+        altro = dict(altro_geometria)
         if lavoro.aree and not lavoro.contesto:
             # Un ritocco: il modello ridisegna tutta l'immagine, e fuori dalle
             # aree puo' togliere quello che un ritocco di prima aveva messo.
@@ -971,6 +1035,29 @@ class Coda:
             **altro,
         )
         self._dire(f"Lavoro {identificativo}: render salvato in {render}")
+
+    def _prima_passata(self, lavoro: Lavoro, richiesta: RichiestaGenerazione, motore: Provider,
+                       avanzamento: Callable[[str], None]) -> tuple[RichiestaGenerazione, dict]:
+        """«Tieni la geometria»: il workflow col ControlNet, poi il suo render parte al posto della vista."""
+        geometria = self._crea_geometria(lambda: avanzamento(INVIATO))
+        annunciata = geometria.destinazione()
+        if annunciata != lavoro.destinazione_geometria:
+            raise LavoroNonValido(
+                f"Il lavoro dice che la prima passata va a {lavoro.destinazione_geometria}, ma "
+                f"partirebbe verso {annunciata}. Non ho inviato niente.",
+                "Rimetti il lavoro in coda: le destinazioni si rileggono e si mostrano di nuovo.",
+            )
+        self._dire(f"Lavoro {lavoro.identificativo}: prima passata «Tieni la geometria» verso {annunciata}.")
+        avanzamento(INVIATO)
+        seme = secrets.randbits(31)  # numero-non-configurabile: il seme del campionatore sta in un intero con segno
+        bozza, lavoro_comfy = geometria.esegui(richiesta.immagine, lavoro.prompt_geometria(), seme)
+        modulo_immagine.misura(bozza)  # solleva se non e' un'immagine
+        motore.controlla_prima_dell_invio(lavoro.modello, bozza)
+        percorso = self.percorsi[FATTO_DIR] / f"{lavoro.identificativo}{SUFFISSO_GEOMETRIA}.png"
+        scrivi_atomico(percorso, bozza)
+        return dataclasses.replace(richiesta, immagine=bozza), {"geometria": {
+            "bozza": str(percorso), "destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
+            "workflow": modulo_geometria.NOME_WORKFLOW}}
 
     def _leggi(self, preso: Path) -> Lavoro:
         try:

@@ -32,7 +32,7 @@ from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
 from ..preset import MODELLI_PREDEFINITI
-from ..provider import comfy
+from ..provider import comfy, geometria as modulo_geometria
 from ..provider.base import Provider
 from ..ricetta import Ricetta, impronta
 from . import miniature as modulo_miniature
@@ -525,7 +525,8 @@ class Studio:
         esempi = self._esempi_scelti(dati, contesto is not None)
         stile = (int(bool(dati.get("riferimento"))) + len(esempi)) if not contesto else 0
         prompt = _prompt_genera(None, scelte, contesto, stile, len(esempi), cambi,
-                                len(self._inserti_scelti(dati, contesto is not None)))
+                                len(self._inserti_scelti(dati, contesto is not None)),
+                                geometria=self._geometria_scelta(dati, contesto))
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
@@ -570,7 +571,8 @@ class Studio:
 
     def destinazione(self, identificativo_modello: str, varianti: object = 1,
                      riferimento: bool = False, contesto: bool = False,
-                     materiali_immagini: object = 0, inserti: object = 0, esempi: object = 0) -> dict:
+                     materiali_immagini: object = 0, inserti: object = 0, esempi: object = 0,
+                     geometria: bool = False) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -608,7 +610,10 @@ class Studio:
             "immagini": (2 if (riferimento or contesto) else 1) + degli_esempi + dei_materiali + dei_rif,
             "inserti": dei_rif,
             "esempi": degli_esempi,
-            "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi),
+            "cosa_parte": (_cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi)
+                           .replace("la vista", "il render della prima passata", 1)
+                           if geometria and not contesto else
+                           _cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi)),
             "contesto_non_accettato": (
                 f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
                 "Scegli Nano Banana 2."
@@ -627,6 +632,7 @@ class Studio:
                 if dei_rif and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
                                    if (riferimento or contesto or dei_materiali or dei_rif) else None),
+            "geometria": _geometria_dict(quante) if geometria and not contesto else None,
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -640,12 +646,14 @@ class Studio:
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
         esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
+        geometria = self._geometria_scelta(dati, contesto)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
                                          riferimento=riferimento is not None, contesto=contesto is not None,
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
-                                         inserti=len(inserti), esempi=len(esempi))
+                                         inserti=len(inserti), esempi=len(esempi), geometria=geometria)
         prompt = _prompt_genera(_prompt_a_mano(dati), scelte, contesto,
-                                int(riferimento is not None) + len(esempi), len(esempi), cambi, len(inserti))
+                                int(riferimento is not None) + len(esempi), len(esempi), cambi, len(inserti),
+                                geometria=geometria)
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
@@ -668,6 +676,9 @@ class Studio:
         if destinazione["inserti_non_accettati"]:
             problemi.append({"fatto": destinazione["inserti_non_accettati"],
                              "cosa_fare": "Scegli Nano Banana 2, oppure togli i Rif."})
+        if destinazione["geometria"] and destinazione["geometria"]["errore"]:
+            problemi.append({"fatto": destinazione["geometria"]["errore"],
+                             "cosa_fare": "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria»."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -678,6 +689,15 @@ class Studio:
             "destinazione": destinazione,
             "problemi": problemi,
         }
+
+    def _geometria_scelta(self, dati: dict, contesto: object) -> bool:
+        if not dati.get("geometria"):
+            return False
+        if contesto is not None:
+            raise RichiestaStudioNonValida(
+                "«Tieni la geometria» non va col Fotoinserimento: il render e' il luogo, non la vista.",
+                "Togli la spunta, oppure usa «Render della vista».")
+        return True
 
     def invia(self, dati: dict) -> dict:
         """Scrive in coda un lavoro per variante. Solo se la destinazione e' quella che la pagina ha mostrato.
@@ -693,10 +713,11 @@ class Studio:
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
         esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
+        geometria = self._geometria_scelta(dati, contesto)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
                                          riferimento=riferimento is not None, contesto=contesto is not None,
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
-                                         inserti=len(inserti), esempi=len(esempi))
+                                         inserti=len(inserti), esempi=len(esempi), geometria=geometria)
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -708,6 +729,7 @@ class Studio:
             materiali=cambi,
             inserti=inserti,
             esempi=esempi,
+            geometria_mostrata=dati.get("destinazione_geometria_mostrata") if geometria else None,
         )
 
     def _esempi_scelti(self, dati: dict, contesto: bool = False, riferimento: object = True) -> tuple[Path, ...]:
@@ -806,13 +828,24 @@ class Studio:
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
-                       esempi: tuple = ()) -> dict:
+                       esempi: tuple = (), geometria_mostrata: str | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
                 f"partirebbe verso {destinazione['destinazione']}. Non ho inviato niente.",
                 "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
             )
+        prima_passata = destinazione.get("geometria")
+        if prima_passata:
+            if prima_passata["errore"]:
+                raise RichiestaStudioNonValida(f"Non mando: {prima_passata['errore']}",
+                                               "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria».")
+            if geometria_mostrata != prima_passata["destinazione"]:
+                raise RichiestaStudioNonValida(
+                    f"La pagina ha mostrato come prima passata {geometria_mostrata!r}, ma la vista "
+                    f"partirebbe verso {prima_passata['destinazione']}. Non ho inviato niente.",
+                    "Ricarica lo Studio: le destinazioni si rileggono e si mostrano di nuovo.",
+                )
         if destinazione["cosa_manca"]:
             raise RichiestaStudioNonValida(
                 f"Non mando: {destinazione['cosa_manca']}",
@@ -855,6 +888,7 @@ class Studio:
                 inserti=tuple(inserti),
                 finale=finale,
                 esempi=tuple(esempi),
+                destinazione_geometria=prima_passata["destinazione"] if prima_passata else None,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -2051,7 +2085,8 @@ def _riassunto_finale(finale: dict) -> str:
     return f"Finale: render ingrandito {finale.get('ingrandimento')} volte, con più dettaglio, come {tipo}."
 
 
-def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int, cambi: tuple, inserti: int) -> str:
+def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int, cambi: tuple, inserti: int,
+                   geometria: bool = False) -> str:
     """Il prompt di Genera: blocchi (o testo a mano), stile, materiali, Rif. Un posto solo per componi e prova a secco."""
     if a_mano:
         prompt = a_mano
@@ -2061,8 +2096,29 @@ def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int
         prompt = blocchi.aggiungi_riferimento(prompt, esempi=esempi)
     if not a_mano:
         prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(stile))
+    if geometria and not contesto:
+        prompt = f"{prompt}\n\n{modulo_geometria.REGOLA_PROMPT}"
     return blocchi.aggiungi_inserti(prompt, modulo_coda.prima_immagine_inserti(
         False, stile, modulo_materiali.quante_immagini(cambi)), inserti)
+
+
+def _geometria_dict(varianti: int) -> dict:
+    """La prima passata di «Tieni la geometria»: dove va e cosa costa, prima del clic (regola 5)."""
+    try:
+        dove, errore = modulo_geometria.destinazione(), None
+    except ErroreAirender as problema:
+        dove, errore = None, problema.fatto
+    return {
+        "destinazione": dove,
+        "errore": errore,
+        "workflow": modulo_geometria.NOME_WORKFLOW,
+        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet sugli spigoli; "
+                       "poi il suo render parte verso il modello al posto della vista."),
+        # Regola 3: il costo di un workflow va a secondi di GPU e non e' mai stato misurato.
+        "costo": ("non misurato: Comfy conta i secondi di GPU" if varianti == 1
+                  else f"non misurato: {varianti} prime passate, Comfy conta i secondi di GPU"),
+        "verificato": False,
+    }
 
 
 def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0, esempi: int = 0) -> str:

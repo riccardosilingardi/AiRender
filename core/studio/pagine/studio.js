@@ -24,6 +24,7 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
+  geometria: false,       // «Tieni la geometria»: prima un workflow col ControlNet, poi il modello
   esempi: [],             // «Stile da esempi»: render d'esempio oltre al riferimento, stessa forma
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
@@ -369,7 +370,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera() });
+      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(), geometria: geometriaGenera() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -399,7 +400,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}&esempi=${esempiGenera().length}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}&esempi=${esempiGenera().length}&geometria=${geometriaGenera() ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -483,6 +484,8 @@ async function genera() {
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
       materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
+      geometria: geometriaGenera(),
+      destinazione_geometria_mostrata: S.destinazione && S.destinazione.geometria && S.destinazione.geometria.destinazione,
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -498,6 +501,7 @@ async function provaASecco() {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome,
       contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
+      geometria: geometriaGenera(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -808,6 +812,7 @@ function colonnaInvio() {
       }, String(n)))),
     S.varianti > 1 ? h("p", { classe: "tenue piccolo" }, `${S.varianti} lavori in coda con le stesse scelte, uno dopo l'altro: ogni variante è un invio.`) : null,
     ...pannelloRiferimento(),
+    S.modo === "contesto" ? null : pannelloGeometria(),
     S.modo === "contesto" ? null : pannelloInserti(S.inserti, modelloScelto(), "Genera", async () => {
       S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render();
     }));
@@ -922,6 +927,19 @@ async function scegliRiferimento(file) {
   render();
 }
 // «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
+function geometriaGenera() { return S.modo !== "contesto" && S.geometria; }
+
+function pannelloGeometria() {
+  const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria,
+    onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
+  return h("div", { classe: "geometria" },
+    h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
+    h("p", { classe: "tenue piccolo" },
+      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
+      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."),
+    S.geometria ? h("p", { classe: "tenue piccolo" }, "Mai provato su Comfy: il primo render dice se gli spigoli tengono e quanto costa.") : null);
+}
+
 function esempiGenera() { return S.modo === "contesto" || !S.riferimento ? [] : S.esempi.map((r) => r.nome); }
 
 async function aggiungiEsempio(file) {
@@ -1239,6 +1257,7 @@ function motivoGeneraSpento() {
   if (S.contesto && !S.contesto.area) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio.";
   if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
   if (S.modo !== "contesto" && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
+  if (S.destinazione.geometria && S.destinazione.geometria.errore) return S.destinazione.geometria.errore;
   return null;
 }
 
@@ -1246,9 +1265,17 @@ function pannelloInvio() {
   const d = S.destinazione;
   const spento = motivoGeneraSpento();
   const blocco = h("section", { classe: "pannello", "aria-label": "Invio" });
+  if (d && d.geometria) {
+    const g = d.geometria;
+    blocco.append(
+      h("p", { classe: "destinazione" }, "Prima passata: la vista va a ",
+        g.destinazione ? h("b", {}, g.destinazione) : "—", "."),
+      h("p", { classe: "destinazione" }, "Costo della prima passata: ", h("b", {}, g.costo)));
+    if (g.errore) blocco.append(avviso("errore", g.errore, "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria»."));
+  }
   if (d) {
     blocco.append(
-      h("p", { classe: "destinazione" }, "La vista va a ", h("b", {}, d.destinazione),
+      h("p", { classe: "destinazione" }, d.geometria ? "Poi il suo render va a " : "La vista va a ", h("b", {}, d.destinazione),
         ` (${d.fornitore}, ${d.modello_nome})`, d.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));

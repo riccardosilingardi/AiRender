@@ -180,7 +180,8 @@ class _Gestore(BaseHTTPRequestHandler):
                                                contesto=(domanda.get("contesto") or ["0"])[0] == "1",
                                                materiali_immagini=(domanda.get("materiali") or ["0"])[0],
                                                inserti=(domanda.get("inserti") or ["0"])[0],
-                                               esempi=(domanda.get("esempi") or ["0"])[0]))
+                                               esempi=(domanda.get("esempi") or ["0"])[0],
+                                               geometria=(domanda.get("geometria") or ["0"])[0] == "1"))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:

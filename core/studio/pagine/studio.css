@@ -506,3 +506,8 @@ select { min-height: 34px; padding: 0 10px; }
 .scheda-modello[aria-checked="true"] .spunta { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
 .corpo-modello { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .etichetta-modello { margin-left: 6px; font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--bordo-forte); color: var(--testo-2); }
+
+/* «Tieni la geometria» in Genera */
+.geometria { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--bordo); }
+.geometria .riga-spunta { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.geometria p { margin: 0; }

@@ -996,3 +996,64 @@ SERVER_INVIO_MASSIMO_MB = _registra(Costante(
     ),
     unita=" MB",
 ))
+
+# --- «Tieni la geometria»: ControlNet prima di Nano Banana --------------------
+
+GEOMETRIA_FORZA = _registra(Costante(
+    nome="GEOMETRIA_FORZA",
+    valore=0.8,
+    origine=SCELTA,
+    ragione=(
+        "Quanto il ControlNet sugli spigoli comanda Z-Image-Turbo nella prima "
+        "passata di «Tieni la geometria» (strength di QwenImageDiffsynthControlnet, "
+        "il modello comfy.org usa 1). Un po' sotto 1 perche' gli spigoli di una "
+        "vista Allplan sono anche quelli dei retini e dei giunti, e a 1 il "
+        "render li ricalca come righe. Giudizio del 2026-11-04, nessun render fatto."
+    ),
+))
+
+GEOMETRIA_PASSI = _registra(Costante(
+    nome="GEOMETRIA_PASSI",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "I passi del campionatore nella prima passata: 8 e' quello del modello "
+        "comfy.org per Z-Image-Turbo, che e' fatto per pochi passi. Il costo su "
+        "Comfy Cloud va a secondi di GPU, e piu' passi costano di piu'. Non misurato."
+    ),
+))
+
+GEOMETRIA_LATO_MASSIMO = _registra(Costante(
+    nome="GEOMETRIA_LATO_MASSIMO",
+    valore=1536,
+    origine=SCELTA,
+    ragione=(
+        "Il lato lungo, in pixel, a cui si porta la vista prima di estrarne gli "
+        "spigoli. Il modello comfy.org avverte sopra i 2500; 1536 tiene i "
+        "dettagli di una facciata e resta veloce. Nano Banana poi rifa' la "
+        "misura del render. Giudizio, non misurato."
+    ),
+))
+
+GEOMETRIA_ATTESA_SECONDI = _registra(Costante(
+    nome="GEOMETRIA_ATTESA_SECONDI",
+    valore=600,
+    origine=SCELTA,
+    ragione=(
+        "Quanto si aspetta al massimo la prima passata su Comfy Cloud prima di "
+        "fermare il lavoro. Una macchina fredda carica circa 20 GB di modelli "
+        "(Z-Image-Turbo, il codificatore Qwen e il ControlNet) prima di partire. "
+        "Dieci minuti e' un margine scelto, non misurato."
+    ),
+))
+
+GEOMETRIA_INTERVALLO_SECONDI = _registra(Costante(
+    nome="GEOMETRIA_INTERVALLO_SECONDI",
+    valore=3,
+    origine=SCELTA,
+    ragione=(
+        "Ogni quanto si chiede a Comfy Cloud se la prima passata e' finita. "
+        "Compromesso fra quanto presto si vede il risultato e quante richieste "
+        "partono; l'API v2 non ha un webhook per i lavori. Scelto."
+    ),
+))

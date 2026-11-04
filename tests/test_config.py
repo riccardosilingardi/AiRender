@@ -419,6 +419,17 @@ def test_esempi_stile_massimo_ferma_un_quinto_esempio_ed_e_scelto(tmp_path):
         studio._esempi_scelti({"esempi": nomi})  # pylint: disable=protected-access
 
 
+def test_le_costanti_di_tieni_la_geometria_sono_scelte_e_dentro_i_limiti_dei_nodi():
+    """Caso: un valore fuori dai limiti di ComfyUI, e il workflow si ferma dopo il caricamento pagato."""
+    for nome in ("GEOMETRIA_FORZA", "GEOMETRIA_PASSI", "GEOMETRIA_LATO_MASSIMO",
+                 "GEOMETRIA_ATTESA_SECONDI", "GEOMETRIA_INTERVALLO_SECONDI"):
+        assert config.costante(nome).origine == config.SCELTA
+    assert -10 <= config.GEOMETRIA_FORZA <= 10  # numero-non-configurabile: limiti di QwenImageDiffsynthControlnet
+    assert 0 < config.GEOMETRIA_LATO_MASSIMO <= 16384  # numero-non-configurabile: limite di ImageScaleToMaxDimension
+    assert config.GEOMETRIA_PASSI >= 1
+    assert 0 < config.GEOMETRIA_INTERVALLO_SECONDI < config.GEOMETRIA_ATTESA_SECONDI
+
+
 # --- guardia -----------------------------------------------------------------
 
 
