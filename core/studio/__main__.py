@@ -4,7 +4,8 @@
 
 Avvia tre cose e le chiude insieme (Ctrl+C):
 
-1. il server locale su 127.0.0.1, porta scelta dal sistema;
+1. il server locale su 127.0.0.1, porta STUDIO_PORTA (core/config.py) se e'
+   libera, altrimenti una scelta dal sistema;
 2. la coda dei lavori (`python -m core.coda`) come processo figlio, sulla
    stessa cartella: e' lei che manda le viste, non lo Studio;
 3. la pagina, con Edge in modalita' app se c'e', altrimenti col browser
@@ -21,7 +22,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from .. import battito as modulo_battito, coda as modulo_coda, provider as registro
+from .. import battito as modulo_battito, coda as modulo_coda, config, provider as registro
 from ..errori import ErroreAirender
 from .server import crea_server, indirizzo
 from .servizio import Studio
@@ -65,6 +66,22 @@ def avvia_coda(cartella: Path) -> subprocess.Popen:
     )
 
 
+def crea_server_sulla_porta(studio: Studio, porta: int | None):
+    """La porta chiesta; senza, STUDIO_PORTA e, se e' occupata, una del sistema.
+
+    La porta fissa fa ricollegare da sola una finestra dello Studio rimasta
+    aperta quando lo Studio riparte. Occupata vuol dire un altro Studio (su
+    un'altra cartella) o un altro programma: si va avanti su un'altra porta,
+    e la palette la legge dal battito come sempre.
+    """
+    if porta is not None:
+        return crea_server(studio, porta)
+    try:
+        return crea_server(studio, config.STUDIO_PORTA)
+    except OSError:
+        return crea_server(studio, 0)
+
+
 def costruisci_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m core.studio",
@@ -74,7 +91,9 @@ def costruisci_parser() -> argparse.ArgumentParser:
         "--cartella", default=None,
         help=f"la cartella delle viste (predefinita: {cartella_predefinita()})",
     )
-    parser.add_argument("--porta", type=int, default=0, help="0 = la sceglie il sistema")
+    parser.add_argument("--porta", type=int, default=None,
+                        help=f"predefinita {config.STUDIO_PORTA}, o una del sistema se e' occupata; "
+                             "0 = la sceglie il sistema")
     parser.add_argument("--senza-finestra", action="store_true", dest="senza_finestra",
                         help="non apre la pagina: stampa solo l'indirizzo")
     parser.add_argument("--senza-coda", action="store_true", dest="senza_coda",
@@ -99,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
             coda_attiva=(lambda: modulo_coda.coda_viva(studio.cartella) is not None
                          or (coda is not None and coda.poll() is None)),
         )
-        server = crea_server(studio, argomenti.porta)
+        server = crea_server_sulla_porta(studio, argomenti.porta)
     except (ErroreAirender, OSError) as errore:
         if coda is not None:
             coda.terminate()

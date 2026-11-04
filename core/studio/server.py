@@ -59,6 +59,8 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
+import socket
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -271,10 +273,28 @@ class _Gestore(BaseHTTPRequestHandler):
                            HTTPStatus.NOT_FOUND)
 
 
+class _ServerStudio(ThreadingHTTPServer):
+    """Una porta, un solo Studio.
+
+    Su Windows SO_REUSEADDR (acceso per default da HTTPServer) lascia a un
+    secondo processo prendere una porta gia' in ascolto: due Studi sulla
+    stessa porta, risposte a caso. Li' si chiede invece la porta in esclusiva;
+    altrove SO_REUSEADDR non lo permette e serve solo a ripartire subito.
+    """
+
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self) -> None:
+        esclusiva = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if os.name == "nt" and esclusiva is not None:
+            self.socket.setsockopt(socket.SOL_SOCKET, esclusiva, 1)
+        super().server_bind()
+
+
 def crea_server(studio: Studio, porta: int = 0) -> ThreadingHTTPServer:
     """Il server, legato a 127.0.0.1. Con porta 0 la sceglie il sistema."""
     gestore = type("GestoreStudio", (_Gestore,), {"studio": studio})
-    server = ThreadingHTTPServer((INDIRIZZO, porta), gestore)
+    server = _ServerStudio((INDIRIZZO, porta), gestore)
     server.daemon_threads = True
     return server
 

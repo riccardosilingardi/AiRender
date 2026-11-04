@@ -86,6 +86,15 @@ class ErroreStudio extends Error {
   constructor(fatto, cosaFare) { super(fatto); this.fatto = fatto; this.cosa_fare = cosaFare; }
 }
 
+// Il programma dello Studio si è chiuso (per esempio pacchetto.py --installa
+// lo ferma prima di copiare i file). La pagina resta aperta e lo dice;
+// controllaStudio la ricarica appena lo Studio riparte sulla stessa porta.
+function studioSpento() {
+  return new ErroreStudio(
+    "Lo Studio non risponde: il suo programma si è chiuso, per esempio dopo un aggiornamento di AIRENDER.",
+    "Premi «Apri nello Studio» nella palette di Allplan. Questa pagina si ricollega da sola appena lo Studio riparte.");
+}
+
 async function api(metodo, indirizzo, corpo, intestazioni) {
   let risposta;
   try {
@@ -95,7 +104,8 @@ async function api(metodo, indirizzo, corpo, intestazioni) {
       body: corpo === undefined ? undefined : (corpo instanceof Blob ? corpo : JSON.stringify(corpo)),
     });
   } catch (e) {
-    throw new ErroreStudio("Lo Studio non risponde: il server locale è chiuso.", "Riapri lo Studio con python -m core.studio.");
+    S.spento = true;
+    throw studioSpento();
   }
   const dati = await risposta.json().catch(() => ({}));
   if (!risposta.ok) {
@@ -2769,6 +2779,9 @@ window.addEventListener("hashchange", async () => {
 async function controllaStudio() {
   try {
     const ora = await get("/api/studio");
+    // Di nuovo raggiungibile dopo un silenzio: si riparte da capo, perché
+    // quello che la pagina sapeva può non valere più (lavori, viste, cartella).
+    if (S.spento || !S.catalogo) { location.reload(); return; }
     const prima = S.studio ? S.studio.viste.map((v) => v.nome) : [];
     const nuove = ora.viste.filter((v) => !prima.includes(v.nome));
     const cambiato = !S.studio || ora.coda_attiva !== S.studio.coda_attiva || ora.viste.length !== S.studio.viste.length;
@@ -2782,7 +2795,10 @@ async function controllaStudio() {
     // su cui si sta lavorando non cambia.
     if (nuove.length && S.scheda === "genera" && !S.lavoroAttivo) { await caricaVista(nuove[0].nome); return; }
     render();
-  } catch (e) { /* la prossima volta */ }
+  } catch (e) {
+    // Lo si dice subito, non al prossimo clic; poi si riprova al giro dopo.
+    if (S.spento && !(S.errore && S.errore.fatto === e.fatto)) { S.errore = e; render(); }
+  }
 }
 
 async function avvia() {
