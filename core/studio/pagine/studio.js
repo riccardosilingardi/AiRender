@@ -468,6 +468,7 @@ async function rifai(lavoro) {
     S.inFila = [];
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
     await caricaRender();
+    if (S.scheda === "passi") await caricaPassi();
   } catch (e) { S.errore = e; }
   render();
 }
@@ -1412,6 +1413,8 @@ function barraAzioni(l) {
   const m = S.catalogo.modelli.find((x) => x.id === l.modello);
   const occupato = !!S.lavoroAttivo;
   const righe = [h("div", { classe: "azioni" },
+    h("button", { classe: "btn", "aria-expanded": String(cambiaAperto(l)), onclick: () => apriCambia(l),
+      title: "Cambia tutta l'immagine a parole: luce, ora, tempo, atmosfera. Spigoli e arredo restano." }, "Cambia"),
     h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }),
       title: "Disegna un'area e scrivi cosa cambiare. Fuori dall'area resta tutto com'è." }, "Ritocca"),
     h("button", { classe: "btn", onclick: () => rifai(l), disabled: occupato || !d || (m && !m.verificato) || null,
@@ -1427,10 +1430,31 @@ function barraAzioni(l) {
   righe.push(h("p", { classe: "dove" },
     `Variante: un'altra versione di questa immagine. Riparte ${da}, con ${cosa} e lo stesso modello (${l.modello_nome}).`,
     d ? [" Va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""] : null));
+  if (cambiaAperto(l) && S.scheda === "risultato") righe.push(pannelloNuovoPasso());
   if (az.video) righe.push(videoVeloce(l));
   if (az.porta) righe.push(pannelloPorta(l));
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
+}
+
+// --- Cambia: tutta l'immagine a parole (2026-11-04) ---------------------------
+// E' il passo a parole che prima stava solo in Passi («Nuovo passo da qui»).
+
+// Un passo dell'albero visto come un lavoro di Risultato, per la stessa barra.
+function comeLavoro(passo) {
+  return { identificativo: passo.identificativo, modello: passo.modello, modello_nome: passo.modello_nome,
+           parte_da: passo.da === "0" ? null : passo.da, preset_nome: passo.nome };
+}
+
+function cambiaAperto(l) { return !!(S.passi.nuovo && S.passi.nuovo.da === l.identificativo); }
+
+async function apriCambia(l) {
+  if (cambiaAperto(l)) { S.passi.nuovo = null; render(); return; }
+  if (!passoDa(l.identificativo)) await caricaPassi();
+  const passo = passoDa(l.identificativo);
+  if (!passo) { S.azioni.errore = new ErroreStudio("Questa immagine non è fra i passi della vista.", "Ricarica la pagina dello Studio."); render(); return; }
+  if (!passo.si_parte) { S.azioni.errore = new ErroreStudio(passo.motivo_non_si_parte || "Da questa immagine non si parte.", "Scegli un render riuscito."); render(); return; }
+  await apriNuovoPasso(passo);
 }
 
 // --- Altra vista: «Porta su un'altra vista» (2026-11-04) ----------------------
@@ -1981,7 +2005,7 @@ function esitoRitocco() {
           h("a", { classe: "btn", href: "#passi" }, "Vedi nei Passi"))),
       passo.avviso ? h("div", { classe: "avviso attenzione", role: "note" },
         h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
-        h("span", {}, "Se vedi l'edificio cambiare, rifai pulito dalla vista dai Passi.")) : null));
+        h("span", {}, "Se vedi l'edificio cambiare, in Passi usa «Rifai tutto dalla vista».")) : null));
 }
 
 // La misura fuori dalle aree, accanto al risultato: si legge dallo stato del
@@ -2143,6 +2167,7 @@ async function applicaPasso() {
     S.inFila = [];
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
     await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
   } catch (e) { n.errore = e; }
   render();
 }
@@ -2216,7 +2241,7 @@ function rigaPasso(passo) {
     h("button", {
       classe: "btn link piccolo", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null,
       onclick: () => apriNuovoPasso(passo),
-    }, "Nuovo passo da qui"));
+    }, "Cambia"));
 }
 
 function colonnaAlbero() {
@@ -2233,7 +2258,7 @@ function colonnaAlbero() {
           h("img", { src: `/file/vista/${enc(S.vista)}`, alt: "" }),
           h("span", { classe: "testo-passo" }, h("span", {}, h("b", { classe: "numero" }, "0"), " Vista Allplan"),
             h("small", {}, dati ? `cattura del ${data(dati.catturata_il)}` : ""))),
-        h("a", { classe: "btn link piccolo", href: "#genera", title: "Dalla vista si parte da Genera: lì scegli lo stile." }, "Nuovo passo da qui")),
+        h("a", { classe: "btn link piccolo", href: "#genera", title: "Dalla vista si parte da Genera: lì scegli lo stile." }, "Genera")),
       passi.map(rigaPasso)),
     passi.length
       ? nota("Ogni passo parte da quello sopra.", "Ogni passo parte da quello sopra di lui. Un passo nuovo fatto da un punto qualsiasi apre un ramo lì sotto.")
@@ -2310,21 +2335,34 @@ function sceltaModello(stato, onCambio) {
   return scegli;
 }
 
+// Cambia: le scorciatoie scrivono una richiesta nel campo, che resta da
+// leggere e correggere. Testi scelti, non provati con il modello.
+const SCORCIATOIE_CAMBIA = [
+  ["Notte", "Stessa scena di notte: cielo scuro, luci artificiali accese, ombre e riflessi dati dalle lampade."],
+  ["Tramonto", "Stessa scena al tramonto: luce calda e radente, ombre lunghe, cielo arancio e rosa."],
+  ["Nuvoloso", "Stessa scena con cielo coperto: luce morbida e diffusa, ombre leggere."],
+  ["Pioggia", "Stessa scena sotto la pioggia: cielo grigio, superfici bagnate e riflettenti."],
+  ["Neve", "Stessa scena d'inverno con neve sulle superfici orizzontali, luce fredda."],
+  ["Luci accese", "Accendi tutte le luci artificiali, la luce naturale resta com'è."],
+];
+
 function pannelloNuovoPasso() {
   const n = S.passi.nuovo;
   const da = passoDa(n.da);
   if (!da) return null;
-  const campo = h("textarea", { id: "testo-passo", rows: "3", placeholder: "Cosa cambiare, a parole: «due alberi davanti al fronte, non coprire le finestre»" });
+  const campo = h("textarea", { id: "testo-passo", rows: "3", placeholder: "Cosa cambiare in tutta l'immagine, a parole: «di notte, con le luci accese»" });
   campo.value = n.testo;
   campo.addEventListener("input", () => { n.testo = campo.value; componiNuovoPasso(); disegnaNuovoPasso(); });
-  return h("section", { classe: "pannello evidenziato", "aria-label": "Nuovo passo" },
-    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, `Nuovo passo da qui · dal passo ${da.numero}`),
+  const usa = (testo) => { n.testo = testo; campo.value = testo; componiNuovoPasso(); disegnaNuovoPasso(); campo.focus(); };
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Cambia" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Cambia tutta l'immagine, a parole"),
       h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Lascia stare")),
-    h("p", { classe: "piccolo" }, da.figli
-      ? `Parte dal passo ${da.numero}: si apre un ramo nuovo accanto a quelli che ci sono già.`
-      : `Parte dal passo ${da.numero} e continua il suo ramo.`),
+    h("p", { classe: "piccolo" }, `Parte da questa immagine (passo ${da.numero}): spigoli, arredo e inquadratura restano, cambia solo quello che scrivi. Esce un passo nuovo${da.figli ? ", accanto a quelli che ci sono già" : ""}.`),
+    h("div", { classe: "scelte-chip", role: "group", "aria-label": "Scorciatoie" },
+      SCORCIATOIE_CAMBIA.map(([nome, testo]) => h("button", { classe: "chip", "aria-pressed": String(n.testo === testo), onclick: () => usa(testo) }, nome))),
     campo,
-    h("div", { classe: "riga" }, h("button", { classe: "chip", onclick: () => ritoccaDa(da) }, "Su un'area…"), h("span", { classe: "tenue piccolo" }, "apre Ritocca su questo render: aree e note")),
+    nota("Scorciatoie: testi scelti, non provati.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare. Non sono ancora state provate con il modello."),
+    h("p", { classe: "tenue piccolo" }, "Solo in una parte dell'immagine? Usa Ritocca: disegni l'area e scrivi la nota."),
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
@@ -2343,10 +2381,10 @@ function pannelloPulito(passo) {
       h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Lascia stare"));
   }
   if (!c) return h("section", { classe: "pannello evidenziato" }, h("p", { classe: "tenue" }, "Unisco le richieste della strada…"));
-  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt di Rifai pulito" });
+  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt di Rifai tutto dalla vista" });
   prompt.value = c.prompt;
-  return h("section", { classe: "pannello evidenziato", "aria-label": "Rifai pulito dalla vista" },
-    h("span", { classe: "etichetta" }, `Rifai pulito dalla vista · strada ${c.strada.join(" › ")}`),
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Rifai tutto dalla vista" },
+    h("span", { classe: "etichetta" }, `Rifai tutto dalla vista · strada ${c.strada.join(" › ")}`),
     h("p", { classe: "piccolo" }, `Un solo invio dalla vista Allplan, una generazione invece di ${c.generazioni}. Il risultato è un ramo nuovo sotto lo 0.`),
     h("dl", { classe: "ricetta" },
       h("dt", {}, "Stile"), h("dd", {}, c.riassunto),
@@ -2406,37 +2444,27 @@ function latoPassi(passo) {
   if (passo.avviso) {
     blocchi.push(h("div", { classe: "avviso attenzione", role: "note" },
       h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
-      h("span", {}, "Se vedi l'edificio cambiare, rifai pulito dalla vista."),
+      h("span", {}, "Se vedi l'edificio cambiare, usa «Rifai tutto dalla vista» qui sotto."),
       h("span", { classe: "piccolo tenue" }, `Avviso da ${S.passi.dati.avviso_da_generazione} generazioni: soglia scelta, da tarare con il piano «catena» del banco di prova.`)));
   }
   if (passo.partenza_mancante) {
     blocchi.push(avviso("errore", "Il punto di partenza non c'è più: il render del passo prima è stato tolto dalla cartella.",
-      "Rifai pulito dalla vista: riparte dalla vista Allplan con le stesse richieste."));
+      "Usa «Rifai tutto dalla vista»: riparte dalla vista Allplan con le stesse richieste."));
   }
   blocchi.push(corpoTenuta(passo.tenuta, null,
     "Si misura sempre contro la vista Allplan, non contro il passo prima: così lo spostamento che si accumula passo dopo passo si vede tutto. Misura grezza: ombre e vegetazione nuove contano come spigoli persi."));
   if (passo.aree && passo.aree.length && passo.render) blocchi.push(pannelloFuoriAree(passo));
   if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
-  const dest = S.passi.dest[passo.modello];
-  const conferma = p.rifai ? h("div", { classe: "avviso" },
-    h("b", {}, "Rifai questo passo"),
-    h("span", {}, passo.da === "0" ? "Stessa vista, stesse scelte: un ramo nuovo sotto lo 0." : `Stesso punto di partenza (passo ${passo.da_numero}), stessa richiesta: un ramo nuovo accanto.`),
-    rigaDestinazione(passo.modello),
+  // La stessa barra di Risultato (2026-11-04): Cambia · Ritocca · Variante ·
+  // Altra vista · Video. «Rifai tutto dalla vista» solo quando serve.
+  const serve = passo.avviso || passo.partenza_mancante;
+  blocchi.push(h("section", { classe: "pannello", "aria-label": "Da questa immagine" },
+    passo.render ? barraAzioni(comeLavoro(passo)) : null,
+    serve && passo.generazioni > 1 ? h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", disabled: !!S.lavoroAttivo || null, onclick: () => apriPulito(passo) }, "Rifai tutto dalla vista"),
+      spiega(`Unisce le richieste dei passi ${passo.strada.slice(1).join(", ")} in un solo invio dalla vista Allplan: una generazione invece di ${passo.generazioni}, gli spigoli tornano quelli della vista.`)) : null,
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => rifaiPasso(passo), disabled: !!S.lavoroAttivo || !dest || !!dest.cosa_manca }, "Conferma e rifai"),
-      h("button", { classe: "btn", onclick: () => { p.rifai = false; render(); } }, "Lascia stare"))) : null;
-  const notaPulito = passo.generazioni <= 1
-    ? "Un passo solo: niente da unire."
-    : `Unisce le richieste dei passi ${passo.strada.slice(1).join(", ")} in un solo invio dalla vista Allplan: una generazione invece di ${passo.generazioni}.`;
-  blocchi.push(h("section", { classe: "pannello", "aria-label": "Adesso" },
-    h("span", { classe: "etichetta" }, "Adesso"),
-    h("div", { classe: "azioni" },
-      h("button", { classe: passo.avviso || passo.partenza_mancante ? "btn primario" : "btn", disabled: passo.generazioni <= 1 || !!S.lavoroAttivo, onclick: () => apriPulito(passo) }, "Rifai pulito dalla vista"),
-      h("button", { classe: "btn", disabled: passo.partenza_mancante || passo.attivo || !!S.lavoroAttivo, onclick: async () => { p.rifai = true; p.pulito = null; await destinazioneDi(passo.modello); render(); } }, "Rifai questo passo"),
-      h("button", { classe: "btn", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null, onclick: () => ritoccaDa(passo) }, "Ritocca da qui"),
-      h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella")),
-    h("p", { classe: "tenue piccolo" }, notaPulito),
-    conferma));
+      h("button", { classe: "btn link piccolo", onclick: () => post("/api/apri-cartella", { quale: "render" }).catch((e) => { S.errore = e; render(); }) }, "Apri cartella"))));
   blocchi.push(ricettaPasso(passo));
   return h("div", { classe: "lato" }, blocchi);
 }
@@ -2872,7 +2900,7 @@ function render() {
       dopo.scrollTop = cursore.alto;
     }
   }
-  if (S.scheda === "passi") { disegnaNuovoPasso(); }
+  if (S.scheda === "passi" || S.scheda === "risultato") { disegnaNuovoPasso(); }
   if (S.scheda === "ritocca") { disegnaApplicaRitocco(); }
   window.scrollTo(0, scorrimento);
 }

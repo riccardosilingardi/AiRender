@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-11"
+VERSIONE = "bozza-12"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -714,9 +714,10 @@ ORDINE_ASSI = ("look", "luce", "cielo", "fuori", "arredo", "sfondo", "intorno", 
 REGOLA_PASSO = Blocco(
     "regola-passo",
     "Regola fissa di un passo",
-    "Edit this exact image. Keep the camera, framing, proportions, light and "
-    "every building element exactly as they are; do not add, remove or "
-    "reshape any architecture. Make only the change described below and "
+    "Edit this exact image. Keep the camera, framing, proportions and every "
+    "building element exactly as they are; do not add, remove or reshape any "
+    "architecture. Keep the light as it is unless the change below is about "
+    "light, time of day or weather. Make only the change described below and "
     "leave everything else as it is.",
 )
 

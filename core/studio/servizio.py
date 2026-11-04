@@ -855,7 +855,7 @@ class Studio:
             raise FileNonTrovato(
                 "Il punto di partenza di questo passo non c'e' piu': il suo render e' "
                 "stato tolto dalla cartella dei lavori.",
-                "Usa «Rifai pulito dalla vista»: riparte dalla vista Allplan con le "
+                "Usa «Rifai tutto dalla vista»: riparte dalla vista Allplan con le "
                 "stesse richieste.",
             )
         vista = Path(lavoro.vista)
@@ -1445,7 +1445,7 @@ class Studio:
         if len(strada) < 2:
             raise RichiestaStudioNonValida(
                 "Questo passo e' partito dalla vista: non ci sono richieste da unire.",
-                "Per rifarlo uguale usa «Rifai questo passo».",
+                "Per rifarlo uguale usa Variante, sotto l'immagine.",
             )
         base = strada[0]
         if not base.get("scelte"):

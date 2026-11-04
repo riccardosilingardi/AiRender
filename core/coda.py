@@ -918,7 +918,7 @@ class Coda:
         if not partenza.is_file():
             raise FileNonTrovato(
                 f"Il punto di partenza non c'e' piu': {partenza}. Non ho inviato niente.",
-                "Nello Studio · Passi usa «Rifai pulito dalla vista», che riparte "
+                "Nello Studio · Passi usa «Rifai tutto dalla vista», che riparte "
                 "dalla vista Allplan con le stesse richieste.",
             )
         dati = partenza.read_bytes()

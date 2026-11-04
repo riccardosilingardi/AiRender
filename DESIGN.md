@@ -247,7 +247,8 @@ decisione che questa schermata deve far prendere.
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
 - **Sotto l'immagine** (dal 2026-11-02): **Ritocca · Variante · Video**, vedi
-  «Azioni sotto l'immagine».
+  «Azioni sotto l'immagine»; dal 2026-11-04 **Cambia · Ritocca · Variante ·
+  Video · Altra vista**, vedi «Una barra sola sotto ogni immagine».
 - **Adesso**: Apri cartella, Copia immagine, **Esporta per il cliente** (dal
   2026-10-31, vedi sotto).
 
@@ -785,6 +786,37 @@ render fatti», durata più lunga).
   sola con un lettore che suona i due tratti di fila; nella cartella sono due
   file, e lo si dice.
 - Durate: 5, 10, 15, 20, 30 secondi (Seedance arriva a 30).
+
+## Una barra sola sotto ogni immagine, costruita il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «partendo da un render che va bene, non è
+chiaro come posso fare una variante modificando solo le luci, ad esempio un
+interno notturno... Se devo passare da ritocca non ha senso xche devo
+selezionare il tutto. Rifai pulito, ritocca da qui, non si capisce.» Scelta
+sua: una barra sola, uguale in Risultato e in Passi.
+
+**La barra:** **Cambia · Ritocca · Variante · Video · Altra vista**.
+- **Cambia** (nuovo, primo): cambia tutta l'immagine a parole, senza
+  disegnare aree. Apre un riquadro sotto la barra: «Cambia tutta l'immagine, a
+  parole», il campo per la richiesta e le scorciatoie **Notte · Tramonto ·
+  Nuvoloso · Pioggia · Neve · Luci accese**, che scrivono una frase nel campo
+  (si può correggere). Sotto: «Scorciatoie: testi scelti, non provati.» e
+  «Per cambiare solo una parte usa Ritocca.» Poi destinazione, costo e
+  **Applica**. Il risultato è un passo nuovo sotto l'immagine di partenza.
+- La regola del passo (blocchi bozza 12) non chiede più di tenere la luce
+  quando la richiesta parla di luce, ora del giorno o tempo atmosferico.
+- **Ritocca**, **Variante**, **Video**, **Altra vista** come sopra.
+
+**Passi, colonna destra:** al posto di «Adesso» la stessa barra, con i suoi
+riquadri. Tolti **Nuovo passo da qui**, **Rifai questo passo** e **Ritocca da
+qui** (facevano quello che fanno Cambia, Variante e Ritocca). Su ogni riga
+dell'albero il collegamento è **Cambia** (sulla riga 0, la vista, **Genera**).
+**Rifai pulito dalla vista** si chiama **Rifai tutto dalla vista** e compare
+solo quando serve: dalla seconda generazione di fila, o quando il punto di
+partenza non c'è più. Resta **Apri cartella**.
+
+- **Vuoto / in corso / errore:** come prima; un passo non riuscito non ha la
+  barra (non c'è un'immagine da cui partire).
 
 ## Schermate sostituite il 2026-10-27
 
