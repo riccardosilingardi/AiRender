@@ -1,19 +1,17 @@
 """«Tieni la geometria»: la prima passata con un ControlNet, prima di Nano Banana.
 
 Un ControlNet e' un pezzo aggiunto a un modello aperto che lo obbliga a
-seguire una guida, qui gli spigoli della vista (Canny). Nano Banana non ne ha:
-segue la vista bene ma non sempre, soprattutto nei passi. Con «Tieni la
-geometria» la vista va prima a un workflow su Comfy Cloud (Z-Image-Turbo con
-il ControlNet Fun Union, `workflow/tieni-geometria.json`), e il suo render
-parte poi verso Nano Banana come prima immagine, con la regola di non
+seguire una guida, qui gli spigoli della vista (Canny). La vista va prima al
+workflow `workflow/tieni-geometria.json` (Z-Image-Turbo con il ControlNet Fun
+Union), pubblicato da Riccardo sulla Comfy Developer Platform come endpoint
+serverless `https://<nome>.run.comfy.app` (`workflow/LEGGIMI.md`). Il suo
+render parte poi verso Nano Banana come prima immagine, con la regola di non
 spostare nessuno spigolo.
 
-Non e' il Router: e' l'API v2 dei workflow di Comfy (carica l'immagine come
-asset, manda il grafo, aspetta il lavoro, scarica l'uscita). La chiave e'
-la stessa del Router (COMFY_API_KEY). L'indirizzo e' Comfy Cloud, che vuole
-un abbonamento Cloud; con `AIRENDER_COMFY_WORKFLOW_URL` si puo' puntare a un
-deployment della Developer Platform (https://<nome>.run.comfy.app).
-NON VERIFICATO al 2026-11-04: nessun workflow e' mai partito da qui.
+Non e' il Router: e' l'API v2 dei workflow (carica la vista come asset, manda
+il grafo, aspetta il lavoro, scarica l'uscita). La chiave e' la stessa del
+Router (COMFY_API_KEY); l'indirizzo del deployment sta in
+AIRENDER_COMFY_WORKFLOW_URL.
 """
 
 from __future__ import annotations
@@ -32,7 +30,6 @@ from ..errori import ErroreProvider
 from . import comfy
 
 VARIABILE_URL = "AIRENDER_COMFY_WORKFLOW_URL"
-URL_PREDEFINITO = "https://cloud.comfy.org"
 WORKFLOW = Path(__file__).resolve().parent / "workflow" / "tieni-geometria.json"
 NOME_WORKFLOW = "Z-Image-Turbo + ControlNet sugli spigoli"
 REGOLA_PROMPT = (
@@ -57,30 +54,31 @@ class TrasportoWorkflow(Protocol):
 
 
 def indirizzo() -> str:
-    """La base dell'API: Comfy Cloud, o il deployment scritto nell'ambiente."""
+    """La base dell'API: il deployment della Developer Platform scritto nell'ambiente."""
     scritto = os.environ.get(VARIABILE_URL, "").strip().rstrip("/")
     if not scritto:
-        return URL_PREDEFINITO
+        raise ErroreProvider(
+            "Manca l'indirizzo del workflow «Tieni la geometria».",
+            f"Pubblica core/provider/workflow/tieni-geometria.json sulla Developer Platform, poi "
+            f"scrivi l'indirizzo con: setx {VARIABILE_URL} https://<nome>.run.comfy.app e riapri lo Studio.",
+        )
     parti = urlparse(scritto)
     if parti.scheme != "https" or not parti.hostname:
         raise ErroreProvider(
             f"{VARIABILE_URL} vale {scritto!r}, che non e' un indirizzo https.",
-            "Scrivi l'indirizzo del deployment come https://<nome>.run.comfy.app, "
-            "o togli la variabile per usare Comfy Cloud.",
+            "Scrivi l'indirizzo del deployment come https://<nome>.run.comfy.app.",
         )
     return f"https://{parti.hostname}"
 
 
 def destinazione() -> str:
     """Il servizio che riceve la vista nella prima passata: si mostra prima dell'invio (regola 5)."""
-    return f"Comfy, workflow {NOME_WORKFLOW} su {urlparse(indirizzo()).hostname}"
+    return f"Comfy Developer Platform, workflow {NOME_WORKFLOW} su {urlparse(indirizzo()).hostname}"
 
 
 def workflow(asset: str, prompt: str, seme: int) -> dict:
     """Il grafo in formato API, coi valori del lavoro. La nota del file non parte."""
-    grafo = {k: v for k, v in json.loads(WORKFLOW.read_text(encoding="utf-8")).items()
-             if not k.startswith("_")}
-    grafo = copy.deepcopy(grafo)
+    grafo = copy.deepcopy(json.loads(WORKFLOW.read_text(encoding="utf-8")))
     grafo[NODO_IMMAGINE]["inputs"]["image"] = {"__type": "core/ASSET", "info": {"id": asset}}
     grafo[NODO_LATO]["inputs"]["largest_size"] = config.GEOMETRIA_LATO_MASSIMO
     grafo[NODO_PROMPT]["inputs"]["text"] = prompt
@@ -114,7 +112,7 @@ class Geometria:
         self.dormi, self.adesso, self.controlla = dormi, adesso, controlla
 
     def destinazione(self) -> str:
-        return f"Comfy, workflow {NOME_WORKFLOW} su {urlparse(self.base).hostname}"
+        return f"Comfy Developer Platform, workflow {NOME_WORKFLOW} su {urlparse(self.base).hostname}"
 
     def _intestazioni(self) -> dict:
         if not self.chiave:
@@ -128,14 +126,11 @@ class Geometria:
     def _errore(self, cosa: str, stato: int, corpo: object) -> ErroreProvider:
         dettaglio = corpo.get("message") or corpo.get("error") if isinstance(corpo, dict) else corpo
         aggiunta = ""
-        if stato in (401, 402, 403):  # numero-non-configurabile: codici HTTP di chiave e abbonamento
-            aggiunta = (" Comfy Cloud vuole un abbonamento Cloud per i workflow; con i soli crediti del "
-                        "Router serve un deployment della Developer Platform "
-                        f"({VARIABILE_URL}).")
+        if stato in (401, 403):  # numero-non-configurabile: codici HTTP di una chiave rifiutata
+            aggiunta = f" Il deployment ha rifiutato la chiave: controlla {comfy.VARIABILI_CHIAVE[0]}."
         return ErroreProvider(
             f"«Tieni la geometria»: {cosa} non e' riuscito (HTTP {stato}): {str(dettaglio)[:300]}.",  # numero-non-configurabile: taglio del messaggio d'errore a schermo
-            "Togli la spunta «Tieni la geometria» per mandare solo a Nano Banana, o controlla "
-            f"la chiave e l'abbonamento.{aggiunta}",
+            f"Togli la spunta «Tieni la geometria» per mandare solo a Nano Banana.{aggiunta}",
         )
 
     def carica(self, immagine: bytes) -> str:
@@ -169,7 +164,7 @@ class Geometria:
                 raise ErroreProvider(
                     f"«Tieni la geometria»: il workflow non ha finito in {config.GEOMETRIA_ATTESA_SECONDI} "
                     "secondi e l'ho fermato.",
-                    "Riprova: la prima volta Comfy carica i modelli. Se succede ancora, togli la spunta.",
+                    "Riprova: a freddo il deployment carica i modelli prima di partire. Se succede ancora, togli la spunta.",
                 )
             self.dormi(config.GEOMETRIA_INTERVALLO_SECONDI)
             self.controlla()

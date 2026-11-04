@@ -22,7 +22,7 @@ from core.provider import geometria as modulo_geometria
 from core.studio.servizio import RichiestaStudioNonValida, Studio
 from test_passi import NANO, VISTA, ProviderCheRende, _dest, cartella, chiamate  # noqa: F401
 
-BASE = "https://cloud.comfy.org"
+BASE = "https://airender-geometria.run.comfy.app"
 
 
 def _png(colore=(10, 200, 10)) -> bytes:
@@ -87,7 +87,7 @@ def _genera(studio, **altro):
 
 def test_il_workflow_e_in_formato_api_coi_valori_di_config_e_senza_la_nota():
     grafo = modulo_geometria.workflow("asset-9", "a house", 42)
-    assert "_nota" not in grafo and all("class_type" in n and "inputs" in n for n in grafo.values())
+    assert all("class_type" in n and "inputs" in n for n in grafo.values())
     assert grafo["1"]["inputs"]["image"] == {"__type": "core/ASSET", "info": {"id": "asset-9"}}
     assert grafo["6"]["inputs"]["text"] == "a house"
     assert grafo["8"]["inputs"]["strength"] == config.GEOMETRIA_FORZA
@@ -152,6 +152,19 @@ def test_un_link_su_un_altro_indirizzo_non_riceve_la_chiave():
     assert not any("ladro" in c[1] for c in finto.chiamate)
 
 
+def test_il_file_del_workflow_e_json_api_puro_da_caricare_sulla_developer_platform():
+    grezzo = json.loads(modulo_geometria.WORKFLOW.read_text(encoding="utf-8"))
+    assert all(k.isdigit() and "class_type" in v for k, v in grezzo.items())
+    assert None not in [x for n in grezzo.values() for x in n["inputs"].values()]
+
+
+def test_senza_indirizzo_del_deployment_si_dice_cosa_fare(monkeypatch):
+    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    with pytest.raises(ErroreProvider, match="Manca l'indirizzo") as errore:
+        modulo_geometria.indirizzo()
+    assert "setx " + modulo_geometria.VARIABILE_URL in errore.value.cosa_fare
+
+
 def test_l_indirizzo_viene_dall_ambiente_solo_se_e_https(monkeypatch):
     monkeypatch.setenv(modulo_geometria.VARIABILE_URL, "https://studio-x.run.comfy.app/")
     assert modulo_geometria.destinazione().endswith("su studio-x.run.comfy.app")
@@ -163,17 +176,18 @@ def test_l_indirizzo_viene_dall_ambiente_solo_se_e_https(monkeypatch):
 # --- Studio e coda -------------------------------------------------------------
 
 
-def test_la_destinazione_mostra_anche_la_prima_passata_e_il_costo_non_misurato(cartella, chiamate, monkeypatch):
-    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+def test_la_destinazione_mostra_anche_la_prima_passata_e_come_si_paga(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
     studio = _studio(cartella, chiamate)
     assert studio.destinazione(NANO)["geometria"] is None
     prima = studio.destinazione(NANO, geometria=True)["geometria"]
-    assert prima["destinazione"] == "Comfy, workflow Z-Image-Turbo + ControlNet sugli spigoli su cloud.comfy.org"
-    assert prima["costo"].startswith("non misurato") and prima["verificato"] is False
+    assert prima["destinazione"] == ("Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet sugli spigoli "
+                                     "su airender-geometria.run.comfy.app")
+    assert prima["costo"] == "a secondi di GPU del deployment" and prima["errore"] is None
 
 
 def test_genera_con_la_spunta_manda_prima_il_workflow_poi_nano_banana_col_suo_render(cartella, chiamate, monkeypatch):
-    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
     studio, finto = _studio(cartella, chiamate), ComfyFinto()
     identificativo = _genera(studio)
     scritto = json.loads((cartella / "lavori" / "in-attesa" / f"{identificativo}.json").read_text("utf-8"))
@@ -193,6 +207,17 @@ def test_genera_con_la_spunta_manda_prima_il_workflow_poi_nano_banana_col_suo_re
     assert (cartella / "lavori" / "fatto" / f"{identificativo}.geometria.png").exists()
 
 
+def test_senza_indirizzo_genera_si_ferma_col_gesto_da_fare(cartella, chiamate, monkeypatch):
+    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    studio = _studio(cartella, chiamate)
+    prima = studio.destinazione(NANO, geometria=True)["geometria"]
+    assert prima["destinazione"] is None and "setx" in prima["cosa_fare"]
+    with pytest.raises(RichiestaStudioNonValida, match="Manca l'indirizzo"):
+        studio.invia({"vista": VISTA, "scelte": blocchi.da_preset("rivista").a_dizionario(), "modello": NANO,
+                      "destinazione_mostrata": _dest(studio), "geometria": True})
+    assert not list(cartella.glob("lavori/in-attesa/*.json"))
+
+
 def test_la_composizione_mostra_la_regola_della_bozza(cartella, chiamate):
     studio = _studio(cartella, chiamate)
     composto = studio.componi({"vista": VISTA, "scelte": blocchi.da_preset("rivista").a_dizionario(), "geometria": True})
@@ -200,7 +225,7 @@ def test_la_composizione_mostra_la_regola_della_bozza(cartella, chiamate):
 
 
 def test_se_la_prima_passata_cambia_indirizzo_dopo_il_clic_non_parte_niente(cartella, chiamate, monkeypatch):
-    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
     studio, finto = _studio(cartella, chiamate), ComfyFinto()
     identificativo = _genera(studio)
     coda = modulo_coda.Coda(cartella, crea_provider=lambda _n: ProviderCheRende(chiamate), dire=lambda _t: None,
@@ -211,7 +236,8 @@ def test_se_la_prima_passata_cambia_indirizzo_dopo_il_clic_non_parte_niente(cart
     assert not finto.chiamate and not chiamate
 
 
-def test_la_destinazione_della_prima_passata_va_mostrata(cartella, chiamate):
+def test_la_destinazione_della_prima_passata_va_mostrata(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
     studio = _studio(cartella, chiamate)
     with pytest.raises(RichiestaStudioNonValida, match="prima passata"):
         _genera(studio, destinazione_geometria_mostrata="un altro posto")
@@ -227,7 +253,7 @@ def test_da_un_passo_la_spunta_si_rifiuta(cartella, chiamate):
 
 
 def test_un_file_del_formato_10_senza_destinazione_o_da_un_passo_si_rifiuta(cartella, chiamate, monkeypatch):
-    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
     identificativo = _genera(_studio(cartella, chiamate))
     scritto = json.loads((cartella / "lavori" / "in-attesa" / f"{identificativo}.json").read_text("utf-8"))
     for guasto in ({"destinazione_geometria": ""}, {"formato_base": modulo_coda.FORMATO_FINALE},

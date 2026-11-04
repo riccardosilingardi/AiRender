@@ -901,16 +901,17 @@ messo in fila a Nano Banana». In Genera, dopo il riferimento per lo stile e
 prima dei Rif.: la spunta **Tieni la geometria**, con la frase che spiega il
 ControlNet nella stessa riga («un pezzo che obbliga un modello aperto a seguire
 gli spigoli della vista») e «Due invii, due costi». Nel riquadro Invio, sopra la destinazione di sempre: «Prima passata: la vista
-va a **Comfy, workflow Z-Image-Turbo + ControlNet sugli spigoli su
-cloud.comfy.org**», «Costo della prima passata: **non misurato**», poi «Poi il
+va a **Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet sugli
+spigoli su <nome>.run.comfy.app**», «Costo della prima passata: **a secondi di
+GPU del deployment**», poi «Poi il
 suo render va a …» e il conteggio delle immagini con «il render della prima
 passata» al posto della vista. Non c'è nel Fotoinserimento, in Cambia e in
 Ritocca: il ControlNet ridisegna tutto dagli spigoli e da un passo perderebbe
 quello che il passo aveva fatto (in Ritocca fuori dalle aree il render resta
 già com'era).
 - **Vuoto:** la spunta tolta, nessuna riga in più.
-- **In corso:** come Genera. **Errore:** un indirizzo del deployment sbagliato
-  spegne Genera col motivo; un workflow fallito si legge come ogni errore, con
+- **In corso:** come Genera. **Errore:** senza l'indirizzo del deployment, o con
+  uno sbagliato, Genera si spegne e dice il comando `setx` da dare; un workflow fallito si legge come ogni errore, con
   «Togli la spunta per mandare solo a Nano Banana».
 - **Pieno:** `docs/ui/studio-rif/76-tieni-la-geometria.png`,
   `77-invio-due-destinazioni.png`. La bozza della prima passata resta accanto al

@@ -1277,7 +1277,7 @@ function pannelloInvio() {
       h("p", { classe: "destinazione" }, "Prima passata: la vista va a ",
         g.destinazione ? h("b", {}, g.destinazione) : "—", "."),
       h("p", { classe: "destinazione" }, "Costo della prima passata: ", h("b", {}, g.costo)));
-    if (g.errore) blocco.append(avviso("errore", g.errore, "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria»."));
+    if (g.errore) blocco.append(avviso("errore", g.errore, `${g.cosa_fare} Oppure togli la spunta «Tieni la geometria».`));
   }
   if (d) {
     blocco.append(

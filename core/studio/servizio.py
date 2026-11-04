@@ -678,7 +678,7 @@ class Studio:
                              "cosa_fare": "Scegli Nano Banana 2, oppure togli i Rif."})
         if destinazione["geometria"] and destinazione["geometria"]["errore"]:
             problemi.append({"fatto": destinazione["geometria"]["errore"],
-                             "cosa_fare": "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria»."})
+                             "cosa_fare": destinazione["geometria"]["cosa_fare"]})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -839,7 +839,7 @@ class Studio:
         if prima_passata:
             if prima_passata["errore"]:
                 raise RichiestaStudioNonValida(f"Non mando: {prima_passata['errore']}",
-                                               "Correggi l'indirizzo, oppure togli la spunta «Tieni la geometria».")
+                                               f"{prima_passata['cosa_fare']} Oppure togli la spunta «Tieni la geometria».")
             if geometria_mostrata != prima_passata["destinazione"]:
                 raise RichiestaStudioNonValida(
                     f"La pagina ha mostrato come prima passata {geometria_mostrata!r}, ma la vista "
@@ -2105,19 +2105,19 @@ def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int
 def _geometria_dict(varianti: int) -> dict:
     """La prima passata di «Tieni la geometria»: dove va e cosa costa, prima del clic (regola 5)."""
     try:
-        dove, errore = modulo_geometria.destinazione(), None
+        dove, errore, cosa_fare = modulo_geometria.destinazione(), None, None
     except ErroreAirender as problema:
-        dove, errore = None, problema.fatto
+        dove, errore, cosa_fare = None, problema.fatto, problema.cosa_fare
     return {
         "destinazione": dove,
         "errore": errore,
+        "cosa_fare": cosa_fare,
         "workflow": modulo_geometria.NOME_WORKFLOW,
         "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet sugli spigoli; "
                        "poi il suo render parte verso il modello al posto della vista."),
-        # Regola 3: il costo di un workflow va a secondi di GPU e non e' mai stato misurato.
-        "costo": ("non misurato: Comfy conta i secondi di GPU" if varianti == 1
-                  else f"non misurato: {varianti} prime passate, Comfy conta i secondi di GPU"),
-        "verificato": False,
+        # Regola 3: un workflow si paga a secondi di GPU del deployment, non a immagine: nessun numero.
+        "costo": ("a secondi di GPU del deployment" if varianti == 1
+                  else f"{varianti} prime passate, a secondi di GPU del deployment"),
     }
 
 

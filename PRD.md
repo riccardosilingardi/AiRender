@@ -270,22 +270,15 @@ la verifica si nomina qui.
 
 ### Tieni la geometria, il ControlNet prima di Nano Banana (2026-11-04)
 
-- **Nessun workflow è mai partito**: l'API v2 dei workflow di Comfy (asset,
-  jobs, uscite) e il grafo `core/provider/workflow/tieni-geometria.json` sono
-  ricostruiti dalla documentazione (openapi-v2 di Comfy-Org/docs) e dal modello
-  comfy.org `image_z_image_turbo_fun_union_controlnet`, provati solo con un
-  finto. Verifica: una vista vera con la spunta, poi i due render affiancati.
-- **Chi può farlo partire**: Comfy Cloud vuole un abbonamento Cloud per i
-  workflow; i crediti del Router potrebbero non bastare. Con
-  `AIRENDER_COMFY_WORKFLOW_URL` si punta a un deployment della Developer
-  Platform (secondi di GPU, partenza a freddo). Nessuno dei due è stato provato.
-- **Il costo**: secondi di GPU, mai misurato; lo Studio scrive «non misurato».
-- **Che gli spigoli tengano davvero dopo Nano Banana**: la regola
-  `REGOLA_PROMPT` dice al modello di non spostarli, ma Nano Banana può ancora
-  muoverli. La misura di tenuta confronta il render finale con la vista.
-- **I valori** `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8,
-  `GEOMETRIA_LATO_MASSIMO` 1536 e le soglie di Canny (0,1 / 0,32 del modello
-  comfy.org) sono scelti, non confrontati su viste Allplan.
+- Il workflow gira sul deployment della **Comfy Developer Platform** di
+  Riccardo (`core/provider/workflow/tieni-geometria.json`, passi in
+  `workflow/LEGGIMI.md`), indirizzo in `AIRENDER_COMFY_WORKFLOW_URL`. Si chiude
+  con il primo render vero sul deployment: bozza `<id>.geometria.png` e render
+  affiancati alla vista.
+- Il costo è a secondi di GPU del deployment: lo Studio non scrive un numero
+  finché una prima passata vera non lo dà.
+- `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
+  le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
 
 ### Stile da esempi (2026-11-04)
 
