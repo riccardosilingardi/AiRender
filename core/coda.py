@@ -83,7 +83,11 @@ FORMATO_FINALE = 8  # numero-non-configurabile: versione del formato di un lavor
 # Il formato 8 (2026-11-04) e' «Finale»: un render ingrandito con piu'
 # dettaglio, senza prompt. Parte sempre da un render, da solo: niente aree,
 # richieste, riferimenti, materiali o contesto.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_ESEMPI = 9  # numero-non-configurabile: versione del formato di un lavoro con «Stile da esempi»
+# Il formato 9 (2026-11-04) aggiunge gli esempi di stile: render d'esempio
+# dopo il riferimento per lo stile, solo dalla vista. Legge anche materiali e
+# Rif. se ci sono.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9)  # numero-non-configurabile: i formati che questo motore sa leggere
 TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
@@ -233,7 +237,7 @@ def scrivi_json(percorso: Path, dati: dict) -> Path:
 # --- il lavoro ---------------------------------------------------------------
 
 
-def prima_immagine_inserti(maschera: bool, riferimento: bool, materiali_immagini: int) -> int:
+def prima_immagine_inserti(maschera: bool, riferimento: int | bool, materiali_immagini: int) -> int:
     """Il numero della prima immagine dei Rif., nell'ordine in cui partono le immagini.
 
     1 la vista o il render, poi la maschera, il riferimento per lo stile, le
@@ -293,12 +297,17 @@ class Lavoro:
     # Studio · Finale: di quante volte ingrandire e il tipo d'immagine. Solo
     # da un render, da solo.
     finale: dict | None = None
+    # Studio · Genera, «Stile da esempi»: render d'esempio dopo il
+    # riferimento per lo stile (che e' il primo esempio). Solo dalla vista.
+    esempi: tuple[str, ...] = ()
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
         if self.finale:
             object.__setattr__(self, "formato", FORMATO_FINALE)
+        elif self.esempi:
+            object.__setattr__(self, "formato", FORMATO_ESEMPI)
         elif self.inserti:
             object.__setattr__(self, "formato", FORMATO_INSERTI)
         elif self.aree:
@@ -324,7 +333,11 @@ class Lavoro:
     def prima_immagine_inserti(self) -> int:
         """Il numero della prima immagine dei Rif.: dopo partenza, maschera, riferimento e materiali."""
         return prima_immagine_inserti(bool(self.aree) and self.modo_aree == modulo_aree.MASCHERA,
-                                      bool(self.riferimento), modulo_materiali.quante_immagini(self.materiali))
+                                      self.immagini_stile(), modulo_materiali.quante_immagini(self.materiali))
+
+    def immagini_stile(self) -> int:
+        """Quante immagini per lo stile partono: il riferimento e gli esempi."""
+        return int(bool(self.riferimento)) + len(self.esempi)
 
     def _prompt_senza_inserti(self) -> str:
         if self.finale:
@@ -343,9 +356,9 @@ class Lavoro:
         else:
             base = blocchi.componi(self.scelte)
         testo = blocchi.aggiungi_richieste(base, self.richieste)
-        testo = (blocchi.aggiungi_riferimento(testo, coerenza=bool(self.portato_da))
+        testo = (blocchi.aggiungi_riferimento(testo, coerenza=bool(self.portato_da), esempi=len(self.esempi))
                  if self.riferimento else testo)
-        return modulo_materiali.prompt(testo, self.materiali, prima_immagine=modulo_materiali.prima_immagine(bool(self.riferimento)))
+        return modulo_materiali.prompt(testo, self.materiali, prima_immagine=modulo_materiali.prima_immagine(self.immagini_stile()))
 
     def a_dizionario(self) -> dict:
         return {
@@ -370,6 +383,7 @@ class Lavoro:
             **({"materiali": [c.a_dizionario() for c in self.materiali]} if self.materiali else {}),
             **({"inserti": list(self.inserti)} if self.inserti else {}),
             **({"finale": dict(self.finale)} if self.finale else {}),
+            **({"esempi": list(self.esempi)} if self.esempi else {}),
         }
 
     @classmethod
@@ -410,7 +424,7 @@ class Lavoro:
             )
         formato = dati.get("formato")
         inserti: tuple[str, ...] = ()
-        if formato == FORMATO_INSERTI:
+        if formato == FORMATO_INSERTI or (formato == FORMATO_ESEMPI and dati.get("inserti")):
             elenco_inserti = dati.get("inserti")
             if (not isinstance(elenco_inserti, list) or not elenco_inserti
                     or not all(isinstance(v, str) and v for v in elenco_inserti)
@@ -430,10 +444,23 @@ class Lavoro:
                     "Rimetti il Finale in coda da sotto il render nello Studio.",
                 )
         aree, modo_aree = _aree_del_lavoro(dati, partenza)
-        riferimento = (dati.get("riferimento") if formato == FORMATO_RIFERIMENTO
+        riferimento = (dati.get("riferimento") if formato in (FORMATO_RIFERIMENTO, FORMATO_ESEMPI)
                        or (formato in (FORMATO_MATERIALI, FORMATO_INSERTI) and dati.get("riferimento")) else None)
+        esempi: tuple[str, ...] = ()
+        if formato == FORMATO_ESEMPI:
+            elenco_esempi = dati.get("esempi")
+            if (not isinstance(elenco_esempi, list) or not elenco_esempi
+                    or not all(isinstance(v, str) and v for v in elenco_esempi)
+                    or 1 + len(elenco_esempi) > config.ESEMPI_STILE_MASSIMO
+                    or not riferimento or partenza or dati.get("contesto") or dati.get("portato_da")):
+                raise LavoroNonValido(
+                    "Il file del lavoro dice che porta esempi di stile, ma non li elenca, ne porta piu' "
+                    f"di {config.ESEMPI_STILE_MASSIMO} o non parte dalla vista con il riferimento.",
+                    "Rimetti il lavoro in coda da Studio · Genera.",
+                )
+            esempi = tuple(elenco_esempi)
         materiali: tuple[modulo_materiali.Cambio, ...] = ()
-        if formato == FORMATO_MATERIALI or (formato == FORMATO_INSERTI and dati.get("materiali")):
+        if formato == FORMATO_MATERIALI or (formato in (FORMATO_INSERTI, FORMATO_ESEMPI) and dati.get("materiali")):
             elenco = dati.get("materiali")
             if partenza or aree or not isinstance(elenco, list) or not elenco:
                 raise LavoroNonValido(
@@ -489,6 +516,7 @@ class Lavoro:
             materiali=materiali,
             inserti=inserti,
             finale=finale,
+            esempi=esempi,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -588,6 +616,7 @@ def metti_in_coda(
     materiali: tuple[modulo_materiali.Cambio, ...] = (),
     inserti: tuple[Path, ...] | list[Path] = (),
     finale: dict | None = None,
+    esempi: tuple[Path, ...] | list[Path] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -649,6 +678,18 @@ def metti_in_coda(
             )
         inserti = tuple(controlla_riferimento(radice, Path(i)) for i in inserti)
     _controlla_inserti_delle_aree(tuple(aree), tuple(inserti))
+    if esempi:
+        if riferimento is None or portato_da or contesto is not None:
+            raise LavoroNonValido(
+                "«Stile da esempi» parte dalla vista, con il primo esempio come riferimento per lo stile.",
+                "Carica gli esempi da Genera.",
+            )
+        if 1 + len(esempi) > config.ESEMPI_STILE_MASSIMO:
+            raise LavoroNonValido(
+                f"Gli esempi di stile sono {1 + len(esempi)}: ne partono al massimo {config.ESEMPI_STILE_MASSIMO}.",
+                "Togline qualcuno.",
+            )
+        esempi = tuple(controlla_riferimento(radice, Path(e)) for e in esempi)
     if finale is not None:
         finale = _finale_controllato(finale)
         if not partenza or richieste or aree or riferimento is not None or contesto is not None \
@@ -686,6 +727,7 @@ def metti_in_coda(
         materiali=tuple(materiali),
         inserti=tuple(str(i) for i in inserti),
         finale=finale,
+        esempi=tuple(str(e) for e in esempi),
     )
     if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
@@ -981,6 +1023,11 @@ class Coda:
             riferimento = controlla_riferimento(self.radice, Path(lavoro.riferimento)).read_bytes()
             modulo_immagine.misura(riferimento)  # solleva se non e' un'immagine
             in_piu = (*in_piu, riferimento)
+        for percorso in lavoro.esempi:
+            # Gli esempi di stile subito dopo il riferimento: il prompt li conta da 3.
+            esempio = controlla_riferimento(self.radice, Path(percorso)).read_bytes()
+            modulo_immagine.misura(esempio)  # solleva se non e' un'immagine
+            in_piu = (*in_piu, esempio)
         for cambio in lavoro.materiali:
             # Rilette dalle loro cartelle: un file sparito ferma il lavoro prima dell'invio.
             for percorso in _cambio_controllato(self.radice, cambio).immagini():

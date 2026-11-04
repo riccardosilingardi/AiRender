@@ -24,6 +24,7 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
+  esempi: [],             // «Stile da esempi»: render d'esempio oltre al riferimento, stessa forma
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
   // quelli spuntati ({ chiave: { diventa, riferimento } }), la ricerca.
@@ -368,7 +369,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera() });
+      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -386,6 +387,7 @@ async function caricaVista(nome) {
   S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
   S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null };
   S.inserti = [];
+  S.esempi = [];
   if (!nome) { render(); return; }
   try { S.descrizione = await get(`/api/viste/${enc(nome)}`); } catch (e) { S.errore = e; }
   try { S.mat.dati = await get(`/api/viste/${enc(nome)}/materiali`); } catch (e) { S.mat.errore = e; }
@@ -397,7 +399,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}&esempi=${esempiGenera().length}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -480,7 +482,7 @@ async function genera() {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
-      materiali: materialiPerServer(), inserti: insertiGenera(),
+      materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -495,7 +497,7 @@ async function provaASecco() {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome,
-      contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(),
+      contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -919,7 +921,28 @@ async function scegliRiferimento(file) {
   aggiornaComposto(true);
   render();
 }
+// «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
+function esempiGenera() { return S.modo === "contesto" || !S.riferimento ? [] : S.esempi.map((r) => r.nome); }
+
+async function aggiungiEsempio(file) {
+  if (!file) return;
+  try { S.esempi.push(await caricaInserto(file)); S.errore = null; } catch (e) { S.errore = e; }
+  S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+
+async function togliEsempio(i) {
+  S.esempi.splice(i, 1); S.secco = null;
+  await caricaDestinazione();
+  aggiornaComposto(true);
+  render();
+}
+
 async function togliRiferimento() {
+  // Il secondo esempio, se c'e', diventa il riferimento: gli esempi restano.
+  if (S.esempi.length) { S.riferimento = S.esempi.shift(); S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); return; }
   S.riferimento = null; S.secco = null;
   await caricaDestinazione();
   aggiornaComposto(true);
@@ -948,12 +971,29 @@ function pannelloRiferimento() {
       file];
   }
   const r = S.riferimento;
-  return [titolo,
-    h("div", { classe: "riga" },
-      h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
-      h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
-      h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
-    nota("Solo palette, luce e materiali.", "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
+  const massimo = S.catalogo.esempi_stile_massimi || 4;
+  const tutti = [r, ...S.esempi];
+  const altro = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": "Aggiungi un altro render d'esempio per lo stile" });
+  altro.addEventListener("change", () => aggiungiEsempio(altro.files && altro.files[0]));
+  if (tutti.length === 1) {
+    return [titolo,
+      h("div", { classe: "riga" },
+        h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
+        h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
+        h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
+      nota("Solo palette, luce e materiali.", "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine."),
+      h("span", {}, altro, h("button", { classe: "btn link piccolo", onclick: () => altro.click() }, "+ Un altro esempio (Stile da esempi)"))];
+  }
+  return [h("span", { classe: "etichetta" }, "Stile da esempi",
+      spiega(`Da 2 a ${massimo} render con lo stile che vuoi: il modello prende quello che hanno in comune (colori, luce, materiali, taglio fotografico), non gli edifici. Con 15 o più immagini dello stesso stile arriverà «Crea il mio stile».`)),
+    h("div", { classe: "griglia-rif" },
+      tutti.map((x, i) => h("div", { classe: "rif" },
+        h("img", { src: `/file/riferimento/${enc(x.nome)}`, alt: `Esempio ${i + 1}: ${x.da || x.nome}` }),
+        h("span", { classe: "piccolo" }, h("b", {}, `Esempio ${i + 1}`)),
+        h("button", { classe: "togli", "aria-label": `Togli l'esempio ${i + 1}`, onclick: () => (i === 0 ? togliRiferimento() : togliEsempio(i - 1)) }, "×"))),
+      tutti.length < massimo ? h("button", { classe: "rif rif-nuovo", onclick: () => altro.click() }, `+ Esempio ${tutti.length + 1}`) : null,
+      altro),
+    h("p", { classe: "tenue piccolo" }, `Partono ${tutti.length} esempi dopo la vista. Testo per il modello scelto, non ancora provato.`)];
 }
 
 // Rif. di oggetti e persone: fino a INSERTI_MASSIMO immagini da mettere

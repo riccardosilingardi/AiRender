@@ -881,6 +881,19 @@ spento, con il perché sulla scheda. Schermate:
 `docs/ui/studio-rif/70-genera-rif-e-modello-chiuso.png`,
 `71-scelta-modello-aperta.png`.
 
+## Stile da esempi, costruito il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «copio qualche immagine di altri render,
+anche solo 3 o 4, e mi restituisce un preset che renderizza uguale». In Genera,
+sotto il riferimento per lo stile caricato: «+ Un altro esempio (Stile da
+esempi)». Con due o più immagini il riquadro diventa **Stile da esempi**: una
+fila «Esempio 1 … 4» (`ESEMPI_STILE_MASSIMO`, scelta) con × e «+ Esempio N»,
+il «?» che dice cosa si prende (colori, luce, materiali, taglio fotografico) e
+che con 15 o più immagini arriverà «Crea il mio stile» (LoRA). Togliere
+l'esempio 1 fa diventare riferimento il 2. Il conteggio «Partono N immagini: la
+vista, M esempi di stile…» compare prima dell'invio. Gli esempi entrano nella
+ricetta per impronta, come il riferimento. Salvarli come preset è il passo dopo.
+
 ## Finale, costruito il 2026-11-04
 
 Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto

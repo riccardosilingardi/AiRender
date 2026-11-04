@@ -268,6 +268,13 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Stile da esempi (2026-11-04)
+
+- **Che 2-4 render d'esempio diano uno stile più fedele di uno solo**:
+  `ESEMPI_STILE` (bozza 14) è un testo scelto, provato solo con un provider
+  finto. Verifica: stessa vista, uno contro tre esempi, Nano Banana 2.
+- **Gli esempi non si salvano ancora in «I miei preset»**: si ricaricano a mano.
+
 ### Finale, l'ingrandimento (2026-11-04)
 
 - **Il corpo di `freepik/ai-image-upscaler-precision-v2`** (image in base64,

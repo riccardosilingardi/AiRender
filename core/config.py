@@ -529,6 +529,19 @@ FINALE_INGRANDIMENTO_PREDEFINITO = _registra(Costante(
     ),
 ))
 
+ESEMPI_STILE_MASSIMO = _registra(Costante(
+    nome="ESEMPI_STILE_MASSIMO",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quanti render d'esempio partono al massimo con «Stile da esempi», "
+        "riferimento per lo stile compreso. Riccardo ne porterebbe 3 o 4 "
+        "(2026-11-04); di piu' allunga l'invio senza che il modello ne tenga "
+        "conto meglio, e con 15 o piu' immagini serve un LoRA, non dei "
+        "riferimenti. Giudizio, mai provato con il modello."
+    ),
+))
+
 INSERTI_MASSIMO = _registra(Costante(
     nome="INSERTI_MASSIMO",
     valore=4,

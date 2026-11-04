@@ -441,6 +441,7 @@ class Studio:
             "rese": _rese(),
             "varianti_massime": config.VARIANTI_MASSIME,
             "inserti_massimi": config.INSERTI_MASSIMO,
+            "esempi_stile_massimi": config.ESEMPI_STILE_MASSIMO,
             "finale": {
                 "modello": self._modello_dict(MODELLO_FINALE),
                 "ingrandimenti": list(config.FINALE_INGRANDIMENTI),
@@ -520,11 +521,11 @@ class Studio:
         """Il prompt vero, il riassunto in italiano e quanti caratteri."""
         scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
-        prompt = contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte)
-        if dati.get("riferimento") and not contesto:
-            prompt = blocchi.aggiungi_riferimento(prompt)
         cambi = self._cambi_scelti(dati) if not contesto else ()
-        prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(bool(dati.get("riferimento"))))
+        esempi = self._esempi_scelti(dati, contesto is not None)
+        stile = (int(bool(dati.get("riferimento"))) + len(esempi)) if not contesto else 0
+        prompt = _prompt_genera(None, scelte, contesto, stile, len(esempi), cambi,
+                                len(self._inserti_scelti(dati, contesto is not None)))
         return {
             "prompt": prompt,
             "caratteri": len(prompt),
@@ -569,7 +570,7 @@ class Studio:
 
     def destinazione(self, identificativo_modello: str, varianti: object = 1,
                      riferimento: bool = False, contesto: bool = False,
-                     materiali_immagini: object = 0, inserti: object = 0) -> dict:
+                     materiali_immagini: object = 0, inserti: object = 0, esempi: object = 0) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
 
         Con N varianti il costo e' N volte quello di un render, e lo si dice
@@ -585,6 +586,10 @@ class Studio:
             dei_rif = max(0, int(inserti or 0))
         except (TypeError, ValueError):
             dei_rif = 0
+        try:
+            degli_esempi = max(0, int(esempi or 0)) if riferimento else 0
+        except (TypeError, ValueError):
+            degli_esempi = 0
         motore = self._crea_provider(self.provider)
         # Anche "airender" passa dal Router, e il server forza il fallback spento.
         senza_ripiego = isinstance(motore, comfy.ProviderComfy) and comfy.FALLBACK == "false"
@@ -600,9 +605,10 @@ class Studio:
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
             # Regola 5: quante immagini partono, detto prima del clic.
-            "immagini": (2 if (riferimento or contesto) else 1) + dei_materiali + dei_rif,
+            "immagini": (2 if (riferimento or contesto) else 1) + degli_esempi + dei_materiali + dei_rif,
             "inserti": dei_rif,
-            "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali, dei_rif),
+            "esempi": degli_esempi,
+            "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi),
             "contesto_non_accettato": (
                 f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
                 "Scegli Nano Banana 2."
@@ -633,17 +639,13 @@ class Studio:
         riferimento = self._riferimento_scelto(dati)
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
+        esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
                                          riferimento=riferimento is not None, contesto=contesto is not None,
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
-                                         inserti=len(inserti))
-        prompt = _prompt_a_mano(dati) or (contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte))
-        if riferimento is not None:
-            prompt = blocchi.aggiungi_riferimento(prompt)
-        if not _prompt_a_mano(dati):
-            prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(riferimento is not None))
-        prompt = blocchi.aggiungi_inserti(prompt, modulo_coda.prima_immagine_inserti(
-            False, riferimento is not None, modulo_materiali.quante_immagini(cambi)), len(inserti))
+                                         inserti=len(inserti), esempi=len(esempi))
+        prompt = _prompt_genera(_prompt_a_mano(dati), scelte, contesto,
+                                int(riferimento is not None) + len(esempi), len(esempi), cambi, len(inserti))
         problemi = []
         descrizione = self.descrivi_vista(vista.name)
         if not descrizione["idonea"]:
@@ -690,10 +692,11 @@ class Studio:
         riferimento = self._riferimento_scelto(dati)
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
+        esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
                                          riferimento=riferimento is not None, contesto=contesto is not None,
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
-                                         inserti=len(inserti))
+                                         inserti=len(inserti), esempi=len(esempi))
         return self._metti_in_coda(
             vista, scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -704,7 +707,28 @@ class Studio:
             contesto=contesto,
             materiali=cambi,
             inserti=inserti,
+            esempi=esempi,
         )
+
+    def _esempi_scelti(self, dati: dict, contesto: bool = False, riferimento: object = True) -> tuple[Path, ...]:
+        """Gli esempi di «Stile da esempi» oltre al riferimento: nomi della cartella dei riferimenti."""
+        nomi = dati.get("esempi") or []
+        if not isinstance(nomi, list) or not all(isinstance(n, str) and n for n in nomi):
+            raise RichiestaStudioNonValida("Gli esempi di stile devono essere un elenco di nomi.",
+                                           "Ricarica lo Studio e scegli di nuovo le immagini.")
+        if not nomi:
+            return ()
+        if contesto:
+            raise RichiestaStudioNonValida("Il Fotoinserimento non prende esempi di stile: la luce la dà il luogo.",
+                                           "Togli gli esempi, oppure usa «Render della vista».")
+        if riferimento is None:
+            raise RichiestaStudioNonValida("Gli esempi di stile partono dopo il riferimento per lo stile, che manca.",
+                                           "Carica di nuovo il primo esempio.")
+        if 1 + len(nomi) > config.ESEMPI_STILE_MASSIMO:
+            raise RichiestaStudioNonValida(
+                f"Hai scelto {1 + len(nomi)} esempi di stile: ne partono al massimo {config.ESEMPI_STILE_MASSIMO}.",
+                "Togline qualcuno.")
+        return tuple(self.percorso_riferimento(n) for n in nomi)
 
     def _riferimento_scelto(self, dati: dict) -> Path | None:
         nome = dati.get("riferimento")
@@ -781,7 +805,8 @@ class Studio:
                        modo_aree: str | None = None, riferimento: Path | None = None,
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
-                       materiali: tuple = (), inserti: tuple = (), finale: dict | None = None) -> dict:
+                       materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
+                       esempi: tuple = ()) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -829,6 +854,7 @@ class Studio:
                 materiali=tuple(materiali),
                 inserti=tuple(inserti),
                 finale=finale,
+                esempi=tuple(esempi),
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -945,8 +971,10 @@ class Studio:
             )
         riferimento = Path(lavoro.riferimento) if lavoro.riferimento else None
         inserti = tuple(Path(i) for i in lavoro.inserti)
+        esempi = tuple(Path(e) for e in lavoro.esempi)
         destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None,
-                                         contesto=lavoro.contesto is not None, inserti=len(inserti))
+                                         contesto=lavoro.contesto is not None, inserti=len(inserti),
+                                         esempi=len(esempi))
         return self._metti_in_coda(
             vista, lavoro.scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
@@ -963,6 +991,7 @@ class Studio:
             contesto=lavoro.contesto,
             inserti=inserti,
             finale=lavoro.finale,
+            esempi=esempi,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -2022,8 +2051,30 @@ def _riassunto_finale(finale: dict) -> str:
     return f"Finale: render ingrandito {finale.get('ingrandimento')} volte, con più dettaglio, come {tipo}."
 
 
-def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0) -> str:
+def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int, cambi: tuple, inserti: int) -> str:
+    """Il prompt di Genera: blocchi (o testo a mano), stile, materiali, Rif. Un posto solo per componi e prova a secco."""
+    if a_mano:
+        prompt = a_mano
+    else:
+        prompt = contesto.prompt(scelte.materiali) if contesto else blocchi.componi(scelte)
+    if stile and not contesto:
+        prompt = blocchi.aggiungi_riferimento(prompt, esempi=esempi)
+    if not a_mano:
+        prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(stile))
+    return blocchi.aggiungi_inserti(prompt, modulo_coda.prima_immagine_inserti(
+        False, stile, modulo_materiali.quante_immagini(cambi)), inserti)
+
+
+def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0, esempi: int = 0) -> str:
     """Quante immagini partono e quali, nelle stesse parole ogni volta (regola 5)."""
+    if esempi and riferimento:
+        pezzi = ["la vista", f"{1 + esempi} esempi di stile"]
+        if materiali:
+            pezzi.append("1 immagine dei materiali" if materiali == 1 else f"{materiali} immagini dei materiali")
+        if inserti:
+            pezzi.append("1 Rif. di oggetti e persone" if inserti == 1 else f"{inserti} Rif. di oggetti e persone")
+        quante = 2 + esempi + materiali + inserti
+        return f"Partono {quante} immagini: " + ", ".join(pezzi[:-1]) + " e " + pezzi[-1] + "."
     if inserti:
         pezzi = ["la vista o il render di partenza"]
         if riferimento:

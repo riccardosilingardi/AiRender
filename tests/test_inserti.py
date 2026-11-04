@@ -159,3 +159,35 @@ def test_una_nota_che_cita_un_rif_che_non_c_e_si_ferma_prima_di_comporre(cartell
     uno = _genera(studio); coda.esegui_uno()
     with pytest.raises(RichiestaStudioNonValida, match="Rif. 1"):
         studio.componi_ritocco({"vista": VISTA, "da": uno, "aree": [{**NOTA, "inserto": 1}]})
+
+
+# --- Stile da esempi ---------------------------------------------------------------
+
+
+def test_stile_da_esempi_manda_riferimento_ed_esempi_dopo_la_vista_e_i_rif_dopo(cartella, chiamate):
+    studio = _studio(cartella, chiamate)
+    primo, secondo, terzo, rif = _rif(studio, (200, 0, 0), (0, 200, 0), (0, 0, 200), (90, 90, 90))
+    destinazione = studio.destinazione(NANO, riferimento=True, esempi=2, inserti=1)
+    assert destinazione["immagini"] == 5 and "3 esempi di stile" in destinazione["cosa_parte"]
+    composto = studio.componi({"vista": VISTA, "scelte": blocchi.da_preset("rivista").a_dizionario(),
+                               "riferimento": primo, "esempi": [secondo, terzo], "inserti": [rif]})
+    assert "Images 2 to 4 are example renders" in composto["prompt"] and "Rif. 1 is image 5" in composto["prompt"]
+    identificativo = _genera(studio, riferimento=primo, esempi=[secondo, terzo], inserti=[rif])
+    scritto = json.loads((cartella / "lavori" / "in-attesa" / f"{identificativo}.json").read_text("utf-8"))
+    assert scritto["formato"] == modulo_coda.FORMATO_ESEMPI and len(scritto["esempi"]) == 2
+    assert Lavoro.da_dizionario(scritto).inserti == tuple(scritto["inserti"])
+    _coda(cartella, chiamate).esegui_uno()
+    assert leggi_stato(cartella, identificativo)["stato"] == "fatto"
+    (richiesta,) = chiamate
+    assert len(richiesta.immagini_in_piu) == 4
+    assert richiesta.prompt == composto["prompt"] or "Images 2 to 4" in richiesta.prompt
+
+
+def test_gli_esempi_senza_riferimento_o_con_il_fotoinserimento_si_rifiutano(cartella, chiamate):
+    studio = _studio(cartella, chiamate)
+    (uno,) = _rif(studio, (10, 10, 10))
+    with pytest.raises(RichiestaStudioNonValida):
+        _genera(studio, esempi=[uno])
+    with pytest.raises(RichiestaStudioNonValida):
+        studio._esempi_scelti({"esempi": [uno]}, contesto=True)  # pylint: disable=protected-access
+    assert not list(cartella.glob("lavori/in-attesa/*.json"))

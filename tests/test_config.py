@@ -409,6 +409,16 @@ def test_finale_ingrandisce_solo_di_quanto_offre_lo_studio_ed_e_scelto():
         comfy.SCHEMI[comfy.MODELLO_FINALE].corpo(richiesta)
 
 
+def test_esempi_stile_massimo_ferma_un_quinto_esempio_ed_e_scelto(tmp_path):
+    """Caso: si caricano dieci render d'esempio e partono tutti, pagati e confusi."""
+    from core.studio.servizio import RichiestaStudioNonValida, Studio
+    assert config.costante("ESEMPI_STILE_MASSIMO").origine == config.SCELTA
+    studio = Studio(tmp_path)
+    nomi = [f"rif-{i:016x}.jpg" for i in range(config.ESEMPI_STILE_MASSIMO)]
+    with pytest.raises(RichiestaStudioNonValida):
+        studio._esempi_scelti({"esempi": nomi})  # pylint: disable=protected-access
+
+
 # --- guardia -----------------------------------------------------------------
 
 
