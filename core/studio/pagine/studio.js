@@ -2829,7 +2829,22 @@ function disegnaStorico() {
   nav.scrollLeft = scorrimento;
 }
 
+// Mentre si trascina (un'area, il rettangolo del fotoinserimento, un
+// foglietto) la pagina non si ridisegna: rifare la tela a meta' gesto le
+// toglieva il puntatore e il disegno saltava (test del 2026-11-04). Il
+// ridisegno chiesto nel frattempo parte appena si lascia.
+let trascinando = false;
+let ridisegnoInAttesa = false;
+window.addEventListener("pointerdown", (ev) => { if (ev.button === 0) trascinando = true; }, true);
+for (const tipo of ["pointerup", "pointercancel"]) {
+  window.addEventListener(tipo, () => {
+    trascinando = false;
+    if (ridisegnoInAttesa) { ridisegnoInAttesa = false; setTimeout(render, 0); }
+  }, true);
+}
+
 function render() {
+  if (trascinando) { ridisegnoInAttesa = true; return; }
   disegnaTestata();
   disegnaStorico();
   const main = document.getElementById("principale");
