@@ -353,7 +353,7 @@ il 2026-10-30».
 **Colonna destra**
 - **Le note in elenco**, nello stesso ordine e con lo stesso numero, per
   rileggerle e correggerle senza cercarle sull'immagine.
-- **Un solo Applica per tutte le note**: «Applica le 2 note · un invio», con
+- **Un solo Applica per tutte le note**: «Applica le 2 note», con
   la destinazione e il costo di **un** invio (regola 5).
 - Il risultato è **un passo nuovo nell'albero** (Studio · Passi), figlio del
   render su cui si sono disegnate le aree.
@@ -485,7 +485,7 @@ provider finto. Dove la schermata si scosta da quello che c'è sopra, e perché:
   destinazione e costo, come Rifai in Risultato. Rifai pulito mostra la
   strada, lo stile del primo passo, le richieste in fila e il prompt intero
   prima di Conferma e invia; il risultato è un ramo sotto lo 0 che si chiama
-  «Pulito dalla vista · <preset>». È spento su un passo partito dalla vista:
+  «Tutto dalla vista · <preset>». È spento su un passo partito dalla vista:
   non c'è niente da unire.
 - **L'avviso parte da `PASSI_AVVISO_DA_GENERAZIONE` generazioni** (2,
   SCELTA in `core/config.py`) e lo dice sotto il testo: la soglia si tara
@@ -683,7 +683,7 @@ mai provato con una chiamata vera: lo si dice prima di ogni invio.
 - **Prova a secco** e **Genera video**.
 
 **I video fatti**, sotto: ognuno col suo lettore, le immagini da cui è nato,
-durata, risoluzione e costo letto dal servizio; **Apri la cartella dei video**.
+durata, risoluzione e costo letto dal servizio; **Apri cartella**.
 
 - **Vuoto:** nessuna immagine scelta: «Carica il render da cui partire, oppure
   da Risultato premi Fai un video da qui.» Genera video è spento con la
@@ -817,6 +817,19 @@ partenza non c'è più. Resta **Apri cartella**.
 
 - **Vuoto / in corso / errore:** come prima; un passo non riuscito non ha la
   barra (non c'è un'immagine da cui partire).
+
+**Suggerimenti e parole, stesso giorno (richiesta di Riccardo).**
+- Ogni pulsante d'azione ha una frase al passaggio del mouse che dice cosa fa.
+  Le frasi stanno in un elenco solo (`SPIEGA_PULSANTI` in `studio.js`), così
+  la stessa azione si spiega sempre allo stesso modo. Le scelte (preset,
+  luce, cielo…) non ne hanno: il nome basta, e dove serve c'è già il «?».
+- Stesse parole per le stesse cose: «Chiudi» per i riquadri (era «Lascia
+  stare»), «Apri cartella» ovunque, «Applica» senza «· un invio», un passo da
+  Cambia si chiama «Cambia» nello storico e «Cambia: …» nell'elenco dei
+  render (era «Modifica» e «Passo: …»), un ritocco «Ritocco: …» (prima
+  risultava «Scelte libere»), un render da Rifai tutto «Tutto dalla vista · …».
+- Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
+  preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
 ## Schermate sostituite il 2026-10-27
 

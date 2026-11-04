@@ -175,8 +175,8 @@ def _studio(cartella, chiamate, coda_attiva=True):
 def test_il_catalogo_dice_dove_va_e_che_non_e_provato(tmp_path):
     catalogo = _studio(tmp_path, []).catalogo_video()
     assert video.MODELLO in catalogo["destinazione"]
-    assert "non e' ancora stato provato" in catalogo["avviso"]
-    assert catalogo["costo"].startswith("non misurato")
+    assert "non è ancora stato provato" in catalogo["avviso"]
+    assert catalogo["costo"].startswith("non ancora misurato")
     assert catalogo["durate"] == list(config.VIDEO_DURATE_SECONDI)
     assert {m["id"] for m in catalogo["modi"]} == set(video.MODI)
 

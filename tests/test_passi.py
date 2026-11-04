@@ -392,7 +392,7 @@ def test_rifai_pulito_parte_dalla_vista_ed_e_un_ramo_nuovo_sotto_lo_0(catena, ca
     assert chiamate[-1].prompt == mostrato  # parte il prompt che si e' visto
     riga = next(p for p in studio.passi(VISTA)["passi"] if p["identificativo"] == nuovo)
     assert riga["da_numero"] == "0" and riga["generazioni"] == 1 and not riga["avviso"]
-    assert riga["tipo"] == "pulito" and riga["nome"].startswith("Pulito dalla vista")
+    assert riga["tipo"] == "pulito" and riga["nome"].startswith("Tutto dalla vista")
 
 
 def test_rifai_pulito_di_un_passo_dalla_vista_non_ha_niente_da_unire(catena):

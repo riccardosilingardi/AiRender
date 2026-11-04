@@ -980,7 +980,9 @@ class Studio:
             "modello_nome": modello.nome if modello else dati.get("modello"),
             "preset": dati.get("preset"),
             "preset_nome": (
-                "Passo: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
+                "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
+                if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
+                else "Cambia: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
                 else preset.nome if preset else "Scelte libere"
             ),
             "parte_da": dati.get("parte_da"),
@@ -1553,9 +1555,9 @@ class Studio:
             "destinazione": motore.destinazione_per(modulo_video.MODELLO),
             "senza_ripiego": comfy.FALLBACK == "false",
             "fa_video": motore.fa_video(),
-            "avviso": (f"{modulo_video.MODELLO} non e' ancora stato provato con una chiamata vera: "
-                       "questo video e' la prova. Se il servizio lo rifiuta, l'errore lo dice."),
-            "costo": "non misurato: nessun video e' ancora stato fatto",
+            "avviso": (f"{modulo_video.MODELLO} non è ancora stato provato con una chiamata vera: "
+                       "il primo video è la prova. Se il servizio lo rifiuta, l'errore lo dice."),
+            "costo": "non ancora misurato, nessun video fatto",
             "modi": [{"id": k, "nome": n, "spiega": d, "minimo": modulo_video.QUANTE[k][0],
                       "massimo": modulo_video.QUANTE[k][1]} for k, (n, d) in modulo_video.MODI.items()],
             "movimenti": [{"id": k, "nome": n} for k, (n, _testo) in modulo_video.MOVIMENTI.items()],
@@ -1754,7 +1756,7 @@ def _richieste_del_passo(passo: dict) -> list[str]:
 
 
 # Come la striscia dello storico chiama ogni immagine: una o due parole.
-_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Modifica", "ritocco": "Ritocco"}
+_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco"}
 
 
 def _tipo_passo(passo: dict) -> str:
@@ -1783,7 +1785,7 @@ def _nome_passo(passo: dict) -> str:
         breve = modulo_passi.nome_breve((passo.get("richieste") or [""])[0])
         return breve[:1].upper() + breve[1:] if breve else "Passo senza richiesta"
     if tipo == "pulito":
-        return f"Pulito dalla vista · {_nome_stile(passo)}"
+        return f"Tutto dalla vista · {_nome_stile(passo)}"
     return _nome_stile(passo)
 
 

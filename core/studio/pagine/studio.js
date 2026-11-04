@@ -65,7 +65,56 @@ const S = {
 
 // --- attrezzi ---------------------------------------------------------------
 
+// Cosa fa ogni pulsante d'azione, al passaggio del mouse (Riccardo,
+// 2026-11-04). Un posto solo, così la stessa azione si spiega sempre allo
+// stesso modo. Un pulsante che ha già il suo title tiene il suo.
+const SPIEGA_PULSANTI = {
+  "Usa un'altra vista…": "Scegli un'altra cattura dalla cartella delle viste.",
+  "Mostra e modifica il prompt completo": "Mostra il testo in inglese che parte al modello. Lo puoi riscrivere a mano.",
+  "Ricomponi dalle scelte": "Butta il testo scritto a mano e rifà il prompt dalle scelte.",
+  "Salva queste scelte": "Salva le scelte di questa pagina fra I miei preset, per riusarle.",
+  "Rinomina": "Cambia il nome di questo preset.",
+  "Elimina": "Toglie questo preset da I miei preset.",
+  "+ Riferimento": "Aggiungi una foto del materiale che vuoi: parte insieme alla vista.",
+  "Scegli la foto": "Carica la foto del luogo dal computer.",
+  "Prova a secco": "Mostra cosa partirebbe, senza inviare niente e senza spendere crediti.",
+  "Genera render": "Manda la vista al servizio scritto sopra, con lo stile scelto.",
+  "Annulla": "Ferma il lavoro.",
+  "Prima / dopo": "Le due immagini una sopra l'altra, con una linea da trascinare.",
+  "Affiancati": "Le due immagini una accanto all'altra.",
+  "Solo render": "Solo il render, grande.",
+  "Misura ora": "Misura quanti spigoli della vista Allplan si ritrovano nel render.",
+  "Apri cartella": "Apre la cartella in Esplora file.",
+  "Copia immagine": "Copia il render negli appunti, da incollare dove vuoi.",
+  "Esporta per il cliente": "Salva il render in JPEG, PNG o PSD a livelli, senza prompt né ricetta.",
+  "Esporta": "Salva il file nella cartella «esportati».",
+  "Chiudi": "Chiude il riquadro. Non parte niente.",
+  "Applica": "Manda questa immagine e la richiesta al servizio scritto sopra. Esce un passo nuovo.",
+  "Genera video": "Manda le immagini al servizio video scritto sopra.",
+  "Porta su questa vista": "Manda la vista scelta con lo stesso stile e le stesse richieste, e questa immagine come riferimento.",
+  "Rifai tutto dalla vista": "Un solo invio dalla vista Allplan con tutte le richieste dei passi: gli spigoli tornano quelli della vista.",
+  "Conferma e invia": "Manda il prompt qui sopra, dalla vista Allplan.",
+  "Rettangolo": "Disegna un'area trascinando da un angolo all'altro.",
+  "Selezione libera": "Disegna un'area a mano libera, come il lazo di Photoshop.",
+  "Togli": "Lo toglie da qui. I file nella cartella restano.",
+  "Dai render": "Scegli fra i render già fatti, di tutte le viste.",
+  "Da file…": "Scegli un'immagine dal computer.",
+  "Vai a Genera": "Apre Genera, dove scegli lo stile e mandi la vista.",
+  "Vedi nei Passi": "Apre l'albero dei passi di questa vista.",
+  "Ritocca questo render": "Apre Ritocca su questo render.",
+  "Torna al render di prima": "Torna all'immagine da cui era partito questo ritocco.",
+};
+
+function testoPulsante(figli) {
+  return figli.flat().filter((f) => typeof f === "string").join("").trim();
+}
+
 function h(tag, attributi, ...figli) {
+  if (tag === "button" && !(attributi && attributi.title)) {
+    const testo = testoPulsante(figli);
+    const spiegazione = SPIEGA_PULSANTI[testo] || (testo.startsWith("Applica ") ? SPIEGA_PULSANTI.Applica : null);
+    if (spiegazione) attributi = { ...attributi, title: spiegazione };
+  }
   const nodo = document.createElement(tag);
   for (const [chiave, valore] of Object.entries(attributi || {})) {
     if (valore === null || valore === undefined || valore === false) continue;
@@ -644,8 +693,7 @@ function colonnaStile() {
     h("div", { classe: "switch", role: "group", "aria-label": "Scena" },
       SCENE.map(([id, nome]) => h("button", { classe: "seg", "aria-pressed": String(S.scelte.scena === id), onclick: () => scegliScena(id) }, nome))));
   const preset = h("section", { classe: "pannello", "aria-label": "Parti da un preset" },
-    h("div", { classe: "riga tra" }, h("h2", {}, "Parti da un preset"),
-      h("span", { classe: "tenue piccolo" }, "Ogni preset ha un prompt curato e imposta i comandi qui sotto")),
+    h("h2", {}, "Parti da un preset"),
     h("p", { classe: "tenue piccolo" }, rigaMiniature(presetDi(S.scelte.scena))),
     h("div", { classe: "griglia" }, presetDi(S.scelte.scena).map((p) =>
       tessera(p.nome, S.preset === p.id, () => scegliPreset(p.id), miniatura(p), null,
@@ -1387,7 +1435,7 @@ function pannelloEsporta(l) {
       " Si salva nella cartella «esportati», accanto alle viste. Nel file ci sono solo le immagini: niente prompt, niente ricetta."),
     h("div", { classe: "azioni" },
       h("button", { classe: "btn primario", onclick: () => esportaRender(l), disabled: r.esportando }, r.esportando ? "Esporto…" : "Esporta"),
-      e ? h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "esportati" }).catch((x) => { S.errore = x; render(); }) }, "Apri cartella esportati") : null),
+      e ? h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "esportati" }).catch((x) => { S.errore = x; render(); }) }, "Apri cartella") : null),
     e ? h("div", { classe: "avviso", role: "status" },
       h("b", {}, `Salvato: ${e.nome}`),
       h("span", {}, `${e.larghezza} × ${e.altezza} px · ${String(e.peso_mb).replace(".", ",")} MB` +
@@ -1709,7 +1757,7 @@ function disegnaApplicaRitocco() {
   const bottone = document.getElementById("applica-ritocco");
   if (bottone) {
     bottone.disabled = !!motivoApplicaRitoccoSpento();
-    bottone.textContent = n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`} · un invio` : "Applica · un invio";
+    bottone.textContent = n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`}` : "Applica";
   }
   const motivo = document.getElementById("motivo-ritocco");
   if (motivo) motivo.textContent = motivoApplicaRitoccoSpento();
@@ -1899,7 +1947,7 @@ function strumentiRitocco(spenti, ragione) {
 function elencoNote(bloccato) {
   const r = S.ritocca;
   if (!r.aree.length) {
-    return h("p", { classe: "tenue piccolo" }, "Le note che scrivi sui foglietti attaccati alle aree le ritrovi qui in elenco, per rileggerle e correggerle.");
+    return h("p", { classe: "tenue piccolo" }, "Qui ritrovi le note delle aree, per rileggerle e correggerle.");
   }
   return h("ol", { classe: "elenco-note" }, r.aree.map((a, i) => {
     const campo = h("textarea", { id: `elenco-nota-${i}`, rows: "2", "aria-label": `Nota ${i + 1}`, readonly: bloccato || null });
@@ -1937,11 +1985,9 @@ function pannelloApplica(base, bloccato) {
     h("div", { id: "errore-ritocco" }),
     bloccato ? null : h("div", { classe: "azioni" },
       h("button", { classe: "btn primario", id: "applica-ritocco", onclick: applicaRitocco, disabled: true },
-        n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`} · un invio` : "Applica · un invio"),
+        n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`}` : "Applica"),
       h("span", { classe: "tenue piccolo", id: "motivo-ritocco" })),
-    h("p", { classe: "tenue piccolo" }, base.figli
-      ? `Il risultato è un passo nuovo nell'albero, figlio del passo ${base.numero}, accanto ai rami che ha già.`
-      : `Il risultato è un passo nuovo nell'albero, figlio del passo ${base.numero}.`));
+    h("p", { classe: "tenue piccolo" }, `Esce un passo nuovo sotto il passo ${base.numero}.`));
 }
 
 async function applicaRitocco() {
@@ -2356,13 +2402,13 @@ function pannelloNuovoPasso() {
   const usa = (testo) => { n.testo = testo; campo.value = testo; componiNuovoPasso(); disegnaNuovoPasso(); campo.focus(); };
   return h("section", { classe: "pannello evidenziato", "aria-label": "Cambia" },
     h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Cambia tutta l'immagine, a parole"),
-      h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Lascia stare")),
-    h("p", { classe: "piccolo" }, `Parte da questa immagine (passo ${da.numero}): spigoli, arredo e inquadratura restano, cambia solo quello che scrivi. Esce un passo nuovo${da.figli ? ", accanto a quelli che ci sono già" : ""}.`),
+      h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Chiudi")),
+    h("p", { classe: "piccolo" }, `Spigoli, arredo e inquadratura restano, cambia solo quello che scrivi. Esce un passo nuovo sotto il passo ${da.numero}.`),
     h("div", { classe: "scelte-chip", role: "group", "aria-label": "Scorciatoie" },
       SCORCIATOIE_CAMBIA.map(([nome, testo]) => h("button", { classe: "chip", "aria-pressed": String(n.testo === testo), onclick: () => usa(testo) }, nome))),
     campo,
     nota("Scorciatoie: testi scelti, non provati.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare. Non sono ancora state provate con il modello."),
-    h("p", { classe: "tenue piccolo" }, "Solo in una parte dell'immagine? Usa Ritocca: disegni l'area e scrivi la nota."),
+    h("p", { classe: "tenue piccolo" }, "Solo una parte? Usa Ritocca."),
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
@@ -2378,7 +2424,7 @@ function pannelloPulito(passo) {
   const c = q.composto;
   if (q.errore && !c) {
     return h("section", { classe: "pannello evidenziato" }, avviso("errore", q.errore.fatto, q.errore.cosa_fare),
-      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Lascia stare"));
+      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Chiudi"));
   }
   if (!c) return h("section", { classe: "pannello evidenziato" }, h("p", { classe: "tenue" }, "Unisco le richieste della strada…"));
   const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt di Rifai tutto dalla vista" });
@@ -2399,7 +2445,7 @@ function pannelloPulito(passo) {
     q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
     h("div", { classe: "azioni" },
       h("button", { classe: "btn primario", onclick: inviaPulito, disabled: !!S.lavoroAttivo }, "Conferma e invia"),
-      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Lascia stare")),
+      h("button", { classe: "btn", onclick: () => { S.passi.pulito = null; render(); } }, "Chiudi")),
     S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: si può inviare quando finisce.") : null);
 }
 
@@ -2445,7 +2491,7 @@ function latoPassi(passo) {
     blocchi.push(h("div", { classe: "avviso attenzione", role: "note" },
       h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
       h("span", {}, "Se vedi l'edificio cambiare, usa «Rifai tutto dalla vista» qui sotto."),
-      h("span", { classe: "piccolo tenue" }, `Avviso da ${S.passi.dati.avviso_da_generazione} generazioni: soglia scelta, da tarare con il piano «catena» del banco di prova.`)));
+      h("span", { classe: "piccolo tenue" }, `Avviso da ${S.passi.dati.avviso_da_generazione} generazioni: soglia scelta, non tarata.`)));
   }
   if (passo.partenza_mancante) {
     blocchi.push(avviso("errore", "Il punto di partenza non c'è più: il render del passo prima è stato tolto dalla cartella.",
@@ -2660,7 +2706,7 @@ function colonnaInvioVideo() {
     h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : pieni ? `Le ${pieni} immagini vanno` : "Le immagini vanno"} a `, h("b", {}, c.destinazione),
       ` (${c.fornitore}, ${c.modello_nome})`, c.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
     h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, c.costo)),
-    avviso("attenzione", c.avviso, "Il primo video è la prova: se va, lo segno come provato."));
+    avviso("attenzione", c.avviso));
   if (!S.studio.coda_attiva) invio.append(avviso("attenzione", "La coda dei lavori non sta girando: il video resterebbe in attesa.", "Chiudi e riapri lo Studio, che la fa partire."));
   invio.append(h("div", { classe: "azioni" },
     h("button", { classe: "btn", onclick: provaASeccoVideo, disabled: !pieni }, "Prova a secco"),
@@ -2780,7 +2826,7 @@ function schermataVideo() {
     h("div", { classe: "colonne" }, colonnaImmaginiVideo(), colonnaInvioVideo()),
     h("section", { classe: "pannello", "aria-label": "I video fatti" },
       h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "I video fatti"),
-        h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "video" }).catch((e) => { v.errore = e; render(); }) }, "Apri la cartella dei video")),
+        h("button", { classe: "btn", onclick: () => post("/api/apri-cartella", { quale: "video" }).catch((e) => { v.errore = e; render(); }) }, "Apri cartella")),
       v.voci.length ? h("div", { classe: "elenco-video" }, vociVideo(v.voci)) : h("p", { classe: "tenue" }, "Nessun video ancora."))];
 }
 
