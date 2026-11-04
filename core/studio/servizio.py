@@ -82,7 +82,7 @@ class Modello:
 # I gruppi della scelta del modello, nell'ordine in cui compaiono.
 CATEGORIE_MODELLI = (
     ("consigliati", "Consigliati", "I modelli con cui lo Studio è stato provato di più."),
-    ("alternative", "Da confrontare", "Altri modelli che ricevono più immagini: utili per un secondo parere sullo stesso render."),
+    ("alternative", "Altri modelli", "Altri modelli che ricevono più immagini: utili per un secondo parere sullo stesso render."),
     ("una_immagine", "Una sola immagine", "Ricevono solo la vista o il render: niente riferimenti, foto dei materiali o Rif."),
 )
 
@@ -452,7 +452,7 @@ class Studio:
             "categorie_modelli": [{"id": c, "nome": n, "spiega": s} for c, n, s in CATEGORIE_MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
             "risoluzioni": [
-                {"id": r, "nome": r.upper() + ("" if r == config.RISOLUZIONE_RENDER_PREDEFINITA else " · da provare")}
+                {"id": r, "nome": r.upper()}
                 for r in config.RISOLUZIONI_RENDER
             ],
             "contesto": {

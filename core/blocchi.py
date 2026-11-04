@@ -443,7 +443,7 @@ SFONDO = {
 
 QUALITA_PRODOTTO = _blocchi(
     ("base", "Base", "Professional furniture product photography, natural detail."),
-    ("32k", "Altissima definizione (da provare)",
+    ("32k", "Altissima definizione",
      "Professional furniture product photography, 32k, ultra-detailed, design "
      "magazine quality."),
 )
@@ -468,7 +468,7 @@ PERSONE = {
 
 QUALITA = _blocchi(
     ("base", "Base", "Professional architectural photography, natural detail."),
-    ("32k", "Altissima definizione (da provare)",
+    ("32k", "Altissima definizione",
      "Professional architectural photography, 32k, ultra-detailed, archi "
      "magazine quality."),
 )

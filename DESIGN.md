@@ -873,9 +873,9 @@ accanto alla finestra»).
 Rifai tutto: chiusa, la scheda del modello scelto (spunta, nome, fornitore,
 «predefinito», una riga su a cosa serve, «Più immagini per invio» o «Una sola
 immagine per invio», costo) e «Cambia modello (N altri)». Aperta, le schede per
-gruppo: **Consigliati**, **Da confrontare**, **Una sola immagine**, con il «?»
-che spiega il gruppo, e in fondo «Le righe sono un giudizio, non un confronto
-misurato sul banco di prova.» Un modello che non può fare l'invio (schema non
+gruppo: **Consigliati**, **Altri modelli**, **Una sola immagine**, con il «?»
+che spiega il gruppo (senza scritte «da provare», richiesta di Riccardo del
+2026-11-04). Un modello che non può fare l'invio (schema non
 verificato, oppure una sola immagine quando ne partono di più) resta visibile,
 spento, con il perché sulla scheda. Schermate:
 `docs/ui/studio-rif/70-genera-rif-e-modello-chiuso.png`,
@@ -900,9 +900,7 @@ Richiesta di Riccardo del 2026-11-04: «ControlNet va fatto, spuntato insieme e
 messo in fila a Nano Banana». In Genera, dopo il riferimento per lo stile e
 prima dei Rif.: la spunta **Tieni la geometria**, con la frase che spiega il
 ControlNet nella stessa riga («un pezzo che obbliga un modello aperto a seguire
-gli spigoli della vista») e «Due invii, due costi». Spuntata, aggiunge «Mai
-provato su Comfy: il primo render dice se gli spigoli tengono e quanto costa.»
-Nel riquadro Invio, sopra la destinazione di sempre: «Prima passata: la vista
+gli spigoli della vista») e «Due invii, due costi». Nel riquadro Invio, sopra la destinazione di sempre: «Prima passata: la vista
 va a **Comfy, workflow Z-Image-Turbo + ControlNet sugli spigoli su
 cloud.comfy.org**», «Costo della prima passata: **non misurato**», poi «Poi il
 suo render va a …» e il conteggio delle immagini con «il render della prima
