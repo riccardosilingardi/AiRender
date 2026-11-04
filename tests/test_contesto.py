@@ -206,7 +206,7 @@ def test_il_prompt_composto_nello_studio_e_quello_del_contesto(cartella, chiamat
     composto = studio.componi({"scelte": blocchi.da_preset("rivista", materiali="intonaco bianco").a_dizionario(),
                                "contesto": _contesto(nome, luogo="Rontano")})
     assert composto["prompt"] == blocchi.componi_contesto("zenitale", luogo="Rontano", materiali="intonaco bianco")
-    assert composto["riassunto"].startswith("Inserisci nel contesto")
+    assert composto["riassunto"].startswith("Fotoinserimento")
 
 
 def test_contesto_e_riferimento_insieme_si_rifiutano(cartella, chiamate):

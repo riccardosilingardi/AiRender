@@ -566,6 +566,12 @@ non c'è: il riferimento si sceglie nello Studio.
 
 ## Inserisci in un luogo, rifatta il 2026-11-01
 
+Dal 2026-11-04 si chiama **Fotoinserimento** (Riccardo: funziona anche per un
+arredo dentro una foto di un interno). Sottotitolo: «Quello che hai in
+Allplan, edificio o arredo, dentro una foto vera: dall'alto, a volo d'uccello
+o da terra.» Passi: «Segna dove va», «Com'è stata scattata la foto», «Da
+Allplan». Il prompt non cambia.
+
 Il fotoinserimento: l'edificio di Allplan dentro una foto del luogo. La prima
 versione (in cima alla colonna destra, immagine piccola, stile spento) non si
 capiva: Riccardo l'ha provata con uno Street View e non ha trovato dove

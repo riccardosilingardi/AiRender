@@ -65,7 +65,7 @@ FORMATO_RIFERIMENTO = 4  # numero-non-configurabile: versione del formato di un 
 # Il formato 4 (prompt 11) aggiunge l'immagine di riferimento per lo stile.
 # Si scrive solo quando c'e' un riferimento: un motore vecchio rifiuta il 4
 # invece di mandare una sola immagine dopo che lo Studio ne ha annunciate due.
-FORMATO_CONTESTO = 5  # numero-non-configurabile: versione del formato di un lavoro «Inserisci nel contesto»
+FORMATO_CONTESTO = 5  # numero-non-configurabile: versione del formato di un lavoro «Fotoinserimento»
 # Il formato 5 (2026-11-01) aggiunge il contesto: l'immagine del luogo con
 # l'area dove va l'edificio. Si scrive solo quando c'e' un contesto: un motore
 # vecchio rifiuta il 5 invece di mandare la vista da sola.
@@ -257,7 +257,7 @@ class Lavoro:
     # questo il riferimento non e' solo stile ma lo stesso progetto da
     # un'altra camera (blocchi.RIFERIMENTO_COERENZA).
     portato_da: str | None = None
-    # Studio · Genera, «Inserisci nel contesto»: l'immagine del luogo con
+    # Studio · Genera, «Fotoinserimento»: l'immagine del luogo con
     # l'area dove va l'edificio. Parte per prima, la vista dopo. Solo da una
     # vista, mai con aree, passi o riferimento.
     contesto: modulo_contesto.Contesto | None = None
@@ -520,7 +520,7 @@ def metti_in_coda(
     if contesto is not None:
         if partenza or aree or riferimento is not None:
             raise LavoroNonValido(
-                "«Inserisci nel contesto» parte solo dalla vista, senza passi, aree o riferimento per lo stile.",
+                "«Fotoinserimento» parte solo dalla vista, senza passi, aree o riferimento per lo stile.",
                 "Togli il riferimento per lo stile, oppure togli il contesto.",
             )
         file_contesto = modulo_contesto.controlla_file(radice, Path(contesto.file))
@@ -530,7 +530,7 @@ def metti_in_coda(
         if partenza or aree or contesto is not None:
             raise LavoroNonValido(
                 "I materiali da cambiare partono solo con un render dalla vista, "
-                "non da un passo, un ritocco o «Inserisci nel contesto».",
+                "non da un passo, un ritocco o «Fotoinserimento».",
                 "Togli la spunta dai materiali, oppure genera da Genera.",
             )
         materiali = tuple(_cambio_controllato(radice, c) for c in modulo_materiali.controlla_cambi(tuple(materiali)))
@@ -570,7 +570,7 @@ def metti_in_coda(
         )
     if contesto is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
-            f"{modello} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due.",
+            f"{modello} riceve una sola immagine per invio: «Fotoinserimento» ne manda due.",
             "Scegli Nano Banana 2.",
         )
     if riferimento is not None and not crea_provider(provider).accetta_piu_immagini(modello):

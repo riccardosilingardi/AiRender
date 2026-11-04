@@ -31,7 +31,7 @@ Rotte:
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
     POST /api/riferimenti                  carica un'immagine di riferimento per lo stile (corpo: i byte)
-    POST /api/contesti                     carica l'immagine del contesto per «Inserisci nel contesto» (corpo: i byte)
+    POST /api/contesti                     carica l'immagine del contesto per «Fotoinserimento» (corpo: i byte)
     POST /api/lavori/<id>/annulla          file .annulla accanto al lavoro
     GET  /api/miei-preset                  i preset salvati dall'utente
     POST /api/miei-preset                  salva le scelte con un nome (rinomina, elimina sotto)

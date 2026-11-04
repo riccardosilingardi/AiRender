@@ -879,7 +879,7 @@ function pannelloRiferimento() {
   const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
   if (S.modo === "contesto") {
     return [titolo, h("p", { classe: "tenue piccolo" },
-      "Con «Inserisci nel contesto» il riferimento non parte: le due immagini sono già il contesto e la vista, e la luce la dà il contesto.")];
+      "Con «Fotoinserimento» il riferimento non parte: le due immagini sono già il contesto e la vista, e la luce la dà il contesto.")];
   }
   if (!accetta) {
     return [titolo,
@@ -984,7 +984,7 @@ async function cambiaModo(modo) {
 function sceltaModo() {
   return h("div", { classe: "scelta-modo", role: "group", "aria-label": "Cosa vuoi fare" },
     [["vista", "Render della vista", "La vista di Allplan diventa una foto, con lo stile che scegli."],
-     ["contesto", "Inserisci in un luogo", "L'edificio dentro una foto del luogo vero: dall'alto, a volo d'uccello o da terra."]]
+     ["contesto", "Fotoinserimento", "Quello che hai in Allplan, edificio o arredo, dentro una foto vera: dall'alto, a volo d'uccello o da terra."]]
       .map(([id, nome, spiega]) => h("button", { classe: "modo", "aria-pressed": String(S.modo === id), onclick: () => cambiaModo(id) },
         h("b", {}, nome), h("span", { classe: "tenue piccolo" }, spiega))));
 }
@@ -1007,22 +1007,22 @@ const VISTA_PER_INQUADRATURA = {
 function sezioneContesto() {
   const c = S.contesto;
   const cat = S.catalogo.contesto;
-  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica la foto del luogo" });
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica la foto" });
   file.addEventListener("change", () => scegliContesto(file.files && file.files[0]));
 
   // 1 · la foto del luogo, grande: e' dove si disegna.
   const uno = c
-    ? passo(1, "Segna dove va l'edificio", !!c.area,
+    ? passo(1, "Segna dove va", !!c.area,
         h("p", { classe: c.area ? "tenue piccolo" : "piccolo invito" }, c.area
           ? "Fatto. Per cambiare l'area trascina di nuovo. Fuori dal rettangolo la foto deve restare com'è."
-          : "Trascina sulla foto un rettangolo, da un angolo all'altro, dove deve stare l'edificio."),
+          : "Trascina sulla foto un rettangolo, da un angolo all'altro, dove deve stare quello che viene da Allplan."),
         telaContesto(),
         h("p", { classe: "tenue piccolo" }, `${c.da || c.nome} · ${c.larghezza} × ${c.altezza} · `,
           h("label", { classe: "link-file" }, "cambia foto", h("span", { classe: "nascosto" }, file)),
           " · ", h("button", { classe: "link-file come-link", onclick: togliContesto }, "togli")))
-    : passo(1, "Carica la foto del luogo", false,
+    : passo(1, "Carica la foto", false,
         h("label", { classe: "carica-luogo" },
-          h("b", {}, "Scegli la foto del luogo"),
+          h("b", {}, "Scegli la foto"),
           h("span", { classe: "tenue piccolo" }, "Uno screenshot di Google Earth, un'ortofoto, una foto da drone o una foto da terra, anche uno Street View. JPEG o PNG."),
           h("span", { classe: "nascosto" }, file)),
         nota("La foto la porti tu.", "AIRENDER non scarica mappe: la foto la porti tu."));
@@ -1042,7 +1042,7 @@ function sezioneContesto() {
     }[inq]));
 
   // 3 · l'edificio: la vista di Allplan, con la camera giusta.
-  const tre = passo(3, "L'edificio, da Allplan", !!(S.vista && S.descrizione && S.descrizione.idonea),
+  const tre = passo(3, "Da Allplan", !!(S.vista && S.descrizione && S.descrizione.idonea),
     S.vista
       ? h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(S.vista)}`, alt: `Vista di Allplan ${S.vista}` })
       : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."),
@@ -1051,7 +1051,7 @@ function sezioneContesto() {
       h("button", { classe: "btn", onclick: () => { S.mostraViste = !S.mostraViste; render(); }, "aria-expanded": String(S.mostraViste) }, "Usa un'altra vista…")),
     S.mostraViste ? pannelloViste() : null);
 
-  return h("section", { classe: "pannello sezione-contesto", "aria-label": "Inserisci in un luogo" },
+  return h("section", { classe: "pannello sezione-contesto", "aria-label": "Fotoinserimento" },
     h("div", { classe: "griglia-contesto" }, uno, h("div", { classe: "passi-destra" }, due, tre)));
 }
 
@@ -2838,13 +2838,25 @@ function render() {
     return;
   }
   const attivo = document.activeElement && document.activeElement.id;
+  // La pagina si ridisegna ogni pochi secondi: chi sta scrivendo deve
+  // ritrovare il cursore dov'era, non in fondo (test del 2026-11-04 sulle note).
+  const prima = attivo ? document.activeElement : null;
+  const cursore = prima && typeof prima.selectionStart === "number"
+    ? { inizio: prima.selectionStart, fine: prima.selectionEnd, direzione: prima.selectionDirection, alto: prima.scrollTop } : null;
   const scorrimento = window.scrollY;
   const contenuto = S.scheda === "video" ? schermataVideo()
     : S.scheda === "risultato" ? schermataRisultato()
     : S.scheda === "passi" ? schermataPassi()
     : S.scheda === "ritocca" ? schermataRitocca() : schermataGenera();
   main.replaceChildren(...[contenuto].flat(2).filter(Boolean));
-  if (attivo && document.getElementById(attivo)) document.getElementById(attivo).focus();
+  const dopo = attivo && document.getElementById(attivo);
+  if (dopo) {
+    dopo.focus();
+    if (cursore && typeof dopo.setSelectionRange === "function") {
+      try { dopo.setSelectionRange(cursore.inizio, cursore.fine, cursore.direzione || "none"); } catch (e) { /* un campo senza cursore */ }
+      dopo.scrollTop = cursore.alto;
+    }
+  }
   if (S.scheda === "passi") { disegnaNuovoPasso(); }
   if (S.scheda === "ritocca") { disegnaApplicaRitocco(); }
   window.scrollTo(0, scorrimento);

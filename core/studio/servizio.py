@@ -324,7 +324,7 @@ class Studio:
         if not re.fullmatch(r"ctx-[0-9a-f]{16}\.(jpg|png)", nome or ""):
             raise RichiestaStudioNonValida(
                 f"\"{nome}\" non e' il nome di un'immagine del contesto.",
-                "Caricala di nuovo in «Inserisci nel contesto».",
+                "Caricala di nuovo in «Fotoinserimento».",
             )
         percorso = modulo_contesto.cartella_contesti(self.cartella) / nome
         if not percorso.is_file():
@@ -564,7 +564,7 @@ class Studio:
             "immagini": (2 if (riferimento or contesto) else 1) + dei_materiali,
             "cosa_parte": _cosa_parte(riferimento, contesto, dei_materiali),
             "contesto_non_accettato": (
-                f"{modello.nome} riceve una sola immagine per invio: «Inserisci nel contesto» ne manda due. "
+                f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
                 "Scegli Nano Banana 2."
                 if contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "riferimento_non_accettato": (
@@ -778,7 +778,7 @@ class Studio:
         lavoro, _cartella = self._lavoro(identificativo)
         if lavoro.contesto is not None:
             raise RichiestaStudioNonValida(
-                "Un'immagine di «Inserisci nel contesto» non si porta su un'altra vista: "
+                "Un'immagine di «Fotoinserimento» non si porta su un'altra vista: "
                 "la sua prima immagine e' il luogo, non la vista.",
                 "Scegli un render nato da una vista Allplan.")
         render = self._render(identificativo)
@@ -1889,8 +1889,8 @@ def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0) -> str:
 
 
 def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") -> str:
-    """Cosa parte con «Inserisci nel contesto», in italiano."""
-    pezzi = ["Inserisci nel contesto", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
+    """Cosa parte con «Fotoinserimento», in italiano."""
+    pezzi = ["Fotoinserimento", blocchi.INQUADRATURE[contesto.inquadratura].nome.lower()]
     pezzi.append(f"materiali: {materiali.strip()}" if materiali and materiali.strip()
                  else "materiali: li sceglie il modello")
     if contesto.luogo:
