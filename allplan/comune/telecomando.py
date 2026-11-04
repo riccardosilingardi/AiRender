@@ -1,21 +1,16 @@
-"""La palette v1 di Allplan, il telecomando: tutto quello che non importa Allplan.
+"""La palette di Allplan, il telecomando: tutto quello che non importa Allplan.
 
 L'adattatore di ogni versione (allplan/v2026/.../AirenderPalette.py) fa solo
 quello che esiste soltanto dentro Allplan: cattura della finestra, lettura
-della camera, lettura e scrittura dei campi della palette, finestre di
-messaggio. Il resto e' qui e si prova con pytest.
+della camera e dei materiali, lettura e scrittura dei campi della palette,
+finestre di messaggio. Il resto e' qui e si prova con pytest.
 
-La palette non genera piu' dentro Allplan. Usa lo stesso servizio dello
-Studio (`core.studio.servizio.Studio`) sulla stessa cartella delle viste:
-stesse scelte, stessi nomi, stessa destinazione e stesso costo, stesso
-controllo che la destinazione mostrata sia quella vera prima di scrivere il
-lavoro in coda. Poi torna libera: il lavoro lo prende la coda, un processo a
-parte.
-
-Se la coda non gira, la palette avvia lo Studio senza finestra (che avvia la
-coda) con un Python che non e' Allplan, scelto con la regola della sonda
-(`sonda_palette.candidati_python`). Una coda sola per cartella: lo dice il
-battito in `lavori/coda-viva.json` (core/battito.py).
+Dal 2026-11-04 la palette cattura e basta (scelta di Riccardo): la vista,
+nel formato scelto, finisce nella cartella delle viste, e stile, invio,
+render, ritocchi e video si fanno nello Studio. «Apri nello Studio» lo avvia
+fuori da Allplan, con un Python che non e' Allplan, scelto con la regola
+della sonda (`sonda_palette.candidati_python`). Uno Studio e una coda sola
+per cartella: lo dice il battito in `lavori/` (core/battito.py).
 """
 
 from __future__ import annotations
@@ -35,31 +30,23 @@ from core.errori import ErroreAirender
 from core.provider import comfy
 from core.studio import servizio
 
-import ponte
 import sonda_palette as sonda
 
-COME_IL_PRESET = "Come il preset"
 COME_LA_FINESTRA = "Come la finestra"
 # I formati fissi sono i rapporti che i modelli accettano: con uno di questi
 # la vista parte senza cornice e torna della stessa forma.
 _NOMI_FORMATO = {"21:9": "21:9 panoramico", "1:1": "1:1 quadrato", "3:4": "3:4 verticale",
                  "2:3": "2:3 verticale", "9:16": "9:16 verticale"}
+# Fuori dalla cartella delle viste: lo Studio non le elenca come viste.
 CARTELLA_ANTEPRIME = "anteprime"
-# Solo 1k e' provata con una chiamata vera: le altre lo dicono nel nome.
-RISOLUZIONI = [("1k", "1K · provata"), ("2k", "2K · da provare"), ("4k", "4K · da provare")]
 NESSUNA_VISTA = (
     "Nessuna vista ancora. Clicca una volta nella finestra 3D da rendere "
-    "(shaded, con ombre), poi Cattura."
-)
-NESSUN_RENDER = "Nessun render ancora."
-GENERA = "Genera render"
-IN_CORSO = (
-    "In corso da {tempo}. Allplan resta libero; l'avanzamento è nello Studio."
+    "(shaded, con ombre), poi Cattura vista."
 )
 
 
 class PythonNonTrovato(ErroreAirender):
-    """Nessun Python fuori da Allplan, con Pillow, che possa far girare la coda."""
+    """Nessun Python fuori da Allplan, con Pillow, che possa far girare lo Studio."""
 
 
 class StudioNonPartito(ErroreAirender):
@@ -69,49 +56,14 @@ class StudioNonPartito(ErroreAirender):
 # --- le voci della palette ---------------------------------------------------
 
 
-def _preset(scena: str) -> list[tuple[str, str]]:
-    return [(p.identificativo, p.nome) for p in blocchi.PRESET_STILE.values() if p.scelte.scena == scena]
-
-
-def _voci(asse: str, scena: str) -> list[tuple[str, str]]:
-    return [(None, COME_IL_PRESET)] + [
-        (b.identificativo, b.nome) for b in blocchi.voci(asse, scena).values()
-    ]
-
-
-def _fedelta() -> list[tuple[str, str]]:
-    """La predefinita per prima: e' la voce che la palette mostra all'apertura."""
-    voci = blocchi.voci("fedelta", blocchi.ESTERNO)
-    prima = voci[blocchi.FEDELTA_PREDEFINITA]
-    return [(prima.identificativo, prima.nome)] + [
-        (b.identificativo, b.nome) for b in voci.values() if b is not prima
-    ]
-
-
 def voci_palette() -> dict[str, list[tuple[str | None, str]]]:
-    """Gli elenchi a scelta della palette, con gli stessi nomi dello Studio · Genera.
+    """Gli elenchi a scelta della palette.
 
-    Il .pyp si genera da qui (allplan/v2026/scrivi_palette_pyp.py): un nome
-    cambiato in core/blocchi.py cambia la palette, e un test controlla che il
-    .pyp nel repository sia aggiornato.
+    Il .pyp si genera da qui (allplan/v2026/scrivi_palette_pyp.py), e un test
+    controlla che il .pyp nel repository sia aggiornato.
     """
     return {
-        "PresetEsterno": _preset(blocchi.ESTERNO),
-        "PresetInterno": _preset(blocchi.INTERNO),
-        "PresetArredo": _preset(blocchi.PRODOTTO),
-        "LuceEsterno": _voci("luce", blocchi.ESTERNO),
-        "LuceInterno": _voci("luce", blocchi.INTERNO),
-        "LuceArredo": _voci("luce", blocchi.PRODOTTO),
-        "Sfondo": _voci("sfondo", blocchi.PRODOTTO),
-        "Cielo": _voci("cielo", blocchi.ESTERNO),
-        "Intorno": _voci("intorno", blocchi.ESTERNO),
-        "Verde": _voci("verde", blocchi.ESTERNO),
-        "Persone": _voci("persone", blocchi.ESTERNO),
-        "Fedelta": _fedelta(),
-        "Resa": list(blocchi.NOMI_RESE.items()),
         "Formato": [(None, COME_LA_FINESTRA)] + [(r, _NOMI_FORMATO.get(r, r)) for r in comfy.RAPPORTI],
-        "Modello": [(m.identificativo, m.nome) for m in servizio.MODELLI],
-        "Risoluzione": list(RISOLUZIONI),
     }
 
 
@@ -122,77 +74,15 @@ def _identificativo(elenco: str, nome: str) -> str | None:
     voci = ", ".join(v for _i, v in voci_palette()[elenco])
     raise blocchi.SceltaNonValida(
         f"Nella palette c'e' una scelta che il motore non conosce: «{nome}».",
-        f"Reinstalla la palette (installa.ps1) e riaprila. Le scelte possibili sono: {voci}.",
+        f"Reinstalla la palette e riaprila. Le scelte possibili sono: {voci}.",
     )
 
 
 @dataclass(frozen=True)
 class ValoriPalette:
-    """Quello che c'e' scritto nei campi della sezione Stile, come lo legge l'adattatore."""
+    """Quello che c'e' scritto nei campi della palette, come lo legge l'adattatore."""
 
-    interno: bool = False
-    # Terza voce dello stesso gruppo «Vista» (bozza 8): un pezzo d'arredo come
-    # prodotto. Vince su «interno».
-    arredo: bool = False
-    preset_esterno: str = ""
-    preset_interno: str = ""
-    preset_arredo: str = ""
-    luce_esterno: str = COME_IL_PRESET
-    luce_interno: str = COME_IL_PRESET
-    luce_arredo: str = COME_IL_PRESET
-    sfondo: str = COME_IL_PRESET
-    cielo: str = COME_IL_PRESET
-    intorno: str = COME_IL_PRESET
-    verde: str = COME_IL_PRESET
-    persone: str = COME_IL_PRESET
-    fedelta: str = ""  # vuoto = la predefinita, come all'apertura della palette
-    resa: str = ""  # vuoto = Fotorealistico, la prima voce
-    materiali: str = ""
-    modello: str = ""
     formato: str = COME_LA_FINESTRA
-    risoluzione: str = RISOLUZIONI[0][1]
-
-    def preset(self) -> str:
-        if self.arredo:
-            return _identificativo("PresetArredo", self.preset_arredo)
-        if self.interno:
-            return _identificativo("PresetInterno", self.preset_interno)
-        return _identificativo("PresetEsterno", self.preset_esterno)
-
-    def scelte(self) -> blocchi.Scelte:
-        """Le scelte del preset con i cambi della palette sopra, come in Studio · Genera."""
-        cambi: dict = {"materiali": " ".join((self.materiali or "").split())}
-        if self.arredo:
-            luce = _identificativo("LuceArredo", self.luce_arredo)
-            sfondo = _identificativo("Sfondo", self.sfondo)
-            if sfondo:
-                cambi["sfondo"] = sfondo
-        elif self.interno:
-            luce = _identificativo("LuceInterno", self.luce_interno)
-        else:
-            luce = _identificativo("LuceEsterno", self.luce_esterno)
-            cielo = _identificativo("Cielo", self.cielo)
-            intorno = _identificativo("Intorno", self.intorno)
-            verde = _identificativo("Verde", self.verde)
-            if cielo:
-                cambi["cielo"] = cielo
-            if intorno:
-                cambi["intorno"] = intorno
-            if verde:
-                cambi["verde"] = verde
-        # Un arredo non ha persone: il campo e' nascosto e non parte.
-        persone = None if self.arredo else _identificativo("Persone", self.persone)
-        if persone:
-            cambi["persone"] = persone
-        if luce:
-            cambi["luce"] = luce
-        cambi["fedelta"] = _identificativo("Fedelta", self.fedelta or voci_palette()["Fedelta"][0][1])
-        cambi["resa"] = _identificativo("Resa", self.resa or voci_palette()["Resa"][0][1])
-        cambi["risoluzione"] = _identificativo("Risoluzione", self.risoluzione or RISOLUZIONI[0][1])
-        return blocchi.da_preset(self.preset(), **cambi)
-
-    def modello_id(self) -> str:
-        return _identificativo("Modello", self.modello)
 
     def rapporto(self) -> float | None:
         """Il formato fisso come larghezza/altezza; None per «Come la finestra»."""
@@ -208,13 +98,6 @@ class ValoriPalette:
 
 
 # --- testi ---------------------------------------------------------------------
-
-
-def durata(secondi: int | None) -> str:
-    if secondi is None:
-        return "un tempo che non so dire"
-    minuti, resto = divmod(int(secondi), 60)  # numero-non-configurabile: secondi in un minuto
-    return f"{minuti}:{resto:02d}"
 
 
 def _percento(quota: float) -> str:
@@ -242,24 +125,13 @@ def _errore(errore: ErroreAirender) -> str:
 # --- il telecomando --------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Riepilogo:
-    """Quello che la palette scrive dopo ogni evento: Invio e Ultimo render."""
-
-    stato: str
-    ultimo: str
-    lavoro_attivo: str
-    render: str
-
-
 class Telecomando:
     """La palette su una cartella delle viste."""
 
     def __init__(self, cartella: Path, avviatore: "Avviatore | None" = None,
                  studio: servizio.Studio | None = None) -> None:
         self.cartella = Path(cartella)
-        self.studio = studio or servizio.Studio(
-            self.cartella, coda_attiva=lambda: modulo_coda.coda_viva(self.cartella) is not None)
+        self.studio = studio or servizio.Studio(self.cartella)
         self.cartella = self.studio.cartella
         self.avviatore = avviatore
 
@@ -289,164 +161,35 @@ class Telecomando:
 
     # --- formato fisso ---------------------------------------------------
 
-    def anteprima(self, vista: str, valori: ValoriPalette) -> str:
-        """L'immagine da mostrare nella palette: la vista, o la vista con scurito cio' che il formato taglia."""
-        vista = (vista or "").strip()
-        rapporto = valori.rapporto()
-        if not vista or rapporto is None or not Path(vista).is_file():
-            return vista
-        cartella = self.cartella / CARTELLA_ANTEPRIME
-        cartella.mkdir(parents=True, exist_ok=True)
-        uscita = cartella / f"{Path(vista).stem}-{valori.suffisso_formato()}.png"
-        if not uscita.exists():
-            uscita.write_bytes(modulo_immagine.anteprima_taglio(modulo_immagine.leggi(vista), rapporto))
-        return str(uscita)
+    def _taglio(self, vista: str) -> Path:
+        return self.cartella / CARTELLA_ANTEPRIME / f"{Path(vista).stem}-taglio.png"
 
-    def vista_al_formato(self, vista: str, valori: ValoriPalette) -> str:
-        """La vista che parte davvero: con un formato fisso, una vista nuova tagliata al centro.
+    def taglia_cattura(self, vista: str, valori: ValoriPalette) -> bool:
+        """Con un formato fisso, la vista appena catturata diventa la sua parte centrale al formato.
 
-        E' una vista a tutti gli effetti, accanto all'originale: lo Studio
-        confronta il render con quella, non con la finestra intera.
+        Nella cartella delle viste resta solo la vista tagliata: e' quella che
+        lo Studio usa e confronta con il render. In anteprime/ resta la
+        finestra intera con scurito quello che e' stato tagliato, per «Vedi
+        cosa ha tagliato». Restituisce se ha tagliato.
         """
         rapporto = valori.rapporto()
+        taglio = self._taglio(vista)
         if rapporto is None:
+            taglio.unlink(missing_ok=True)  # una cattura nuova con lo stesso nome non e' tagliata
+            return False
+        intera = modulo_immagine.leggi(vista)
+        taglio.parent.mkdir(parents=True, exist_ok=True)
+        taglio.write_bytes(modulo_immagine.anteprima_taglio(intera, rapporto))
+        Path(vista).write_bytes(modulo_immagine.ritaglia_a_rapporto(intera, rapporto))
+        return True
+
+    def anteprima(self, vista: str) -> str:
+        """La finestra intera con scurito quello che il formato ha tagliato; la vista se non e' stata tagliata."""
+        vista = (vista or "").strip()
+        if not vista:
             return vista
-        originale = Path(vista)
-        tagliata = originale.with_name(f"{originale.stem}-{valori.suffisso_formato()}{originale.suffix}")
-        if not tagliata.exists():
-            tagliata.write_bytes(modulo_immagine.ritaglia_a_rapporto(modulo_immagine.leggi(originale), rapporto))
-            camera = originale.with_name(originale.stem + ponte.SUFFISSO_CAMERA)
-            if camera.is_file():
-                shutil.copyfile(camera, tagliata.with_name(tagliata.stem + ponte.SUFFISSO_CAMERA))
-        return str(tagliata)
-
-    # --- invio ---------------------------------------------------------
-
-    def invio(self, valori: ValoriPalette) -> tuple[str, str, str]:
-        """Dove va la vista, cosa sapere sull'invio e quanto costa, da scrivere prima di Genera (regola 5).
-
-        Il primo testo e' la destinazione nuda: Genera la confronta con quella
-        vera, e se non coincide non parte niente.
-        """
-        destinazione = self.studio.destinazione(valori.modello_id())
-        nota = "Senza ripiego su altri servizi." if destinazione["senza_ripiego"] else (
-            "Attenzione: il servizio puo' ripiegare su un altro fornitore.")
-        if destinazione["cosa_manca"]:
-            nota += f" Non parte: {destinazione['cosa_manca']}"
-        if destinazione.get("avviso"):
-            nota += f" {destinazione['avviso']}"
-        resa = _identificativo("Resa", valori.resa or voci_palette()["Resa"][0][1])
-        if resa != blocchi.FOTO:
-            spenti = blocchi.SPENTI_DA_RESA[resa]
-            nota += (f" Con la resa {blocchi.NOMI_RESE[resa]} non partono: "
-                     f"{', '.join(a for a in ('materiali', *blocchi.ORDINE_ASSI) if a in spenti)}.")
-        return destinazione["destinazione"], nota, destinazione["costo"]
-
-    def _dati(self, vista: str, valori: ValoriPalette, destinazione_mostrata: str = "") -> dict:
-        return {
-            "vista": self._nome(vista),
-            "scelte": valori.scelte().a_dizionario(),
-            "preset": valori.preset(),
-            "modello": valori.modello_id(),
-            "destinazione_mostrata": destinazione_mostrata,
-        }
-
-    def prova_a_secco(self, vista: str, valori: ValoriPalette) -> str:
-        """Tutto quello che farebbe Genera, tranne mandare. Il testo per la finestra di messaggio."""
-        if not (vista or "").strip():
-            return "Non c'e' ancora una vista da usare.\n\nCosa fare: premi prima Cattura vista."
-        try:
-            esito = self.studio.prova_a_secco(self._dati(vista, valori))
-        except ErroreAirender as errore:
-            return _errore(errore)
-        righe = [
-            "Prova a secco: non ho mandato niente.",
-            f"La vista andrebbe a: {esito['destinazione']['destinazione']}.",
-            f"Costo: {esito['destinazione']['costo']}.",
-            f"Prompt ({esito['caratteri']} caratteri):\n{esito['prompt']}",
-        ]
-        # La coda ferma non ferma Genera della palette: Genera la fa partire.
-        problemi = [p for p in esito["problemi"] if p != servizio._CODA_FERMA]  # pylint: disable=protected-access
-        if problemi:
-            righe.append("Genera si fermerebbe per:")
-            righe += [f"- {p['fatto']} {p['cosa_fare']}" for p in problemi]
-        else:
-            righe.append("Genera partirebbe.")
-        return "\n\n".join(righe)
-
-    def genera(self, vista: str, valori: ValoriPalette, destinazione_mostrata: str) -> str:
-        """Scrive il lavoro in coda e torna. Se la coda non gira, la fa partire.
-
-        `destinazione_mostrata` e' quello che la palette ha scritto in
-        «La vista va a»: se non e' la destinazione vera, non parte niente.
-        """
-        if not (vista or "").strip():
-            return "Non c'e' ancora una vista da usare.\n\nCosa fare: premi prima Cattura vista."
-        try:
-            self._nome(vista)  # prima di scrivere una vista tagliata fuori posto
-            vista = self.vista_al_formato(vista, valori)
-            risposta = self.studio.invia(self._dati(vista, valori, destinazione_mostrata))
-        except ErroreAirender as errore:
-            return _errore(errore)
-        testo = f"In coda, verso {risposta['destinazione']}. Allplan resta libero."
-        if modulo_coda.coda_viva(self.cartella) is None:
-            if self.avviatore is None:
-                return f"{testo}\n\n{_CODA_FERMA['fatto']}\n\nCosa fare: {_CODA_FERMA['cosa_fare']}"
-            try:
-                self.avviatore.assicura_coda()
-            except ErroreAirender as errore:
-                return testo + "\n\nMa la coda dei lavori non gira, e il lavoro resta in attesa.\n" + _errore(errore)
-        return testo
-
-    def annulla(self, identificativo: str) -> str:
-        if not identificativo:
-            return "Non c'e' un lavoro in corso da annullare."
-        try:
-            self.studio.annulla(identificativo)
-        except ErroreAirender as errore:
-            return _errore(errore)
-        return ("Chiesto l'annullamento. Se la vista era gia' partita, il servizio "
-                "puo' averla gia' fatta e addebitata: lo dice lo stato del lavoro.")
-
-    # --- dopo ogni evento --------------------------------------------------
-
-    def riepilogo(self) -> Riepilogo:
-        """Lo stato dell'ultimo lavoro e il riassunto dell'ultimo render, letti dal disco."""
-        try:
-            ultimo = self.studio.ultimo_lavoro()
-        except ErroreAirender as errore:
-            return Riepilogo(_errore(errore), NESSUN_RENDER, "", "")
-        if ultimo is None:
-            return Riepilogo("", NESSUN_RENDER, "", "")
-        stato = ultimo["stato"]
-        titolo = f"{ultimo['preset_nome']} · {ultimo['modello_nome']}"
-        if ultimo["attivo"]:
-            testo = IN_CORSO.format(tempo=durata(ultimo["secondi"]))
-            if stato == modulo_coda.IN_CODA and modulo_coda.coda_viva(self.cartella) is None:
-                testo = f"{_CODA_FERMA['fatto']} {_CODA_FERMA['cosa_fare']}"
-            return Riepilogo(testo, f"{titolo} · {stato}", ultimo["identificativo"], "")
-        if stato == modulo_coda.FATTO and ultimo["render"]:
-            render = str(self.studio.file_render(ultimo["identificativo"]))
-            try:
-                crediti = self.studio.ricetta(ultimo["identificativo"]).get("crediti")
-            except ErroreAirender:
-                crediti = None
-            riga = f"{titolo} · {crediti or 'crediti non letti dal servizio'}"
-            return Riepilogo("Render pronto.", riga, "", render)
-        if stato == modulo_coda.ERRORE:
-            testo = (f"Non e' andato: {ultimo['fatto']} {ultimo['cosa_fare'] or ''} "
-                     "Apri nello Studio per i dettagli.").replace("  ", " ")
-            return Riepilogo(testo, f"{titolo} · errore", "", "")
-        return Riepilogo(f"Ultimo lavoro: {stato}.", f"{titolo} · {stato}", "", "")
-
-    def testo_genera(self, riepilogo: Riepilogo) -> str:
-        return "Annulla" if riepilogo.lavoro_attivo else GENERA
-
-
-_CODA_FERMA = {
-    "fatto": "La coda dei lavori non sta girando: il lavoro resta in attesa.",
-    "cosa_fare": "Premi Apri nello Studio: lo Studio la fa partire.",
-}
+        taglio = self._taglio(vista)
+        return str(taglio) if taglio.is_file() else vista
 
 
 # --- processi: la coda, lo Studio, Edge -----------------------------------------

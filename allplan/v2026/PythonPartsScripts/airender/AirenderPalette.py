@@ -1,12 +1,13 @@
-"""AIRENDER — la palette v1 (il telecomando) per Allplan 2026.
+"""AIRENDER — la palette (il telecomando) per Allplan 2026.
 
-Unico file della palette v1 che importa Allplan. Fa solo quello che esiste
-soltanto dentro Allplan: cattura la finestra, legge la camera, legge e scrive
-i campi della palette (AirenderPalette.pyp), mostra i messaggi. Tutto il
-resto e' in `telecomando.py`, che sta accanto e si prova con pytest.
+Unico file della palette che importa Allplan. Fa solo quello che esiste
+soltanto dentro Allplan: cattura la finestra, legge la camera e i materiali,
+legge e scrive i campi della palette (AirenderPalette.pyp), mostra i
+messaggi. Tutto il resto e' in `telecomando.py`, che sta accanto e si prova
+con pytest.
 
-Genera non chiama il motore dentro Allplan: scrive un lavoro nella coda e
-torna. La coda e lo Studio girano in un processo a parte.
+Dal 2026-11-04 la palette cattura e basta: stile, invio, render e ritocchi
+si fanno nello Studio, che gira in un processo a parte.
 """
 
 from __future__ import annotations
@@ -50,9 +51,6 @@ except Exception:  # pylint: disable=broad-exception-caught
     _ERRORE_AVVIO = traceback.format_exc()
 
 EVENTO_CATTURA = 1001
-EVENTO_GENERA = 1003
-EVENTO_ANNULLA = 1004
-EVENTO_AGGIORNA = 1005
 EVENTO_APRI_STUDIO = 1006
 EVENTO_APRI_CARTELLA = 1007
 EVENTO_VEDI_TAGLIO = 1008
@@ -129,7 +127,7 @@ def _cartella_pillow() -> str | None:
 
 
 class AirenderPalette(BaseScriptObject):
-    """Vista, Stile, Invio, Ultimo render."""
+    """Vista e Apri nello Studio."""
 
     def __init__(self, build_ele: BuildingElement, script_object_data: BaseScriptObjectData):
         super().__init__(script_object_data)
@@ -139,16 +137,13 @@ class AirenderPalette(BaseScriptObject):
         self._apri()
 
     def execute(self) -> CreateElementResult:
-        # Questo PythonPart non crea elementi. Allplan chiama execute anche
-        # dopo un cambio in palette: si rileggono destinazione e costo, cosi'
-        # un modello cambiato si vede prima di Genera (regola 5).
-        self._aggiorna_invio()
+        # Questo PythonPart non crea elementi.
         return CreateElementResult()
 
     def on_cancel_function(self):
         """Esc: chiude la palette senza creare niente e torna alla Library.
 
-        I lavori gia' in coda continuano: li fa girare un processo a parte.
+        I lavori gia' in coda continuano: li fa girare lo Studio, un processo a parte.
         """
         if OnCancelFunctionResult is None:
             return super().on_cancel_function()
@@ -178,7 +173,7 @@ class AirenderPalette(BaseScriptObject):
             self.telecomando = telecomando.Telecomando(cartella, avviatore=avviatore)
         except (ErroreAirender, OSError) as errore:
             self.telecomando = None
-            self.build_ele.Stato.value = f"La palette non si apre: {errore}"
+            self.build_ele.VistaEsito.value = f"La palette non si apre: {errore}"
             return
         self._aggiorna()
 
@@ -191,9 +186,6 @@ class AirenderPalette(BaseScriptObject):
             return
         azioni = {
             EVENTO_CATTURA: self._cattura,
-            EVENTO_GENERA: self._genera,
-            EVENTO_ANNULLA: self._annulla,
-            EVENTO_AGGIORNA: lambda: None,
             EVENTO_APRI_STUDIO: self._apri_studio,
             EVENTO_APRI_CARTELLA: self._apri_cartella,
             EVENTO_VEDI_TAGLIO: self._vedi_taglio,
@@ -224,11 +216,12 @@ class AirenderPalette(BaseScriptObject):
                 "Cosa fare: clicca una volta dentro la finestra 3D che vuoi catturare, "
                 "poi premi di nuovo Cattura vista.")
             return
+        tagliata = self.telecomando.taglia_cattura(str(vista), self._valori())
         ponte.scrivi_camera(vista, self._camera())
         self.build_ele.UltimaVista.value = str(vista)
         self._leggi_materiali(vista)
-        if self._valori().rapporto() is not None:
-            self._vedi_taglio()  # con un formato fisso, si vede subito cosa resta fuori
+        if tagliata:
+            self._vedi_taglio()  # con un formato fisso, si vede subito cosa e' rimasto fuori
 
     def _leggi_materiali(self, vista: Path) -> None:
         """I materiali del progetto, accanto alla vista, per la tabella dello Studio. Solo lettura.
@@ -268,86 +261,36 @@ class AirenderPalette(BaseScriptObject):
         return camera
 
     def _valori(self) -> telecomando.ValoriPalette:
-        e = self.build_ele
-        scena = int(e.Interno.value or 0)  # 0 esterno, 1 interno, 2 arredo
-        return telecomando.ValoriPalette(
-            interno=scena == 1,
-            arredo=scena == 2,
-            preset_esterno=e.PresetEsterno.value,
-            preset_interno=e.PresetInterno.value,
-            preset_arredo=e.PresetArredo.value,
-            luce_esterno=e.LuceEsterno.value,
-            luce_interno=e.LuceInterno.value,
-            luce_arredo=e.LuceArredo.value,
-            sfondo=e.Sfondo.value,
-            cielo=e.Cielo.value,
-            intorno=e.Intorno.value,
-            verde=e.Verde.value,
-            persone=e.Persone.value,
-            fedelta=e.Fedelta.value,
-            resa=e.Resa.value,
-            materiali=e.Materiali.value or "",
-            modello=e.Modello.value,
-            formato=e.Formato.value,
-            risoluzione=e.Risoluzione.value,
-        )
+        return telecomando.ValoriPalette(formato=self.build_ele.Formato.value)
 
     def _vedi_taglio(self) -> None:
         vista = self.build_ele.UltimaVista.value or ""
         if not vista:
             _messaggio("Non c'e' ancora una vista.\n\nCosa fare: premi prima Cattura vista.")
             return
-        anteprima = self.telecomando.anteprima(vista, self._valori())
+        anteprima = self.telecomando.anteprima(vista)
         if anteprima == vista:
-            _messaggio("Con «Come la finestra» non si taglia niente: la vista parte intera.")
+            _messaggio("Questa vista non e' stata tagliata: e' stata catturata con il formato "
+                       "«Come la finestra».")
             return
         servizio.apri_nel_sistema(Path(anteprima))
-
-    def _genera(self) -> None:
-        mostrata = self.build_ele.Destinazione.value or ""
-        _messaggio(self.telecomando.genera(self.build_ele.UltimaVista.value, self._valori(), mostrata))
-
-    def _annulla(self) -> None:
-        _messaggio(self.telecomando.annulla(self.build_ele.LavoroAttivo.value or ""))
 
     def _apri_studio(self) -> None:
         self.telecomando.avviatore.apri_studio()
 
     def _apri_cartella(self) -> None:
-        render = self.build_ele.UltimoRender.value
-        servizio.apri_nel_sistema(Path(render).parent if render else self.telecomando.cartella)
+        servizio.apri_nel_sistema(self.telecomando.cartella)
 
     # ------------------------------------------------------------ campi
 
-    def _aggiorna_invio(self) -> None:
-        if self.telecomando is None:
-            return
-        try:
-            dove, nota, costo = self.telecomando.invio(self._valori())
-        except ErroreAirender as errore:
-            dove, nota, costo = "", f"{errore.fatto} {errore.cosa_fare}", ""
-        self.build_ele.Destinazione.value = dove
-        self.build_ele.NotaInvio.value = nota
-        self.build_ele.Costo.value = costo
-
     def _aggiorna(self) -> None:
-        """Dopo ogni evento: vista, invio, stato del lavoro e ultimo render, letti dal disco."""
+        """Dopo ogni evento: nome ed esito della vista, letti dal disco."""
         e = self.build_ele
         nome, esito = self.telecomando.vista(e.UltimaVista.value or "")
         e.VistaNome.value, e.VistaEsito.value = nome, esito
-        self._aggiorna_invio()
-        riepilogo = self.telecomando.riepilogo()
-        e.Stato.value = riepilogo.stato
-        e.Ultimo.value = riepilogo.ultimo
-        e.LavoroAttivo.value = riepilogo.lavoro_attivo
-        e.InCorso.value = 1 if riepilogo.lavoro_attivo else 0
-        e.UltimoRender.value = riepilogo.render
-        if config.PALETTE_IMMAGINI_DA_SCRIPT:
+        if config.PALETTE_IMMAGINI_DA_SCRIPT and e.UltimaVista.value and os.path.exists(e.UltimaVista.value):
             # Il secondo dei due modi provati dalla sonda: percorso assoluto nel valore.
-            if e.UltimaVista.value and os.path.exists(e.UltimaVista.value):
-                e.VistaImmagine.value = self.telecomando.anteprima(e.UltimaVista.value, self._valori())
-            if riepilogo.render:
-                e.UltimoImmagine.value = riepilogo.render
+            e.VistaImmagine.value = self.telecomando.anteprima(e.UltimaVista.value)
 
 
 def _messaggio(testo: str) -> None:

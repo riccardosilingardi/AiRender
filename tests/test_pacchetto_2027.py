@@ -113,7 +113,7 @@ def test_installa_copia_e_toglie_le_prove_vecchie(tmp_path):
     (usr / "PythonPartsScripts" / "airender" / "core").mkdir(parents=True)
     libreria = usr / "Library" / "AIRENDER"
     libreria.mkdir(parents=True)
-    for vecchio in ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_a.png"):
+    for vecchio in ("AirenderProva.pyp", "AirenderSonda.pyp", "sonda_a.png", "AirenderSondaElenco.pyp"):
         (libreria / vecchio).write_text("vecchio")
     viste = usr / "AIRENDER" / "viste"
     viste.mkdir(parents=True)
@@ -126,13 +126,13 @@ def test_installa_copia_e_toglie_le_prove_vecchie(tmp_path):
 
     assert not (usr / "PythonPartsScripts" / "airender").exists()
     assert sorted(p.name for p in libreria.iterdir()) == [
-        "AirenderPalette.pyp", "AirenderSondaElenco.pyp", "AirenderSondaMateriali.pyp", "palette_nessuna.png"]
+        "AirenderPalette.pyp", "palette_nessuna.png"]
     assert (script / "AirenderPalette.py").is_file()
     assert not (script / "core" / "rimasto.py").exists()
     assert (usr / "PythonPartsActionbar" / pacchetto.SVILUPPATORE / "airender" / "Airender_24.png").is_file()
     assert not (usr / "install-config.yml").exists()
     assert (viste / "vista.png").read_text() == "una vista"  # le viste non si toccano
-    assert len(esito.tolti) == 4
+    assert len(esito.tolti) == 5
     assert esito.avvisi and "Pillow" in esito.avvisi[0]
 
 

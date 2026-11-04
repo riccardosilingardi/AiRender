@@ -64,6 +64,16 @@ documento.
 
 ### Palette v1 — il telecomando
 
+**Dal 2026-11-04 la palette cattura e basta** (scelta di Riccardo: «solo per
+cattura vista, poi apro tutto in studio»). Restano **Vista** (nome, esito,
+Cattura vista, Dimensione, Formato, **Vedi cosa ha tagliato**) e **Studio**
+(«Stile, render, ritocchi e video si fanno nello Studio.», **Apri nello
+Studio**, Apri cartella), più la riga di Esc in cima e la cartella in fondo.
+Tolti Stile, Invio, Ultimo render e Nello Studio. Un formato fisso taglia la
+vista alla cattura: nella cartella c'è solo la parte che resta, e la finestra
+intera scurita si apre da sola per far vedere il taglio. Quello che segue
+descrive la palette fino al 2026-11-03.
+
 Mockup: `Palette.dc.html`. Quattro expander in fila, numerati, più uno che
 rimanda allo Studio. In cima una riga: «Per tornare alla Library premi Esc».
 Allplan non dà un pulsante Chiudi nella palette di un PythonPart: si esce con

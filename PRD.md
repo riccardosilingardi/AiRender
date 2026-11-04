@@ -443,7 +443,7 @@ Tabella materiali nello Studio (2026-11-02), non verificato:
 
 ### Palette: Esc per tornare alla Library (2026-11-01)
 
-- **Esc chiude palette e sonda e fa tornare la Library** — non verificato in
+- **Esc chiude la palette e fa tornare la Library** — non verificato in
   Allplan. Gli adattatori ora rispondono a `on_cancel_function` con
   `OnCancelFunctionResult.CANCEL_INPUT`, importato da
   `ScriptObjectInteractors.OnCancelFunctionResult`. Nome del modulo e del

@@ -2,11 +2,12 @@
 
     python allplan/v2026/scrivi_palette_pyp.py
 
-Gli elenchi a scelta (resa, preset, ora, cielo, intorno, verde, persone, fedelta', formato, modello) vengono da
-`allplan/comune/telecomando.voci_palette()`, cioe' da core/blocchi.py e dai
-modelli dello Studio: la palette chiama ogni cosa come lo Studio. Dopo un
-cambio dei blocchi si rilancia questo script; un test (tests/test_palette_pyp.py)
-fallisce finche' il .pyp nel repository non e' aggiornato.
+Dal 2026-11-04 la palette cattura e basta: vista, dimensione, formato,
+Apri nello Studio. L'elenco dei formati viene da
+`allplan/comune/telecomando.voci_palette()`, cioe' dai rapporti che il modello
+accetta. Dopo un cambio si rilancia questo script; un test
+(tests/test_palette_pyp.py) fallisce finche' il .pyp nel repository non e'
+aggiornato.
 
 Lo schema della palette e' della versione di Allplan (regola 2 di CLAUDE.md).
 La 2027 usa gli stessi campi: allplan/v2027/scrivi_palette_pyp.py chiama
@@ -34,9 +35,6 @@ IMMAGINE_VUOTA = "palette_nessuna.png"
 # Gli eventi dei pulsanti: AirenderPalette.py usa gli stessi numeri.
 EVENTI = {
     "Cattura": 1001,
-    "Genera": 1003,
-    "Annulla": 1004,
-    "Aggiorna": 1005,
     "ApriStudio": 1006,
     "ApriCartella": 1007,
     "VediTaglio": 1008,
@@ -45,8 +43,11 @@ EVENTI = {
 # si chiude con Esc, che fa tornare la Library (on_cancel_function
 # nell'adattatore). Lo si scrive in cima, perche' non e' ovvio.
 TESTO_CHIUDI = "Per tornare alla Library premi Esc. I render in corso continuano."
-# 1002 era «Prova a secco», tolta dalla palette il 2026-10-31: non si riusa,
-# cosi' un .pyp vecchio rimasto in giro non fa partire un'altra azione.
+TESTO_STUDIO = "Stile, render, ritocchi e video si fanno nello Studio."
+# 1002 era «Prova a secco», tolta dalla palette il 2026-10-31; 1003 Genera,
+# 1004 Annulla e 1005 Aggiorna, tolti il 2026-11-04 con la sezione Stile.
+# Non si riusano, cosi' un .pyp vecchio rimasto in giro non fa partire
+# un'altra azione.
 
 
 def _parametro(nome: str, tipo: str, testo: str = "", valore: str | None = None, *,
@@ -117,72 +118,28 @@ SCRIPT_2026 = "airender\\AirenderPalette.py"
 
 def pyp(anno_schema: str = "2026", script: str = SCRIPT_2026,
         generato_da: str = "allplan/v2026/scrivi_palette_pyp.py") -> str:
-    # «Interno» e' il gruppo della scena: 0 esterno, 1 interno, 2 arredo. Il
-    # nome resta quello della v1, cosi' i valori salvati in Allplan valgono.
-    esterno, interno, arredo = "Interno == 0", "Interno == 1", "Interno == 2"
+    # Dal 2026-11-04 la palette serve solo a catturare (scelta di Riccardo):
+    # stile, invio, render, ritocchi e video si fanno nello Studio.
     parametri = [
         _nascosto("ImmaginiDaScript", "Integer", "0"),
-        _nascosto("InCorso", "Integer", "0"),
-        _nascosto("LavoroAttivo", "String", ""),
         _nascosto("UltimaVista", "String", ""),
-        _nascosto("UltimoRender", "String", ""),
         _parametro("Chiudi", "Text", TESTO_CHIUDI),
         _espansore(
-            "Sezione1", "1 · Vista",
+            "Sezione1", "Vista",
             _sola_lettura("VistaNome", "Vista"),
             _immagine("VistaImmagine"),
             _sola_lettura("VistaEsito", "Esito"),
             _riga("RigaCattura", "Finestra attiva", _pulsante("Cattura", "Cattura vista")),
             _radio("Dimensione", "Dimensione", ["Come la finestra", "1920 × 1080", "3840 × 2160"]),
             _scelta("Formato", "Formato"),
-            _riga("RigaTaglio", "Taglio", _pulsante("VediTaglio", "Vedi cosa taglia")),
+            _riga("RigaTaglio", "Taglio", _pulsante("VediTaglio", "Vedi cosa ha tagliato")),
         ),
         _espansore(
-            "Sezione2", "2 · Stile",
-            _scelta("Resa", "Resa"),
-            _radio("Interno", "Vista", ["Esterno", "Interno", "Arredo"]),
-            _scelta("PresetEsterno", "Preset", esterno),
-            _scelta("PresetInterno", "Preset", interno),
-            _scelta("PresetArredo", "Preset", arredo),
-            _scelta("LuceEsterno", "Ora", esterno),
-            _scelta("LuceInterno", "Luce", interno),
-            _scelta("LuceArredo", "Luce", arredo),
-            _scelta("Sfondo", "Sfondo", arredo),
-            _scelta("Cielo", "Cielo", esterno),
-            _scelta("Intorno", "Intorno", esterno),
-            _scelta("Verde", "Verde, alberi", esterno),
-            _scelta("Persone", "Persone", "Interno != 2"),
-            _scelta("Fedelta", "Fedeltà al disegno"),
-            _parametro("Materiali", "String", "Materiali", ""),
-            _scelta("Modello", "Modello"),
-            _scelta("Risoluzione", "Risoluzione del render"),
-        ),
-        _espansore(
-            "Sezione3", "3 · Invio",
-            _sola_lettura("Destinazione", "La vista va a"),
-            _sola_lettura("NotaInvio", "Ripiego"),
-            _sola_lettura("Costo", "Costo"),
-            _sola_lettura("Stato", "Stato"),
-            _riga("RigaInvio", "Motore",
-                  _pulsante("Genera", "Genera render", "InCorso == 0"),
-                  _pulsante("Annulla", "Annulla", "InCorso == 1")),
-            _riga("RigaAggiorna", "Stato del lavoro", _pulsante("Aggiorna", "Aggiorna")),
-        ),
-        _espansore(
-            "Sezione4", "4 · Ultimo render",
-            _sola_lettura("Ultimo", "Ultimo"),
-            _immagine("UltimoImmagine"),
+            "Sezione2", "Studio",
+            _parametro("NelloStudio", "Text", TESTO_STUDIO),
             _riga("RigaStudio", "Studio",
                   _pulsante("ApriStudio", "Apri nello Studio"),
                   _pulsante("ApriCartella", "Apri cartella")),
-        ),
-        _espansore(
-            "Sezione5", "Nello Studio",
-            *[_parametro(f"NelloStudio{i}", "Text", testo)
-              for i, testo in enumerate((
-                  "Annota aree e ritocchi: scheda Ritocca",
-                  "Video dai render: scheda Video",
-              ))],
         ),
         _parametro("Cartella", "String", "Cartella delle viste (vuota = Usr\\AIRENDER\\viste)", ""),
     ]

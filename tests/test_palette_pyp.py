@@ -67,16 +67,18 @@ def test_le_condizioni_di_visibilita_nominano_campi_che_esistono():
 def test_le_immagini_restano_nascoste_finche_la_sonda_non_risponde():
     """Caso: la palette mostra una miniatura che Allplan non aggiorna, cioe' la vista sbagliata."""
     parametri = _parametri()
-    for nome in ("VistaImmagine", "UltimoImmagine"):
+    for nome in ("VistaImmagine",):
         assert parametri[nome].findtext("Visible") == "ImmaginiDaScript == 1"
     assert parametri["ImmaginiDaScript"].findtext("Value") == "0"
 
 
-def test_genera_e_annulla_non_si_vedono_mai_insieme():
-    """Stato in corso di DESIGN.md: Genera diventa Annulla."""
+def test_la_palette_cattura_e_basta():
+    """Decisione di Riccardo del 2026-11-04: stile e invio solo nello Studio."""
     parametri = _parametri()
-    assert parametri["Genera"].findtext("Visible") == "InCorso == 0"
-    assert parametri["Annulla"].findtext("Visible") == "InCorso == 1"
+    for tolto in ("Genera", "Annulla", "Aggiorna", "Modello", "PresetEsterno", "Resa", "Costo"):
+        assert tolto not in parametri, tolto
+    for resta in ("Cattura", "Dimensione", "Formato", "VediTaglio", "ApriStudio", "ApriCartella", "Cartella"):
+        assert resta in parametri, resta
 
 
 def test_l_installazione_copia_tutto_quello_che_la_palette_importa():
@@ -115,11 +117,9 @@ def _ritorno_di_on_cancel(percorso: Path) -> str:
     return ""
 
 
-def test_esc_chiude_palette_e_sonda_senza_creare_niente():
+def test_esc_chiude_la_palette_senza_creare_niente():
     """Esc deve chiudere, non creare elementi ne' ricominciare l'input."""
-    sonda = (RADICE / "allplan" / "v2027" / "pacchetto" / "PythonPartsScripts"
-             / "riccardo_silingardi" / "airender" / "AirenderSondaMateriali.py")
-    for percorso in (ADATTATORE, sonda):
+    for percorso in (ADATTATORE,):
         corpo = _ritorno_di_on_cancel(percorso)
         assert "OnCancelFunctionResult.CANCEL_INPUT" in corpo, percorso
         assert "CREATE_ELEMENTS" not in corpo and "RESTART" not in corpo, percorso
