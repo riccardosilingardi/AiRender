@@ -1418,7 +1418,13 @@ function barraAzioni(l) {
       title: occupato ? "Un lavoro è in corso: Variante si accende quando finisce." : "Stessa ricetta, un'altra immagine. Arriva accanto a questa, già scelta." }, "Variante"),
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
       title: "Un video che parte da questa immagine." }, "Video"))];
-  if (d) righe.push(h("p", { classe: "dove" }, "Variante: va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""));
+  // Variante non dice niente da sola (test del 2026-11-04): si scrive da dove
+  // riparte e con cosa, prima che parta.
+  const da = l.parte_da ? "dall'immagine da cui era nata questa" : "dalla vista Allplan";
+  const cosa = l.parte_da ? "la stessa richiesta" : `lo stesso stile (${l.preset_nome})`;
+  righe.push(h("p", { classe: "dove" },
+    `Variante: un'altra versione di questa immagine. Riparte ${da}, con ${cosa} e lo stesso modello (${l.modello_nome}).`,
+    d ? [" Va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""] : null));
   if (az.video) righe.push(videoVeloce(l));
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
@@ -2598,6 +2604,24 @@ function colonnaInvioVideo() {
     invio);
 }
 
+// Un lettore per video, tenuto fra un disegno e l'altro. La pagina si ridisegna
+// ogni pochi secondi: un <video> rifatto da capo ricarica il file (lampeggia) e
+// perde il punto in cui era; uno spostato nel DOM nello stesso giro continua.
+const lettoriVideo = new Map();
+function lettoreVideo(chiave, attributi, prepara) {
+  let nodo = lettoriVideo.get(chiave);
+  if (!nodo) {
+    nodo = h("video", attributi);
+    if (prepara) prepara(nodo);
+    lettoriVideo.set(chiave, nodo);
+  }
+  return nodo;
+}
+// Uno solo suona: premere play su un video ferma gli altri.
+document.addEventListener("play", (evento) => {
+  for (const altro of document.querySelectorAll("video")) if (altro !== evento.target && !altro.paused) altro.pause();
+}, true);
+
 function voceVideo(x) {
   const attivo = x.stato === "in coda" || x.stato === "inviato";
   const righe = [
@@ -2606,7 +2630,7 @@ function voceVideo(x) {
       h("span", { classe: "tag-stato" }, x.stato)),
     h("span", { classe: "piccolo tenue" }, `${x.modo} · ${x.immagini} ${x.immagini === 1 ? "immagine" : "immagini"} · ${data(x.aggiornato_il)}`),
   ];
-  if (x.pronto) righe.push(h("video", { src: `/file/video/${enc(x.identificativo)}`, controls: true, preload: "metadata", classe: "lettore-video" }),
+  if (x.pronto) righe.push(lettoreVideo(`voce:${x.identificativo}`, { src: `/file/video/${enc(x.identificativo)}`, controls: true, preload: "metadata", classe: "lettore-video" }),
     h("span", { classe: "piccolo tenue" }, x.crediti_usati !== null && x.crediti_usati !== undefined ? `Costo letto dal servizio: ${String(x.crediti_usati).replace(".", ",")} crediti` : "Costo: il servizio non l'ha detto"));
   if (attivo) righe.push(h("span", { classe: "piccolo" }, x.stato === "in coda" ? "In coda: parte appena la coda lo prende." : "Seedance ci lavora: di solito qualche minuto. Lo Studio e Allplan restano liberi."),
     x.stato === "in coda" ? h("div", { classe: "azioni" }, h("button", { classe: "btn", onclick: () => annullaVideo(x.identificativo) }, "Annulla")) : null);
@@ -2638,12 +2662,14 @@ function voceSequenza(tratti) {
       h("span", { classe: "tag-stato" }, pronti ? "fatto" : tratti.map((t) => t.stato).join(" · "))),
   ];
   if (pronti) {
-    const lettore = h("video", { src: `/file/video/${enc(tratti[0].identificativo)}`, controls: true, preload: "metadata", classe: "lettore-video" });
-    let quale = 0;
-    lettore.addEventListener("ended", () => {
-      quale = (quale + 1) % tratti.length;
-      lettore.src = `/file/video/${enc(tratti[quale].identificativo)}`;
-      if (quale) lettore.play();
+    const indirizzi = tratti.map((t) => `/file/video/${enc(t.identificativo)}`);
+    const lettore = lettoreVideo(`sequenza:${primo.sequenza}`, { src: indirizzi[0], controls: true, preload: "metadata", classe: "lettore-video" }, (nodo) => {
+      let quale = 0;
+      nodo.addEventListener("ended", () => {
+        quale = (quale + 1) % indirizzi.length;
+        nodo.src = indirizzi[quale];
+        if (quale) nodo.play();
+      });
     });
     righe.push(lettore, nota("Due file, uno per tratto.", "Seedance non ha un fotogramma di mezzo: sono due video, il secondo parte da dove finisce il primo. Lo Studio li suona uno dopo l'altro; nella cartella dei video sono due file."));
   }
@@ -2707,7 +2733,7 @@ async function apriDalloStorico(v) {
 function tesseraStorico(v) {
   let quadro;
   if (v.tipo === "cattura") quadro = h("img", { src: `/file/vista/${enc(v.vista)}`, alt: "", loading: "lazy", decoding: "async" });
-  else if (v.tipo === "video" && v.immagine) quadro = h("video", { src: `/file/video/${enc(v.identificativo)}`, preload: "metadata", muted: true });
+  else if (v.tipo === "video" && v.immagine) quadro = lettoreVideo(`striscia:${v.identificativo}`, { src: `/file/video/${enc(v.identificativo)}`, preload: "metadata", muted: true });
   else if (v.immagine) quadro = h("img", { src: `/file/render/${enc(v.identificativo)}`, alt: "", loading: "lazy", decoding: "async" });
   else quadro = h("span", { classe: "piccolo" }, v.attivo ? "…" : "—");
   const nuova = v.tipo === "cattura" && !S.viste_viste.has(v.vista);
