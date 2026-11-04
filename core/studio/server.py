@@ -38,6 +38,8 @@ Rotte:
     POST /api/lavori/<id>/misura           spigoli ritrovati di un render fatto prima della misura
     POST /api/lavori/<id>/esporta          il render in JPEG, PNG o PSD a livelli, nella cartella esportati
     POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
+    GET  /api/lavori/<id>/porta            cosa porta «Porta su un'altra vista» e su quali viste
+    POST /api/lavori/<id>/porta            {vista, destinazione_mostrata}: render coerente su un'altra vista
     POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
     POST /api/passi/invia                  un passo nuovo dal render di un passo
     POST /api/passi/pulito/componi         il prompt di «Rifai pulito dalla vista»
@@ -59,6 +61,8 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
+import socket
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -177,6 +181,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
                 self._json(studio.ricetta(identificativo))
+            case ["api", "lavori", identificativo, "porta"]:
+                self._json(studio.anteprima_porta(identificativo))
             case ["file", "vista", nome]:
                 self._file(studio.percorso_vista(nome))
             case ["file", "render", identificativo]:
@@ -243,6 +249,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.misura_ora(identificativo))
             case ["api", "lavori", identificativo, "rifai"]:
                 self._json(studio.rifai(identificativo, self._corpo_json()))
+            case ["api", "lavori", identificativo, "porta"]:
+                self._json(studio.porta_su_vista(identificativo, self._corpo_json()))
             case ["api", "passi", "componi"]:
                 self._json(studio.componi_passo(self._corpo_json()))
             case ["api", "passi", "invia"]:
@@ -271,10 +279,28 @@ class _Gestore(BaseHTTPRequestHandler):
                            HTTPStatus.NOT_FOUND)
 
 
+class _ServerStudio(ThreadingHTTPServer):
+    """Una porta, un solo Studio.
+
+    Su Windows SO_REUSEADDR (acceso per default da HTTPServer) lascia a un
+    secondo processo prendere una porta gia' in ascolto: due Studi sulla
+    stessa porta, risposte a caso. Li' si chiede invece la porta in esclusiva;
+    altrove SO_REUSEADDR non lo permette e serve solo a ripartire subito.
+    """
+
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self) -> None:
+        esclusiva = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if os.name == "nt" and esclusiva is not None:
+            self.socket.setsockopt(socket.SOL_SOCKET, esclusiva, 1)
+        super().server_bind()
+
+
 def crea_server(studio: Studio, porta: int = 0) -> ThreadingHTTPServer:
     """Il server, legato a 127.0.0.1. Con porta 0 la sceglie il sistema."""
     gestore = type("GestoreStudio", (_Gestore,), {"studio": studio})
-    server = ThreadingHTTPServer((INDIRIZZO, porta), gestore)
+    server = _ServerStudio((INDIRIZZO, porta), gestore)
     server.daemon_threads = True
     return server
 

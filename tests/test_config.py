@@ -377,6 +377,12 @@ def test_ritocco_incolla_margine_e_sfumatura_coprono_il_bordo_del_modello_e_sono
         assert config.costante(nome).origine == config.SCELTA
 
 
+def test_studio_porta_e_fissa_fuori_dalle_porte_note_e_scelta():
+    """Caso: lo Studio riparte su un'altra porta e la finestra rimasta aperta dice «server chiuso» per sempre."""
+    assert 1024 < config.STUDIO_PORTA < 49152
+    assert config.costante("STUDIO_PORTA").origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 

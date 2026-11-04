@@ -749,6 +749,19 @@ render fatti», durata più lunga).
   ragione accanto. Mandato: «Video in coda», e la tessera compare nella
   striscia accanto all'immagine.
 - Al posto di «Cambia una parte» e di «Rifai con la stessa ricetta».
+- Dal 2026-11-04 la riga di Variante dice da dove riparte e con cosa: «Variante:
+  un'altra versione di questa immagine. Riparte dalla vista Allplan (o
+  dall'immagine da cui era nata questa), con lo stesso stile (…) e lo stesso
+  modello (…). Va a <servizio> · costo».
+- Dal 2026-11-04 un quarto pulsante, **Altra vista** (Porta su un'altra vista),
+  per i fotogrammi di un video da più viste Allplan. Apre un riquadro come
+  Video: «Su quale vista» (le altre catture della cartella), stile, modello e
+  l'elenco delle richieste e note dei ritocchi che porta, la frase «Questa
+  immagine parte come seconda immagine… Le aree dei ritocchi non si portano»,
+  dove va e costo, **Porta su questa vista**. Vuoto: «Non c'è un'altra vista.
+  In Allplan inquadra il punto di vista del prossimo fotogramma e cattura
+  dalla palette: comparirà qui.» Mandato: «In coda sulla vista …». Il
+  risultato è un passo 1 della vista nuova.
 
 **Meno parole**
 - Le spiegazioni lunghe diventano un «?» accanto all'etichetta: il testo

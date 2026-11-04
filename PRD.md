@@ -268,6 +268,27 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Altra vista: fotogrammi coerenti da più viste (2026-11-04)
+
+«Altra vista» sotto l'immagine porta stile, modello, richieste e note dei
+ritocchi su un'altra cattura, con l'immagine scelta come seconda immagine e la
+frase RIFERIMENTO_COERENZA (bozza 11). Provato solo con il provider finto: mai
+con Nano Banana vero, quindi non si sa quanto arredo e materiali restino
+uguali. Le aree dei ritocchi passano solo a parole; i materiali cambiati da
+Genera non si portano. Verifica: due viste dello stesso progetto, «Altra
+vista» da un render ritoccato, confronto a occhio degli oggetti aggiunti.
+
+### Studio che si ricollega dopo un riavvio (2026-11-04)
+
+`pacchetto.py --installa` ferma lo Studio; la finestra di Edge restava aperta
+su una porta scelta a caso, morta, e diceva «server locale chiuso» con un
+comando senza `--cartella`. Ora lo Studio ascolta su `STUDIO_PORTA` (se
+occupata, una del sistema) e la pagina si ricarica da sola quando risponde di
+nuovo. Provato solo su Linux nei test: mai su Windows, mai con Edge in
+modalità app, mai con `SO_EXCLUSIVEADDRUSE` vero. Verifica: Studio aperto,
+`--installa`, poi «Apri nello Studio» dalla palette; la vecchia finestra deve
+ricaricarsi da sola entro pochi secondi.
+
 ### Termini di Comfy e rivendita (2026-11-03)
 
 Termini di Comfy in `docs/comfy-termini.md`; fornitori, rischi e mail in

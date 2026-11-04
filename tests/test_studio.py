@@ -718,3 +718,35 @@ def test_i_miei_preset_dallo_studio_vivono_nella_cartella_delle_viste(cartella, 
     with pytest.raises(RichiestaStudioNonValida):
         studio.salva_mio_preset({"nome": "Altro", "scelte": scelte, "modello": "inventato/x"})
     assert studio.elimina_mio_preset({"nome": "Mio"})["preset"] == []
+
+
+def test_lo_studio_parte_sulla_porta_fissa_e_se_occupata_ne_prende_un_altra(cartella, chiamate):
+    """Caso: la finestra dello Studio resta aperta mentre --installa ferma lo
+    Studio; con una porta nuova a ogni avvio non si ricollegava piu'."""
+    from core import config
+    from core.studio.__main__ import crea_server_sulla_porta
+
+    primo = crea_server_sulla_porta(_studio(cartella, chiamate), None)
+    try:
+        if primo.server_address[1] != config.STUDIO_PORTA:
+            pytest.skip("la porta fissa e' occupata su questa macchina")
+        secondo = crea_server_sulla_porta(_studio(cartella, chiamate), None)
+        try:
+            assert secondo.server_address[1] not in (0, config.STUDIO_PORTA)
+        finally:
+            secondo.server_close()
+    finally:
+        primo.server_close()
+    # Chiuso il primo, la porta fissa torna libera per chi riparte.
+    terzo = crea_server_sulla_porta(_studio(cartella, chiamate), None)
+    try:
+        assert terzo.server_address[1] == config.STUDIO_PORTA
+    finally:
+        terzo.server_close()
+
+
+def test_la_pagina_si_ricollega_quando_lo_studio_riparte():
+    """La pagina non deve suggerire un comando senza --cartella e deve ricaricarsi da sola."""
+    testo = (Path(__file__).resolve().parents[1] / "core" / "studio" / "pagine" / "studio.js").read_text(encoding="utf-8")
+    assert "python -m core.studio" not in testo
+    assert "if (S.spento || !S.catalogo) { location.reload(); return; }" in testo

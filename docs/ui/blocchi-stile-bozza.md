@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 10 (2026-11-01)
+# Blocchi di stile — bozza 11 (2026-11-04)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -23,6 +23,12 @@ Cosa cambia dalla bozza 5: la regola fissa si sceglie fra tre. **Bilanciata** è
 Solo quando in Studio · Genera c'è un'immagine di riferimento: parte come seconda immagine e questa frase entra subito prima di «cosa evitare». Non provata: il primo render con un riferimento è anche la prima volta che Nano Banana 2 riceve due immagini in una chiamata vera.
 
 > The second image is a style reference only: take from it the colour palette, the light and the look of the materials. Do not copy its geometry, camera, objects or composition; the building stays the one in the first image.
+
+## Stesso progetto da un'altra vista, bozza 11 (2026-11-04)
+
+Solo con «Altra vista» sotto l'immagine (Porta su un'altra vista): la vista nuova parte per prima, l'immagine scelta per seconda, e questa frase prende il posto di quella del riferimento per lo stile. È il contrario sugli oggetti: qui arredo e oggetti si riprendono. Lo stile e le richieste sono quelli della strada dell'immagine (primo render, passi, note dei ritocchi a parole). Non provata.
+
+> The second image is the same project rendered from another camera. Keep this render consistent with it: the same materials, colours, furniture, objects, people style and light, wherever they are visible from this camera. Do not copy its camera or composition; the geometry and the viewpoint stay the ones in the first image.
 
 ## Inserisci nel contesto, bozza 10 (2026-11-01)
 

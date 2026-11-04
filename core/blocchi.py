@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-10"
+VERSIONE = "bozza-11"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -819,9 +819,24 @@ RIFERIMENTO_STILE = Blocco(
 )
 
 
-def aggiungi_riferimento(base: str) -> str:
+# «Porta su un'altra vista» (2026-11-04): la seconda immagine e' un render
+# dello stesso progetto da un'altra camera, gia' ritoccato. Qui il modello deve
+# riprendere materiali e oggetti, non solo l'atmosfera: e' il contrario di
+# RIFERIMENTO_STILE su oggetti e arredo. Non provato con il modello.
+RIFERIMENTO_COERENZA = Blocco(
+    "riferimento-coerenza",
+    "Stesso progetto da un'altra vista",
+    "The second image is the same project rendered from another camera. Keep "
+    "this render consistent with it: the same materials, colours, furniture, "
+    "objects, people style and light, wherever they are visible from this "
+    "camera. Do not copy its camera or composition; the geometry and the "
+    "viewpoint stay the ones in the first image.",
+)
+
+
+def aggiungi_riferimento(base: str, coerenza: bool = False) -> str:
     """Il prompt con la frase del riferimento prima di «cosa evitare», se c'e'."""
-    return _prima_di_evitare(base, RIFERIMENTO_STILE.testo)
+    return _prima_di_evitare(base, (RIFERIMENTO_COERENZA if coerenza else RIFERIMENTO_STILE).testo)
 
 
 # --- aree e note (banco di prova, piano "aree"; Ritocca non c'e' ancora) -----

@@ -434,6 +434,21 @@ QUOTA_COLORATA_AVVISO = _registra(Costante(
     ),
 ))
 
+STUDIO_PORTA = _registra(Costante(
+    nome="STUDIO_PORTA",
+    valore=47317,
+    origine=SCELTA,
+    ragione=(
+        "La porta su cui lo Studio prova ad ascoltare, sempre la stessa. "
+        "Con una porta scelta dal sistema, a ogni riavvio (per esempio dopo "
+        "pacchetto.py --installa, che ferma lo Studio) la finestra di Edge "
+        "rimasta aperta puntava a un indirizzo morto e diceva «server "
+        "chiuso» per sempre (visto il 2026-11-04). Con la porta fissa la "
+        "finestra si ricollega da sola. 47317 e' un numero qualunque fuori "
+        "dalle porte note; se e' occupata lo Studio ne prende una dal sistema."
+    ),
+))
+
 STUDIO_CARICAMENTO_MASSIMO_MB = _registra(Costante(
     nome="STUDIO_CARICAMENTO_MASSIMO_MB",
     valore=50,

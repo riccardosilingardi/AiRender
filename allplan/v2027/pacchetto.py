@@ -141,7 +141,8 @@ def installa(albero: Path, usr: Path, ferma=ferma_coda_e_studio) -> Esito:
     fermati = ferma()
     if fermati:
         esito.avvisi.append(f"Ho fermato coda e Studio di AIRENDER (processi {', '.join(fermati)}): "
-                            "ripartono da soli al prossimo Genera.")
+                            "ripartono da soli al prossimo Genera o con Apri nello Studio. Una finestra dello "
+                            "Studio rimasta aperta si ricollega da sola quando lo Studio riparte.")
     vecchi = usr / VECCHI_SCRIPT
     if vecchi.is_dir():
         shutil.rmtree(vecchi)

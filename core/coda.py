@@ -253,6 +253,10 @@ class Lavoro:
     # Studio · Genera: il file dell'immagine di riferimento per lo stile, che
     # parte come seconda immagine. Solo da una vista, mai con le aree.
     riferimento: str | None = None
+    # «Porta su un'altra vista»: il lavoro da cui viene il riferimento. Con
+    # questo il riferimento non e' solo stile ma lo stesso progetto da
+    # un'altra camera (blocchi.RIFERIMENTO_COERENZA).
+    portato_da: str | None = None
     # Studio · Genera, «Inserisci nel contesto»: l'immagine del luogo con
     # l'area dove va l'edificio. Parte per prima, la vista dopo. Solo da una
     # vista, mai con aree, passi o riferimento.
@@ -294,7 +298,8 @@ class Lavoro:
         else:
             base = blocchi.componi(self.scelte)
         testo = blocchi.aggiungi_richieste(base, self.richieste)
-        testo = blocchi.aggiungi_riferimento(testo) if self.riferimento else testo
+        testo = (blocchi.aggiungi_riferimento(testo, coerenza=bool(self.portato_da))
+                 if self.riferimento else testo)
         return modulo_materiali.prompt(testo, self.materiali, prima_immagine=modulo_materiali.prima_immagine(bool(self.riferimento)))
 
     def a_dizionario(self) -> dict:
@@ -315,6 +320,7 @@ class Lavoro:
             **({"aree": [a.a_dizionario() for a in self.aree], "modo_aree": self.modo_aree}
                if self.aree else {}),
             **({"riferimento": self.riferimento} if self.riferimento else {}),
+            **({"portato_da": self.portato_da} if self.portato_da else {}),
             **({"contesto": self.contesto.a_dizionario()} if self.contesto else {}),
             **({"materiali": [c.a_dizionario() for c in self.materiali]} if self.materiali else {}),
         }
@@ -404,6 +410,7 @@ class Lavoro:
             aree=aree,
             modo_aree=modo_aree,
             riferimento=str(riferimento) if riferimento else None,
+            portato_da=str(dati["portato_da"]) if riferimento and dati.get("portato_da") else None,
             contesto=contesto,
             materiali=materiali,
             creato_il=str(dati.get("creato_il") or _adesso()),
@@ -476,6 +483,7 @@ def metti_in_coda(
     aree: tuple[modulo_aree.Area, ...] = (),
     modo_aree: str | None = None,
     riferimento: Path | None = None,
+    portato_da: str | None = None,
     contesto: modulo_contesto.Contesto | None = None,
     materiali: tuple[modulo_materiali.Cambio, ...] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
@@ -504,6 +512,11 @@ def metti_in_coda(
                 "Togli il riferimento, oppure genera da Genera.",
             )
         riferimento = controlla_riferimento(radice, riferimento)
+    elif portato_da:
+        raise LavoroNonValido(
+            "«Porta su un'altra vista» ha bisogno dell'immagine da cui portare.",
+            "Rifallo da sotto l'immagine nello Studio.",
+        )
     if contesto is not None:
         if partenza or aree or riferimento is not None:
             raise LavoroNonValido(
@@ -545,6 +558,7 @@ def metti_in_coda(
         aree=tuple(aree),
         modo_aree=modo_aree if aree else None,
         riferimento=str(riferimento) if riferimento else None,
+        portato_da=portato_da or None,
         contesto=contesto,
         materiali=tuple(materiali),
     )
