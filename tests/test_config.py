@@ -383,6 +383,18 @@ def test_studio_porta_e_fissa_fuori_dalle_porte_note_e_scelta():
     assert config.costante("STUDIO_PORTA").origine == config.SCELTA
 
 
+def test_inserti_massimo_ferma_un_quinto_rif_ed_e_scelto():
+    """Caso: partono cinque oggetti in un invio e il modello li confonde, o un'area punta a un Rif. che non esiste."""
+    from core.aree import Area, AreaNonValida
+
+    assert 1 <= config.INSERTI_MASSIMO <= 14  # numero-non-configurabile: Gemini 3 Pro Image ne prende 14
+    assert config.costante("INSERTI_MASSIMO").origine == config.SCELTA
+    rettangolo = ((0.1, 0.1), (0.4, 0.4))
+    Area("rettangolo", rettangolo, "una poltrona", inserto=config.INSERTI_MASSIMO)
+    with pytest.raises(AreaNonValida):
+        Area("rettangolo", rettangolo, "una poltrona", inserto=config.INSERTI_MASSIMO + 1)
+
+
 # --- guardia -----------------------------------------------------------------
 
 

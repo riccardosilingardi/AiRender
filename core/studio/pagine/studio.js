@@ -24,6 +24,7 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
+  inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
   // quelli spuntati ({ chiave: { diventa, riferimento } }), la ricerca.
   mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null },
@@ -367,7 +368,7 @@ function aggiornaComposto(subito) {
   clearTimeout(attesaComponi);
   const fai = async () => {
     try {
-      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer() });
+      S.composto = await post("/api/componi", { vista: S.vista, scelte: S.scelte, preset: S.preset, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera() });
       S.errore = null;
     } catch (e) { S.errore = e; }
     disegnaComposto();
@@ -384,6 +385,7 @@ async function caricaVista(nome) {
   S.risultato = { ...S.risultato, lavori: [], scelto: null, ricetta: null, caricato: false, confronto: "vista", rifai: false };
   S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
   S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null };
+  S.inserti = [];
   if (!nome) { render(); return; }
   try { S.descrizione = await get(`/api/viste/${enc(nome)}`); } catch (e) { S.errore = e; }
   try { S.mat.dati = await get(`/api/viste/${enc(nome)}/materiali`); } catch (e) { S.mat.errore = e; }
@@ -395,7 +397,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -478,7 +480,7 @@ async function genera() {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, destinazione_mostrata: S.destinazione && S.destinazione.destinazione,
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
-      materiali: materialiPerServer(),
+      materiali: materialiPerServer(), inserti: insertiGenera(),
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -493,7 +495,7 @@ async function provaASecco() {
     S.secco = await post("/api/prova-a-secco", {
       vista: S.vista, scelte: S.scelte, preset: S.preset, modello: S.modello, varianti: S.varianti,
       prompt_a_mano: S.promptAMano, riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome,
-      contesto: contestoPerServer(), materiali: materialiPerServer(),
+      contesto: contestoPerServer(), materiali: materialiPerServer(), inserti: insertiGenera(),
     });
   } catch (e) { S.errore = e; S.secco = null; }
   render();
@@ -768,11 +770,9 @@ function colonnaInvio() {
       h("p", { id: "nota-prompt", classe: S.promptAMano !== null ? "piccolo" : "piccolo nascosto", stile: "color:var(--attenzione)" },
         "Prompt modificato a mano: parte questo testo, non le scelte a sinistra.")) : null);
 
-  const modelli = h("select", { id: "modello", "aria-label": "Modello" },
-    S.catalogo.modelli.map((m) => h("option", { value: m.id, selected: m.id === S.modello, disabled: !m.verificato },
-      m.nome + (m.id === S.studio.modello_predefinito ? " — predefinito" : "") + (m.verificato ? "" : " — schema non verificato"))),
-    S.catalogo.modelli_non_provati.map((n) => h("option", { disabled: true }, `${n} — non ancora provato`)));
-  modelli.addEventListener("change", async () => { S.modello = modelli.value; S.secco = null; await caricaDestinazione(); render(); });
+  const modelli = schedeModello("genera", S.modello,
+    S.modo === "contesto" || !!S.riferimento || immaginiMateriali() > 0 || S.inserti.length > 0,
+    async (id) => { S.modello = id; S.secco = null; await caricaDestinazione(); render(); });
 
   const qualita = h("div", { classe: "switch", role: "group", "aria-label": "Qualità" },
     asse("qualita").voci.map((v) => h("button", {
@@ -805,7 +805,10 @@ function colonnaInvio() {
         onclick: async () => { S.varianti = n; S.secco = null; await caricaDestinazione(); render(); },
       }, String(n)))),
     S.varianti > 1 ? h("p", { classe: "tenue piccolo" }, `${S.varianti} lavori in coda con le stesse scelte, uno dopo l'altro: ogni variante è un invio.`) : null,
-    ...pannelloRiferimento());
+    ...pannelloRiferimento(),
+    S.modo === "contesto" ? null : pannelloInserti(S.inserti, modelloScelto(), "Genera", async () => {
+      S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render();
+    }));
 
   return h("div", { classe: "colonna-invio" },
     S.modo === "contesto" ? null : h("section", { classe: "pannello", "aria-label": "Materiali" },
@@ -951,6 +954,54 @@ function pannelloRiferimento() {
       h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
       h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
     nota("Solo palette, luce e materiali.", "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine.")];
+}
+
+// Rif. di oggetti e persone: fino a INSERTI_MASSIMO immagini da mettere
+// nell'immagine di partenza, citate nel testo come «Rif. 1», «Rif. 2».
+// Partono dopo tutte le altre immagini; il server le salva con la loro
+// impronta, come il riferimento per lo stile. Solo con i modelli che
+// ricevono piu' di un'immagine: con gli altri il server non manda.
+function insertiGenera() { return S.modo === "contesto" ? [] : S.inserti.map((r) => r.nome); }
+
+async function caricaInserto(file) {
+  return post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+}
+
+function miniaturaRif(r, numero, togli) {
+  return h("div", { classe: "rif" },
+    h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: `Rif. ${numero}: ${r.da || r.nome}` }),
+    h("span", { classe: "piccolo" }, h("b", {}, `Rif. ${numero}`)),
+    togli ? h("button", { classe: "togli", "aria-label": `Togli il Rif. ${numero}`, onclick: togli }, "×") : null);
+}
+
+function pannelloInserti(lista, modello, dove, cambiato, bloccato) {
+  const massimo = S.catalogo.inserti_massimi || 4;
+  const accetta = !!(modello && modello.piu_immagini);
+  const titolo = h("span", { classe: "etichetta" }, "Oggetti e persone da inserire",
+    spiega(`Una foto per ogni cosa da mettere nell'immagine: un arredo, una persona, un'auto, una lampada. Nel testo la citi come «Rif. 1», «Rif. 2»: per esempio «metti la poltrona del Rif. 1 accanto alla finestra». Al massimo ${massimo}.`));
+  const errore = h("div", {});
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": "Carica la foto di un oggetto o di una persona" });
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    try { lista.push(await caricaInserto(f)); } catch (e) { errore.replaceChildren(avviso("errore", e.fatto, e.cosa_fare)); return; }
+    await cambiato();
+  });
+  const aggiungi = lista.length < massimo && !bloccato
+    ? h("button", { classe: "rif rif-nuovo", onclick: () => file.click(), disabled: !accetta || null,
+      title: accetta ? "Aggiungi la foto di un oggetto o di una persona" : "" }, `+ Rif. ${lista.length + 1}`) : null;
+  return h("div", { classe: "inserti", "aria-label": `Oggetti e persone da inserire · ${dove}` },
+    titolo,
+    h("div", { classe: "griglia-rif" },
+      lista.map((r, i) => miniaturaRif(r, i + 1, bloccato ? null : async () => { lista.splice(i, 1); await cambiato(); })),
+      aggiungi, file),
+    !accetta ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" },
+      `${modello ? modello.nome : "Questo modello"} riceve una sola immagine per invio: i Rif. si usano con Nano Banana 2.`
+      + (lista.length ? ` Con ${lista.length === 1 ? "questo Rif." : "questi Rif."} non manda.` : ""))
+      : lista.length ? h("p", { classe: "tenue piccolo" },
+        `${lista.length === 1 ? "Il Rif. parte" : `I ${lista.length} Rif. partono`} dopo le altre immagini. Citali nel testo: «Rif. 1»${lista.length > 1 ? ", «Rif. 2»" : ""}. Testo per il modello scelto, non ancora provato.`)
+      : null,
+    errore);
 }
 
 // Inserisci nel contesto: il fotoinserimento. L'utente porta l'immagine del
@@ -1720,8 +1771,48 @@ function ritoccoBloccato() {
   return !!(S.lavoroAttivo && S.ritocca.inviato && S.lavoroAttivo.identificativo === S.ritocca.inviato);
 }
 
+// Ogni nota puo' avere la sua foto: i Rif. sono quelli delle note, nell'ordine
+// delle note, e la nota porta il numero del suo.
+function insertiRitocco() { return S.ritocca.aree.filter((a) => a.rif).map((a) => a.rif); }
+
 function areePerIlServer() {
-  return S.ritocca.aree.map((a) => ({ forma: a.forma, punti: a.punti, nota: a.nota }));
+  let numero = 0;
+  return S.ritocca.aree.map((a) => {
+    const area = { forma: a.forma, punti: a.punti, nota: a.nota };
+    if (a.rif) area.inserto = ++numero;
+    return area;
+  });
+}
+
+function numeroRif(i) { return S.ritocca.aree.slice(0, i + 1).filter((a) => a.rif).length; }
+
+async function immagineNota(i, file) {
+  const r = S.ritocca;
+  if (!file) return;
+  try { r.aree[i].rif = await caricaInserto(file); r.errore = null; } catch (e) { r.errore = e; }
+  componiRitocco();
+  render();
+}
+
+function togliImmagineNota(i) { S.ritocca.aree[i].rif = null; componiRitocco(); render(); }
+
+function bottoneImmagineNota(a, i, bloccato) {
+  const m = S.catalogo.modelli.find((x) => x.id === S.ritocca.modello);
+  if (a.rif) {
+    return h("div", { classe: "riga nota-rif" },
+      h("img", { src: `/file/riferimento/${enc(a.rif.nome)}`, alt: `Rif. ${numeroRif(i)} della nota ${i + 1}` }),
+      h("span", { classe: "piccolo" }, h("b", {}, `Rif. ${numeroRif(i)}`), ` · ${a.rif.da || a.rif.nome}`),
+      bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliImmagineNota(i) }, "Togli"));
+  }
+  if (bloccato) return null;
+  const pieni = insertiRitocco().length >= (S.catalogo.inserti_massimi || 4);
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": `Foto da inserire con la nota ${i + 1}` });
+  file.addEventListener("change", () => immagineNota(i, file.files && file.files[0]));
+  const spento = pieni || !(m && m.piu_immagini);
+  return h("span", {}, file, h("button", {
+    classe: "btn link piccolo", onclick: () => file.click(), disabled: spento || null,
+    title: pieni ? "Ci sono già 4 Rif. in questo ritocco." : !(m && m.piu_immagini) ? `${m ? m.nome : "Questo modello"} riceve una sola immagine: scegli Nano Banana 2.` : "La foto dell'oggetto o della persona da mettere in quest'area",
+  }, "+ Immagine"));
 }
 
 function noteVuote() { return S.ritocca.aree.map((a, i) => (a.nota.trim() ? null : i + 1)).filter(Boolean); }
@@ -1743,7 +1834,7 @@ function componiRitocco() {
   clearTimeout(attesaRitocco);
   if (!r.aree.length || noteVuote().length) { r.composto = null; disegnaApplicaRitocco(); return; }
   attesaRitocco = setTimeout(async () => {
-    try { r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, aree: areePerIlServer() }); r.errore = null; }
+    try { r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) }); r.errore = null; }
     catch (e) { r.composto = null; r.errore = e; }
     disegnaApplicaRitocco();
   }, 250);
@@ -1901,7 +1992,7 @@ function foglietto(a, i, bloccato) {
     h("b", {}, `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}`),
     bloccato ? null : h("button", { classe: "togli", "aria-label": `Togli l'area ${i + 1} e la sua nota`, onclick: () => togliArea(i) }, "×"));
   const nota = h("div", { classe: "foglietto", stile: `left:${a.posNota.x * 100}%;top:${a.posNota.y * 100}%` },
-    testata, campo,
+    testata, campo, bottoneImmagineNota(a, i, bloccato),
     h("span", { classe: "manca-nota", id: `manca-nota-${i}`, hidden: !!a.nota.trim() }, "Scrivi la nota, oppure togli l'area."));
   if (!bloccato) {
     testata.addEventListener("pointerdown", (ev) => {
@@ -1957,6 +2048,7 @@ function elencoNote(bloccato) {
       h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, h("b", { classe: "numero-elenco" }, String(i + 1)), a.forma === "rettangolo" ? " rettangolo" : " selezione libera"),
         bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
       campo,
+      bottoneImmagineNota(a, i, bloccato),
       h("span", { classe: "manca-nota", id: `manca-elenco-${i}`, hidden: !!a.nota.trim() }, "Un'area senza nota non dice al modello cosa fare."));
   }));
 }
@@ -1978,9 +2070,11 @@ function pannelloApplica(base, bloccato) {
   return h("section", { classe: "pannello evidenziato", "aria-label": "Applica le note" },
     h("span", { classe: "etichetta" }, `Note sull'immagine · dal passo ${base.numero}`),
     elencoNote(bloccato),
+    insertiRitocco().length ? h("p", { classe: "tenue piccolo" },
+      `Partono ${1 + insertiRitocco().length} immagini: il render e ${insertiRitocco().length === 1 ? "1 Rif." : `${insertiRitocco().length} Rif.`} delle note. Testo per il modello scelto, non ancora provato.`) : null,
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-ritocco" })),
       h("textarea", { classe: "prompt", id: "prompt-ritocco", readonly: true, "aria-label": "Prompt del ritocco" })),
-    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(r, render))),
+    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(r, render, "ritocca", insertiRitocco().length > 0))),
     rigaDestinazione(r.modello, S.studio.ritocco.modo === "maschera" ? "Il render, con la maschera delle aree," : "Il render, con le aree disegnate sopra,"),
     h("div", { id: "errore-ritocco" }),
     bloccato ? null : h("div", { classe: "azioni" },
@@ -1997,6 +2091,7 @@ async function applicaRitocco() {
     const dest = await destinazioneDi(r.modello);
     const risposta = await post("/api/ritocca/invia", {
       vista: S.vista, da: r.da, aree: areePerIlServer(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione,
+      inserti: insertiRitocco().map((x) => x.nome),
     });
     r.inviato = risposta.identificativo;
     S.inFila = [];
@@ -2157,7 +2252,7 @@ async function apriNuovoPasso(passo) {
   const p = S.passi;
   p.scelto = passo.identificativo;
   p.rifai = false; p.pulito = null;
-  p.nuovo = { da: passo.identificativo, testo: "", modello: modelloVerificato(passo.modello), composto: null, errore: null };
+  p.nuovo = { da: passo.identificativo, testo: "", modello: modelloVerificato(passo.modello), composto: null, errore: null, inserti: [] };
   await destinazioneDi(p.nuovo.modello);
   render();
   const campo = document.getElementById("testo-passo");
@@ -2170,7 +2265,7 @@ function componiNuovoPasso() {
   clearTimeout(attesaPasso);
   if (!n || !n.testo.trim()) { if (n) { n.composto = null; disegnaNuovoPasso(); } return; }
   attesaPasso = setTimeout(async () => {
-    try { n.composto = await post("/api/passi/componi", { vista: S.vista, da: n.da, testo: n.testo }); n.errore = null; }
+    try { n.composto = await post("/api/passi/componi", { vista: S.vista, da: n.da, testo: n.testo, inserti: n.inserti.map((r) => r.nome) }); n.errore = null; }
     catch (e) { n.composto = null; n.errore = e; }
     disegnaNuovoPasso();
   }, 250);
@@ -2207,6 +2302,7 @@ async function applicaPasso() {
     const dest = await destinazioneDi(n.modello);
     const risposta = await post("/api/passi/invia", {
       vista: S.vista, da: n.da, testo: n.testo, modello: n.modello, destinazione_mostrata: dest && dest.destinazione,
+      inserti: n.inserti.map((r) => r.nome),
     });
     S.passi.nuovo = null;
     S.passi.scelto = risposta.identificativo;
@@ -2374,11 +2470,57 @@ function rigaDestinazione(modello, cosaParte) {
     d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`);
 }
 
-function sceltaModello(stato, onCambio) {
-  const scegli = h("select", { "aria-label": "Modello" },
-    S.catalogo.modelli.map((m) => h("option", { value: m.id, selected: stato.modello === m.id, disabled: !m.verificato }, `${m.nome}${m.verificato ? "" : " · schema non verificato"}`)));
-  scegli.addEventListener("change", async () => { stato.modello = scegli.value; await destinazioneDi(stato.modello); onCambio(); });
-  return scegli;
+function sceltaModello(stato, onCambio, dove, piuImmagini) {
+  return schedeModello(dove || "passi", stato.modello, !!piuImmagini,
+    async (id) => { stato.modello = id; await destinazioneDi(stato.modello); onCambio(); });
+}
+
+// La scelta del modello: schede raggruppate per categoria, ognuna con una riga
+// su a cosa serve e la spunta su quella scelta. Chiusa mostra solo la scelta.
+// Le righe sono giudizi (SCELTA), non confronti misurati: lo si scrive.
+// Un modello a una sola immagine resta visibile ma spento quando l'invio ne
+// manda piu' d'una, con il perche' scritto sulla scheda.
+const modelliAperti = new Set();
+function schedeModello(dove, sceltoId, servePiuImmagini, onScegli) {
+  const aperta = modelliAperti.has(dove);
+  const tutti = S.catalogo.modelli;
+  const scelto = tutti.find((m) => m.id === sceltoId);
+  const scheda = (m) => {
+    const perche = !m.verificato ? "Schema non verificato: non si può mandare."
+      : servePiuImmagini && !m.piu_immagini ? "Riceve una sola immagine: questo invio ne manda più d'una." : "";
+    const attiva = m.id === sceltoId;
+    return h("button", {
+      classe: "scheda-modello", role: "radio", "aria-checked": String(attiva), disabled: (!!perche && !attiva) || null,
+      onclick: async () => { modelliAperti.delete(dove); if (!attiva) await onScegli(m.id); else render(); },
+    },
+      h("span", { classe: "spunta", "aria-hidden": "true" }, attiva ? "✓" : ""),
+      h("span", { classe: "corpo-modello" },
+        h("span", { classe: "riga-modello" }, h("b", {}, m.nome), h("span", { classe: "tenue piccolo" }, ` · ${m.fornitore}`),
+          m.id === S.studio.modello_predefinito ? h("span", { classe: "etichetta-modello" }, "predefinito") : null),
+        h("span", { classe: "piccolo" }, m.spiega),
+        h("span", { classe: "tenue piccolo" }, m.piu_immagini ? "Più immagini per invio" : "Una sola immagine per invio",
+          m.costo && m.costo.startsWith("circa") ? ` · ${m.costo.split(" · ")[0]}` : " · costo non misurato"),
+        perche ? h("span", { classe: "piccolo", stile: "color:var(--attenzione)" }, perche) : null));
+  };
+  if (!aperta) {
+    return h("div", { classe: "scelta-modello", role: "radiogroup", "aria-label": "Modello" },
+      scelto ? scheda(scelto) : h("p", { classe: "tenue piccolo" }, "Nessun modello scelto."),
+      h("button", { classe: "btn link piccolo", onclick: () => { modelliAperti.add(dove); render(); } },
+        `Cambia modello (${tutti.length - (scelto ? 1 : 0)} altri)`));
+  }
+  const categorie = S.catalogo.categorie_modelli || [];
+  return h("div", { classe: "scelta-modello aperta", role: "radiogroup", "aria-label": "Modello" },
+    categorie.map((c) => {
+      const del_gruppo = tutti.filter((m) => m.categoria === c.id);
+      if (!del_gruppo.length) return null;
+      return h("div", { classe: "gruppo-modelli" },
+        h("span", { classe: "etichetta" }, c.nome, spiega(c.spiega)),
+        del_gruppo.map(scheda));
+    }),
+    tutti.filter((m) => !categorie.some((c) => c.id === m.categoria)).map(scheda),
+    S.catalogo.modelli_non_provati.map((n) => h("p", { classe: "tenue piccolo" }, `${n} · non ancora provato`)),
+    h("p", { classe: "tenue piccolo" }, "Le righe sono un giudizio, non un confronto misurato sul banco di prova."),
+    h("button", { classe: "btn link piccolo", onclick: () => { modelliAperti.delete(dove); render(); } }, "Chiudi"));
 }
 
 // Cambia: le scorciatoie scrivono una richiesta nel campo, che resta da
@@ -2409,9 +2551,10 @@ function pannelloNuovoPasso() {
     campo,
     nota("Scorciatoie: testi scelti, non provati.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare. Non sono ancora state provate con il modello."),
     h("p", { classe: "tenue piccolo" }, "Solo una parte? Usa Ritocca."),
+    pannelloInserti(n.inserti, S.catalogo.modelli.find((m) => m.id === n.modello), "Cambia", () => { componiNuovoPasso(); render(); }),
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
-    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
+    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(n, render, "cambia", n.inserti.length > 0))),
     rigaDestinazione(n.modello),
     h("div", { id: "errore-passo" }),
     h("div", { classe: "azioni" },
@@ -2440,7 +2583,7 @@ function pannelloPulito(passo) {
       "Dalla vista le aree non valgono più: erano disegnate su un render. Il modello non sa più dove fare quelle modifiche; se servono lì, ritocca dopo.") : null,
     h("span", { classe: "piccolo tenue" }, `Il prompt che parte, in inglese · ${c.caratteri} caratteri`),
     prompt,
-    h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(q, render))),
+    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(q, render, "pulito", false))),
     rigaDestinazione(q.modello),
     q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
     h("div", { classe: "azioni" },

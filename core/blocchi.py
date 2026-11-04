@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-12"
+VERSIONE = "bozza-13"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -840,6 +840,43 @@ def aggiungi_riferimento(base: str, coerenza: bool = False) -> str:
     return _prima_di_evitare(base, (RIFERIMENTO_COERENZA if coerenza else RIFERIMENTO_STILE).testo)
 
 
+# --- riferimenti di oggetti e persone (Studio, bozza 13, 2026-11-04) ----------
+
+# Le immagini che l'utente porta per dire «metti questo»: una poltrona, una
+# persona, un albero, un'auto. Partono dopo la vista o il render e dopo le
+# altre immagini; nel testo l'utente le chiama «Rif. 1», «Rif. 2»... e questa
+# frase dice al modello quale immagine e' quale. E' il contrario del
+# riferimento per lo stile: qui l'oggetto si copia, l'atmosfera no. Come ogni
+# blocco, non provata con il modello.
+INSERTI_REGOLA = Blocco(
+    "inserti",
+    "Riferimenti di oggetti e persone",
+    "These images show objects or people to place into image 1. Insert each "
+    "one only where the text asks for it, keeping its shape, colours and "
+    "materials, at the scale, perspective and light of image 1, with a "
+    "matching shadow. Do not copy the background, camera or framing of a "
+    "reference image, and do not change anything else in image 1.",
+)
+
+# Quando una nota di Ritocca ha la sua immagine: la nota dice da quale Rif.
+NOTA_CON_INSERTO = "use the object or person shown in Rif. {numero}"
+
+
+def frase_inserti(prima_immagine: int, quanti: int) -> str:
+    """Quale immagine e' ciascun Rif., poi la regola. Vuota se non ce ne sono."""
+    if quanti <= 0:
+        return ""
+    nomi = "; ".join(f"Rif. {n} is image {prima_immagine + n - 1}" for n in range(1, quanti + 1))
+    return f"Reference images: {nomi}. {INSERTI_REGOLA.testo}"
+
+
+def aggiungi_inserti(base: str, prima_immagine: int, quanti: int) -> str:
+    """Il prompt con i riferimenti di oggetti e persone prima di «cosa evitare», se ce ne sono."""
+    if quanti <= 0:
+        return base
+    return _prima_di_evitare(base, frase_inserti(prima_immagine, quanti))
+
+
 # --- aree e note (banco di prova, piano "aree"; Ritocca non c'e' ancora) -----
 
 # Due modi di dire al modello dove intervenire. Nessuno dei due e' provato:
@@ -864,10 +901,12 @@ AREE_MASCHERA = Blocco(
 )
 
 
-def componi_aree(modo: Blocco, note: list[str]) -> str:
+def componi_aree(modo: Blocco, note: list[str], inserti: list[int | None] | None = None) -> str:
     """Il prompt di un invio con aree: come sono indicate, una riga per nota, cosa evitare.
 
     Le note passano come le scrive l'utente, anche in italiano, come i materiali.
+    `inserti` dice, per ogni nota, il numero del suo Rif. (o None): la nota
+    finisce con «use the object or person shown in Rif. N».
     """
     pulite = [" ".join((n or "").split()).rstrip(".") for n in note]
     if not pulite or not all(pulite):
@@ -875,7 +914,9 @@ def componi_aree(modo: Blocco, note: list[str]) -> str:
             "Un'area senza nota non dice al modello cosa fare.",
             "Scrivi una nota per ogni area, oppure togli l'area.",
         )
-    righe = [f"Area {numero}: {nota}." for numero, nota in enumerate(pulite, start=1)]
+    inserti = list(inserti or [None] * len(pulite))
+    righe = [f"Area {numero}: {nota}" + (f"; {NOTA_CON_INSERTO.format(numero=rif)}." if rif else ".")
+             for numero, (nota, rif) in enumerate(zip(pulite, inserti), start=1)]
     return " ".join([modo.testo, *righe, COSA_EVITARE.testo])
 
 

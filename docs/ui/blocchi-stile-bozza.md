@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 12 (2026-11-04)
+# Blocchi di stile — bozza 13 (2026-11-04)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -356,3 +356,9 @@ Cosa va verificato prima, in quest'ordine:
 4. Che la mappa non venga copiata nei colori del render: è la trappola «colori come materiali» del 27/10, al contrario. Da provare con un render solo prima di qualunque altra cosa.
 
 Finché non c'è, resta attivo il campo Materiali a parole.
+
+## Riferimenti di oggetti e persone (bozza 13, 2026-11-04)
+
+Fino a 4 immagini (Rif. 1-4) di oggetti o persone da mettere nell'immagine di partenza, in Genera, Cambia e Ritocca. Partono dopo tutte le altre immagini; il prompt dice quale immagine è quale Rif. Una nota di Ritocca può citarne uno («use the object or person shown in Rif. N»). Testo scelto, non provato con il modello.
+
+> These images show objects or people to place into image 1. Insert each one only where the text asks for it, keeping its shape, colours and materials, at the scale, perspective and light of image 1, with a matching shadow. Do not copy the background, camera or framing of a reference image, and do not change anything else in image 1.

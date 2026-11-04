@@ -268,6 +268,18 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Rif. di oggetti e persone e scelta del modello (2026-11-04)
+
+- **Che il modello metta davvero l'oggetto del Rif. dove dice il testo**, con
+  forma, colori, scala e ombra giuste: la regola `INSERTI_REGOLA` (bozza 13) è
+  un testo scelto, provato solo con un provider finto. Verifica: un Cambia e un
+  Ritocca con una foto di poltrona su un render vero, Nano Banana 2.
+- **Che il Router accetti 3-6 immagini in un invio** (render + fino a 4 Rif. +
+  eventuali materiali): con Nano Banana 2 ne sono partite al massimo 3.
+- **Le righe delle schede dei modelli** («Veloce, tiene gli spigoli»,
+  «Fotorealismo marcato»…) sono giudizi, non un confronto sul banco di prova.
+- **Le schede a schermo** sono viste solo in Chromium headless, tema chiaro.
+
 ### Cambia: tutta l'immagine a parole (2026-11-04)
 
 Le scorciatoie di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci

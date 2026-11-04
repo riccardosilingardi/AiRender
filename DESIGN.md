@@ -841,6 +841,46 @@ partenza non c'è più. Resta **Apri cartella**.
 - Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
   preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
+## Oggetti e persone da inserire, e scelta del modello, costruiti il 2026-11-04
+
+Richieste di Riccardo del 2026-11-04: «vorrei poter inserire ref image di
+oggetti da inserire, o persone… sulla vista base o sul render successivo» e
+«togli i modelli dalla tendina e raggruppali per categorie e funzioni con un
+minimo di spiega sintetica, spunta per quello che selezioni».
+
+**Oggetti e persone da inserire (Rif.).** Fino a 4 foto (`INSERTI_MASSIMO`),
+chiamate **Rif. 1 … Rif. 4**, da citare nel testo («metti la poltrona del Rif. 1
+accanto alla finestra»).
+- **Genera**, colonna destra sotto «Immagine di riferimento per lo stile»: una
+  fila di riquadri con la foto, «Rif. N» e × per toglierla, poi «+ Rif. N».
+  Non c'è con Fotoinserimento.
+- **Cambia**: la stessa fila, sotto «Solo una parte? Usa Ritocca.».
+- **Ritocca**: ogni nota (sul foglietto e nell'elenco) ha **+ Immagine**; la
+  foto si mostra piccola con «Rif. N · nome» e «Togli». I numeri seguono
+  l'ordine delle note che hanno una foto. Sotto l'elenco: «Partono N immagini:
+  il render e M Rif. delle note.»
+- Il conteggio delle immagini si dice prima dell'invio («Partono 3 immagini:
+  … e 2 Rif. di oggetti e persone»). Con un modello che riceve una sola
+  immagine i riquadri restano, «+ Rif.» è spento e la frase lo dice; il
+  server non manda.
+- **Vuoto:** solo «+ Rif. 1». **In corso:** come l'invio di sempre.
+  **Errore:** caricamento rifiutato (formato, peso) sotto la fila; una nota
+  che cita un Rif. che non c'è si ferma con «La nota N usa il Rif. M, che non
+  c'è». **Pieno:** `docs/ui/studio-rif/72-genera-due-rif.png`,
+  `73-ritocca-nota-con-rif.png`, `74-cambia-con-rif.png`.
+
+**Scelta del modello.** Al posto della tendina, in Genera, Cambia, Ritocca e
+Rifai tutto: chiusa, la scheda del modello scelto (spunta, nome, fornitore,
+«predefinito», una riga su a cosa serve, «Più immagini per invio» o «Una sola
+immagine per invio», costo) e «Cambia modello (N altri)». Aperta, le schede per
+gruppo: **Consigliati**, **Da confrontare**, **Una sola immagine**, con il «?»
+che spiega il gruppo, e in fondo «Le righe sono un giudizio, non un confronto
+misurato sul banco di prova.» Un modello che non può fare l'invio (schema non
+verificato, oppure una sola immagine quando ne partono di più) resta visibile,
+spento, con il perché sulla scheda. Schermate:
+`docs/ui/studio-rif/70-genera-rif-e-modello-chiuso.png`,
+`71-scelta-modello-aperta.png`.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,

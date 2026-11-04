@@ -73,7 +73,13 @@ FORMATO_MATERIALI = 6  # numero-non-configurabile: versione del formato di un la
 # Il formato 6 (2026-11-02) aggiunge i materiali di Allplan da cambiare, con
 # anteprima e foto di riferimento. Si scrive solo quando ce ne sono: un motore
 # vecchio rifiuta il 6 invece di mandare la vista senza le immagini annunciate.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_INSERTI = 7  # numero-non-configurabile: versione del formato di un lavoro con riferimenti di oggetti
+# Il formato 7 (2026-11-04) aggiunge i riferimenti di oggetti e persone da
+# inserire (Rif. 1, 2, ...), da Genera, Cambia o Ritocca. Puo' portare anche
+# aree, riferimento per lo stile e materiali, letti se ci sono. Si scrive solo
+# quando c'e' almeno un Rif.: un motore vecchio rifiuta il 7 invece di mandare
+# il lavoro senza le immagini annunciate.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7)  # numero-non-configurabile: i formati che questo motore sa leggere
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
 CARTELLA_RIFERIMENTI = "riferimenti"
@@ -222,6 +228,17 @@ def scrivi_json(percorso: Path, dati: dict) -> Path:
 # --- il lavoro ---------------------------------------------------------------
 
 
+def prima_immagine_inserti(maschera: bool, riferimento: bool, materiali_immagini: int) -> int:
+    """Il numero della prima immagine dei Rif., nell'ordine in cui partono le immagini.
+
+    1 la vista o il render, poi la maschera, il riferimento per lo stile, le
+    immagini dei materiali; i Rif. per ultimi. Un posto solo, per il prompt
+    dello Studio e per quello della coda.
+    """
+    prima = 1  # numero-non-configurabile: la vista o il render e' sempre l'immagine 1
+    return prima + int(maschera) + int(riferimento) + max(0, int(materiali_immagini)) + 1
+
+
 @dataclass(frozen=True)
 class Lavoro:
     """Quello che la palette o lo Studio chiedono, scritto prima di partire."""
@@ -264,11 +281,17 @@ class Lavoro:
     # Studio · Genera: i materiali di Allplan da cambiare. Partono dopo la
     # vista e dopo il riferimento per lo stile. Solo da una vista.
     materiali: tuple[modulo_materiali.Cambio, ...] = ()
+    # Studio · Genera, Cambia e Ritocca: le immagini di oggetti o persone da
+    # inserire, Rif. 1, 2, ... nell'ordine. Partono per ultime. Una nota di
+    # Ritocca dice quale usa (Area.inserto).
+    inserti: tuple[str, ...] = ()
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
-        if self.aree:
+        if self.inserti:
+            object.__setattr__(self, "formato", FORMATO_INSERTI)
+        elif self.aree:
             object.__setattr__(self, "formato", FORMATO_RITOCCO)
         elif self.materiali:
             object.__setattr__(self, "formato", FORMATO_MATERIALI)
@@ -285,6 +308,15 @@ class Lavoro:
         gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti i
         blocchi, piu' le richieste se ce ne sono.
         """
+        return blocchi.aggiungi_inserti(self._prompt_senza_inserti(), self.prima_immagine_inserti(),
+                                        len(self.inserti))
+
+    def prima_immagine_inserti(self) -> int:
+        """Il numero della prima immagine dei Rif.: dopo partenza, maschera, riferimento e materiali."""
+        return prima_immagine_inserti(bool(self.aree) and self.modo_aree == modulo_aree.MASCHERA,
+                                      bool(self.riferimento), modulo_materiali.quante_immagini(self.materiali))
+
+    def _prompt_senza_inserti(self) -> str:
         if self.aree:
             return modulo_aree.prompt(self.modo_aree, self.aree)
         if self.contesto:
@@ -323,6 +355,7 @@ class Lavoro:
             **({"portato_da": self.portato_da} if self.portato_da else {}),
             **({"contesto": self.contesto.a_dizionario()} if self.contesto else {}),
             **({"materiali": [c.a_dizionario() for c in self.materiali]} if self.materiali else {}),
+            **({"inserti": list(self.inserti)} if self.inserti else {}),
         }
 
     @classmethod
@@ -361,11 +394,24 @@ class Lavoro:
                 "Nel file del lavoro le richieste non sono un elenco di frasi.",
                 "Rimetti il passo in coda dallo Studio · Passi.",
             )
+        formato = dati.get("formato")
+        inserti: tuple[str, ...] = ()
+        if formato == FORMATO_INSERTI:
+            elenco_inserti = dati.get("inserti")
+            if (not isinstance(elenco_inserti, list) or not elenco_inserti
+                    or not all(isinstance(v, str) and v for v in elenco_inserti)
+                    or len(elenco_inserti) > config.INSERTI_MASSIMO or dati.get("contesto")):
+                raise LavoroNonValido(
+                    "Il file del lavoro dice che porta riferimenti di oggetti o persone, ma non "
+                    f"li elenca, ne elenca piu' di {config.INSERTI_MASSIMO} o li porta con un contesto.",
+                    "Rimetti il lavoro in coda dallo Studio.",
+                )
+            inserti = tuple(elenco_inserti)
         aree, modo_aree = _aree_del_lavoro(dati, partenza)
-        riferimento = (dati.get("riferimento") if dati.get("formato") == FORMATO_RIFERIMENTO
-                       or (dati.get("formato") == FORMATO_MATERIALI and dati.get("riferimento")) else None)
+        riferimento = (dati.get("riferimento") if formato == FORMATO_RIFERIMENTO
+                       or (formato in (FORMATO_MATERIALI, FORMATO_INSERTI) and dati.get("riferimento")) else None)
         materiali: tuple[modulo_materiali.Cambio, ...] = ()
-        if dati.get("formato") == FORMATO_MATERIALI:
+        if formato == FORMATO_MATERIALI or (formato == FORMATO_INSERTI and dati.get("materiali")):
             elenco = dati.get("materiali")
             if partenza or aree or not isinstance(elenco, list) or not elenco:
                 raise LavoroNonValido(
@@ -378,6 +424,12 @@ class Lavoro:
                     tuple(modulo_materiali.Cambio.da_dizionario(v) for v in elenco))
             except modulo_materiali.MaterialeNonValido as errore:
                 raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
+        if formato == FORMATO_INSERTI and riferimento and partenza:
+            raise LavoroNonValido(
+                "Il file del lavoro porta un riferimento per lo stile ma parte da un render.",
+                "Rimetti il lavoro in coda da Studio · Genera.",
+            )
+        _controlla_inserti_delle_aree(aree, inserti)
         if dati.get("formato") == FORMATO_RIFERIMENTO and (not riferimento or partenza):
             raise LavoroNonValido(
                 "Il file del lavoro dice che porta un riferimento per lo stile, ma non dice "
@@ -413,13 +465,15 @@ class Lavoro:
             portato_da=str(dati["portato_da"]) if riferimento and dati.get("portato_da") else None,
             contesto=contesto,
             materiali=materiali,
+            inserti=inserti,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
 
 def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
     """Le aree di un lavoro del formato 3, o nessuna. Un lavoro con aree che non tornano non parte."""
-    if dati.get("formato") != FORMATO_RITOCCO:
+    if dati.get("formato") != FORMATO_RITOCCO and not (
+            dati.get("formato") == FORMATO_INSERTI and dati.get("aree")):
         return (), None
     if not partenza:
         raise LavoroNonValido(
@@ -430,6 +484,16 @@ def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Ar
         return modulo_aree.da_elenco(dati.get("aree")), modulo_aree.controlla_modo(dati.get("modo_aree"))
     except modulo_aree.AreaNonValida as errore:
         raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
+
+
+def _controlla_inserti_delle_aree(aree: tuple[modulo_aree.Area, ...], inserti: tuple) -> None:
+    """Ogni nota che usa un Rif. deve trovare il suo file fra i riferimenti del lavoro."""
+    for numero, area in enumerate(aree, start=1):
+        if area.inserto is not None and area.inserto > len(inserti):
+            raise LavoroNonValido(
+                f"La nota {numero} usa il Rif. {area.inserto}, ma il lavoro ne porta {len(inserti)}.",
+                "Togli l'immagine dalla nota e rimettila, poi applica di nuovo.",
+            )
 
 
 def _quante_immagini(numero: int) -> str:
@@ -486,6 +550,7 @@ def metti_in_coda(
     portato_da: str | None = None,
     contesto: modulo_contesto.Contesto | None = None,
     materiali: tuple[modulo_materiali.Cambio, ...] = (),
+    inserti: tuple[Path, ...] | list[Path] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -534,6 +599,19 @@ def metti_in_coda(
                 "Togli la spunta dai materiali, oppure genera da Genera.",
             )
         materiali = tuple(_cambio_controllato(radice, c) for c in modulo_materiali.controlla_cambi(tuple(materiali)))
+    if inserti:
+        if contesto is not None:
+            raise LavoroNonValido(
+                "«Fotoinserimento» non porta riferimenti di oggetti o persone: le immagini sono gia' il luogo e la vista.",
+                "Togli i Rif., oppure usa Genera dalla vista.",
+            )
+        if len(inserti) > config.INSERTI_MASSIMO:
+            raise LavoroNonValido(
+                f"I riferimenti di oggetti e persone sono {len(inserti)}: ne partono al massimo {config.INSERTI_MASSIMO}.",
+                "Togline qualcuno.",
+            )
+        inserti = tuple(controlla_riferimento(radice, Path(i)) for i in inserti)
+    _controlla_inserti_delle_aree(tuple(aree), tuple(inserti))
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -561,7 +639,13 @@ def metti_in_coda(
         portato_da=portato_da or None,
         contesto=contesto,
         materiali=tuple(materiali),
+        inserti=tuple(str(i) for i in inserti),
     )
+    if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: i riferimenti di oggetti e persone non partirebbero.",
+            "Scegli Nano Banana 2 o Nano Banana Pro, oppure togli i Rif.",
+        )
     if materiali and modulo_materiali.quante_immagini(tuple(materiali)) \
             and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
@@ -857,6 +941,11 @@ class Coda:
                 immagine = Path(percorso).read_bytes()
                 modulo_immagine.misura(immagine)  # solleva se non e' un'immagine
                 in_piu = (*in_piu, immagine)
+        for percorso in lavoro.inserti:
+            # I Rif. per ultimi, nell'ordine: il prompt li conta da prima_immagine_inserti.
+            inserto = controlla_riferimento(self.radice, Path(percorso)).read_bytes()
+            modulo_immagine.misura(inserto)  # solleva se non e' un'immagine
+            in_piu = (*in_piu, inserto)
         # La grana non entra nei blocchi: i modelli del Router non hanno un
         # dettaglio della grana, e la ricetta lo scrive come assente.
         livello = modulo_grana.MEDIA

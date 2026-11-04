@@ -506,6 +506,20 @@ RITOCCO_MODO_AREE = _registra(Costante(
     ),
 ))
 
+INSERTI_MASSIMO = _registra(Costante(
+    nome="INSERTI_MASSIMO",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quante immagini di oggetti o persone da inserire (Rif. 1, 2, ...) "
+        "partono al massimo con un invio di Genera, Cambia o Ritocca. Nano "
+        "Banana 2 e Pro accettano fino a 14 immagini, ma con piu' di quattro "
+        "oggetti diversi in una volta il modello li confonde piu' facilmente "
+        "e il testo per dire dove va ciascuno diventa lungo. 4 e' un giudizio "
+        "del 2026-11-04, mai provato con il modello."
+    ),
+))
+
 # --- Inserisci nel contesto -------------------------------------------------
 
 CONTESTO_INQUADRATURA_PREDEFINITA = _registra(Costante(

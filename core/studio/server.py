@@ -19,7 +19,7 @@ Rotte:
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
     GET  /api/viste/<nome>/materiali       i materiali del progetto letti dalla palette con la vista
-    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1   dove va la vista, quante immagini, quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1&inserti=<n>   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
@@ -176,7 +176,8 @@ class _Gestore(BaseHTTPRequestHandler):
                                                (domanda.get("varianti") or ["1"])[0],
                                                (domanda.get("riferimento") or ["0"])[0] == "1",
                                                contesto=(domanda.get("contesto") or ["0"])[0] == "1",
-                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0]))
+                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0],
+                                               inserti=(domanda.get("inserti") or ["0"])[0]))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
