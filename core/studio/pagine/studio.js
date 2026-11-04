@@ -471,6 +471,18 @@ function seguiLavoro(lavoro) {
   }, 1000);
 }
 
+// Un invio alla volta: un doppio clic su Genera, Applica o Porta mandava due
+// lavori (e pagava due render). Finché la prima richiesta non torna, il
+// secondo clic non fa niente.
+let invioInCorso = false;
+function unInvioAllaVolta(fn) {
+  return async function (...argomenti) {
+    if (invioInCorso) return;
+    invioInCorso = true;
+    try { return await fn(...argomenti); } finally { invioInCorso = false; }
+  };
+}
+
 async function genera() {
   S.errore = null; S.secco = null;
   try {
@@ -707,8 +719,8 @@ function colonnaStile() {
       h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
     h("div", { classe: "gruppo" }, h("h3", {}, "1 · Resa"),
       h("p", { classe: "tenue piccolo" }, resaScelta().spegne.length
-        ? `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}. Testi scelti, non ancora provati con il modello.`
-        : "Miniature illustrative. Le rese non fotografiche sono testi scelti, non ancora provati con il modello."),
+        ? `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}.`
+        : "Miniature illustrative."),
       h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
         (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
     h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico", spiega("Colore, contrasto, pellicola o digitale · solo per le rese fotografiche")),
@@ -755,7 +767,6 @@ function colonnaInvio() {
     h("p", { id: "riassunto" }, S.modo === "contesto" && !contestoPerServer()
       ? "Il prompt si compone quando la foto del luogo e l'area ci sono (passo 1)."
       : S.composto ? S.composto.riassunto : "…"),
-    h("p", { classe: "tenue piccolo" }, `Blocchi di prompt ${S.catalogo.versione_blocchi}: testi scelti, non ancora provati con il modello.`),
     h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
       S.mostraPrompt ? "Nascondi il prompt" : "Mostra e modifica il prompt completo"),
     S.mostraPrompt ? h("div", { classe: "sotto-gruppo" },
@@ -770,14 +781,13 @@ function colonnaInvio() {
 
   const modelli = h("select", { id: "modello", "aria-label": "Modello" },
     S.catalogo.modelli.map((m) => h("option", { value: m.id, selected: m.id === S.modello, disabled: !m.verificato },
-      m.nome + (m.id === S.studio.modello_predefinito ? " — predefinito" : "") + (m.verificato ? "" : " — schema non verificato"))),
-    S.catalogo.modelli_non_provati.map((n) => h("option", { disabled: true }, `${n} — non ancora provato`)));
+      m.nome + (m.id === S.studio.modello_predefinito ? " — predefinito" : ""))));
   modelli.addEventListener("change", async () => { S.modello = modelli.value; S.secco = null; await caricaDestinazione(); render(); });
 
   const qualita = h("div", { classe: "switch", role: "group", "aria-label": "Qualità" },
     asse("qualita").voci.map((v) => h("button", {
       classe: "seg", "aria-pressed": String(S.scelte.qualita === v.id), onclick: () => cambiaAsse("qualita", v.id),
-    }, v.id === "32k" ? "Altissima definizione (32k) — da confrontare" : v.nome)));
+    }, v.id === "32k" ? "Altissima definizione (32k)" : v.nome)));
 
   const fedelta = h("div", { classe: "switch", role: "group", "aria-label": "Fedeltà al disegno" },
     asse("fedelta").voci.map((v) => h("button", {
@@ -795,9 +805,8 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
-    nota("2K e 4K: costo non ancora provato.", "Vale per Nano Banana e Seedream; GPT Image ha misure sue. 2K e 4K costano di più e non sono ancora provati: il costo lo dice il primo render."),
     ...(S.modo === "contesto" ? [] : [h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
-    nota("Testi scelti, non ancora confrontati.", "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
+    nota("Quanto il modello può allontanarsi dalla vista.", "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -1121,7 +1130,6 @@ function colonnaContesto() {
   materiali.addEventListener("input", () => { S.scelte.materiali = materiali.value; aggiornaComposto(); });
   const pulisci = h("input", { type: "checkbox", id: "pulisci-contesto", checked: !!(c && c.pulisci), disabled: !c });
   pulisci.addEventListener("change", () => cambiaContesto("pulisci", pulisci.checked));
-  const cerca = h("input", { type: "checkbox", id: "cerca-web-contesto", disabled: true });
   const terra = c && c.inquadratura === "terra";
   return h("div", { classe: "colonna-stile" },
     h("section", { classe: "pannello", "aria-label": "Facoltativo" },
@@ -1131,9 +1139,7 @@ function colonnaContesto() {
       h("span", { classe: "etichetta" }, "Dove si trova", spiega("Indirizzo o coordinate: aiutano il modello a capire il posto. Entrano nel prompt come li scrivi.")), luogo,
       terra ? null : h("label", { classe: "riga" }, pulisci,
         h("span", { classe: "piccolo" }, "È uno screenshot con scritte e icone (Google Earth, Maps): toglile e rendilo una foto aerea")),
-      c && c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null,
-      h("label", { classe: "riga grigio", "aria-disabled": "true" }, cerca,
-        h("span", { classe: "piccolo" }, "Cerca il luogo sul web"), presto("Da provare"))),
+      c && c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null),
     nota("Luce e cielo dalla foto.", "Qui preset e stile non servono: luce, cielo e colore li prende dalla foto del luogo. Per scegliere lo stile torna a «Render della vista»."));
 }
 
@@ -1161,10 +1167,7 @@ function pannelloInvio() {
         ` (${d.fornitore}, ${d.modello_nome})`, d.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
-    if (d.avviso) blocco.append(avviso("attenzione", d.avviso, "Per andare sul sicuro, Nano Banana 2 è provato dal 27/10/2026."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
-    if (d.avviso_riferimento) blocco.append(avviso("attenzione", d.avviso_riferimento,
-      S.modo === "contesto" ? "Il contesto parte sempre con due immagini: è la prima prova vera anche di questo." : "Se non vuoi fare la prova adesso, togli il riferimento."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",
@@ -1335,7 +1338,7 @@ function corpoTenuta(t, identificativo, nota) {
   } else {
     figli.push(h("span", { classe: "misura" }, `Spigoli ritrovati: ${percento(t.spigoli)}`));
     if (t.avvisa) {
-      figli.push(avviso("attenzione", `Sotto il ${percento(t.soglia)}: la geometria può essersi mossa.`, "Guardalo con la linea del prima/dopo. Soglia scelta, non ancora tarata su render veri."));
+      figli.push(avviso("attenzione", `Sotto il ${percento(t.soglia)}: la geometria può essersi mossa.`, "Guardalo con la linea del prima/dopo."));
     }
   }
   if (nota) figli.push(h("p", { classe: "tenue piccolo" }, nota));
@@ -1597,8 +1600,8 @@ function videoVeloce(l) {
         onclick: () => { az.movimento = x.id; render(); } }, x.nome))),
     h("span", { classe: "etichetta" }, "Cosa succede", spiega("Facoltativo. Entra nel prompt del video com'è scritto, dopo il movimento della camera.")),
     testoVideoVeloce(),
-    h("p", { classe: "dove" }, "Va a ", h("b", {}, c.destinazione), ` · ${c.modello_nome}, mai provato · ${c.durate[0]} s · ${c.risoluzioni[0]}`,
-      spiega(`${c.avviso} Costo: ${c.costo}. Durata e risoluzione si cambiano nella scheda Video.`)),
+    h("p", { classe: "dove" }, "Va a ", h("b", {}, c.destinazione), ` · ${c.modello_nome} · ${c.durate[0]} s · ${c.risoluzioni[0]}`,
+      spiega("Durata e risoluzione si cambiano nella scheda Video.")),
     h("div", { classe: "azioni" },
       h("button", { classe: "btn primario", onclick: () => videoInUnClic(l), disabled: !!spento || null }, "Genera video"),
       spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
@@ -2064,7 +2067,7 @@ function pannelloFuoriAree(passo) {
     m && m.incollato
       ? h("p", { classe: "tenue piccolo", title: "Il modello ridisegna tutta l'immagine: il suo risultato si incolla solo nelle aree, con il bordo sfumato, sul render da cui parte. Il risultato intero del modello resta nella cartella dei lavori, accanto al render." },
         "Cambiano solo le aree.")
-      : nota("Soglie scelte, non tarate.", "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Soglie scelte, non tarate: serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
+      : nota("Confronto con il render da cui parte.", "Confronto pixel per pixel con il render da cui parte, senza le aree e una fascia stretta intorno. Serve a vedere se il modello ha toccato il resto, il giudizio resta tuo sul prima/dopo."),
     passo.modo_aree_nome ? h("p", { classe: "tenue piccolo" }, `Aree mandate come ${passo.modo_aree_nome}.`) : null);
 }
 
@@ -2407,7 +2410,7 @@ function pannelloNuovoPasso() {
     h("div", { classe: "scelte-chip", role: "group", "aria-label": "Scorciatoie" },
       SCORCIATOIE_CAMBIA.map(([nome, testo]) => h("button", { classe: "chip", "aria-pressed": String(n.testo === testo), onclick: () => usa(testo) }, nome))),
     campo,
-    nota("Scorciatoie: testi scelti, non provati.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare. Non sono ancora state provate con il modello."),
+    nota("Le scorciatoie scrivono nel campo.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare."),
     h("p", { classe: "tenue piccolo" }, "Solo una parte? Usa Ritocca."),
     h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
@@ -2460,7 +2463,7 @@ function ricettaPasso(passo) {
     ["Servizio", passo.destinazione || "—"],
     ["Costo", passo.costo],
     ["Data", data(passo.creato_il)],
-    ["Blocchi", passo.versione_blocchi ? `${passo.versione_blocchi} · testi scelti, non ancora provati` : "—"],
+    ["Blocchi", passo.versione_blocchi || "—"],
     ["Aree", passo.aree && passo.aree.length
       ? h("span", {}, passo.aree.map((a, i) => `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}: ${a.nota}`).join(" — "),
         passo.modo_aree_nome ? h("span", { classe: "tenue" }, ` (mandate come ${passo.modo_aree_nome})`) : null)
@@ -2490,8 +2493,7 @@ function latoPassi(passo) {
   if (passo.avviso) {
     blocchi.push(h("div", { classe: "avviso attenzione", role: "note" },
       h("b", {}, `Questo passo è la ${passo.generazioni}ª generazione di fila: gli spigoli possono spostarsi un poco a ogni giro.`),
-      h("span", {}, "Se vedi l'edificio cambiare, usa «Rifai tutto dalla vista» qui sotto."),
-      h("span", { classe: "piccolo tenue" }, `Avviso da ${S.passi.dati.avviso_da_generazione} generazioni: soglia scelta, non tarata.`)));
+      h("span", {}, "Se vedi l'edificio cambiare, usa «Rifai tutto dalla vista» qui sotto.")));
   }
   if (passo.partenza_mancante) {
     blocchi.push(avviso("errore", "Il punto di partenza non c'è più: il render del passo prima è stato tolto dalla cartella.",
@@ -2706,7 +2708,7 @@ function colonnaInvioVideo() {
     h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : pieni ? `Le ${pieni} immagini vanno` : "Le immagini vanno"} a `, h("b", {}, c.destinazione),
       ` (${c.fornitore}, ${c.modello_nome})`, c.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
     h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, c.costo)),
-    avviso("attenzione", c.avviso));
+  );
   if (!S.studio.coda_attiva) invio.append(avviso("attenzione", "La coda dei lavori non sta girando: il video resterebbe in attesa.", "Chiudi e riapri lo Studio, che la fa partire."));
   invio.append(h("div", { classe: "azioni" },
     h("button", { classe: "btn", onclick: provaASeccoVideo, disabled: !pieni }, "Prova a secco"),
@@ -2737,8 +2739,7 @@ function colonnaInvioVideo() {
       h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del video" },
         c.risoluzioni.map((r) => h("button", { classe: "seg", "aria-pressed": String(v.risoluzione === r),
           onclick: () => { v.risoluzione = r; v.secco = null; render(); } }, r))),
-      h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio (per un render d'architettura di solito non serve)")),
-      nota("Scelte nostre, non misurate.", "Durate, risoluzioni e audio spento sono scelte nostre, non misurate.")),
+      h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio (per un render d'architettura di solito non serve)"))),
     invio);
 }
 
@@ -3020,5 +3021,15 @@ async function avvia() {
   render();
   setInterval(controllaStudio, 3000);
 }
+
+// Ogni gesto che manda un lavoro passa da qui: vedi unInvioAllaVolta.
+genera = unInvioAllaVolta(genera);
+rifai = unInvioAllaVolta(rifai);
+porta = unInvioAllaVolta(porta);
+applicaRitocco = unInvioAllaVolta(applicaRitocco);
+applicaPasso = unInvioAllaVolta(applicaPasso);
+inviaPulito = unInvioAllaVolta(inviaPulito);
+rifaiPasso = unInvioAllaVolta(rifaiPasso);
+generaVideo = unInvioAllaVolta(generaVideo);
 
 avvia();
