@@ -106,6 +106,12 @@ MODELLI = (
     Modello("byteplus/seedream-5-0-260128", "Seedream 5.0", "ByteDance",
             categoria="alternative", spiega="Fotorealismo marcato, fino a 4K."),
 )
+# «Finale»: non e' un modello di render, non sta fra le schede. Costo «a
+# misura e ingrandimento» secondo il Router, nessuna stima prima dell'invio.
+MODELLO_FINALE = Modello(comfy.MODELLO_FINALE, "Magnific Precision V2", "Freepik",
+                         categoria="finale", spiega="Ingrandisce e aggiunge dettaglio, senza cambiare il disegno.")
+NOMI_TIPI_FINALE = {"foto": "Foto", "illustrazione": "Illustrazione"}
+
 # Scritti a schermo e non selezionabili: oggi nessuno, restano per i prossimi.
 MODELLI_NON_PROVATI: tuple[str, ...] = ()
 
@@ -435,6 +441,12 @@ class Studio:
             "rese": _rese(),
             "varianti_massime": config.VARIANTI_MASSIME,
             "inserti_massimi": config.INSERTI_MASSIMO,
+            "finale": {
+                "modello": self._modello_dict(MODELLO_FINALE),
+                "ingrandimenti": list(config.FINALE_INGRANDIMENTI),
+                "predefinito": config.FINALE_INGRANDIMENTO_PREDEFINITO,
+                "tipi": [{"id": k, "nome": v} for k, v in NOMI_TIPI_FINALE.items()],
+            },
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "categorie_modelli": [{"id": c, "nome": n, "spiega": s} for c, n, s in CATEGORIE_MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
@@ -534,7 +546,7 @@ class Studio:
     # --- destinazione e costo --------------------------------------------
 
     def _modello(self, identificativo: str) -> Modello:
-        for modello in MODELLI:
+        for modello in (*MODELLI, MODELLO_FINALE):
             if modello.identificativo == identificativo:
                 return modello
         raise RichiestaStudioNonValida(
@@ -769,7 +781,7 @@ class Studio:
                        modo_aree: str | None = None, riferimento: Path | None = None,
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
-                       materiali: tuple = (), inserti: tuple = ()) -> dict:
+                       materiali: tuple = (), inserti: tuple = (), finale: dict | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -816,6 +828,7 @@ class Studio:
                 contesto=contesto,
                 materiali=tuple(materiali),
                 inserti=tuple(inserti),
+                finale=finale,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -949,6 +962,7 @@ class Studio:
             riferimento=riferimento,
             contesto=lavoro.contesto,
             inserti=inserti,
+            finale=lavoro.finale,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -1013,7 +1027,7 @@ class Studio:
             secondi = max(0, int((self._adesso() - creato).total_seconds()))
         except ValueError:
             secondi = None
-        modello = next((m for m in MODELLI if m.identificativo == dati.get("modello")), None)
+        modello = next((m for m in (*MODELLI, MODELLO_FINALE) if m.identificativo == dati.get("modello")), None)
         preset = blocchi.PRESET_STILE.get(dati.get("preset") or "")
         render = self._render(identificativo, stato)
         richieste = [r for r in (dati.get("richieste") or []) if isinstance(r, str)]
@@ -1022,7 +1036,10 @@ class Studio:
             testo_riassunto = riassunto(scelte, dati.get("preset"))
         except ErroreAirender:
             testo_riassunto = ""
-        if dati.get("partenza"):
+        finale = dati.get("finale") if isinstance(dati.get("finale"), dict) else None
+        if finale:
+            testo_riassunto = _riassunto_finale(finale)
+        elif dati.get("partenza"):
             # Un passo su un render: lo stile non riparte, solo la richiesta.
             testo_riassunto = "Passo sul render di prima: " + "; ".join(richieste) + "."
         elif richieste:
@@ -1043,7 +1060,8 @@ class Studio:
             "modello_nome": modello.nome if modello else dati.get("modello"),
             "preset": dati.get("preset"),
             "preset_nome": (
-                "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
+                f"Finale ×{finale.get('ingrandimento')}" if finale
+                else "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
                 if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
                 else "Cambia: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
                 else preset.nome if preset else "Scelte libere"
@@ -1624,6 +1642,47 @@ class Studio:
             inserti=inserti,
         )
 
+    # --- Finale ----------------------------------------------------------
+
+    def _finale(self, dati: dict) -> tuple[Path, dict, Path, dict]:
+        """Vista, passo di partenza, il suo render e {ingrandimento, tipo} chiesti."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        passo, render = self._passo_di_partenza(self._albero(vista), dati.get("da"))
+        ingrandimento = dati.get("ingrandimento", config.FINALE_INGRANDIMENTO_PREDEFINITO)
+        tipo = dati.get("tipo") or "foto"
+        if ingrandimento not in config.FINALE_INGRANDIMENTI or isinstance(ingrandimento, bool) \
+                or tipo not in NOMI_TIPI_FINALE:
+            raise RichiestaStudioNonValida(
+                "«Finale» ingrandisce di " + " o ".join(f"{n} volte" for n in config.FINALE_INGRANDIMENTI)
+                + ", per una foto o un'illustrazione.",
+                "Scegli una delle voci di «Finale».")
+        return vista, passo, render, {"ingrandimento": int(ingrandimento), "tipo": tipo}
+
+    def componi_finale(self, dati: dict) -> dict:
+        """Cosa fa «Finale», prima di Applica: misura di partenza e d'uscita, destinazione, costo."""
+        _vista, passo, render, finale = self._finale(dati)
+        larghezza, altezza = modulo_immagine.dimensioni(modulo_immagine.leggi(render))
+        n = finale["ingrandimento"]
+        return {
+            "da_numero": str(passo.get("numero")),
+            "partenza": f"{larghezza} × {altezza}",
+            "uscita": f"{larghezza * n} × {altezza * n}",
+            "riassunto": _riassunto_finale(finale),
+            "destinazione": self.destinazione(MODELLO_FINALE.identificativo),
+        }
+
+    def invia_finale(self, dati: dict) -> dict:
+        """«Finale» sul render di un passo: il risultato e' un passo figlio, ingrandito."""
+        vista, passo, render, finale = self._finale(dati)
+        destinazione = self.destinazione(MODELLO_FINALE.identificativo)
+        return self._metti_in_coda(
+            vista, blocchi.Scelte(scena=self._scena(self._albero(vista), passo)), destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=None, prompt_a_mano=None,
+            parte_da=passo["identificativo"], partenza=render,
+            finale=finale,
+        )
+
     # --- cartella --------------------------------------------------------
 
     # --- video (Studio · Video) -------------------------------------------
@@ -1955,6 +2014,12 @@ def _prompt_a_mano(dati: dict) -> str | None:
     if isinstance(testo, str) and testo.strip():
         return testo.strip()
     return None
+
+
+def _riassunto_finale(finale: dict) -> str:
+    """«Finale», in italiano, sempre con le stesse parole."""
+    tipo = NOMI_TIPI_FINALE.get(str(finale.get("tipo")), str(finale.get("tipo"))).lower()
+    return f"Finale: render ingrandito {finale.get('ingrandimento')} volte, con più dettaglio, come {tipo}."
 
 
 def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0) -> str:

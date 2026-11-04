@@ -268,6 +268,19 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Finale, l'ingrandimento (2026-11-04)
+
+- **Il corpo di `freepik/ai-image-upscaler-precision-v2`** (image in base64,
+  scale_factor, flavor) e la risposta (`data.generated[0]`, link che scade)
+  vengono dalla documentazione del Router (Comfy-Org/docs, router-schemas, letta
+  il 2026-11-04), **non da una sonda**. Verifica: un Finale ×2 su un render vero,
+  oppure `python scripts/sonda_comfy.py --modello freepik/ai-image-upscaler-precision-v2 --solo-schema`.
+- **Il costo**: il Router lo dice «a misura e ingrandimento» e non lo stima
+  prima dell'invio; lo Studio scrive «non misurato» finché un Finale vero non
+  copia i crediti.
+- **Il peso massimo** di un render 2K come base64 nel corpo, e se un ×4 su 2K
+  (8K) viene accettato.
+
 ### Rif. di oggetti e persone e scelta del modello (2026-11-04)
 
 - **Che il modello metta davvero l'oggetto del Rif. dove dice il testo**, con

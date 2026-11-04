@@ -1506,7 +1506,7 @@ function palcoConAzioni(l) {
 }
 
 function barraAzioni(l) {
-  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null };
+  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null, finale: null };
   const az = S.azioni;
   const d = S.passi.dest[l.modello];
   const m = S.catalogo.modelli.find((x) => x.id === l.modello);
@@ -1521,7 +1521,9 @@ function barraAzioni(l) {
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
       title: "Un video che parte da questa immagine." }, "Video"),
     h("button", { classe: "btn", "aria-expanded": String(!!az.porta), onclick: () => apriPorta(l),
-      title: "La stessa immagine su un'altra vista catturata in Allplan: stesso stile, stessi ritocchi. Per i fotogrammi di un video." }, "Altra vista"))];
+      title: "La stessa immagine su un'altra vista catturata in Allplan: stesso stile, stessi ritocchi. Per i fotogrammi di un video." }, "Altra vista"),
+    h("button", { classe: "btn", "aria-expanded": String(!!az.finale), onclick: () => apriFinale(l),
+      title: "Ingrandisce questa immagine e aggiunge dettaglio, senza cambiare il disegno. Per la tavola o la stampa." }, "Finale"))];
   // Variante non dice niente da sola (test del 2026-11-04): si scrive da dove
   // riparte e con cosa, prima che parta.
   const da = l.parte_da ? "dall'immagine da cui era nata questa" : "dalla vista Allplan";
@@ -1532,6 +1534,7 @@ function barraAzioni(l) {
   if (cambiaAperto(l) && S.scheda === "risultato") righe.push(pannelloNuovoPasso());
   if (az.video) righe.push(videoVeloce(l));
   if (az.porta) righe.push(pannelloPorta(l));
+  if (az.finale) righe.push(pannelloFinale(l));
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
 }
@@ -1554,6 +1557,72 @@ async function apriCambia(l) {
   if (!passo) { S.azioni.errore = new ErroreStudio("Questa immagine non è fra i passi della vista.", "Ricarica la pagina dello Studio."); render(); return; }
   if (!passo.si_parte) { S.azioni.errore = new ErroreStudio(passo.motivo_non_si_parte || "Da questa immagine non si parte.", "Scegli un render riuscito."); render(); return; }
   await apriNuovoPasso(passo);
+}
+
+// --- Finale: ingrandire con piu' dettaglio (2026-11-04) -----------------------
+// Magnific Precision V2 dal Router: nessun prompt, il render esce N volte piu'
+// grande. Il risultato e' un passo nuovo sotto questa immagine.
+
+async function apriFinale(l) {
+  const az = S.azioni;
+  if (az.finale) { az.finale = null; render(); return; }
+  const f = S.catalogo.finale;
+  az.finale = { ingrandimento: f.predefinito, tipo: "foto", composto: null, errore: null };
+  await componiFinale(l);
+}
+
+async function componiFinale(l) {
+  const q = S.azioni.finale;
+  try { q.composto = await post("/api/finale/componi", { vista: S.vista, da: l.identificativo, ingrandimento: q.ingrandimento, tipo: q.tipo }); q.errore = null; }
+  catch (e) { q.composto = null; q.errore = e; }
+  render();
+}
+
+async function applicaFinale(l) {
+  const q = S.azioni.finale;
+  q.errore = null;
+  try {
+    const dest = await post("/api/finale/componi", { vista: S.vista, da: l.identificativo, ingrandimento: q.ingrandimento, tipo: q.tipo });
+    const risposta = await post("/api/finale/invia", {
+      vista: S.vista, da: l.identificativo, ingrandimento: q.ingrandimento, tipo: q.tipo,
+      destinazione_mostrata: dest.destinazione.destinazione,
+    });
+    S.azioni.finale = null;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+function pannelloFinale(l) {
+  const q = S.azioni.finale;
+  const f = S.catalogo.finale;
+  const c = q.composto;
+  const d = c && c.destinazione;
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Finale" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Finale · ingrandisci con più dettaglio"),
+      h("button", { classe: "btn link", onclick: () => { S.azioni.finale = null; render(); } }, "Chiudi")),
+    h("p", { classe: "piccolo" }, `${f.modello.nome} di ${f.modello.fornitore}: ingrandisce e aggiunge dettaglio, senza cambiare il disegno e senza prompt.`),
+    h("span", { classe: "etichetta" }, "Quanto più grande"),
+    h("div", { classe: "switch", role: "group", "aria-label": "Quanto più grande" },
+      f.ingrandimenti.map((n) => h("button", { classe: "seg", "aria-pressed": String(q.ingrandimento === n),
+        onclick: () => { q.ingrandimento = n; componiFinale(l); } }, `×${n}`))),
+    h("span", { classe: "etichetta" }, "Che immagine è"),
+    h("div", { classe: "switch", role: "group", "aria-label": "Che immagine è" },
+      f.tipi.map((t) => h("button", { classe: "seg", "aria-pressed": String(q.tipo === t.id),
+        onclick: () => { q.tipo = t.id; componiFinale(l); } }, t.nome))),
+    nota("Scelta, non provata.", "Foto per i render fotografici; Illustrazione per schizzi, acquerelli e rese non fotografiche. Nessun Finale è ancora stato fatto con il servizio vero: il primo è la prova."),
+    c ? h("p", { classe: "piccolo" }, `Da ${c.partenza} a `, h("b", {}, c.uscita), " pixel.") : null,
+    d ? h("p", { classe: "destinazione" }, "Il render va a ", h("b", {}, d.destinazione),
+      d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`) : null,
+    d && d.avviso ? h("p", { classe: "tenue piccolo" }, d.avviso) : null,
+    q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => applicaFinale(l), disabled: !c || !!S.lavoroAttivo || null }, "Applica"),
+      S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Applica si accende quando finisce.") : null),
+    h("p", { classe: "tenue piccolo" }, "Esce un passo nuovo sotto questa immagine."));
 }
 
 // --- Altra vista: «Porta su un'altra vista» (2026-11-04) ----------------------

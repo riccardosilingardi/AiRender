@@ -881,6 +881,19 @@ spento, con il perché sulla scheda. Schermate:
 `docs/ui/studio-rif/70-genera-rif-e-modello-chiuso.png`,
 `71-scelta-modello-aperta.png`.
 
+## Finale, costruito il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto
+ogni immagine, dopo **Altra vista**: **Finale**. Apre un riquadro «Finale ·
+ingrandisci con più dettaglio»: chi lo fa (Magnific Precision V2 di Freepik,
+dal Router, senza prompt), **Quanto più grande** ×2 · ×4
+(`FINALE_INGRANDIMENTI`, scelta), **Che immagine è** Foto · Illustrazione, la
+misura «Da L × A a L×n × A×n pixel», destinazione e costo, **Applica**. Esce
+un passo nuovo, «Finale ×2» nello storico e nell'albero.
+- **Vuoto:** non c'è: il pulsante c'è solo sotto un'immagine riuscita.
+- **In corso:** come gli altri passi. **Errore:** sotto Applica, con il gesto.
+- **Pieno:** `docs/ui/studio-rif/75-finale.png`.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,

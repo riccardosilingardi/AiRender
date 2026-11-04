@@ -506,6 +506,29 @@ RITOCCO_MODO_AREE = _registra(Costante(
     ),
 ))
 
+FINALE_INGRANDIMENTI = _registra(Costante(
+    nome="FINALE_INGRANDIMENTI",
+    valore=(2, 4),
+    origine=SCELTA,
+    ragione=(
+        "Di quante volte «Finale» puo' ingrandire un render (Magnific "
+        "Precision V2 dal Router, scale_factor da 2 a 16). Un render di Nano "
+        "Banana 2 a 2K diventa 4K con 2 e 8K con 4: oltre, il file e' troppo "
+        "grande per una tavola e il costo cresce con la misura. Giudizio del "
+        "2026-11-04, nessun Finale ancora fatto."
+    ),
+))
+
+FINALE_INGRANDIMENTO_PREDEFINITO = _registra(Costante(
+    nome="FINALE_INGRANDIMENTO_PREDEFINITO",
+    valore=2,
+    origine=SCELTA,
+    ragione=(
+        "L'ingrandimento proposto da «Finale»: il piu' piccolo, che costa "
+        "meno e basta per una tavola A3. Giudizio, non misurato."
+    ),
+))
+
 INSERTI_MASSIMO = _registra(Costante(
     nome="INSERTI_MASSIMO",
     valore=4,

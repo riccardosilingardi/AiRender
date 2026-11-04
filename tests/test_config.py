@@ -395,6 +395,20 @@ def test_inserti_massimo_ferma_un_quinto_rif_ed_e_scelto():
         Area("rettangolo", rettangolo, "una poltrona", inserto=config.INSERTI_MASSIMO + 1)
 
 
+def test_finale_ingrandisce_solo_di_quanto_offre_lo_studio_ed_e_scelto():
+    """Caso: un Finale x16 parte e costa una fortuna senza che nessuno l'abbia deciso."""
+    from core.provider import comfy
+    assert config.costante("FINALE_INGRANDIMENTI").origine == config.SCELTA
+    assert config.costante("FINALE_INGRANDIMENTO_PREDEFINITO").origine == config.SCELTA
+    assert config.FINALE_INGRANDIMENTO_PREDEFINITO in config.FINALE_INGRANDIMENTI
+    assert max(config.FINALE_INGRANDIMENTI) <= 16 and min(config.FINALE_INGRANDIMENTI) >= 2  # limiti di Magnific
+    richiesta = comfy.RichiestaGenerazione(immagine=b"x", prompt="", preset="", preset_versione="",
+                                           modello=comfy.MODELLO_FINALE, grana="", dettaglio_grana=0,
+                                           ingrandimento=max(config.FINALE_INGRANDIMENTI) + 1)
+    with pytest.raises(Exception):
+        comfy.SCHEMI[comfy.MODELLO_FINALE].corpo(richiesta)
+
+
 # --- guardia -----------------------------------------------------------------
 
 

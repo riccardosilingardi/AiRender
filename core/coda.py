@@ -79,7 +79,12 @@ FORMATO_INSERTI = 7  # numero-non-configurabile: versione del formato di un lavo
 # aree, riferimento per lo stile e materiali, letti se ci sono. Si scrive solo
 # quando c'e' almeno un Rif.: un motore vecchio rifiuta il 7 invece di mandare
 # il lavoro senza le immagini annunciate.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_FINALE = 8  # numero-non-configurabile: versione del formato di un lavoro «Finale»
+# Il formato 8 (2026-11-04) e' «Finale»: un render ingrandito con piu'
+# dettaglio, senza prompt. Parte sempre da un render, da solo: niente aree,
+# richieste, riferimenti, materiali o contesto.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8)  # numero-non-configurabile: i formati che questo motore sa leggere
+TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
 CARTELLA_RIFERIMENTI = "riferimenti"
@@ -285,11 +290,16 @@ class Lavoro:
     # inserire, Rif. 1, 2, ... nell'ordine. Partono per ultime. Una nota di
     # Ritocca dice quale usa (Area.inserto).
     inserti: tuple[str, ...] = ()
+    # Studio · Finale: di quante volte ingrandire e il tipo d'immagine. Solo
+    # da un render, da solo.
+    finale: dict | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
-        if self.inserti:
+        if self.finale:
+            object.__setattr__(self, "formato", FORMATO_FINALE)
+        elif self.inserti:
             object.__setattr__(self, "formato", FORMATO_INSERTI)
         elif self.aree:
             object.__setattr__(self, "formato", FORMATO_RITOCCO)
@@ -317,6 +327,9 @@ class Lavoro:
                                       bool(self.riferimento), modulo_materiali.quante_immagini(self.materiali))
 
     def _prompt_senza_inserti(self) -> str:
+        if self.finale:
+            # Il modello di «Finale» non ha prompt: questa riga e' solo per la ricetta.
+            return f"Finale: upscale x{self.finale['ingrandimento']}, {self.finale['tipo']}."
         if self.aree:
             return modulo_aree.prompt(self.modo_aree, self.aree)
         if self.contesto:
@@ -356,6 +369,7 @@ class Lavoro:
             **({"contesto": self.contesto.a_dizionario()} if self.contesto else {}),
             **({"materiali": [c.a_dizionario() for c in self.materiali]} if self.materiali else {}),
             **({"inserti": list(self.inserti)} if self.inserti else {}),
+            **({"finale": dict(self.finale)} if self.finale else {}),
         }
 
     @classmethod
@@ -407,6 +421,14 @@ class Lavoro:
                     "Rimetti il lavoro in coda dallo Studio.",
                 )
             inserti = tuple(elenco_inserti)
+        finale = None
+        if formato == FORMATO_FINALE:
+            finale = _finale_controllato(dati.get("finale"))
+            if not partenza or richieste or any(dati.get(k) for k in ("aree", "riferimento", "contesto", "materiali", "inserti")):
+                raise LavoroNonValido(
+                    "Il file del lavoro e' un «Finale» ma non parte da un render, o porta anche altro.",
+                    "Rimetti il Finale in coda da sotto il render nello Studio.",
+                )
         aree, modo_aree = _aree_del_lavoro(dati, partenza)
         riferimento = (dati.get("riferimento") if formato == FORMATO_RIFERIMENTO
                        or (formato in (FORMATO_MATERIALI, FORMATO_INSERTI) and dati.get("riferimento")) else None)
@@ -466,6 +488,7 @@ class Lavoro:
             contesto=contesto,
             materiali=materiali,
             inserti=inserti,
+            finale=finale,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -484,6 +507,19 @@ def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Ar
         return modulo_aree.da_elenco(dati.get("aree")), modulo_aree.controlla_modo(dati.get("modo_aree"))
     except modulo_aree.AreaNonValida as errore:
         raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
+
+
+def _finale_controllato(finale: object) -> dict:
+    """{"ingrandimento", "tipo"} di un «Finale», solo con i valori che lo Studio offre."""
+    if (not isinstance(finale, dict) or finale.get("ingrandimento") not in config.FINALE_INGRANDIMENTI
+            or isinstance(finale.get("ingrandimento"), bool) or finale.get("tipo") not in TIPI_FINALE):
+        raise LavoroNonValido(
+            "«Finale» ingrandisce di "
+            + " o ".join(str(n) for n in config.FINALE_INGRANDIMENTI)
+            + " volte, per una foto o un'illustrazione: il lavoro chiede altro.",
+            "Scegli ingrandimento e tipo dallo Studio.",
+        )
+    return {"ingrandimento": int(finale["ingrandimento"]), "tipo": str(finale["tipo"])}
 
 
 def _controlla_inserti_delle_aree(aree: tuple[modulo_aree.Area, ...], inserti: tuple) -> None:
@@ -551,6 +587,7 @@ def metti_in_coda(
     contesto: modulo_contesto.Contesto | None = None,
     materiali: tuple[modulo_materiali.Cambio, ...] = (),
     inserti: tuple[Path, ...] | list[Path] = (),
+    finale: dict | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -612,6 +649,14 @@ def metti_in_coda(
             )
         inserti = tuple(controlla_riferimento(radice, Path(i)) for i in inserti)
     _controlla_inserti_delle_aree(tuple(aree), tuple(inserti))
+    if finale is not None:
+        finale = _finale_controllato(finale)
+        if not partenza or richieste or aree or riferimento is not None or contesto is not None \
+                or materiali or inserti:
+            raise LavoroNonValido(
+                "«Finale» parte da un render, da solo: niente richieste, aree, riferimenti o materiali.",
+                "Fai prima il passo che ti serve, poi il Finale sul suo render.",
+            )
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -640,6 +685,7 @@ def metti_in_coda(
         contesto=contesto,
         materiali=tuple(materiali),
         inserti=tuple(str(i) for i in inserti),
+        finale=finale,
     )
     if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
@@ -960,6 +1006,8 @@ class Coda:
             testo_utente=lavoro.scelte.materiali,
             immagini_in_piu=in_piu,
             dimensione_render=lavoro.scelte.risoluzione,
+            ingrandimento=lavoro.finale["ingrandimento"] if lavoro.finale else 0,
+            tipo_finale=lavoro.finale["tipo"] if lavoro.finale else "",
         )
         return richiesta, motore
 

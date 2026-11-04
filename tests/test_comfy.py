@@ -115,7 +115,8 @@ def test_solo_i_modelli_sondati_hanno_uno_schema_e_ognuno_dice_quando():
     assert all(comfy.SCHEMI[m].verificato_il == "2026-10-27" for m in sondati)
     # Aggiunti su richiesta prima della sonda: solo questi, e ognuno lo dice prima dell'invio.
     assert set(comfy.SCHEMI) - sondati == {
-        "vertexai/gemini-3-pro-image", "openai/gpt-image-2", "byteplus/seedream-5-0-260128"}
+        "vertexai/gemini-3-pro-image", "openai/gpt-image-2", "byteplus/seedream-5-0-260128",
+        comfy.MODELLO_FINALE}
     assert all("non e' ancora stato provato" in comfy.ProviderComfy().avviso(m)
                for m in set(comfy.SCHEMI) - sondati)
 
