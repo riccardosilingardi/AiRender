@@ -710,6 +710,7 @@ class Studio:
                        varianti: int = 1, parte_da: str | None = None,
                        partenza: Path | None = None, richieste=(), aree=(),
                        modo_aree: str | None = None, riferimento: Path | None = None,
+                       portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = ()) -> dict:
         if mostrata != destinazione["destinazione"]:
@@ -751,6 +752,7 @@ class Studio:
                 aree=tuple(aree),
                 modo_aree=modo_aree,
                 riferimento=riferimento,
+                portato_da=portato_da,
                 contesto=contesto,
                 materiali=tuple(materiali),
                 crea_provider=self._crea_provider,
@@ -762,6 +764,83 @@ class Studio:
             "identificativi": [l.identificativo for l in lavori],
             "destinazione": lavori[0].destinazione,
             "coda_attiva": self._coda_attiva(),
+        }
+
+    def ricetta_da_portare(self, identificativo: str) -> dict:
+        """Cosa porta «Porta su un'altra vista» da questa immagine: stile, modello e richieste di tutta la strada.
+
+        Lo stile e' quello del primo render dalla vista; dopo, ogni passo e
+        ogni ritocco aggiunge le sue richieste e le sue note, nell'ordine. Le
+        aree no: sono disegnate su un'altra inquadratura. Le prende a parole,
+        e l'immagine scelta parte come seconda immagine perche' il modello
+        veda come sono venute.
+        """
+        lavoro, _cartella = self._lavoro(identificativo)
+        if lavoro.contesto is not None:
+            raise RichiestaStudioNonValida(
+                "Un'immagine di «Inserisci nel contesto» non si porta su un'altra vista: "
+                "la sua prima immagine e' il luogo, non la vista.",
+                "Scegli un render nato da una vista Allplan.")
+        render = self._render(identificativo)
+        if render is None:
+            raise RichiestaStudioNonValida(
+                "Questa immagine non ha un render da portare.",
+                "Scegli un render riuscito, oppure aspetta che finisca.")
+        vista = Path(lavoro.vista)
+        strada = [p["identificativo"] for p in self._albero(vista).strada(identificativo)] or [identificativo]
+        lavori = [self._lavoro(i)[0] for i in strada]
+        origine = next((l for l in lavori if not l.partenza), None)
+        if origine is None:
+            raise RichiestaStudioNonValida(
+                "Non trovo il primo render di questa strada: lo stile da portare non si sa.",
+                "Parti da un render fatto da Genera.")
+        richieste: list[str] = []
+        for passo in lavori:
+            richieste += [r for r in passo.richieste if r.strip()]
+            richieste += [a.nota for a in passo.aree if a.nota.strip()]
+        return {"lavoro": lavoro, "render": render, "vista": vista, "origine": origine,
+                "richieste": richieste}
+
+    def porta_su_vista(self, identificativo: str, dati: dict) -> dict:
+        """Un render nuovo su un'altra vista, coerente con questa immagine.
+
+        Stesse scelte e stesso modello del primo render, tutte le richieste
+        e le note della strada, e questa immagine come seconda immagine
+        (blocchi.RIFERIMENTO_COERENZA). E' un lavoro dalla vista nuova:
+        nell'albero di quella vista e' un passo 1.
+        """
+        ricetta = self.ricetta_da_portare(identificativo)
+        lavoro, origine = ricetta["lavoro"], ricetta["origine"]
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        if vista.resolve() == ricetta["vista"].resolve():
+            raise RichiestaStudioNonValida(
+                "Questa e' la stessa vista dell'immagine: qui serve Variante.",
+                "Cattura in Allplan l'altra inquadratura, poi sceglila qui.")
+        riferimento = self.percorso_riferimento(
+            self.carica_riferimento(ricetta["render"].read_bytes(), ricetta["render"].name)["nome"])
+        destinazione = self.destinazione(lavoro.modello, riferimento=True)
+        return self._metti_in_coda(
+            vista, origine.scelte, destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=origine.preset, prompt_a_mano=origine.prompt_a_mano,
+            richieste=ricetta["richieste"], riferimento=riferimento,
+            portato_da=lavoro.identificativo,
+        )
+
+    def anteprima_porta(self, identificativo: str) -> dict:
+        """Quello che la pagina mostra prima del clic: da dove viene e cosa porta."""
+        ricetta = self.ricetta_da_portare(identificativo)
+        lavoro, origine = ricetta["lavoro"], ricetta["origine"]
+        modello = next((m for m in MODELLI if m.identificativo == lavoro.modello), None)
+        preset = blocchi.PRESET_STILE.get(origine.preset or "")
+        return {
+            "modello": lavoro.modello,
+            "modello_nome": modello.nome if modello else lavoro.modello,
+            "stile": "Prompt scritto a mano" if (origine.prompt_a_mano or "").strip()
+                     else (preset.nome if preset else "Scelte libere"),
+            "richieste": ricetta["richieste"],
+            "vista": ricetta["vista"].name,
+            "viste": [v["nome"] for v in self.elenco_viste() if v["nome"] != ricetta["vista"].name],
         }
 
     def rifai(self, identificativo: str, dati: dict) -> dict:

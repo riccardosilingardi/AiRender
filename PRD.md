@@ -268,6 +268,16 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Altra vista: fotogrammi coerenti da più viste (2026-11-04)
+
+«Altra vista» sotto l'immagine porta stile, modello, richieste e note dei
+ritocchi su un'altra cattura, con l'immagine scelta come seconda immagine e la
+frase RIFERIMENTO_COERENZA (bozza 11). Provato solo con il provider finto: mai
+con Nano Banana vero, quindi non si sa quanto arredo e materiali restino
+uguali. Le aree dei ritocchi passano solo a parole; i materiali cambiati da
+Genera non si portano. Verifica: due viste dello stesso progetto, «Altra
+vista» da un render ritoccato, confronto a occhio degli oggetti aggiunti.
+
 ### Studio che si ricollega dopo un riavvio (2026-11-04)
 
 `pacchetto.py --installa` ferma lo Studio; la finestra di Edge restava aperta

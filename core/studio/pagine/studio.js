@@ -1406,7 +1406,7 @@ function palcoConAzioni(l) {
 }
 
 function barraAzioni(l) {
-  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null };
+  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null };
   const az = S.azioni;
   const d = S.passi.dest[l.modello];
   const m = S.catalogo.modelli.find((x) => x.id === l.modello);
@@ -1417,7 +1417,9 @@ function barraAzioni(l) {
     h("button", { classe: "btn", onclick: () => rifai(l), disabled: occupato || !d || (m && !m.verificato) || null,
       title: occupato ? "Un lavoro è in corso: Variante si accende quando finisce." : "Stessa ricetta, un'altra immagine. Arriva accanto a questa, già scelta." }, "Variante"),
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
-      title: "Un video che parte da questa immagine." }, "Video"))];
+      title: "Un video che parte da questa immagine." }, "Video"),
+    h("button", { classe: "btn", "aria-expanded": String(!!az.porta), onclick: () => apriPorta(l),
+      title: "La stessa immagine su un'altra vista catturata in Allplan: stesso stile, stessi ritocchi. Per i fotogrammi di un video." }, "Altra vista"))];
   // Variante non dice niente da sola (test del 2026-11-04): si scrive da dove
   // riparte e con cosa, prima che parta.
   const da = l.parte_da ? "dall'immagine da cui era nata questa" : "dalla vista Allplan";
@@ -1426,8 +1428,70 @@ function barraAzioni(l) {
     `Variante: un'altra versione di questa immagine. Riparte ${da}, con ${cosa} e lo stesso modello (${l.modello_nome}).`,
     d ? [" Va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""] : null));
   if (az.video) righe.push(videoVeloce(l));
+  if (az.porta) righe.push(pannelloPorta(l));
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
+}
+
+// --- Altra vista: «Porta su un'altra vista» (2026-11-04) ----------------------
+// Per i fotogrammi di un video: la stessa ricetta (stile, modello, richieste e
+// note dei ritocchi) su un'altra cattura, con questa immagine come seconda
+// immagine perché il modello tenga uguali materiali e oggetti.
+
+async function apriPorta(l) {
+  const az = S.azioni;
+  if (az.porta) { az.porta = null; render(); return; }
+  az.porta = { dati: null, dest: null, vista: null, mandato: null, errore: null };
+  render();
+  try {
+    const dati = await get(`/api/lavori/${enc(l.identificativo)}/porta`);
+    az.porta.dati = dati;
+    az.porta.vista = dati.viste[0] || null;
+    az.porta.dest = await get(`/api/destinazione?modello=${enc(dati.modello)}&riferimento=1`);
+  } catch (e) { if (az.porta) az.porta.errore = e; }
+  render();
+}
+
+function pannelloPorta(l) {
+  const p = S.azioni.porta;
+  if (p.errore) return avviso("errore", p.errore.fatto, p.errore.cosa_fare);
+  if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo stile e ritocchi di questa immagine…");
+  if (p.mandato) {
+    return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, `In coda sulla vista ${p.mandato}.`),
+      h("span", { classe: "piccolo tenue" }, "La trovi nella striscia in alto, sotto quella vista. Poi in Video la usi come fotogramma."));
+  }
+  const d = p.dati;
+  if (!d.viste.length) {
+    return h("div", { classe: "video-veloce" },
+      h("b", {}, "Non c'è un'altra vista."),
+      h("span", { classe: "piccolo" }, "In Allplan inquadra il punto di vista del prossimo fotogramma e cattura dalla palette: comparirà qui."));
+  }
+  const scelta = h("select", { "aria-label": "Vista su cui portare", onchange: (e) => { p.vista = e.target.value; } },
+    d.viste.map((v) => h("option", { value: v, selected: v === p.vista || null }, v)));
+  const spento = S.lavoroAttivo ? "Un lavoro è in corso: si accende quando finisce."
+    : p.dest.cosa_manca || p.dest.riferimento_non_accettato || null;
+  return h("div", { classe: "video-veloce" },
+    h("span", { classe: "etichetta" }, "Su quale vista"),
+    scelta,
+    h("p", { classe: "piccolo" }, `Porta lo stile «${d.stile}», il modello ${d.modello_nome}`,
+      d.richieste.length ? ` e ${d.richieste.length === 1 ? "questa richiesta" : `queste ${d.richieste.length} richieste`}:` : "."),
+    d.richieste.length ? h("ul", { classe: "piccolo" }, d.richieste.map((r) => h("li", {}, r))) : null,
+    h("p", { classe: "piccolo tenue" }, "Questa immagine parte come seconda immagine, perché materiali e oggetti restino gli stessi. Le aree dei ritocchi non si portano: sono disegnate su un'altra inquadratura, passano a parole."),
+    h("p", { classe: "dove" }, "Va a ", h("b", {}, p.dest.destinazione), p.dest.costo ? ` · ${p.dest.costo}` : ""),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => porta(l), disabled: !!spento || null }, "Porta su questa vista"),
+      spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
+}
+
+async function porta(l) {
+  const p = S.azioni.porta;
+  p.errore = null;
+  try {
+    await post(`/api/lavori/${enc(l.identificativo)}/porta`, { vista: p.vista, destinazione_mostrata: p.dest.destinazione });
+    p.mandato = p.vista;
+    await caricaStorico();
+  } catch (e) { p.errore = e; }
+  render();
 }
 
 async function apriVideoVeloce() {
