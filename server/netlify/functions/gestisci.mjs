@@ -4,7 +4,7 @@
 import { serve } from "../../lib/ambiente.mjs";
 import { leggiFirma } from "../../lib/codice.mjs";
 import { creaDb } from "../../lib/db.mjs";
-import { errore } from "../../lib/risposte.mjs";
+import { errore, protetto } from "../../lib/risposte.mjs";
 import { creaStripe } from "../../lib/stripe.mjs";
 
 export async function gestisci(req, { ambiente = process.env, db = creaDb(ambiente), stripe = creaStripe(ambiente) } = {}) {
@@ -24,6 +24,6 @@ export async function gestisci(req, { ambiente = process.env, db = creaDb(ambien
   return new Response(null, { status: 303, headers: { location: portale.url } });
 }
 
-export default (req) => gestisci(req);
+export default protetto("gestisci", (req) => gestisci(req));
 
 export const config = { path: "/api/gestisci" };
