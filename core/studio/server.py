@@ -15,7 +15,7 @@ Rotte:
     GET  /api/studio                       cartella, coda, viste, lavori attivi
     GET  /api/catalogo                     preset, assi, modelli
     GET  /api/licenza                      codice salvato o no, piano e saldo dal server AIRENDER
-    GET  /api/storico                      tutte le immagini di tutte le viste, per la striscia
+    GET  /api/storico                      tutte le immagini di tutte le viste, per lo storico
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista

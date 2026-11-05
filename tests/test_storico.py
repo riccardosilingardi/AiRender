@@ -1,4 +1,4 @@
-"""Lo storico dello Studio: tutte le immagini di tutte le viste, in una striscia.
+"""Lo storico dello Studio: tutte le immagini di tutte le viste, in una colonna.
 
 Il problema di Riccardo del 2026-11-02: una cattura nuova faceva sparire il
 render di prima e i suoi passi. Qui si controlla che lo storico li tenga

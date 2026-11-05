@@ -1483,7 +1483,7 @@ class Studio:
     # --- storico ---------------------------------------------------------
 
     def storico(self) -> dict:
-        """Tutte le immagini di tutte le viste, per la striscia in alto nello Studio.
+        """Tutte le immagini di tutte le viste, per lo storico a sinistra nello Studio.
 
         Un gruppo per vista, la vista catturata per ultima per prima. Dentro
         il gruppo: la cattura, poi i render, i ritocchi e i video in ordine
@@ -2062,7 +2062,7 @@ def _richieste_del_passo(passo: dict) -> list[str]:
     return list(passo.get("richieste") or [])
 
 
-# Come la striscia dello storico chiama ogni immagine: una o due parole.
+# Come lo storico chiama ogni immagine: una o due parole.
 _ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco"}
 
 
