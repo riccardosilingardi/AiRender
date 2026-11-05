@@ -12,6 +12,9 @@
 // - ADDEBITA solo quando il risultato torna con un'immagine; se il Router
 //   rifiuta l'invio o chiude senza immagine, ANNULLA la riserva.
 //
+// Prima di inoltrare toglie dalle immagini EXIF, XMP e testi (lib/pulisci.mjs):
+// al Router partono solo i pixel e il prompt.
+//
 // Ogni chiamata di stato o risultato controlla che la richiesta sia della
 // licenza che chiede: nessuno legge il render di un altro.
 
@@ -20,7 +23,8 @@ import { serve } from "../../lib/ambiente.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { intestazioniCliente, licenzaDi } from "../../lib/licenza.mjs";
 import { dimensioneDaCorpo, fuoriDalPiano, peso } from "../../lib/listino.mjs";
-import { errore, json } from "../../lib/risposte.mjs";
+import { corpoPulito } from "../../lib/pulisci.mjs";
+import { errore, json, protetto } from "../../lib/risposte.mjs";
 
 export const COMFY = "https://api.comfy.org/v2/models";
 // Il Router vuole esattamente "false": ogni altro valore lascia acceso il
@@ -30,6 +34,12 @@ export const FALLBACK = "false";
 // Netlify (6 MB): si carica nello Storage e torna un link firmato.
 export const RISPOSTA_MASSIMA_BYTE = 4_500_000;
 export const LINK_RISULTATO_SECONDI = 24 * 3600;
+// I risultati caricati nello Storage si cancellano dopo questo tempo
+// (netlify/functions/pulizia.mjs, ogni ora). SCELTA: il link
+// firmato vale 24 ore, il plugin lo scarica subito; 48 ore lasciano un giorno
+// di margine a chi riprova. Al server non serve tenerli: la copia del cliente
+// e' sul suo PC (GDPR art. 5.1.e, limitazione della conservazione).
+export const RISULTATI_CONSERVATI_ORE = 48;
 const ATTESA_COMFY_MS = 20_000;
 
 export function analizzaPercorso(pathname) {
@@ -82,6 +92,9 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
 
   const chiave = (req.headers.get("idempotency-key") || "").slice(0, 200);
   if (!chiave) return errore(400, "idempotenza_mancante", "Manca la Idempotency-Key.", "Aggiorna il plugin.");
+  // Prima di riservare: senza la chiave di Riccardo non partirebbe niente, e
+  // una riserva fatta per niente terrebbe fermo il credito per 24 ore.
+  const chiaveComfy = serve("COMFY_API_KEY", ambiente);
 
   const riserva = await db.rpc("airender_riserva", {
     p_licenza: licenza.id, p_postazione: cliente.postazione, p_canale: cliente.canale,
@@ -108,12 +121,12 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
     r = await chiama(`${COMFY}/${modello}/requests?${query}`, {
       method: "POST",
       headers: {
-        "x-api-key": serve("COMFY_API_KEY", ambiente),
+        "x-api-key": chiaveComfy,
         "idempotency-key": chiaveVersoComfy(licenza.id, chiave),
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify(corpo),
+      body: JSON.stringify(corpoPulito(corpo)),
       signal: AbortSignal.timeout(ATTESA_COMFY_MS),
     });
   } catch {
@@ -196,6 +209,6 @@ function inoltra(r, nomi) {
   return fuori;
 }
 
-export default (req) => gestisci(req);
+export default protetto("router", (req) => gestisci(req));
 
 export const config = { path: "/v2/models/*" };

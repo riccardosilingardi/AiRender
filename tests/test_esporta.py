@@ -53,6 +53,8 @@ def test_jpg_e_png_portano_solo_i_pixel(formato, firma):
     assert dati.startswith(firma)
     assert b"segreto" not in dati and b"prompt" not in dati
     assert Image.open(io.BytesIO(dati)).size == (160, 90)
+    # L'unica cosa aggiunta: «generata con l'IA», in XMP (AI Act, art. 50.2).
+    assert b"trainedAlgorithmicMedia" in dati and b"AIRENDER" in dati
 
 
 def test_il_psd_ha_un_livello_per_passaggio_dal_basso_in_alto():

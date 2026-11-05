@@ -14,12 +14,13 @@ Rotte:
     GET  /pagine/<file>                    foglio di stile e script
     GET  /api/studio                       cartella, coda, viste, lavori attivi
     GET  /api/catalogo                     preset, assi, modelli
+    GET  /api/licenza                      codice salvato o no, piano e saldo dal server AIRENDER
     GET  /api/storico                      tutte le immagini di tutte le viste, per la striscia
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
     GET  /api/viste/<nome>/materiali       i materiali del progetto letti dalla palette con la vista
-    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1   dove va la vista, quante immagini, quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1&inserti=<n>   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
@@ -27,6 +28,8 @@ Rotte:
     GET  /file/contesto/<nome>             l'immagine del contesto caricata
     GET  /file/miniatura/<preset>          la miniatura vera di un preset, se c'e'
     POST /api/componi                      prompt, riassunto, caratteri
+    POST /api/licenza                      {codice}: controlla col server e, se va, lo salva
+    POST /api/licenza/servizio             {provider}: crediti AIRENDER o chiave Comfy propria
     POST /api/prova-a-secco                tutto tranne l'invio
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
@@ -46,6 +49,8 @@ Rotte:
     POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
     POST /api/ritocca/componi              il prompt di un ritocco (aree e note), prima di Applica
     POST /api/ritocca/invia                tutte le note in un invio sul render di un passo
+    POST /api/finale/componi               cosa fa «Finale» su un render: misura d'uscita, destinazione
+    POST /api/finale/invia                 «Finale»: il render ingrandito, un passo nuovo
     POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
     GET  /api/video/catalogo               modello, modi, movimenti, durate e dove va il video
     GET  /api/video                        i video della cartella
@@ -159,6 +164,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.stato_studio())
             case ["api", "catalogo"]:
                 self._json(studio.catalogo())
+            case ["api", "licenza"]:
+                self._json(studio.licenza())
             case ["api", "miei-preset"]:
                 self._json(studio.miei_preset())
             case ["api", "storico"]:
@@ -176,7 +183,10 @@ class _Gestore(BaseHTTPRequestHandler):
                                                (domanda.get("varianti") or ["1"])[0],
                                                (domanda.get("riferimento") or ["0"])[0] == "1",
                                                contesto=(domanda.get("contesto") or ["0"])[0] == "1",
-                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0]))
+                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0],
+                                               inserti=(domanda.get("inserti") or ["0"])[0],
+                                               esempi=(domanda.get("esempi") or ["0"])[0],
+                                               geometria=(domanda.get("geometria") or ["0"])[0] == "1"))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
@@ -225,6 +235,10 @@ class _Gestore(BaseHTTPRequestHandler):
         match parti:
             case ["api", "componi"]:
                 self._json(studio.componi(self._corpo_json()))
+            case ["api", "licenza"]:
+                self._json(studio.attiva_licenza(self._corpo_json()))
+            case ["api", "licenza", "servizio"]:
+                self._json(studio.usa_servizio(self._corpo_json()))
             case ["api", "prova-a-secco"]:
                 self._json(studio.prova_a_secco(self._corpo_json()))
             case ["api", "invia"]:
@@ -263,6 +277,10 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_ritocco(self._corpo_json()))
             case ["api", "ritocca", "invia"]:
                 self._json(studio.invia_ritocco(self._corpo_json()))
+            case ["api", "finale", "componi"]:
+                self._json(studio.componi_finale(self._corpo_json()))
+            case ["api", "finale", "invia"]:
+                self._json(studio.invia_finale(self._corpo_json()))
             case ["api", "video", "immagini"]:
                 self._json(studio.carica_immagine_video(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "video", "prova-a-secco"]:

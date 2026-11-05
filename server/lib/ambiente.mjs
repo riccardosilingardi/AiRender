@@ -1,7 +1,9 @@
 // Le variabili d'ambiente del sito Netlify. Nessuna chiave sta nel
 // repository: se manca, la funzione lo dice per nome e non parte.
 
-export class VariabileMancante extends Error {}
+export class VariabileMancante extends Error {
+  name = "VariabileMancante";
+}
 
 export function serve(nome, ambiente = process.env) {
   const valore = (ambiente[nome] || "").trim();

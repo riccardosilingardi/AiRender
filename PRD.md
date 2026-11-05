@@ -268,6 +268,89 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Licenza e saldo nello Studio (2026-11-05)
+
+Provata in Chromium con un server finto (codice valido, rifiutato, server
+muto, risposta lenta) e nei test. Mai con il server AIRENDER vero, che non è
+online; mai in Edge in modalità app su Windows, quindi non si sa se Ricarica
+e Gestisci (link con `target=_blank`) aprono il browser predefinito. Non
+verificato che la coda già avviata prenda il codice appena salvato: legge il
+file a ogni lavoro, ma non provato su Windows. Verifica: al primo deploy,
+incollare un codice vero dallo Studio, un render, il saldo in testata sceso.
+
+### Server di vendita: errori, pulizia, peso dell'invio (2026-11-05)
+
+Tre ritocchi per il lancio, provati solo nei test (Node coi finti, pytest).
+Mai provati su Netlify e Supabase veri, perche' il server non e' ancora
+online. Non verificati: che `@hourly` parta davvero sul piano Netlify scelto;
+che la funzione SQL `airender_risultati_vecchi` possa leggere
+`storage.objects` (dipende dai permessi di Supabase); che il DELETE dello
+Storage con `prefixes` cancelli i file; il limite di tempo delle funzioni
+Netlify rispetto all'attesa di 20 s verso Comfy. Il limite di 6 MB per
+richiesta viene dalla documentazione Netlify, non da una prova. Verifica: al
+primo deploy, un render con Nano Banana Pro e tre riferimenti pesanti (deve
+partire con l'avviso «rimpicciolite»), un render 4K (il risultato passa dallo
+Storage), due giorni dopo il bucket `risultati` vuoto.
+### Tieni la geometria, il ControlNet prima di Nano Banana (2026-11-04)
+
+- Il workflow gira sul deployment della **Comfy Developer Platform** di
+  Riccardo (`core/provider/workflow/tieni-geometria.json`, passi in
+  `workflow/LEGGIMI.md`), indirizzo in `AIRENDER_COMFY_WORKFLOW_URL`. Si chiude
+  con il primo render vero sul deployment: bozza `<id>.geometria.png` e render
+  affiancati alla vista.
+- Il costo è a secondi di GPU del deployment: lo Studio non scrive un numero
+  finché una prima passata vera non lo dà.
+- `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
+  le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
+
+### Stile da esempi (2026-11-04)
+
+- **Che 2-4 render d'esempio diano uno stile più fedele di uno solo**:
+  `ESEMPI_STILE` (bozza 14) è un testo scelto, provato solo con un provider
+  finto. Verifica: stessa vista, uno contro tre esempi, Nano Banana 2.
+- **Gli esempi non si salvano ancora in «I miei preset»**: si ricaricano a mano.
+
+### Finale, l'ingrandimento (2026-11-04)
+
+- **Il corpo di `freepik/ai-image-upscaler-precision-v2`** (image in base64,
+  scale_factor, flavor) e la risposta (`data.generated[0]`, link che scade)
+  vengono dalla documentazione del Router (Comfy-Org/docs, router-schemas, letta
+  il 2026-11-04), **non da una sonda**. Verifica: un Finale ×2 su un render vero,
+  oppure `python scripts/sonda_comfy.py --modello freepik/ai-image-upscaler-precision-v2 --solo-schema`.
+- **Il costo**: il Router lo dice «a misura e ingrandimento» e non lo stima
+  prima dell'invio; lo Studio scrive «non misurato» finché un Finale vero non
+  copia i crediti.
+- **Il peso massimo** di un render 2K come base64 nel corpo, e se un ×4 su 2K
+  (8K) viene accettato.
+
+### Rif. di oggetti e persone e scelta del modello (2026-11-04)
+
+- **Che il modello metta davvero l'oggetto del Rif. dove dice il testo**, con
+  forma, colori, scala e ombra giuste: la regola `INSERTI_REGOLA` (bozza 13) è
+  un testo scelto, provato solo con un provider finto. Verifica: un Cambia e un
+  Ritocca con una foto di poltrona su un render vero, Nano Banana 2.
+- **Che il Router accetti 3-6 immagini in un invio** (render + fino a 4 Rif. +
+  eventuali materiali): con Nano Banana 2 ne sono partite al massimo 3.
+- **Le righe delle schede dei modelli** («Veloce, tiene gli spigoli»,
+  «Fotorealismo marcato»…) sono giudizi, non un confronto sul banco di prova.
+- **Le schede a schermo** sono viste solo in Chromium headless, tema chiaro.
+
+### Privacy e AI Act: metadati tolti, render marcati (2026-11-05)
+
+Le immagini partono senza EXIF, XMP e testi (`core/immagine.py`,
+`senza_metadati`; di nuovo sul server in `server/lib/pulisci.mjs`) e i render
+tornano con un XMP «generata con l'IA» (IPTC Digital Source Type). Provato
+solo nei test, con immagini fatte da Pillow: mai con una foto vera di
+telefono (iPhone HEIC convertito, Android con GPS), mai con il server dal
+vivo. Non si sa se Google mette già una sua marcatura C2PA nei risultati di
+Nano Banana via Router; se c'è, il ritaglio della cornice la toglie. Non si sa
+se un lettore di metadati comune (Photoshop, exiftool, il verificatore del
+codice europeo) legge la marcatura come «generata». PSD e video non sono
+marcati. La pulizia oraria dello Storage (`pulizia.mjs`, 48 ore) e la
+casella dei Termini nel Checkout di Stripe non sono mai state eseguite su
+servizi veri. Verifica: una foto col GPS nel fotoinserimento, poi `exiftool`
+sulla vista inviata (dal corpo salvato) e sul render esportato.
+
 ### Prompt nascosto e look per effetto (2026-11-05)
 
 Il prompt in inglese si vede solo con Pro e Studio o con la chiave propria:

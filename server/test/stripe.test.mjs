@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { codificaForm, datiFiscali, firmaValida, prodottoDelPrezzo } from "../lib/stripe.mjs";
 import { firmaStripe } from "./finti.mjs";
-import { parametriCheckout } from "../netlify/functions/acquista.mjs";
+import { parametriCheckout, TERMINI_VERSIONE } from "../netlify/functions/acquista.mjs";
 
 test("la firma del webhook si verifica, e una vecchia o falsa no", () => {
   const corpo = '{"id":"evt_1"}';
@@ -31,6 +31,16 @@ test("il Checkout chiede dati fiscali, codici sconto e porta la licenza della ri
   const a = parametriCheckout("pro_anno", { sito: "https://s", prezzo: "price_pa" });
   assert.equal(a.mode, "subscription");
   assert.equal(a.customer_creation, undefined);
+});
+
+test("senza spuntare i Termini non si paga, e la versione accettata resta nei metadati", () => {
+  for (const nome of ["prova", "ricarica", "pro_mese"]) {
+    const p = parametriCheckout(nome, { sito: "https://s", prezzo: "price_x", licenza: "L1" });
+    assert.deepEqual(p.consent_collection, { terms_of_service: "required" });
+    assert.match(p.custom_text.terms_of_service_acceptance.message, /https:\/\/s\/termini\.html/);
+    assert.match(p.custom_text.terms_of_service_acceptance.message, /https:\/\/s\/privacy\.html/);
+    assert.equal(p.metadata.termini, TERMINI_VERSIONE);
+  }
 });
 
 test("i dati fiscali escono dalla sessione; una PEC nel campo SDI va in PEC", () => {

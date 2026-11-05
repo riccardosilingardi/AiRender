@@ -5,11 +5,22 @@
 // Il Checkout raccoglie quello che serve alla fattura elettronica: indirizzo,
 // partita IVA, codice destinatario SDI o PEC, codice fiscale. I codici
 // sconto (segnalazioni Serteco) si scrivono nel Checkout stesso.
+//
+// Il Checkout chiede anche di accettare i Termini di servizio con una casella
+// obbligatoria (consent_collection): senza spunta non si paga. La prova
+// dell'accettazione la tiene Stripe sulla sessione (consent.terms_of_service
+// = "accepted"), e la sessione e' gia' salvata nella licenza
+// (riferimento_creazione). Nei metadati resta la versione dei termini
+// accettata. Prima di andare dal vivo, l'indirizzo dei Termini va scritto in
+// Stripe, Impostazioni > Dettagli pubblici: senza, Stripe rifiuta la sessione.
 
 import { facoltativa, serve } from "../../lib/ambiente.mjs";
 import { leggiFirma } from "../../lib/codice.mjs";
-import { errore } from "../../lib/risposte.mjs";
+import { errore, protetto } from "../../lib/risposte.mjs";
 import { creaStripe, PRODOTTI } from "../../lib/stripe.mjs";
+
+// La versione dei testi in docs/legale/: si cambia insieme ai testi.
+export const TERMINI_VERSIONE = "2026-11-05";
 
 export function parametriCheckout(nome, { sito, prezzo, licenza, iva }) {
   const p = PRODOTTI[nome];
@@ -28,7 +39,14 @@ export function parametriCheckout(nome, { sito, prezzo, licenza, iva }) {
       { key: "codice_fiscale", type: "text", optional: true,
         label: { type: "custom", custom: "Codice fiscale" } },
     ],
-    metadata: { prodotto: nome, ...(licenza ? { licenza } : {}) },
+    consent_collection: { terms_of_service: "required" },
+    custom_text: {
+      terms_of_service_acceptance: {
+        message: `Accetto i [Termini di servizio](${sito}/termini.html) e ho letto l'[Informativa privacy](${sito}/privacy.html). ` +
+          "Le immagini sono elaborate da servizi di intelligenza artificiale esterni (elenco nell'informativa).",
+      },
+    },
+    metadata: { prodotto: nome, termini: TERMINI_VERSIONE, ...(licenza ? { licenza } : {}) },
   };
   if (p.modo === "payment") parametri.customer_creation = "always";
   else parametri.subscription_data = { metadata: { prodotto: nome } };
@@ -58,6 +76,6 @@ export async function gestisci(req, { ambiente = process.env, stripe = creaStrip
   return new Response(null, { status: 303, headers: { location: sessione.url } });
 }
 
-export default (req) => gestisci(req);
+export default protetto("acquista", (req) => gestisci(req));
 
 export const config = { path: "/api/acquista" };

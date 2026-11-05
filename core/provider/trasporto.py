@@ -102,6 +102,23 @@ class TrasportoHTTP:
         )
         return self._esegui_completo(richiesta)
 
+    def manda_byte(self, url: str, intestazioni: dict, dati: bytes) -> tuple[int, dict, object]:
+        """Un POST con un corpo gia' fatto (il multipart dell'API dei workflow)."""
+        richiesta = urllib.request.Request(url, data=dati, method="POST", headers=dict(intestazioni))
+        return self._esegui_completo(richiesta)
+
+    def scarica_con(self, url: str, intestazioni: dict) -> bytes:
+        """Come `scarica`, per le uscite che vogliono la chiave."""
+        richiesta = urllib.request.Request(url, method="GET", headers=dict(intestazioni))
+        try:
+            with urllib.request.urlopen(richiesta, timeout=self.timeout) as risposta:
+                return risposta.read()
+        except (urllib.error.URLError, TimeoutError) as errore:
+            raise ErroreProvider(
+                f"L'immagine della prima passata e' pronta ma non sono riuscito a scaricarla: {errore}.",
+                "Riprova: il lavoro su Comfy resta salvato per qualche ora.",
+            ) from None
+
     def posta(self, url: str, intestazioni: dict, corpo: dict) -> tuple[int, object]:
         dati = json.dumps(corpo).encode("utf-8")
         richiesta = urllib.request.Request(

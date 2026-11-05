@@ -482,3 +482,65 @@ select { min-height: 34px; padding: 0 10px; }
   border: 1px solid var(--bordo); border-radius: 10px; background: var(--pannello);
 }
 .griglia-render-video { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow-y: auto; }
+
+/* --- licenza e saldo ----------------------------------------------------- */
+
+.pastiglia {
+  font-size: 12px; border: 1px solid var(--bordo-forte); border-radius: 999px; padding: 4px 12px;
+  display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; color: var(--testo-2); text-decoration: none;
+}
+.pastiglia b { font-variant-numeric: tabular-nums; color: var(--testo); }
+.pastiglia.ok::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.pastiglia.attenzione { border-color: var(--attenzione); color: var(--attenzione); }
+a.btn { text-decoration: none; }
+.testata a.btn[data-scheda].attiva { border-color: var(--accento); }
+.schermata-licenza { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.modulo-codice { display: flex; flex-direction: column; gap: 8px; }
+.etichetta-campo { font-size: 12px; font-weight: 600; color: var(--testo-2); }
+input.codice {
+  font: inherit; font-family: Consolas, "Cascadia Mono", ui-monospace, monospace; font-size: 14px; letter-spacing: .04em;
+  padding: 0 12px; min-height: 36px; border: 1px solid var(--bordo-forte); border-radius: 8px;
+  background: var(--fondo-alto); color: var(--testo); flex: 1 1 260px; min-width: 0;
+}
+input.codice:disabled { color: var(--tenue); }
+input.codice.sbagliato { border-color: var(--errore); }
+.giro { width: 14px; height: 14px; border: 2px solid var(--bordo-forte); border-top-color: var(--accento); border-radius: 50%; display: inline-block; animation: giro .9s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .giro { animation: none; } }
+.saldo { align-items: baseline; gap: 10px; }
+.saldo .numero { font-size: 32px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.dati { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13px; }
+.dati dt { color: var(--tenue); }
+.dati dd { margin: 0; font-variant-numeric: tabular-nums; }
+.costi { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.costi th, .costi td { text-align: left; padding: 6px 0; border-top: 1px solid var(--bordo); }
+.costi th:last-child, .costi td:last-child { text-align: right; }
+.costi th { font-size: 12px; font-weight: 600; color: var(--tenue); }
+/* Rif. di oggetti e persone */
+.griglia-rif { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.rif { position: relative; width: 84px; height: 84px; border: 1px solid var(--bordo-forte); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; background: var(--pannello-2); }
+.rif img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rif > span { position: relative; background: rgba(0,0,0,.6); color: #fff; width: 100%; text-align: center; padding: 1px 0; }
+.rif .togli { position: absolute; top: 2px; right: 2px; }
+.rif-nuovo { cursor: pointer; justify-content: center; border-style: dashed; color: inherit; font: inherit; }
+.rif-nuovo[disabled] { cursor: not-allowed; opacity: .5; }
+.nota-rif img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+
+/* Scelta del modello: schede per categoria, spunta sulla scelta */
+.gruppo-scelta-modello { display: flex; flex-direction: column; gap: 6px; }
+.nota-rif { flex-wrap: nowrap; }
+.scelta-modello { display: flex; flex-direction: column; gap: 6px; }
+.gruppo-modelli { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.scheda-modello { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; padding: 8px 10px; border: 1px solid var(--bordo-forte); border-radius: 8px; background: var(--pannello-2); color: var(--testo); font: inherit; cursor: pointer; }
+.scheda-modello:hover:not([disabled]) { border-color: var(--accento); }
+.scheda-modello[aria-checked="true"] { border-color: var(--accento); background: var(--scelto); }
+.scheda-modello[disabled] { cursor: not-allowed; opacity: .55; }
+.scheda-modello .spunta { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bordo-forte); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 1px; }
+.scheda-modello[aria-checked="true"] .spunta { background: var(--accento); color: var(--accento-testo); border-color: var(--accento); }
+.corpo-modello { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.etichetta-modello { margin-left: 6px; font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--bordo-forte); color: var(--testo-2); }
+
+/* «Tieni la geometria» in Genera */
+.geometria { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--bordo); }
+.geometria .riga-spunta { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.geometria p { margin: 0; }

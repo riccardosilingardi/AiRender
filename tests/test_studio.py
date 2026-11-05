@@ -752,6 +752,105 @@ def test_la_pagina_si_ricollega_quando_lo_studio_riparte():
     assert "if (S.spento || !S.catalogo) { location.reload(); return; }" in testo
 
 
+# --- licenza e saldo (bozza A, 2026-11-05) ------------------------------------
+
+SALDO = {"piano": "pro", "funzioni": {"nome": "Pro"}, "saldo": 42, "in_attesa": 1, "ultime_cifre": "3333",
+         "email": "studio@esempio.it", "postazioni": {"usate": 1, "massimo": 1}, "pesi": {NANO: {"1K": 1}},
+         "prossima_scadenza": {"quantita": 10, "il": "2026-11-30T00:00:00Z"},
+         "ricarica_url": "https://airender.prova/api/acquista?prodotto=ricarica&t=x", "gestisci_url": None}
+
+
+def _studio_licenza(cartella, chiamate, saldo=None, errore=None):
+    lette = []
+
+    def leggi_saldo(codice):
+        lette.append(codice)
+        if errore:
+            raise errore
+        return saldo or SALDO
+
+    studio = Studio(cartella, provider="comfy", crea_provider=lambda _n: ProviderDiProva(chiamate),
+                    coda_attiva=lambda: True, leggi_saldo=leggi_saldo)
+    studio.lette = lette
+    return studio
+
+
+def test_licenza_vuota_non_chiama_il_server(cartella, chiamate):
+    studio = _studio_licenza(cartella, chiamate)
+    stato = studio.licenza()
+    assert stato["presente"] is False and stato["saldo"] is None and stato["errore"] is None
+    assert studio.lette == []
+    assert stato["chiave_comfy"] is False
+
+
+def test_attiva_controlla_col_server_poi_salva_e_passa_ai_crediti(cartella, chiamate):
+    from core import licenza
+    studio = _studio_licenza(cartella, chiamate)
+    stato = studio.attiva_licenza({"codice": "air 0000 1111 2222 3333"})
+    assert studio.lette[0] == "AIR-0000-1111-2222-3333"
+    assert licenza.leggi() == "AIR-0000-1111-2222-3333"
+    assert studio.provider == "airender" and stato["provider"] == "airender"
+    assert stato["saldo"]["saldo"] == 42 and stato["ultime_cifre"] == "3333"
+
+
+def test_un_codice_rifiutato_dal_server_non_si_salva(cartella, chiamate):
+    from core import licenza
+    studio = _studio_licenza(cartella, chiamate, errore=ErroreProvider(
+        "Questo codice licenza non esiste.", "Ricopialo dall'email.", stato=401))
+    with pytest.raises(ErroreProvider) as e:
+        studio.attiva_licenza({"codice": "AIR-0000-1111-2222-3333"})
+    assert "non esiste" in e.value.fatto
+    assert licenza.leggi() is None and studio.provider == "comfy"
+
+
+def test_un_codice_storto_si_ferma_prima_del_server(cartella, chiamate):
+    studio = _studio_licenza(cartella, chiamate)
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.attiva_licenza({"codice": "comfyui-abc"})
+    assert studio.lette == []
+
+
+def test_server_che_non_risponde_lascia_il_codice_e_lo_dice(cartella, chiamate):
+    from core import licenza
+    licenza.salva("AIR-0000-1111-2222-3333")
+    studio = _studio_licenza(cartella, chiamate, errore=ErroreProvider(
+        "Il server AIRENDER non risponde: rete.", "Riprova fra un minuto."))
+    stato = studio.licenza()
+    assert stato["presente"] and stato["saldo"] is None
+    assert "non risponde" in stato["errore"]["fatto"]
+    assert licenza.leggi() == "AIR-0000-1111-2222-3333"
+
+
+def test_chiave_comfy_si_sceglie_solo_se_c_e(cartella, chiamate, monkeypatch):
+    studio = _studio_licenza(cartella, chiamate)
+    with pytest.raises(RichiestaStudioNonValida) as e:
+        studio.usa_servizio({"provider": "comfy"})
+    assert "COMFY_API_KEY" in e.value.cosa_fare
+    monkeypatch.setenv("COMFY_API_KEY", "comfyui-prova")
+    assert studio.usa_servizio({"provider": "comfy"})["provider"] == "comfy"
+    with pytest.raises(RichiestaStudioNonValida):
+        studio.usa_servizio({"provider": "airender"})  # senza codice salvato
+
+
+def test_rotte_della_licenza(cartella, chiamate):
+    studio = _studio_licenza(cartella, chiamate)
+    server = crea_server(studio)
+    avvia_in_sottofondo(server)
+    porta = server.server_address[1]
+    try:
+        c = http.client.HTTPConnection("127.0.0.1", porta, timeout=5)
+        c.request("GET", "/api/licenza", headers={"Host": f"127.0.0.1:{porta}"})
+        assert json.loads(c.getresponse().read())["presente"] is False
+        corpo = json.dumps({"codice": "AIR-0000-1111-2222-3333"})
+        c.request("POST", "/api/licenza", body=corpo, headers={"Host": f"127.0.0.1:{porta}", "X-Airender": "1", "Content-Type": "application/json"})
+        r = c.getresponse()
+        assert r.status == 200 and json.loads(r.read())["saldo"]["saldo"] == 42
+        c.request("POST", "/api/licenza", body=corpo, headers={"Host": f"127.0.0.1:{porta}", "Content-Type": "application/json"})
+        assert c.getresponse().status == 403  # senza l'intestazione dello Studio
+    finally:
+        server.shutdown()
+
+
 # --- prompt nascosto secondo il piano (2026-11-05) ---------------------------
 
 def test_con_la_chiave_propria_il_prompt_completo_si_vede(cartella, chiamate):
@@ -793,3 +892,12 @@ def test_il_look_si_legge_per_effetto_non_per_marca(cartella, chiamate):
         for marca in ("Canon", "Fujifilm", "Leica", "Kodak", "Lomo", "DJI"):
             assert marca not in voce["nome"]
     assert "Kodak Portra 160" in blocchi.LOOK["portra160"].testo
+
+
+def test_attivare_un_codice_decide_subito_se_il_prompt_si_vede(cartella, chiamate):
+    """Caso: lo Studio era aperto con un piano Base, si incolla un codice Pro e il prompt resta nascosto."""
+    pro = {**SALDO, "funzioni": {"nome": "Pro", "prompt_completo": True}}
+    studio = _studio_licenza(cartella, chiamate, saldo=pro)
+    studio._prompt_completo = False  # pylint: disable=protected-access
+    studio.attiva_licenza({"codice": "AIR-0000-1111-2222-3333"})
+    assert studio.prompt_completo() is True

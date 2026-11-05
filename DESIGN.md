@@ -848,6 +848,115 @@ partenza non c'è più. Resta **Apri cartella**.
 - Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
   preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
+## Studio · Licenza e saldo, costruita il 2026-11-05
+
+Bozza A scelta da Riccardo il 2026-11-05 fra due (A scheda intera, B cassetto
+dalla testata; bozze in `/mnt/project-files/mockup/licenza-saldo/`). Il
+pulsante in alto a destra, prima «Chiave e tetto di spesa · In arrivo», ora è
+«Licenza e saldo» (`#licenza`). Accanto, una pastiglia sempre visibile:
+«42 render · Pro», «Nessuna licenza», «Saldo non letto» o «Chiave Comfy tua».
+Senza codice e senza chiave Comfy sul PC, lo Studio si apre sulla scheda.
+
+| Stato | Cosa si vede |
+|---|---|
+| Vuoto | «Attiva AIRENDER»: campo del codice, Attiva, il nome del server che lo controlla, «Non hai una licenza? Vedi i piani», il riquadro della chiave Comfy propria |
+| In corso | Campo e Attiva spenti, «Chiedo al server AIRENDER (<host>) se il codice è valido.» con la rotella |
+| Errore | Codice rifiutato: bordo rosso e la frase del server con Cosa fare; il codice non si salva. Server muto con codice già salvato: «Licenza …WN3B», l'avviso, Riprova, Cambia codice |
+| Pieno | Piano, render disponibili (e in corso), scadenza del lotto più vicino, postazioni, licenza; Ricarica e Gestisci abbonamento (link firmati, un'ora); costo di un render per modello dal listino; Cambia codice |
+
+L'errore «Il saldo AIRENDER non basta» in Genera ha accanto Ricarica e «Vedi
+il saldo». La scelta crediti AIRENDER o chiave Comfy vale per lo Studio
+aperto; senza chiave Comfy sul PC il pulsante non c'è e si spiega dove
+metterla.
+## Oggetti e persone da inserire, e scelta del modello, costruiti il 2026-11-04
+
+Richieste di Riccardo del 2026-11-04: «vorrei poter inserire ref image di
+oggetti da inserire, o persone… sulla vista base o sul render successivo» e
+«togli i modelli dalla tendina e raggruppali per categorie e funzioni con un
+minimo di spiega sintetica, spunta per quello che selezioni».
+
+**Oggetti e persone da inserire (Rif.).** Fino a 4 foto (`INSERTI_MASSIMO`),
+chiamate **Rif. 1 … Rif. 4**, da citare nel testo («metti la poltrona del Rif. 1
+accanto alla finestra»).
+- **Genera**, colonna destra sotto «Immagine di riferimento per lo stile»: una
+  fila di riquadri con la foto, «Rif. N» e × per toglierla, poi «+ Rif. N».
+  Non c'è con Fotoinserimento.
+- **Cambia**: la stessa fila, sotto «Solo una parte? Usa Ritocca.».
+- **Ritocca**: ogni nota (sul foglietto e nell'elenco) ha **+ Immagine**; la
+  foto si mostra piccola con «Rif. N · nome» e «Togli». I numeri seguono
+  l'ordine delle note che hanno una foto. Sotto l'elenco: «Partono N immagini:
+  il render e M Rif. delle note.»
+- Il conteggio delle immagini si dice prima dell'invio («Partono 3 immagini:
+  … e 2 Rif. di oggetti e persone»). Con un modello che riceve una sola
+  immagine i riquadri restano, «+ Rif.» è spento e la frase lo dice; il
+  server non manda.
+- **Vuoto:** solo «+ Rif. 1». **In corso:** come l'invio di sempre.
+  **Errore:** caricamento rifiutato (formato, peso) sotto la fila; una nota
+  che cita un Rif. che non c'è si ferma con «La nota N usa il Rif. M, che non
+  c'è». **Pieno:** `docs/ui/studio-rif/72-genera-due-rif.png`,
+  `73-ritocca-nota-con-rif.png`, `74-cambia-con-rif.png`.
+
+**Scelta del modello.** Al posto della tendina, in Genera, Cambia, Ritocca e
+Rifai tutto: chiusa, la scheda del modello scelto (spunta, nome, fornitore,
+«predefinito», una riga su a cosa serve, «Più immagini per invio» o «Una sola
+immagine per invio», costo) e «Cambia modello (N altri)». Aperta, le schede per
+gruppo: **Consigliati**, **Altri modelli**, **Una sola immagine**, con il «?»
+che spiega il gruppo (senza scritte «da provare», richiesta di Riccardo del
+2026-11-04). Un modello che non può fare l'invio (schema non
+verificato, oppure una sola immagine quando ne partono di più) resta visibile,
+spento, con il perché sulla scheda. Schermate:
+`docs/ui/studio-rif/70-genera-rif-e-modello-chiuso.png`,
+`71-scelta-modello-aperta.png`.
+
+## Stile da esempi, costruito il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «copio qualche immagine di altri render,
+anche solo 3 o 4, e mi restituisce un preset che renderizza uguale». In Genera,
+sotto il riferimento per lo stile caricato: «+ Un altro esempio (Stile da
+esempi)». Con due o più immagini il riquadro diventa **Stile da esempi**: una
+fila «Esempio 1 … 4» (`ESEMPI_STILE_MASSIMO`, scelta) con × e «+ Esempio N»,
+il «?» che dice cosa si prende (colori, luce, materiali, taglio fotografico) e
+che con 15 o più immagini arriverà «Crea il mio stile» (LoRA). Togliere
+l'esempio 1 fa diventare riferimento il 2. Il conteggio «Partono N immagini: la
+vista, M esempi di stile…» compare prima dell'invio. Gli esempi entrano nella
+ricetta per impronta, come il riferimento. Salvarli come preset è il passo dopo.
+
+## Tieni la geometria, costruito il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «ControlNet va fatto, spuntato insieme e
+messo in fila a Nano Banana». In Genera, dopo il riferimento per lo stile e
+prima dei Rif.: la spunta **Tieni la geometria**, con la frase che spiega il
+ControlNet nella stessa riga («un pezzo che obbliga un modello aperto a seguire
+gli spigoli della vista») e «Due invii, due costi». Nel riquadro Invio, sopra la destinazione di sempre: «Prima passata: la vista
+va a **Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet sugli
+spigoli su <nome>.run.comfy.app**», «Costo della prima passata: **a secondi di
+GPU del deployment**», poi «Poi il
+suo render va a …» e il conteggio delle immagini con «il render della prima
+passata» al posto della vista. Non c'è nel Fotoinserimento, in Cambia e in
+Ritocca: il ControlNet ridisegna tutto dagli spigoli e da un passo perderebbe
+quello che il passo aveva fatto (in Ritocca fuori dalle aree il render resta
+già com'era).
+- **Vuoto:** la spunta tolta, nessuna riga in più.
+- **In corso:** come Genera. **Errore:** senza l'indirizzo del deployment, o con
+  uno sbagliato, Genera si spegne e dice il comando `setx` da dare; un workflow fallito si legge come ogni errore, con
+  «Togli la spunta per mandare solo a Nano Banana».
+- **Pieno:** `docs/ui/studio-rif/76-tieni-la-geometria.png`,
+  `77-invio-due-destinazioni.png`. La bozza della prima passata resta accanto al
+  render (`<id>.geometria.png`), non ancora mostrata nello Studio.
+
+## Finale, costruito il 2026-11-04
+
+Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto
+ogni immagine, dopo **Altra vista**: **Finale**. Apre un riquadro «Finale ·
+ingrandisci con più dettaglio»: chi lo fa (Magnific Precision V2 di Freepik,
+dal Router, senza prompt), **Quanto più grande** ×2 · ×4
+(`FINALE_INGRANDIMENTI`, scelta), **Che immagine è** Foto · Illustrazione, la
+misura «Da L × A a L×n × A×n pixel», destinazione e costo, **Applica**. Esce
+un passo nuovo, «Finale ×2» nello storico e nell'albero.
+- **Vuoto:** non c'è: il pulsante c'è solo sotto un'immagine riuscita.
+- **In corso:** come gli altri passi. **Errore:** sotto Applica, con il gesto.
+- **Pieno:** `docs/ui/studio-rif/75-finale.png`.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -897,13 +1006,8 @@ contraddicono le nuove, valgono le nuove:
 
 ## Non ancora progettato
 
-- Schermata di configurazione della chiave API e del tetto di spesa (nello
-  Studio c'è solo il segnaposto in grigio). Dal 2026-11-02 diventa **Licenza
-  e saldo**: incolla il codice AIR-…, piano, render disponibili e scadenza,
-  pulsanti Ricarica e Gestisci abbonamento (i link li dà `/api/saldo`), e la
-  chiave Comfy propria come opzione. Il server c'è (`server/`); i quattro
-  stati vanno scritti prima di costruirla. Per ora: `python -m core.cli
-  --licenza` e `--saldo`.
+- Tetto di spesa per la chiave Comfy propria (la Licenza e saldo è costruita,
+  vedi sopra).
 - Il video oltre la scheda Video: montare più video, musica, titoli.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.

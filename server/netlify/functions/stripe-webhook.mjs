@@ -16,7 +16,7 @@ import { creaDb } from "../../lib/db.mjs";
 import { creaEmail } from "../../lib/email.mjs";
 import { creaFatture, fattura } from "../../lib/fatture.mjs";
 import { listino, renderDelPeriodo } from "../../lib/listino.mjs";
-import { json } from "../../lib/risposte.mjs";
+import { json, protetto } from "../../lib/risposte.mjs";
 import { creaStripe, datiFiscali, firmaValida, prodottoDelPrezzo } from "../../lib/stripe.mjs";
 import { accredita, cambiaPiano, nuovaLicenza, traMesi } from "../../lib/vendite.mjs";
 
@@ -168,6 +168,6 @@ async function abbonamentoFinito(s, abbonamento) {
   if (licenza) await cambiaPiano(s, licenza.id, "nessuno");
 }
 
-export default (req) => gestisci(req);
+export default protetto("stripe-webhook", (req) => gestisci(req));
 
 export const config = { path: "/api/stripe-webhook" };

@@ -277,6 +277,38 @@ def _corpo_seedream(richiesta: RichiestaGenerazione) -> dict:
     return corpo
 
 
+# «Finale»: Magnific Precision V2 di Freepik, dal Router. Corpo letto dalla
+# documentazione del Router (router-schemas di Comfy-Org/docs, 2026-11-04),
+# senza sonda: image in base64 (o URL pubblico), scale_factor 2-16, flavor.
+# Nessun prompt: ingrandisce e aggiunge dettaglio, non cambia il disegno.
+MODELLO_FINALE = "freepik/ai-image-upscaler-precision-v2"
+# I tipi d'immagine di «Finale», con il nome che usa Magnific (flavor).
+TIPI_FINALE = {"foto": "photo", "illustrazione": "sublime"}
+
+
+def _corpo_finale(richiesta: RichiestaGenerazione) -> dict:
+    if richiesta.ingrandimento not in config.FINALE_INGRANDIMENTI:
+        raise ErroreProvider(
+            f"«Finale» ingrandisce di {', '.join(str(n) for n in config.FINALE_INGRANDIMENTI)} volte, "
+            f"non di {richiesta.ingrandimento}.",
+            "Scegli uno degli ingrandimenti dello Studio.",
+        )
+    return {
+        "image": immagine_base64(richiesta.immagine),
+        "scale_factor": richiesta.ingrandimento,
+        "flavor": TIPI_FINALE.get(richiesta.tipo_finale, TIPI_FINALE["foto"]),
+    }
+
+
+def _immagine_finale(uscita: object) -> tuple[str, str]:
+    """data.generated[0]: un link di Freepik che scade. Si scarica subito."""
+    try:
+        dati = uscita.get("data", uscita) if isinstance(uscita, dict) else None
+        return "url", str(dati["generated"][0])
+    except (KeyError, IndexError, TypeError):
+        raise _risultato_senza_immagine() from None
+
+
 def _immagine_dati(uscita: object) -> tuple[str, str]:
     """Forma OpenAI, usata anche da Seedream: data[0].b64_json oppure data[0].url."""
     try:
@@ -346,6 +378,13 @@ SCHEMI: dict[str, SchemaModello] = {
         immagine=_immagine_dati,
         verificato_il="",
         piu_immagini=True,
+    ),
+    # «Finale», aggiunto il 2026-11-04 su richiesta di Riccardo, dalla
+    # documentazione del Router e senza sonda (vedi _corpo_finale).
+    MODELLO_FINALE: SchemaModello(
+        corpo=_corpo_finale,
+        immagine=_immagine_finale,
+        verificato_il="",
     ),
 }
 
@@ -543,7 +582,13 @@ class ProviderComfy(Provider):
                 "Togli le immagini in piu' (maschera, mappa), oppure usa Nano Banana 2.",
             )
 
-        inviata, cornice = con_cornice(richiesta, schema.rapporti) if schema.rapporti else (richiesta, None)
+        # Partono solo i pixel: EXIF (posizione GPS), XMP e testi restano qui.
+        pulita = replace(
+            richiesta,
+            immagine=modulo_immagine.senza_metadati(richiesta.immagine),
+            immagini_in_piu=tuple(modulo_immagine.senza_metadati(d) for d in richiesta.immagini_in_piu),
+        )
+        inviata, cornice = con_cornice(pulita, schema.rapporti) if schema.rapporti else (pulita, None)
         corpo = schema.corpo(inviata)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
         uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
@@ -552,6 +597,8 @@ class ProviderComfy(Provider):
         if cornice is not None:
             dati = modulo_immagine.togli_cornice(dati, cornice)
             dettagli = {**dettagli, "cornice": cornice.come_dizionario()}
+        # Nel file si scrive che e' generata con l'IA (AI Act, art. 50.2).
+        dati = modulo_immagine.marca_generata(dati)
 
         ricetta = Ricetta(
             provider=self.nome,

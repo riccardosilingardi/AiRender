@@ -68,5 +68,17 @@ export function creaDb(ambiente = process.env, chiama = fetch) {
     return `${base()}/storage/v1${signedURL}`;
   }
 
-  return { rpc, select, aggiorna, inserisci, caricaRisultato };
+  // Cancella dal bucket "risultati" i file indicati (al massimo 1000 per
+  // chiamata, il limite dell'API dello Storage).
+  async function rimuoviRisultati(nomi) {
+    if (!nomi.length) return;
+    const r = await chiama(`${base()}/storage/v1/object/risultati`, {
+      method: "DELETE",
+      headers: { ...intestazioni(), "content-type": "application/json" },
+      body: JSON.stringify({ prefixes: nomi }),
+    });
+    if (!r.ok) throw new Error(`Supabase Storage: ${r.status} ${(await r.text()).slice(0, 300)}`);
+  }
+
+  return { rpc, select, aggiorna, inserisci, caricaRisultato, rimuoviRisultati };
 }

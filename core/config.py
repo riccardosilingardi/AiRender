@@ -506,6 +506,56 @@ RITOCCO_MODO_AREE = _registra(Costante(
     ),
 ))
 
+FINALE_INGRANDIMENTI = _registra(Costante(
+    nome="FINALE_INGRANDIMENTI",
+    valore=(2, 4),
+    origine=SCELTA,
+    ragione=(
+        "Di quante volte «Finale» puo' ingrandire un render (Magnific "
+        "Precision V2 dal Router, scale_factor da 2 a 16). Un render di Nano "
+        "Banana 2 a 2K diventa 4K con 2 e 8K con 4: oltre, il file e' troppo "
+        "grande per una tavola e il costo cresce con la misura. Giudizio del "
+        "2026-11-04, nessun Finale ancora fatto."
+    ),
+))
+
+FINALE_INGRANDIMENTO_PREDEFINITO = _registra(Costante(
+    nome="FINALE_INGRANDIMENTO_PREDEFINITO",
+    valore=2,
+    origine=SCELTA,
+    ragione=(
+        "L'ingrandimento proposto da «Finale»: il piu' piccolo, che costa "
+        "meno e basta per una tavola A3. Giudizio, non misurato."
+    ),
+))
+
+ESEMPI_STILE_MASSIMO = _registra(Costante(
+    nome="ESEMPI_STILE_MASSIMO",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quanti render d'esempio partono al massimo con «Stile da esempi», "
+        "riferimento per lo stile compreso. Riccardo ne porterebbe 3 o 4 "
+        "(2026-11-04); di piu' allunga l'invio senza che il modello ne tenga "
+        "conto meglio, e con 15 o piu' immagini serve un LoRA, non dei "
+        "riferimenti. Giudizio, mai provato con il modello."
+    ),
+))
+
+INSERTI_MASSIMO = _registra(Costante(
+    nome="INSERTI_MASSIMO",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Quante immagini di oggetti o persone da inserire (Rif. 1, 2, ...) "
+        "partono al massimo con un invio di Genera, Cambia o Ritocca. Nano "
+        "Banana 2 e Pro accettano fino a 14 immagini, ma con piu' di quattro "
+        "oggetti diversi in una volta il modello li confonde piu' facilmente "
+        "e il testo per dire dove va ciascuno diventa lungo. 4 e' un giudizio "
+        "del 2026-11-04, mai provato con il modello."
+    ),
+))
+
 # --- Inserisci nel contesto -------------------------------------------------
 
 CONTESTO_INQUADRATURA_PREDEFINITA = _registra(Costante(
@@ -938,6 +988,32 @@ SERVER_AIRENDER = _registra(Costante(
     ),
 ))
 
+SERVER_CORPO_MASSIMO_MB = _registra(Costante(
+    nome="SERVER_CORPO_MASSIMO_MB",
+    valore=5.5,
+    origine=VINCOLO,
+    ragione=(
+        "Quanto puo' pesare in tutto un invio al server AIRENDER: vista e "
+        "immagini in piu' (riferimenti, materiali) in base64. Il limite vero "
+        "e' 6 MB per richiesta a una funzione Netlify; mezzo MB resta al "
+        "testo e al JSON. Sopra, Netlify risponde 413 senza dire perche'."
+    ),
+    unita=" MB",
+))
+
+SERVER_RIDUZIONE_LATI_PX = _registra(Costante(
+    nome="SERVER_RIDUZIONE_LATI_PX",
+    valore=(1536, 1024, 768),
+    origine=SCELTA,
+    ragione=(
+        "Se l'invio supera SERVER_CORPO_MASSIMO_MB, le immagini in piu' (mai "
+        "la vista) si rimpiccioliscono a questo lato lungo, un gradino alla "
+        "volta, finche' il totale ci sta. Un riferimento di stile o di "
+        "materiale a 1536 px porta ancora tutto quello che il modello legge."
+    ),
+    unita=" px",
+))
+
 SERVER_INVIO_MASSIMO_MB = _registra(Costante(
     nome="SERVER_INVIO_MASSIMO_MB",
     valore=4,
@@ -949,4 +1025,65 @@ SERVER_INVIO_MASSIMO_MB = _registra(Costante(
         "provato con una vista vera a 4K."
     ),
     unita=" MB",
+))
+
+# --- «Tieni la geometria»: ControlNet prima di Nano Banana --------------------
+
+GEOMETRIA_FORZA = _registra(Costante(
+    nome="GEOMETRIA_FORZA",
+    valore=0.8,
+    origine=SCELTA,
+    ragione=(
+        "Quanto il ControlNet sugli spigoli comanda Z-Image-Turbo nella prima "
+        "passata di «Tieni la geometria» (strength di QwenImageDiffsynthControlnet, "
+        "il modello comfy.org usa 1). Un po' sotto 1 perche' gli spigoli di una "
+        "vista Allplan sono anche quelli dei retini e dei giunti, e a 1 il "
+        "render li ricalca come righe. Giudizio del 2026-11-04, nessun render fatto."
+    ),
+))
+
+GEOMETRIA_PASSI = _registra(Costante(
+    nome="GEOMETRIA_PASSI",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "I passi del campionatore nella prima passata: 8 e' quello del modello "
+        "comfy.org per Z-Image-Turbo, che e' fatto per pochi passi. Il costo su "
+        "Comfy Cloud va a secondi di GPU, e piu' passi costano di piu'. Non misurato."
+    ),
+))
+
+GEOMETRIA_LATO_MASSIMO = _registra(Costante(
+    nome="GEOMETRIA_LATO_MASSIMO",
+    valore=1536,
+    origine=SCELTA,
+    ragione=(
+        "Il lato lungo, in pixel, a cui si porta la vista prima di estrarne gli "
+        "spigoli. Il modello comfy.org avverte sopra i 2500; 1536 tiene i "
+        "dettagli di una facciata e resta veloce. Nano Banana poi rifa' la "
+        "misura del render. Giudizio, non misurato."
+    ),
+))
+
+GEOMETRIA_ATTESA_SECONDI = _registra(Costante(
+    nome="GEOMETRIA_ATTESA_SECONDI",
+    valore=600,
+    origine=SCELTA,
+    ragione=(
+        "Quanto si aspetta al massimo la prima passata su Comfy Cloud prima di "
+        "fermare il lavoro. Una macchina fredda carica circa 20 GB di modelli "
+        "(Z-Image-Turbo, il codificatore Qwen e il ControlNet) prima di partire. "
+        "Dieci minuti e' un margine scelto, non misurato."
+    ),
+))
+
+GEOMETRIA_INTERVALLO_SECONDI = _registra(Costante(
+    nome="GEOMETRIA_INTERVALLO_SECONDI",
+    valore=3,
+    origine=SCELTA,
+    ragione=(
+        "Ogni quanto si chiede a Comfy Cloud se la prima passata e' finita. "
+        "Compromesso fra quanto presto si vede il risultato e quante richieste "
+        "partono; l'API v2 non ha un webhook per i lavori. Scelto."
+    ),
 ))
