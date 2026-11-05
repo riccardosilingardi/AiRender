@@ -100,6 +100,7 @@ Riscritto il 2026-10-28 con lo Studio v1 (sezione 5, riga del 2026-10-27).
 | 2026-09-14 | Due modalità: **ritocco** (maschera) e **variante** (rigenerazione a stesso seed) | Il riempimento mascherato non ricalcola riflessi e luce di rimbalzo. Un cambio radicale di materiale richiede di rilanciare la base | |
 | 2026-09-14 | BYOK, chiave del cliente | Un modello a crediti richiede backend, fatturazione e antifrode: è un'azienda, non un MVP | **Sì, 2026-11-02.** Un account Comfy per ogni cliente è una barriera troppo alta (Riccardo). Vedi la riga del 2026-11-02; BYOK resta come opzione (`--provider comfy`) |
 | 2026-11-02 | **Crediti AIRENDER: licenza + saldo, server su Netlify.** Il cliente compra su una pagina prezzi (Stripe Checkout), riceve per email un codice `AIR-…`, lo incolla una volta (`python -m core.cli --licenza`). Il plugin manda la vista al server AIRENDER (`server/`), che controlla piano e saldo, la passa al Comfy Router con la chiave di Riccardo e **scala solo se il render torna con un'immagine**. Supabase tiene licenze, lotti di crediti con scadenza, render e movimenti; Fatture in Cloud fa la fattura elettronica SdI. Listino in `core/config.py` (`LISTINO`): Prova 15 € 50 render 12 mesi, Base 19 €/mese 80 render, Pro 39 €/mese 200, Studio 99 €/mese 600 e 3 postazioni, annuale = 10 mensilità, Ricarica 10 € per 100; pesi NB2 1 (4K 2), Pro 2 (4K 3); 10 render di benvenuto. Una licenza è l'account (email + codice) e vale anche per la futura web app: il **plugin Allplan è nei piani da Pro in su**, la web app in tutti | Decisione di Riccardo nel thread di vendita (Serteco). Stripe + Fatture in Cloud al posto di Lemon Squeezy perché i clienti sono studi italiani B2B che vogliono la fattura SdI. Il server parla lo stesso protocollo del Router, così il motore cambia solo indirizzo e intestazione (`core/provider/airender.py`). Rivendita Serteco: licenze attivate a mano (`scripts/licenze.py`), fattura Serteco; segnalazioni con codici sconto Stripe | |
+| 2026-11-05 | **Piani divisi per funzioni, plugin Allplan in tutti.** AIRENDER nasce per Allplan: il plugin è in Base, Pro, Studio, Prova e anche a fine abbonamento. Base = Nano Banana 2 fino a 2K, Ritocca, Altra vista, tabella materiali, 2 varianti, 1 riferimento. Pro = Nano Banana Pro, 4K, scene (Contesto, Arredo), 4 riferimenti, Stile da esempi, Finale, **video 720p fino a 10 s**. Studio = 3 postazioni, video 1080p fino a 30 s, Tieni la geometria, Crea il mio stile. Voce `funzioni` per piano in `LISTINO`; pesi di Finale e video in `pesi_azioni` (video a crediti al secondo: 720p 4, 1080p 8) | Decisione di Riccardo nel thread «Definire i piani e le funzioni incluse». Il concorrente diretto (AI Visualizer di Allplan 2027) è incluso nell'abbonamento Allplan: si vende il flusso, non il render. I prezzi non cambiano qui: si decidono nel thread del posizionamento rispetto ai concorrenti. Il server non inoltra ancora Finale e video coi crediti AIRENDER (solo corpi Gemini) | |
 
 ## 6 · Fonti dati
 
@@ -267,6 +268,17 @@ per PR (regola di `CLAUDE.md`).
 
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
+
+### Funzioni per piano e video nel Pro (2026-11-05)
+
+La voce `funzioni` dei piani arriva allo Studio con il saldo, ma lo Studio non
+la usa ancora: nessun pulsante si mette in grigio per piano, e il server
+controlla solo modello, grandezza e canale. Finale e video non passano dal
+server AIRENDER (il router legge solo corpi Gemini): coi crediti AIRENDER
+oggi non partono. Costi di video (720p, 1080p), Finale x4, Nano Banana Pro e
+4K sono stime del listino Comfy, non spese vere. Verifica: un video 720p da
+5 s e uno 1080p con la chiave Comfy, leggere `x-comfy-credits-used`, e
+correggere `pesi_azioni` se un credito costa piu' di 0,09 EUR.
 
 ### Licenza e saldo nello Studio (2026-11-05)
 

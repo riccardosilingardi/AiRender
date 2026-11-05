@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dimensioneDaCorpo, fuoriDalPiano, peso, renderDelPeriodo } from "../lib/listino.mjs";
+import { dimensioneDaCorpo, fuoriDalPiano, funzioni, peso, renderDelPeriodo } from "../lib/listino.mjs";
 
 const NB2 = "vertexai/gemini-3.1-flash-image";
 const PRO = "vertexai/gemini-3-pro-image";
@@ -20,9 +20,11 @@ test("la grandezza si legge dal corpo; assente e' 1K, sconosciuta e' rifiutata",
   assert.equal(dimensioneDaCorpo({ generationConfig: { imageConfig: { imageSize: "8K" } } }), null);
 });
 
-test("Base: solo web app, solo NB2, fino a 2K", () => {
+test("Base: plugin e web app, solo NB2, fino a 2K", () => {
   assert.equal(fuoriDalPiano("base", NB2, "2K", "web"), null);
-  assert.equal(fuoriDalPiano("base", NB2, "2K", "plugin").tipo, "canale_non_incluso");
+  assert.equal(fuoriDalPiano("base", NB2, "2K", "plugin"), null);
+  assert.equal(fuoriDalPiano("nessuno", NB2, "2K", "plugin"), null, "a fine abbonamento il plugin resta");
+  assert.equal(fuoriDalPiano("base", NB2, "2K", "tavoletta").tipo, "canale_non_incluso");
   assert.equal(fuoriDalPiano("base", PRO, "1K", "web").tipo, "modello_non_incluso");
   assert.equal(fuoriDalPiano("base", NB2, "4K", "web").tipo, "dimensione_non_inclusa");
 });
@@ -35,4 +37,14 @@ test("l'annuale accredita 12 mesi di render, il mensile uno", () => {
   assert.equal(renderDelPeriodo("pro", "mese"), 200);
   assert.equal(renderDelPeriodo("pro", "anno"), 2400);
   assert.equal(renderDelPeriodo("prova", "mese"), 0);
+});
+
+test("le funzioni del piano arrivano allo Studio: video solo da Pro, 1080p solo in Studio", () => {
+  assert.equal(funzioni("base").video, null);
+  assert.equal(funzioni("base").materiali, true, "la tabella materiali e' anche in Base");
+  assert.equal(funzioni("base").finale, false);
+  assert.deepEqual(funzioni("pro").video, { risoluzione_massima: "720p", secondi_massimi: 10 });
+  assert.deepEqual(funzioni("studio").video, { risoluzione_massima: "1080p", secondi_massimi: 30 });
+  assert.equal(funzioni("studio").tieni_geometria, true);
+  assert.equal(funzioni("pro").nome, "Pro");
 });

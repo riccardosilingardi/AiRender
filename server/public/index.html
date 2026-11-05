@@ -47,10 +47,15 @@
 
   function voci(p, l) {
     const v = [];
-    v.push(p.canali.includes("plugin") ? "Plugin per Allplan e web app" : "Web app (il plugin per Allplan è da Pro in su)");
+    const f = p.funzioni || {};
+    v.push(p.canali.includes("plugin") ? "Plugin per Allplan e web app" : "Web app");
     v.push(p.modelli.length > 1 ? "Nano Banana 2 e Nano Banana Pro" : "Nano Banana 2");
     v.push(`Fino a ${p.dimensione_massima}`);
-    if (p.studio) v.push("Studio: ritocchi, passi, video");
+    v.push("Ritocca, Altra vista, tabella dei materiali");
+    if (f.scene) v.push("Inserisci nel contesto, Arredo, fino a 4 riferimenti");
+    if (f.finale) v.push("Finale: ingrandimento per la consegna");
+    if (f.video) v.push(`Video fino a ${f.video.risoluzione_massima}, ${f.video.secondi_massimi} s`);
+    if (f.tieni_geometria) v.push("Tieni la geometria");
     v.push(p.postazioni > 1 ? `${p.postazioni} postazioni` : "1 postazione");
     return v.map((t) => `<li>${t}</li>`).join("");
   }

@@ -67,9 +67,9 @@ test("saldo insufficiente: 402 insufficient_credits, Comfy non viene chiamato", 
 test("un modello fuori listino o fuori piano si ferma prima di Comfy", async () => {
   const db = conLicenza("base");
   const chiama = fetchFinto([]);
-  const r = await gestisci(invio(), { db, ambiente, chiama });
+  const r = await gestisci(invio({ contents: [], generationConfig: { imageConfig: { imageSize: "4K" } } }), { db, ambiente, chiama });
   assert.equal(r.status, 403);
-  assert.equal((await r.json()).error.type, "canale_non_incluso", "Base non apre il plugin");
+  assert.equal((await r.json()).error.type, "dimensione_non_inclusa", "Base arriva fino a 2K");
   const altro = new Request(`${SERVER}/v2/models/bfl/flux-kontext-pro/requests`, {
     method: "POST", headers: { "x-airender-licenza": CODICE, "idempotency-key": "k" }, body: "{}" });
   const r3 = await gestisci(altro, { db: conLicenza(), ambiente, chiama });
