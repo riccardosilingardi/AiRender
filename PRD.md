@@ -268,6 +268,22 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Privacy e AI Act: metadati tolti, render marcati (2026-11-05)
+
+Le immagini partono senza EXIF, XMP e testi (`core/immagine.py`,
+`senza_metadati`; di nuovo sul server in `server/lib/pulisci.mjs`) e i render
+tornano con un XMP «generata con l'IA» (IPTC Digital Source Type). Provato
+solo nei test, con immagini fatte da Pillow: mai con una foto vera di
+telefono (iPhone HEIC convertito, Android con GPS), mai con il server dal
+vivo. Non si sa se Google mette già una sua marcatura C2PA nei risultati di
+Nano Banana via Router; se c'è, il ritaglio della cornice la toglie. Non si sa
+se un lettore di metadati comune (Photoshop, exiftool, il verificatore del
+codice europeo) legge la marcatura come «generata». PSD e video non sono
+marcati. La pulizia oraria dello Storage (`pulizia-risultati.mjs`) e la
+casella dei Termini nel Checkout di Stripe non sono mai state eseguite su
+servizi veri. Verifica: una foto col GPS nel fotoinserimento, poi `exiftool`
+sulla vista inviata (dal corpo salvato) e sul render esportato.
+
 ### Cambia: tutta l'immagine a parole (2026-11-04)
 
 Le scorciatoie di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci
