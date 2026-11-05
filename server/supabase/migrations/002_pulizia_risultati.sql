@@ -2,7 +2,7 @@
 --
 -- Un risultato piu' pesante di 4,5 MB non sta nella risposta di una funzione
 -- Netlify: il router lo carica nel bucket privato "risultati" e da' al plugin
--- un link firmato che vale 24 ore. Dopo, il file non serve a nessuno e non
+-- un link firmato che vale 24 ore; si cancella dopo 48. Il file non serve a nessuno e non
 -- deve restare: e' l'immagine di un progetto del cliente (GDPR,
 -- minimizzazione). La funzione programmata netlify/functions/pulizia.mjs
 -- chiede qui i nomi dei file piu' vecchi e li cancella con l'API dello

@@ -24,7 +24,7 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 | `/api/stripe-webhook` | `stripe-webhook.mjs` | Crea licenze, accredita, manda il codice, fattura |
 | `/api/admin` | `admin.mjs` | Licenze manuali (rivendita Serteco), accrediti, sospensioni. Da `scripts/licenze.py` |
 | `/api/listino` | `listino.mjs` | Il listino per la pagina prezzi |
-| (ogni ora) | `pulizia.mjs` | Cancella dallo Storage i risultati piu' vecchi di 24 ore |
+| (ogni ora) | `pulizia.mjs` | Cancella dallo Storage i risultati piu' vecchi di 48 ore |
 
 Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 `listino.json` si riscrive con `python scripts/scrivi_listino.py` e
@@ -32,7 +32,8 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 
 ## Messa in produzione, in ordine
 
-1. **Supabase.** Nuovo progetto (regione UE). SQL editor: incolla ed esegui
+1. **Supabase.** Nuovo progetto in regione UE, Francoforte (`eu-central-1`):
+   la regione non si cambia dopo. SQL editor: incolla ed esegui
    `supabase/migrations/001_crediti.sql`, poi
    `supabase/migrations/002_pulizia_risultati.sql`. Crea anche il bucket
    privato `risultati`. Copia URL e chiave `service_role`.
@@ -86,7 +87,14 @@ AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgr
   corpo Gemini.
 - GDPR: DPA con Comfy (e i suoi fornitori), Supabase, Netlify, Stripe, Resend; le viste passano dal
   server ma non si salvano, tranne i risultati sopra 4,5 MB (Storage, link di
-  24 ore; la funzione programmata `pulizia.mjs` li cancella ogni ora quando il
-  link e' scaduto).
+  24 ore, cancellati dopo 48 ore da `pulizia.mjs`, funzione
+  programmata ogni ora). Prima di inoltrare, il router toglie dalle immagini
+  EXIF, XMP e testi (`lib/pulisci.mjs`). Comfy non ha un DPA (mail del
+  2026-11-05): testi e stato in `docs/legale/`.
+- Termini: il Checkout chiede di spuntarli (`consent_collection`). Prima di
+  andare dal vivo vanno pubblicati `termini.html` e `privacy.html` in
+  `public/` (testi in `docs/legale/`, dopo la revisione dell'avvocato) e
+  l'indirizzo dei Termini va scritto in Stripe, Impostazioni > Dettagli
+  pubblici: senza, Stripe rifiuta la sessione.
 - Regime fiscale di Riccardo (forfettario o no): decide IVA e natura
   sulla fattura.

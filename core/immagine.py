@@ -496,3 +496,135 @@ def ritaglia_miniatura(dati: bytes) -> bytes:
     uscita = io.BytesIO()
     piccola.save(uscita, format="JPEG", quality=85)  # numero-non-configurabile: qualita' JPEG di una miniatura
     return uscita.getvalue()
+
+
+# --- prima di partire e dopo il ritorno: privacy e marcatura -----------------
+#
+# Due cose che chiedono le regole, non il render:
+#
+# - prima dell'invio, dalla vista o dalla foto si tolgono i metadati (EXIF con
+#   la posizione GPS e il modello del telefono, XMP, commenti, testi PNG). Una
+#   foto per l'inserimento nel contesto scattata col telefono porta le
+#   coordinate del cantiere e a volte il nome di chi l'ha scattata: al servizio
+#   che fa il render servono solo i pixel (GDPR, art. 5.1.c, minimizzazione);
+# - al ritorno, nel file si scrive che l'immagine e' generata con l'IA, in un
+#   formato che le macchine leggono (AI Act, art. 50.2): un pacchetto XMP con
+#   il campo IPTC «Digital Source Type». Niente prompt, ricetta o nome del
+#   cliente: solo il fatto che e' generata.
+
+# Metadati che un'immagine si tiene senza dire niente di nessuno: il profilo
+# colore (senza, i colori cambiano), la risoluzione di stampa, la trasparenza.
+_INFO_INNOCUE = frozenset({
+    "icc_profile", "dpi", "transparency", "gamma", "srgb", "chromaticity",
+    "jfif", "jfif_version", "jfif_unit", "jfif_density", "adobe", "adobe_transform",
+    "progressive", "progression", "aspect", "interlace", "bbox",
+})
+
+TIPO_SORGENTE_IA = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+DESCRIZIONE_IA = "Immagine generata con intelligenza artificiale (AIRENDER)"
+_XMP_JPEG = b"http://ns.adobe.com/xap/1.0/\x00"
+_XMP_PNG = b"XML:com.adobe.xmp"
+_CAMPO_LUNGHEZZA_PNG = 4  # numero-non-configurabile: in PNG la lunghezza del blocco sta nei 4 byte prima del tipo
+_DUE_BYTE = 2  # numero-non-configurabile: in JPEG marcatore e campo lunghezza sono di 2 byte
+_CRC_32 = 0xFFFFFFFF  # numero-non-configurabile: il CRC del PNG e' a 32 bit
+
+
+def metadati_personali(dati: bytes) -> list[str]:
+    """I nomi dei metadati che la pulizia toglierebbe; vuota se non c'e' niente da togliere."""
+    try:
+        immagine = Image.open(io.BytesIO(dati))
+        immagine.load()
+    except Exception:
+        return []
+    trovati = [chiave for chiave in immagine.info if chiave not in _INFO_INNOCUE]
+    if len(immagine.getexif()) and "exif" not in trovati:
+        trovati.append("exif")
+    return sorted(trovati)
+
+
+def senza_metadati(dati: bytes) -> bytes:
+    """I pixel e basta, pronti a partire.
+
+    Se non c'e' niente da togliere tornano gli stessi byte: le viste salvate da
+    Allplan non si ricodificano e il render parte dagli stessi pixel di prima.
+    Se c'e' un orientamento EXIF lo si applica ai pixel prima di toglierlo,
+    cosi' il servizio vede la foto dritta come la vede l'utente. Il profilo
+    colore resta. Un file che non si apre torna com'e': lo fermera' chi lo
+    deve leggere, con il suo messaggio.
+    """
+    if not metadati_personali(dati):
+        return dati
+    from PIL import ImageOps
+
+    immagine = Image.open(io.BytesIO(dati))
+    formato = immagine.format
+    if formato not in ("PNG", "JPEG", "WEBP"):
+        return dati
+    profilo = immagine.info.get("icc_profile")
+    pulita = ImageOps.exif_transpose(immagine).copy()
+    pulita.info = {}
+    opzioni = {"icc_profile": profilo} if profilo else {}
+    uscita = io.BytesIO()
+    if formato == "JPEG":
+        pulita.convert("RGB").save(uscita, "JPEG", quality=95, **opzioni)  # numero-non-configurabile: qualita' quasi senza perdita per una vista che riparte
+    elif formato == "WEBP":
+        pulita.save(uscita, "WEBP", lossless=True, **opzioni)
+    else:
+        pulita.save(uscita, "PNG", **opzioni)
+    return uscita.getvalue()
+
+
+def _xmp_generata() -> bytes:
+    return (
+        '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+        '<rdf:Description rdf:about=""'
+        ' xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"'
+        ' xmlns:xmp="http://ns.adobe.com/xap/1.0/"'
+        ' xmlns:dc="http://purl.org/dc/elements/1.1/"'
+        f' Iptc4xmpExt:DigitalSourceType="{TIPO_SORGENTE_IA}"'
+        ' xmp:CreatorTool="AIRENDER">'
+        f'<dc:description><rdf:Alt><rdf:li xml:lang="x-default">{DESCRIZIONE_IA}</rdf:li></rdf:Alt></dc:description>'
+        '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="r"?>'
+    ).encode("utf-8")
+
+
+def _blocco_png(tipo: bytes, contenuto: bytes) -> bytes:
+    import struct
+    import zlib
+
+    return (struct.pack(">I", len(contenuto)) + tipo + contenuto
+            + struct.pack(">I", zlib.crc32(tipo + contenuto) & _CRC_32))
+
+
+def e_marcata(dati: bytes) -> bool:
+    """Vero se il file dice gia' di essere generato con l'IA (il nostro XMP o uno uguale)."""
+    return TIPO_SORGENTE_IA.encode("ascii") in dati
+
+
+def marca_generata(dati: bytes) -> bytes:
+    """Gli stessi pixel, con dentro la dichiarazione «generata con l'IA» in XMP.
+
+    Si scrive nei byte, senza ricodificare: PNG riceve un blocco iTXt prima
+    della fine, JPEG un segmento APP1 dopo l'intestazione. Gli altri formati
+    tornano come sono (nessun servizio del Router li manda oggi).
+    """
+    if e_marcata(dati):
+        return dati
+    xmp = _xmp_generata()
+    if dati.startswith(b"\x89PNG\r\n\x1a\n"):
+        fine = dati.rfind(b"IEND") - _CAMPO_LUNGHEZZA_PNG
+        if fine < 0:
+            return dati
+        # iTXt: parola chiave, poi compressione, metodo, lingua e traduzione vuote.
+        blocco = _blocco_png(b"iTXt", _XMP_PNG + b"\x00" * 5 + xmp)  # numero-non-configurabile: i 5 separatori del blocco iTXt
+        return dati[:fine] + blocco + dati[fine:]
+    if dati.startswith(b"\xff\xd8"):
+        posizione = _DUE_BYTE
+        if dati[posizione:posizione + _DUE_BYTE] == b"\xff\xe0":  # dopo l'APP0 JFIF, se c'e'
+            posizione += _DUE_BYTE + int.from_bytes(dati[posizione + _DUE_BYTE:posizione + 2 * _DUE_BYTE], "big")
+        contenuto = _XMP_JPEG + xmp
+        segmento = b"\xff\xe1" + (len(contenuto) + _DUE_BYTE).to_bytes(_DUE_BYTE, "big") + contenuto
+        return dati[:posizione] + segmento + dati[posizione:]
+    return dati

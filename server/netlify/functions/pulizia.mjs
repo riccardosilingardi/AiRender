@@ -1,12 +1,13 @@
 // Funzione programmata (ogni ora): cancella dallo Storage i risultati piu'
-// vecchi di LINK_RISULTATO_SECONDI, cioe' quando il link firmato dato al
-// plugin e' gia' scaduto. Vedi supabase/migrations/002_pulizia_risultati.sql.
+// vecchi di RISULTATI_CONSERVATI_ORE (48): il link firmato dato al plugin
+// scade dopo 24 ore, poi resta un giorno di margine. Le 48 ore sono quelle
+// promesse nei testi legali (docs/legale). Vedi supabase/migrations/002_pulizia_risultati.sql.
 
 import { creaDb } from "../../lib/db.mjs";
 import { json, protetto } from "../../lib/risposte.mjs";
-import { LINK_RISULTATO_SECONDI } from "./router.mjs";
+import { RISULTATI_CONSERVATI_ORE } from "./router.mjs";
 
-export const ORE = LINK_RISULTATO_SECONDI / 3600;
+export const ORE = RISULTATI_CONSERVATI_ORE;
 const PER_GIRO = 500;
 
 export async function pulisci({ db = creaDb(), giri = 10, log = console.log } = {}) {

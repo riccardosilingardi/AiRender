@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 from urllib.parse import urlparse
 
-from .. import config
+from .. import config, immagine as modulo_immagine
 from ..errori import ErroreProvider
 from . import comfy
 
@@ -134,6 +134,7 @@ class Geometria:
         )
 
     def carica(self, immagine: bytes) -> str:
+        immagine = modulo_immagine.senza_metadati(immagine)  # partono solo i pixel, senza EXIF ne' XMP
         tipo = comfy.tipo_mime(immagine)
         corpo, contenuto = _multipart(immagine, "vista." + tipo.rsplit("/", 1)[-1], tipo)
         stato, _int, risposta = self.trasporto.manda_byte(
