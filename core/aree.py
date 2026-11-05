@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import blocchi, immagine as modulo_immagine
+from . import blocchi, config, immagine as modulo_immagine
 from .errori import ErroreAirender
 
 FORME = ("rettangolo", "libera")
@@ -53,6 +53,9 @@ class Area:
     forma: str
     punti: tuple[tuple[float, float], ...]
     nota: str
+    # Il numero del Rif. (riferimento di un oggetto o di una persona) che
+    # questa nota usa, da 1. Il file sta nel lavoro, in `inserti`.
+    inserto: int | None = None
 
     def __post_init__(self) -> None:
         if self.forma not in FORME:
@@ -74,6 +77,12 @@ class Area:
                 "Un'area senza nota non dice al modello cosa fare.",
                 "Scrivi la nota dell'area.",
             )
+        if self.inserto is not None and not (
+                isinstance(self.inserto, int) and 1 <= self.inserto <= config.INSERTI_MASSIMO):
+            raise AreaNonValida(
+                f"Un'area dice di usare il Rif. {self.inserto!r}, che non c'e'.",
+                f"I riferimenti vanno da 1 a {config.INSERTI_MASSIMO}.",
+            )
 
     def in_pixel(self, larghezza: int, altezza: int) -> list[tuple[float, float]]:
         punti = [(x * larghezza, y * altezza) for x, y in self.punti]
@@ -90,10 +99,17 @@ class Area:
             punti = tuple(tuple(float(c) for c in p) for p in dati.get("punti") or ())
         except (TypeError, ValueError):
             punti = ()
-        return cls(str(dati.get("forma") or ""), punti, str(dati.get("nota") or ""))
+        inserto = dati.get("inserto")
+        if inserto is not None and not (isinstance(inserto, int) and not isinstance(inserto, bool)):
+            raise AreaNonValida(f"Un'area ha un Rif. che non e' un numero: {inserto!r}.",
+                                "Togli l'immagine dalla nota e rimettila.")
+        return cls(str(dati.get("forma") or ""), punti, str(dati.get("nota") or ""), inserto)
 
     def a_dizionario(self) -> dict:
-        return {"forma": self.forma, "punti": [list(p) for p in self.punti], "nota": self.nota}
+        voce = {"forma": self.forma, "punti": [list(p) for p in self.punti], "nota": self.nota}
+        if self.inserto is not None:
+            voce["inserto"] = self.inserto
+        return voce
 
 
 def da_elenco(dati: object) -> tuple[Area, ...]:
@@ -122,7 +138,8 @@ def poligoni(aree: tuple[Area, ...], dimensioni_immagine: tuple[int, int]) -> li
 
 def prompt(modo: str, aree: tuple[Area, ...]) -> str:
     """Il testo che parte: come sono indicate le aree, una riga per nota, cosa evitare."""
-    return blocchi.componi_aree(_BLOCCHI[controlla_modo(modo)], [a.nota for a in aree])
+    return blocchi.componi_aree(_BLOCCHI[controlla_modo(modo)], [a.nota for a in aree],
+                                [a.inserto for a in aree])
 
 
 def prepara(immagine: bytes, aree: tuple[Area, ...], modo: str) -> tuple[bytes, tuple[bytes, ...]]:

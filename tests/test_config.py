@@ -390,6 +390,51 @@ def test_corpo_del_server_sta_sotto_i_6_mb_di_netlify_e_la_riduzione_scende():
     lati = config.SERVER_RIDUZIONE_LATI_PX
     assert list(lati) == sorted(lati, reverse=True) and lati[-1] >= 512
     assert config.costante("SERVER_RIDUZIONE_LATI_PX").origine == config.SCELTA
+def test_inserti_massimo_ferma_un_quinto_rif_ed_e_scelto():
+    """Caso: partono cinque oggetti in un invio e il modello li confonde, o un'area punta a un Rif. che non esiste."""
+    from core.aree import Area, AreaNonValida
+
+    assert 1 <= config.INSERTI_MASSIMO <= 14  # numero-non-configurabile: Gemini 3 Pro Image ne prende 14
+    assert config.costante("INSERTI_MASSIMO").origine == config.SCELTA
+    rettangolo = ((0.1, 0.1), (0.4, 0.4))
+    Area("rettangolo", rettangolo, "una poltrona", inserto=config.INSERTI_MASSIMO)
+    with pytest.raises(AreaNonValida):
+        Area("rettangolo", rettangolo, "una poltrona", inserto=config.INSERTI_MASSIMO + 1)
+
+
+def test_finale_ingrandisce_solo_di_quanto_offre_lo_studio_ed_e_scelto():
+    """Caso: un Finale x16 parte e costa una fortuna senza che nessuno l'abbia deciso."""
+    from core.provider import comfy
+    assert config.costante("FINALE_INGRANDIMENTI").origine == config.SCELTA
+    assert config.costante("FINALE_INGRANDIMENTO_PREDEFINITO").origine == config.SCELTA
+    assert config.FINALE_INGRANDIMENTO_PREDEFINITO in config.FINALE_INGRANDIMENTI
+    assert max(config.FINALE_INGRANDIMENTI) <= 16 and min(config.FINALE_INGRANDIMENTI) >= 2  # limiti di Magnific
+    richiesta = comfy.RichiestaGenerazione(immagine=b"x", prompt="", preset="", preset_versione="",
+                                           modello=comfy.MODELLO_FINALE, grana="", dettaglio_grana=0,
+                                           ingrandimento=max(config.FINALE_INGRANDIMENTI) + 1)
+    with pytest.raises(Exception):
+        comfy.SCHEMI[comfy.MODELLO_FINALE].corpo(richiesta)
+
+
+def test_esempi_stile_massimo_ferma_un_quinto_esempio_ed_e_scelto(tmp_path):
+    """Caso: si caricano dieci render d'esempio e partono tutti, pagati e confusi."""
+    from core.studio.servizio import RichiestaStudioNonValida, Studio
+    assert config.costante("ESEMPI_STILE_MASSIMO").origine == config.SCELTA
+    studio = Studio(tmp_path)
+    nomi = [f"rif-{i:016x}.jpg" for i in range(config.ESEMPI_STILE_MASSIMO)]
+    with pytest.raises(RichiestaStudioNonValida):
+        studio._esempi_scelti({"esempi": nomi})  # pylint: disable=protected-access
+
+
+def test_le_costanti_di_tieni_la_geometria_sono_scelte_e_dentro_i_limiti_dei_nodi():
+    """Caso: un valore fuori dai limiti di ComfyUI, e il workflow si ferma dopo il caricamento pagato."""
+    for nome in ("GEOMETRIA_FORZA", "GEOMETRIA_PASSI", "GEOMETRIA_LATO_MASSIMO",
+                 "GEOMETRIA_ATTESA_SECONDI", "GEOMETRIA_INTERVALLO_SECONDI"):
+        assert config.costante(nome).origine == config.SCELTA
+    assert -10 <= config.GEOMETRIA_FORZA <= 10  # numero-non-configurabile: limiti di QwenImageDiffsynthControlnet
+    assert 0 < config.GEOMETRIA_LATO_MASSIMO <= 16384  # numero-non-configurabile: limite di ImageScaleToMaxDimension
+    assert config.GEOMETRIA_PASSI >= 1
+    assert 0 < config.GEOMETRIA_INTERVALLO_SECONDI < config.GEOMETRIA_ATTESA_SECONDI
 
 
 # --- guardia -----------------------------------------------------------------
