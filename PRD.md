@@ -268,6 +268,29 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Licenza e saldo nello Studio (2026-11-05)
+
+Provata in Chromium con un server finto (codice valido, rifiutato, server
+muto, risposta lenta) e nei test. Mai con il server AIRENDER vero, che non è
+online; mai in Edge in modalità app su Windows, quindi non si sa se Ricarica
+e Gestisci (link con `target=_blank`) aprono il browser predefinito. Non
+verificato che la coda già avviata prenda il codice appena salvato: legge il
+file a ogni lavoro, ma non provato su Windows. Verifica: al primo deploy,
+incollare un codice vero dallo Studio, un render, il saldo in testata sceso.
+
+### Server di vendita: errori, pulizia, peso dell'invio (2026-11-05)
+
+Tre ritocchi per il lancio, provati solo nei test (Node coi finti, pytest).
+Mai provati su Netlify e Supabase veri, perche' il server non e' ancora
+online. Non verificati: che `@hourly` parta davvero sul piano Netlify scelto;
+che la funzione SQL `airender_risultati_vecchi` possa leggere
+`storage.objects` (dipende dai permessi di Supabase); che il DELETE dello
+Storage con `prefixes` cancelli i file; il limite di tempo delle funzioni
+Netlify rispetto all'attesa di 20 s verso Comfy. Il limite di 6 MB per
+richiesta viene dalla documentazione Netlify, non da una prova. Verifica: al
+primo deploy, un render con Nano Banana Pro e tre riferimenti pesanti (deve
+partire con l'avviso «rimpicciolite»), un render 4K (il risultato passa dallo
+Storage), il giorno dopo il bucket `risultati` vuoto.
 ### Tieni la geometria, il ControlNet prima di Nano Banana (2026-11-04)
 
 - Il workflow gira sul deployment della **Comfy Developer Platform** di

@@ -984,6 +984,32 @@ SERVER_AIRENDER = _registra(Costante(
     ),
 ))
 
+SERVER_CORPO_MASSIMO_MB = _registra(Costante(
+    nome="SERVER_CORPO_MASSIMO_MB",
+    valore=5.5,
+    origine=VINCOLO,
+    ragione=(
+        "Quanto puo' pesare in tutto un invio al server AIRENDER: vista e "
+        "immagini in piu' (riferimenti, materiali) in base64. Il limite vero "
+        "e' 6 MB per richiesta a una funzione Netlify; mezzo MB resta al "
+        "testo e al JSON. Sopra, Netlify risponde 413 senza dire perche'."
+    ),
+    unita=" MB",
+))
+
+SERVER_RIDUZIONE_LATI_PX = _registra(Costante(
+    nome="SERVER_RIDUZIONE_LATI_PX",
+    valore=(1536, 1024, 768),
+    origine=SCELTA,
+    ragione=(
+        "Se l'invio supera SERVER_CORPO_MASSIMO_MB, le immagini in piu' (mai "
+        "la vista) si rimpiccioliscono a questo lato lungo, un gradino alla "
+        "volta, finche' il totale ci sta. Un riferimento di stile o di "
+        "materiale a 1536 px porta ancora tutto quello che il modello legge."
+    ),
+    unita=" px",
+))
+
 SERVER_INVIO_MASSIMO_MB = _registra(Costante(
     nome="SERVER_INVIO_MASSIMO_MB",
     valore=4,

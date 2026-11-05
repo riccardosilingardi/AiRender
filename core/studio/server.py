@@ -14,6 +14,7 @@ Rotte:
     GET  /pagine/<file>                    foglio di stile e script
     GET  /api/studio                       cartella, coda, viste, lavori attivi
     GET  /api/catalogo                     preset, assi, modelli
+    GET  /api/licenza                      codice salvato o no, piano e saldo dal server AIRENDER
     GET  /api/storico                      tutte le immagini di tutte le viste, per la striscia
     GET  /api/viste/<nome>                 la vista e il suo esito di idoneita'
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
@@ -27,6 +28,8 @@ Rotte:
     GET  /file/contesto/<nome>             l'immagine del contesto caricata
     GET  /file/miniatura/<preset>          la miniatura vera di un preset, se c'e'
     POST /api/componi                      prompt, riassunto, caratteri
+    POST /api/licenza                      {codice}: controlla col server e, se va, lo salva
+    POST /api/licenza/servizio             {provider}: crediti AIRENDER o chiave Comfy propria
     POST /api/prova-a-secco                tutto tranne l'invio
     POST /api/invia                        scrive il lavoro in coda
     POST /api/viste                        carica una vista (corpo: i byte)
@@ -161,6 +164,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.stato_studio())
             case ["api", "catalogo"]:
                 self._json(studio.catalogo())
+            case ["api", "licenza"]:
+                self._json(studio.licenza())
             case ["api", "miei-preset"]:
                 self._json(studio.miei_preset())
             case ["api", "storico"]:
@@ -230,6 +235,10 @@ class _Gestore(BaseHTTPRequestHandler):
         match parti:
             case ["api", "componi"]:
                 self._json(studio.componi(self._corpo_json()))
+            case ["api", "licenza"]:
+                self._json(studio.attiva_licenza(self._corpo_json()))
+            case ["api", "licenza", "servizio"]:
+                self._json(studio.usa_servizio(self._corpo_json()))
             case ["api", "prova-a-secco"]:
                 self._json(studio.prova_a_secco(self._corpo_json()))
             case ["api", "invia"]:

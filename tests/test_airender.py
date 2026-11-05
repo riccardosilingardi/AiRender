@@ -140,3 +140,65 @@ def test_preset_vale_anche_per_i_crediti_airender():
     for p in elenco():
         if "comfy" in p.modelli:
             assert p.modello_per("airender") == p.modelli["comfy"]
+
+
+def _rumore(lato: int, seme: int) -> bytes:
+    import io, random
+    from PIL import Image
+    casuale = random.Random(seme)
+    immagine = Image.frombytes("RGB", (lato, lato), bytes(casuale.getrandbits(8) for _ in range(lato * lato * 3)))
+    uscita = io.BytesIO()
+    immagine.save(uscita, format="PNG")
+    return uscita.getvalue()
+
+
+def _base64_inviato(trasporto) -> int:
+    import json
+    return len(json.dumps(trasporto.chiamate[0][3]))
+
+
+def test_riferimenti_troppo_pesanti_insieme_si_rimpiccioliscono_e_la_vista_resta_intera():
+    vista = _rumore(500, 1)
+    riferimenti = (_rumore(1200, 2), _rumore(1200, 3))
+    assert sum(len(d) for d in (vista, *riferimenti)) * 4 / 3 / 2**20 > config.SERVER_CORPO_MASSIMO_MB
+    trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), _risultato_gemini()])
+    risultato = _provider(trasporto).genera(_richiesta(
+        immagine=vista, modello=config.NANO_BANANA_PRO, immagini_in_piu=riferimenti))
+    import base64
+    assert base64.b64encode(vista).decode() in str(trasporto.chiamate[0][3])
+    assert _base64_inviato(trasporto) / 2**20 < 6
+    assert any("rimpicciolite" in a for a in risultato.avvisi)
+
+
+def test_se_anche_rimpicciolito_non_ci_sta_si_ferma_prima_di_ogni_chiamata(monkeypatch):
+    monkeypatch.setattr(config, "SERVER_CORPO_MASSIMO_MB", 0.001)
+    trasporto = TrasportoComfyFinto([])
+    with pytest.raises(ErroreProvider) as errore:
+        _provider(trasporto).genera(_richiesta(
+            modello=config.NANO_BANANA_PRO, immagini_in_piu=(_rumore(300, 4),)))
+    assert "non e' stato scalato credito" in errore.value.fatto
+    assert "Togli un riferimento" in errore.value.cosa_fare
+    assert trasporto.chiamate == []
+
+
+def test_invio_leggero_parte_com_e():
+    riferimento = _rumore(64, 5)
+    trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), _risultato_gemini()])
+    risultato = _provider(trasporto).genera(_richiesta(
+        modello=config.NANO_BANANA_PRO, immagini_in_piu=(riferimento,)))
+    import base64
+    assert base64.b64encode(riferimento).decode() in str(trasporto.chiamate[0][3])
+    assert not any("rimpicciolite" in a for a in risultato.avvisi)
+
+
+def test_una_mappa_a_pochi_colori_resta_png_e_non_mescola_i_colori():
+    import io
+    from PIL import Image
+    from core import immagine as modulo_immagine
+    mappa = Image.new("RGB", (2000, 1000), (255, 0, 0))
+    mappa.paste((0, 0, 255), (1000, 0, 2000, 1000))
+    uscita = io.BytesIO()
+    mappa.save(uscita, format="PNG")
+    ridotta = Image.open(io.BytesIO(modulo_immagine.riduci_lato(uscita.getvalue(), 500)))
+    assert ridotta.format == "PNG" and ridotta.size == (500, 250)
+    assert sorted(c for _, c in ridotta.getcolors(16)) == [(0, 0, 255), (255, 0, 0)]

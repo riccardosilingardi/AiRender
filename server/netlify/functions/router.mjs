@@ -20,7 +20,7 @@ import { serve } from "../../lib/ambiente.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { intestazioniCliente, licenzaDi } from "../../lib/licenza.mjs";
 import { dimensioneDaCorpo, fuoriDalPiano, peso } from "../../lib/listino.mjs";
-import { errore, json } from "../../lib/risposte.mjs";
+import { errore, json, protetto } from "../../lib/risposte.mjs";
 
 export const COMFY = "https://api.comfy.org/v2/models";
 // Il Router vuole esattamente "false": ogni altro valore lascia acceso il
@@ -82,6 +82,9 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
 
   const chiave = (req.headers.get("idempotency-key") || "").slice(0, 200);
   if (!chiave) return errore(400, "idempotenza_mancante", "Manca la Idempotency-Key.", "Aggiorna il plugin.");
+  // Prima di riservare: senza la chiave di Riccardo non partirebbe niente, e
+  // una riserva fatta per niente terrebbe fermo il credito per 24 ore.
+  const chiaveComfy = serve("COMFY_API_KEY", ambiente);
 
   const riserva = await db.rpc("airender_riserva", {
     p_licenza: licenza.id, p_postazione: cliente.postazione, p_canale: cliente.canale,
@@ -108,7 +111,7 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
     r = await chiama(`${COMFY}/${modello}/requests?${query}`, {
       method: "POST",
       headers: {
-        "x-api-key": serve("COMFY_API_KEY", ambiente),
+        "x-api-key": chiaveComfy,
         "idempotency-key": chiaveVersoComfy(licenza.id, chiave),
         "content-type": "application/json",
         accept: "application/json",
@@ -196,6 +199,6 @@ function inoltra(r, nomi) {
   return fuori;
 }
 
-export default (req) => gestisci(req);
+export default protetto("router", (req) => gestisci(req));
 
 export const config = { path: "/v2/models/*" };
