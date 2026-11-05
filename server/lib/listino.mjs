@@ -68,6 +68,7 @@ export function funzioni(nomePiano, l = listino) {
     dimensione_massima: p.dimensione_massima,
     canali: p.canali,
     studio: p.studio,
+    prompt_completo: Boolean(p.prompt_completo),
     postazioni: p.postazioni,
   };
 }

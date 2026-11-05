@@ -626,7 +626,7 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "Vista non adatta",                                        # errore
         "L'invio non è andato.",
         "Miniature illustrative: rendono l'idea, non sono render del modello",
-        "Mostra e modifica il prompt completo",
+        "Avanzate: mostra e modifica il prompt completo",
         "Ricomponi dalle scelte",
         "Prova a secco",
         "Il modello legge i colori della vista come materiali.",
@@ -849,3 +849,55 @@ def test_rotte_della_licenza(cartella, chiamate):
         assert c.getresponse().status == 403  # senza l'intestazione dello Studio
     finally:
         server.shutdown()
+
+
+# --- prompt nascosto secondo il piano (2026-11-05) ---------------------------
+
+def test_con_la_chiave_propria_il_prompt_completo_si_vede(cartella, chiamate):
+    """Caso: Riccardo con la sua chiave Comfy vede e riscrive il prompt come prima."""
+    studio = _studio(cartella, chiamate)
+    assert studio.catalogo()["prompt_completo"] is True
+
+
+@pytest.mark.parametrize("piano, vede", [("pro", True), ("studio", True), ("base", False), ("prova", False)])
+def test_coi_crediti_airender_il_prompt_lo_decide_il_piano(cartella, piano, vede):
+    """Caso: un cliente Base non vede il prompt, un cliente Pro si'."""
+    funzioni = {"prompt_completo": config.LISTINO["piani"][piano]["prompt_completo"]}
+    studio = Studio(cartella, provider="airender", leggi_saldo=lambda: {"funzioni": funzioni})
+    assert studio.prompt_completo() is vede
+
+
+def test_se_il_server_non_risponde_il_prompt_resta_nascosto(cartella):
+    """Caso: il server AIRENDER e' giu': nel dubbio il prompt non si mostra."""
+    def giu():
+        raise ErroreAirender("Il server AIRENDER non risponde.", "Riprova.")
+    studio = Studio(cartella, provider="airender", leggi_saldo=giu)
+    assert studio.prompt_completo() is False
+
+
+def test_senza_prompt_completo_il_prompt_a_mano_non_parte(cartella, vista, chiamate):
+    """Caso: un preset salvato da Pro col prompt a mano, caricato con un piano Base."""
+    studio = _studio(cartella, chiamate)
+    studio.prompt_completo = lambda: False
+    with pytest.raises(ErroreAirender, match="Pro e Studio"):
+        studio.invia(_richiesta(studio, vista, prompt_a_mano="my own prompt"))
+
+
+def test_il_look_si_legge_per_effetto_non_per_marca(cartella, chiamate):
+    """Caso: chi non fotografa non sa cosa vuol dire «Portra 160»; la marca resta nel prompt."""
+    assi = _studio(cartella, chiamate).catalogo()["scene"]["esterno"]["assi"]
+    look = next(a for a in assi if a["id"] == "look")
+    for voce in look["voci"]:
+        assert voce["descrizione"], voce["id"]
+        for marca in ("Canon", "Fujifilm", "Leica", "Kodak", "Lomo", "DJI"):
+            assert marca not in voce["nome"]
+    assert "Kodak Portra 160" in blocchi.LOOK["portra160"].testo
+
+
+def test_attivare_un_codice_decide_subito_se_il_prompt_si_vede(cartella, chiamate):
+    """Caso: lo Studio era aperto con un piano Base, si incolla un codice Pro e il prompt resta nascosto."""
+    pro = {**SALDO, "funzioni": {"nome": "Pro", "prompt_completo": True}}
+    studio = _studio_licenza(cartella, chiamate, saldo=pro)
+    studio._prompt_completo = False  # pylint: disable=protected-access
+    studio.attiva_licenza({"codice": "AIR-0000-1111-2222-3333"})
+    assert studio.prompt_completo() is True

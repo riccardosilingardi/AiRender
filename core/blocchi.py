@@ -63,13 +63,21 @@ class Blocco:
     origine: str = config.SCELTA
     # Vero se il blocco aggiunge qualcosa che nella vista non c'e'.
     aggiunge: bool = False
+    # Una riga per l'utente: cosa cambia nel render, in parole semplici.
+    descrizione: str = ""
 
     def __post_init__(self) -> None:
         controlla_etichetta(self.nome, f"il nome del blocco {self.identificativo}")
+        controlla_etichetta(self.descrizione, f"la descrizione del blocco {self.identificativo}")
 
 
 def _blocchi(*righe: tuple[str, str, str]) -> dict[str, Blocco]:
     return {r[0]: Blocco(*r) for r in righe}
+
+
+def _descritti(elenco: dict[str, Blocco], descrizioni: dict[str, str]) -> dict[str, Blocco]:
+    """Gli stessi blocchi, con la riga che dice all'utente cosa cambiano."""
+    return {i: replace(b, descrizione=descrizioni.get(i, b.descrizione)) for i, b in elenco.items()}
 
 
 # La coda di ogni blocco che aggiunge qualcosa.
@@ -221,43 +229,60 @@ SCENA = _blocchi(
 )
 
 LOOK = _blocchi(
-    ("canon", "Canon tilt-shift · rivista",
+    ("canon", "Nitido da rivista",
      "Professional architectural photograph, Canon EOS R5 with 17mm tilt-shift "
      "lens: perfectly straight verticals, deep focus, crisp micro-contrast, "
      "clean polarized colour."),
-    ("gfx", "Fujifilm GFX100S · caldo naturale",
+    ("gfx", "Caldo naturale",
      "Fujifilm GFX100S photograph: warm natural colour, earthy muted tones, "
      "softly luminous highlights, deep but detailed shadows, gentle contrast, "
      "olive greens, pale blues."),
-    ("leica", "Leica SL2 · neutro profondo",
+    ("leica", "Neutro profondo",
      "Leica SL2 full-frame photograph: rich tonal depth, refined "
      "micro-contrast, restrained warm colour, smooth highlight roll-off, "
      "detailed shadows, tactile textures."),
-    ("portra160", "Kodak Portra 160 · morbido",
+    ("portra160", "Pellicola morbida",
      "Kodak Portra 160 film colour: soft and restrained, slightly warm "
      "neutrals, cream highlights, muted greens, moderate elegant contrast, "
      "fine grain, gentle pastel midtones."),
-    ("portra400", "Kodak Portra 400 · caldo vissuto",
+    ("portra400", "Pellicola calda",
      "Kodak Portra 400 film colour: warm, soft and lived-in, slightly warm "
      "whites, muted organic greens, open shadows, creamy rolled-off "
      "highlights, fine visible grain."),
-    ("ektar", "Kodak Ektar 100 · colori vividi",
+    ("ektar", "Colori vividi",
      "Kodak Ektar 100 film colour: bold, clean, saturated, strong "
      "well-separated contrast, bright clean highlights, deep but open "
      "shadows, ultra-fine grain, sharp edges."),
-    ("metropolis", "LomoChrome Metropolis · urbano",
+    ("metropolis", "Urbano freddo",
      "LomoChrome Metropolis film colour: desaturated and slightly cool, muted "
      "cyan skies, subdued greens, vivid red and orange accents, punchy "
      "contrast, dense blacks, visible grain."),
-    ("x100v", "Fujifilm X100V · analogico 35mm",
+    ("x100v", "Analogico 35 mm",
      "Fujifilm X100V with Classic Negative: warm muted colour, olive greens, "
      "cream highlights, lifted blacks with teal shadows, moderate contrast, "
      "fine grain, light vignette."),
-    ("mavic", "DJI Mavic · drone (solo viste dall'alto)",
+    ("mavic", "Da drone (solo viste dall'alto)",
      "Aerial photo look of a DJI Mavic 3 Pro Hasselblad camera: deep focus to "
      "the horizon, natural muted colour, slightly cool shadows, soft distant "
      "haze, wide dynamic range."),
 )
+
+# Il look non cambia obiettivo ne' inquadratura: quelli li tiene la regola
+# fissa, dalla vista di Allplan. La marca della fotocamera o della pellicola
+# resta nel testo per il modello, perche' e' lei che da' colore, contrasto e
+# grana; a schermo si legge l'effetto (richiesta di Riccardo del 2026-11-05:
+# chi non fotografa non sa cosa vuol dire «Portra 160»).
+LOOK = _descritti(LOOK, {
+    "canon": "Verticali dritte, tutto a fuoco, colori puliti.",
+    "gfx": "Colori caldi e terrosi, luci morbide, verdi oliva.",
+    "leica": "Contrasto raffinato, colore trattenuto, ombre ricche di dettaglio.",
+    "portra160": "Toni pastello, bianchi color crema, grana fine.",
+    "portra400": "Caldo e vissuto, ombre aperte, grana visibile.",
+    "ektar": "Colori saturi, contrasto forte, molto nitido.",
+    "metropolis": "Desaturato, cieli ciano, rossi e arancioni accesi, neri densi.",
+    "x100v": "Caldo smorzato, ombre verde acqua, leggera vignettatura.",
+    "mavic": "Tutto a fuoco fino all'orizzonte, foschia lontana. La vista dall'alto la deve dare Allplan.",
+})
 
 LUCE_ESTERNI = _blocchi(
     ("mezzogiorno", "Mezzogiorno",
@@ -376,21 +401,27 @@ ARREDO = {
 # profondita' di campo invece si', perche' non sposta niente.
 LOOK_PRODOTTO = {
     **_blocchi(
-        ("hasselblad", "Hasselblad H6D · catalogo",
+        ("hasselblad", "Catalogo fedele",
          "Hasselblad H6D-100c product photograph, 120mm lens at f/11: true-to-life "
          "neutral colour, edge-to-edge sharpness, accurate material textures, clean "
          "highlights, no lens distortion."),
-        ("phaseone", "Phase One · editoriale design",
+        ("phaseone", "Rivista di design",
          "Phase One IQ4 editorial still life, 80mm lens: rich tonal depth, refined "
          "micro-contrast, restrained slightly warm colour, design magazine "
          "furniture photography."),
-        ("macro", "Macro 100mm · dettaglio",
+        ("macro", "Dettaglio, sfondo sfocato",
          "Canon EOS R5 with 100mm macro lens at f/4: shallow depth of field with "
          "focus on the material and the joints, soft creamy falloff, tactile wood "
          "grain, fabric weave and metal finish."),
     ),
     **{i: LOOK[i] for i in ("leica", "gfx", "portra160")},
 }
+
+LOOK_PRODOTTO = _descritti(LOOK_PRODOTTO, {
+    "hasselblad": "Colori fedeli, nitido da bordo a bordo, materiali precisi.",
+    "phaseone": "Toni profondi, colore leggermente caldo, da rivista d'arredo.",
+    "macro": "A fuoco materiali e giunti, il resto sfuma.",
+})
 
 LUCE_PRODOTTO = _blocchi(
     ("softbox", "Softbox morbida",

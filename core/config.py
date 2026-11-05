@@ -921,37 +921,41 @@ LISTINO = _registra(Costante(
             NANO_BANANA_PRO: {"1K": 2, "2K": 2, "4K": 3},
         },
         "benvenuto": {"render": 10, "validita_mesi": 12},
+        # "prompt_completo": il cliente vede e riscrive il prompt in inglese
+        # («Avanzate» dello Studio). Solo Pro e Studio: chi compra il risultato
+        # non ha bisogno del testo, e un testo in vista si copia (Riccardo,
+        # 2026-11-05). E' una scelta di prodotto, non una misura.
         "piani": {
             "prova": {
                 "nome": "Prova", "tipo": "una_tantum", "prezzo": 15,
                 "render": 50, "validita_mesi": 12, "postazioni": 1,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
-                "canali": ["web", "plugin"], "studio": True,
+                "canali": ["web", "plugin"], "studio": True, "prompt_completo": False,
             },
             "base": {
                 "nome": "Base", "tipo": "abbonamento", "prezzo_mese": 19, "prezzo_anno": 190,
                 "render_mese": 80, "postazioni": 1,
                 "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
-                "canali": ["web"], "studio": False,
+                "canali": ["web"], "studio": False, "prompt_completo": False,
             },
             "pro": {
                 "nome": "Pro", "tipo": "abbonamento", "prezzo_mese": 39, "prezzo_anno": 390,
                 "render_mese": 200, "postazioni": 1,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
-                "canali": ["web", "plugin"], "studio": True,
+                "canali": ["web", "plugin"], "studio": True, "prompt_completo": True,
             },
             "studio": {
                 "nome": "Studio", "tipo": "abbonamento", "prezzo_mese": 99, "prezzo_anno": 990,
                 "render_mese": 600, "postazioni": 3,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
-                "canali": ["web", "plugin"], "studio": True,
+                "canali": ["web", "plugin"], "studio": True, "prompt_completo": True,
             },
             # Abbonamento finito: restano i crediti di ricarica e benvenuto,
             # con le funzioni di Base.
             "nessuno": {
                 "nome": "Senza abbonamento", "tipo": "nessuno", "postazioni": 1,
                 "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
-                "canali": ["web"], "studio": False,
+                "canali": ["web"], "studio": False, "prompt_completo": False,
             },
         },
         "ricarica": {"nome": "Ricarica", "prezzo": 10, "render": 100, "validita_mesi": 12},
