@@ -162,9 +162,13 @@ def controlla_cambi(cambi: tuple[Cambio, ...]) -> tuple[Cambio, ...]:
     return cambi
 
 
-def prima_immagine(con_riferimento: bool) -> int:
-    """Il numero della prima immagine dei materiali: dopo la vista e, se c'e', il riferimento per lo stile."""
-    return 1 + (2 if con_riferimento else 1)  # numero-non-configurabile: posizioni delle immagini nell'invio
+def prima_immagine(riferimenti: int | bool) -> int:
+    """Il numero della prima immagine dei materiali: dopo la vista e le immagini per lo stile.
+
+    `riferimenti` e' quante immagini per lo stile partono (il riferimento e
+    gli esempi di «Stile da esempi»); True vale una.
+    """
+    return 2 + int(riferimenti)  # numero-non-configurabile: posizioni delle immagini nell'invio
 
 
 def quante_immagini(cambi: tuple[Cambio, ...]) -> int:

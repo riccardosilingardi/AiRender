@@ -19,7 +19,7 @@ Rotte:
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
     GET  /api/viste/<nome>/materiali       i materiali del progetto letti dalla palette con la vista
-    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1   dove va la vista, quante immagini, quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1&inserti=<n>   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
@@ -46,6 +46,8 @@ Rotte:
     POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
     POST /api/ritocca/componi              il prompt di un ritocco (aree e note), prima di Applica
     POST /api/ritocca/invia                tutte le note in un invio sul render di un passo
+    POST /api/finale/componi               cosa fa «Finale» su un render: misura d'uscita, destinazione
+    POST /api/finale/invia                 «Finale»: il render ingrandito, un passo nuovo
     POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
     GET  /api/video/catalogo               modello, modi, movimenti, durate e dove va il video
     GET  /api/video                        i video della cartella
@@ -176,7 +178,10 @@ class _Gestore(BaseHTTPRequestHandler):
                                                (domanda.get("varianti") or ["1"])[0],
                                                (domanda.get("riferimento") or ["0"])[0] == "1",
                                                contesto=(domanda.get("contesto") or ["0"])[0] == "1",
-                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0]))
+                                               materiali_immagini=(domanda.get("materiali") or ["0"])[0],
+                                               inserti=(domanda.get("inserti") or ["0"])[0],
+                                               esempi=(domanda.get("esempi") or ["0"])[0],
+                                               geometria=(domanda.get("geometria") or ["0"])[0] == "1"))
             case ["api", "lavori", identificativo]:
                 self._json(studio.lavoro(identificativo))
             case ["api", "lavori", identificativo, "ricetta"]:
@@ -263,6 +268,10 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_ritocco(self._corpo_json()))
             case ["api", "ritocca", "invia"]:
                 self._json(studio.invia_ritocco(self._corpo_json()))
+            case ["api", "finale", "componi"]:
+                self._json(studio.componi_finale(self._corpo_json()))
+            case ["api", "finale", "invia"]:
+                self._json(studio.invia_finale(self._corpo_json()))
             case ["api", "video", "immagini"]:
                 self._json(studio.carica_immagine_video(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "video", "prova-a-secco"]:
