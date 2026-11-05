@@ -383,6 +383,15 @@ def test_studio_porta_e_fissa_fuori_dalle_porte_note_e_scelta():
     assert config.costante("STUDIO_PORTA").origine == config.SCELTA
 
 
+def test_corpo_del_server_sta_sotto_i_6_mb_di_netlify_e_la_riduzione_scende():
+    """Caso: vista e tre riferimenti passano uno per uno ma insieme superano i 6 MB e Netlify risponde 413 muto."""
+    assert config.SERVER_INVIO_MASSIMO_MB * 4 / 3 < config.SERVER_CORPO_MASSIMO_MB < 6
+    assert config.costante("SERVER_CORPO_MASSIMO_MB").origine == config.VINCOLO
+    lati = config.SERVER_RIDUZIONE_LATI_PX
+    assert list(lati) == sorted(lati, reverse=True) and lati[-1] >= 512
+    assert config.costante("SERVER_RIDUZIONE_LATI_PX").origine == config.SCELTA
+
+
 # --- guardia -----------------------------------------------------------------
 
 

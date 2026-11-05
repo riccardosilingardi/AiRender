@@ -151,6 +151,28 @@ def sfuma_maschera(dati: bytes, raggio_px: int | None = None) -> bytes:
     return uscita.getvalue()
 
 
+def riduci_lato(dati: bytes, lato_massimo: int) -> bytes:
+    """L'immagine col lato lungo al massimo `lato_massimo`, piu' leggera da spedire.
+
+    Una foto diventa JPEG; un'immagine a pochi colori o con trasparenza (una
+    mappa dei materiali, una maschera) resta PNG e si rimpicciolisce senza
+    mescolare i colori, che per il modello sono informazione.
+    """
+    immagine = _apri(dati)
+    larghezza, altezza = immagine.size
+    fattore = min(1.0, lato_massimo / max(larghezza, altezza))
+    nuova = (max(1, round(larghezza * fattore)), max(1, round(altezza * fattore)))
+    pochi_colori = immagine.getcolors(256) is not None  # numero-non-configurabile: tavolozza PNG
+    trasparente = "A" in immagine.getbands() or "transparency" in immagine.info
+    uscita = io.BytesIO()
+    if pochi_colori or trasparente:
+        immagine.resize(nuova, Image.Resampling.NEAREST).save(uscita, format="PNG", optimize=True)
+    else:
+        immagine.convert("RGB").resize(nuova, Image.Resampling.LANCZOS).save(
+            uscita, format="JPEG", quality=88)  # numero-non-configurabile: qualita' JPEG senza artefatti visibili
+    return uscita.getvalue()
+
+
 def dimensioni(dati: bytes) -> tuple[int, int]:
     """Larghezza e altezza, senza calcolare le statistiche."""
     immagine = _apri(dati)
