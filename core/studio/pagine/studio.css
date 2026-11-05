@@ -482,3 +482,37 @@ select { min-height: 34px; padding: 0 10px; }
   border: 1px solid var(--bordo); border-radius: 10px; background: var(--pannello);
 }
 .griglia-render-video { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow-y: auto; }
+
+/* --- licenza e saldo ----------------------------------------------------- */
+
+.pastiglia {
+  font-size: 12px; border: 1px solid var(--bordo-forte); border-radius: 999px; padding: 4px 12px;
+  display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; color: var(--testo-2); text-decoration: none;
+}
+.pastiglia b { font-variant-numeric: tabular-nums; color: var(--testo); }
+.pastiglia.ok::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.pastiglia.attenzione { border-color: var(--attenzione); color: var(--attenzione); }
+a.btn { text-decoration: none; }
+.testata a.btn[data-scheda].attiva { border-color: var(--accento); }
+.schermata-licenza { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.modulo-codice { display: flex; flex-direction: column; gap: 8px; }
+.etichetta-campo { font-size: 12px; font-weight: 600; color: var(--testo-2); }
+input.codice {
+  font: inherit; font-family: Consolas, "Cascadia Mono", ui-monospace, monospace; font-size: 14px; letter-spacing: .04em;
+  padding: 0 12px; min-height: 36px; border: 1px solid var(--bordo-forte); border-radius: 8px;
+  background: var(--fondo-alto); color: var(--testo); flex: 1 1 260px; min-width: 0;
+}
+input.codice:disabled { color: var(--tenue); }
+input.codice.sbagliato { border-color: var(--errore); }
+.giro { width: 14px; height: 14px; border: 2px solid var(--bordo-forte); border-top-color: var(--accento); border-radius: 50%; display: inline-block; animation: giro .9s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .giro { animation: none; } }
+.saldo { align-items: baseline; gap: 10px; }
+.saldo .numero { font-size: 32px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.dati { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13px; }
+.dati dt { color: var(--tenue); }
+.dati dd { margin: 0; font-variant-numeric: tabular-nums; }
+.costi { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.costi th, .costi td { text-align: left; padding: 6px 0; border-top: 1px solid var(--bordo); }
+.costi th:last-child, .costi td:last-child { text-align: right; }
+.costi th { font-size: 12px; font-weight: 600; color: var(--tenue); }

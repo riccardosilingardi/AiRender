@@ -268,6 +268,16 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Licenza e saldo nello Studio (2026-11-05)
+
+Provata in Chromium con un server finto (codice valido, rifiutato, server
+muto, risposta lenta) e nei test. Mai con il server AIRENDER vero, che non è
+online; mai in Edge in modalità app su Windows, quindi non si sa se Ricarica
+e Gestisci (link con `target=_blank`) aprono il browser predefinito. Non
+verificato che la coda già avviata prenda il codice appena salvato: legge il
+file a ogni lavoro, ma non provato su Windows. Verifica: al primo deploy,
+incollare un codice vero dallo Studio, un render, il saldo in testata sceso.
+
 ### Server di vendita: errori, pulizia, peso dell'invio (2026-11-05)
 
 Tre ritocchi per il lancio, provati solo nei test (Node coi finti, pytest).

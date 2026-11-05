@@ -28,6 +28,7 @@ from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
 from .. import video as modulo_video
+from .. import licenza as modulo_licenza
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta
@@ -158,6 +159,7 @@ class Studio:
         apri: Callable[[Path], None] = apri_nel_sistema,
         adesso: Callable[[], datetime] = _adesso,
         cartella_miniature: Path = modulo_miniature.CARTELLA,
+        leggi_saldo: Callable[[str], dict] = modulo_licenza.saldo,
     ) -> None:
         self.cartella = Path(cartella).resolve()
         self.cartella.mkdir(parents=True, exist_ok=True)
@@ -167,6 +169,7 @@ class Studio:
         self._apri = apri
         self._adesso = adesso
         self.cartella_miniature = Path(cartella_miniature)
+        self._leggi_saldo = leggi_saldo
         self.percorsi = modulo_coda.cartelle(self.cartella)
         # Il server risponde a piu' richieste insieme: l'albero dei passi lo
         # allinea e lo scrive una richiesta alla volta.
@@ -189,6 +192,76 @@ class Studio:
                 "origine": config.costante("RITOCCO_MODO_AREE").origine,
             },
         }
+
+    # --- licenza e saldo -------------------------------------------------
+
+    def _chiave_comfy(self) -> bool:
+        return comfy.chiave_da_ambiente() is not None
+
+    def licenza(self) -> dict:
+        """La scheda Licenza: codice salvato o no, e il saldo detto dal server AIRENDER.
+
+        Senza codice non si chiama il server. Se il server non risponde la
+        scheda lo dice e il codice resta salvato: non e' il codice a essere
+        sbagliato.
+        """
+        codice = modulo_licenza.leggi()
+        stato = {
+            "presente": bool(codice),
+            "ultime_cifre": modulo_licenza.formatta(codice)[-4:] if codice and modulo_licenza.valido(codice) else "",  # numero-non-configurabile: le ultime cifre del codice, come le mostra il server
+            "server": modulo_licenza.server(),
+            "provider": self.provider,
+            "chiave_comfy": self._chiave_comfy(),
+            "saldo": None,
+            "errore": None,
+        }
+        if codice:
+            try:
+                stato["saldo"] = self._leggi_saldo(codice)
+            except ErroreAirender as errore:
+                stato["errore"] = {"fatto": errore.fatto, "cosa_fare": errore.cosa_fare}
+        return stato
+
+    def attiva_licenza(self, dati: dict) -> dict:
+        """Controlla il codice col server e solo se va lo salva su questo PC.
+
+        Da qui i render dello Studio passano dai crediti AIRENDER, senza
+        riavviare: ogni lavoro nuovo porta il provider con se'.
+        """
+        codice = str(dati.get("codice") or "").strip()
+        if not modulo_licenza.valido(codice):
+            raise RichiestaStudioNonValida(
+                "Questo non sembra un codice licenza AIRENDER.",
+                "Il codice ha la forma AIR-XXXX-XXXX-XXXX-XXXX: ricopialo dall'email "
+                "che hai ricevuto dopo l'acquisto.",
+            )
+        codice = modulo_licenza.formatta(codice)
+        saldo = self._leggi_saldo(codice)  # un rifiuto del server esce da qui, e non si salva niente
+        modulo_licenza.salva(codice)
+        self.provider = registro.ProviderAirender.nome
+        return {**self.licenza(), "saldo": saldo, "errore": None}
+
+    def usa_servizio(self, dati: dict) -> dict:
+        """Crediti AIRENDER o chiave Comfy propria, per questo Studio aperto."""
+        scelto = str(dati.get("provider") or "")
+        if scelto == comfy.ProviderComfy.nome:
+            if not self._chiave_comfy():
+                raise RichiestaStudioNonValida(
+                    "Non trovo una chiave Comfy su questo PC.",
+                    "Crea una chiave nel tuo workspace Comfy, mettila nella variabile "
+                    f"d'ambiente {comfy.VARIABILI_CHIAVE[0]} di Windows e riapri lo Studio.",
+                )
+        elif scelto == registro.ProviderAirender.nome:
+            if not modulo_licenza.leggi():
+                raise RichiestaStudioNonValida(
+                    "Non hai ancora inserito un codice licenza AIRENDER.",
+                    "Incollalo qui sopra e premi Attiva.",
+                )
+        else:
+            raise RichiestaStudioNonValida(
+                "Lo Studio non conosce questo servizio.", "Ricarica la pagina dello Studio.")
+        self.provider = scelto
+        return self.licenza()
 
     # --- viste -----------------------------------------------------------
 

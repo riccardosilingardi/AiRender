@@ -841,6 +841,27 @@ partenza non c'è più. Resta **Apri cartella**.
 - Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
   preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
+## Studio · Licenza e saldo, costruita il 2026-11-05
+
+Bozza A scelta da Riccardo il 2026-11-05 fra due (A scheda intera, B cassetto
+dalla testata; bozze in `/mnt/project-files/mockup/licenza-saldo/`). Il
+pulsante in alto a destra, prima «Chiave e tetto di spesa · In arrivo», ora è
+«Licenza e saldo» (`#licenza`). Accanto, una pastiglia sempre visibile:
+«42 render · Pro», «Nessuna licenza», «Saldo non letto» o «Chiave Comfy tua».
+Senza codice e senza chiave Comfy sul PC, lo Studio si apre sulla scheda.
+
+| Stato | Cosa si vede |
+|---|---|
+| Vuoto | «Attiva AIRENDER»: campo del codice, Attiva, il nome del server che lo controlla, «Non hai una licenza? Vedi i piani», il riquadro della chiave Comfy propria |
+| In corso | Campo e Attiva spenti, «Chiedo al server AIRENDER (<host>) se il codice è valido.» con la rotella |
+| Errore | Codice rifiutato: bordo rosso e la frase del server con Cosa fare; il codice non si salva. Server muto con codice già salvato: «Licenza …WN3B», l'avviso, Riprova, Cambia codice |
+| Pieno | Piano, render disponibili (e in corso), scadenza del lotto più vicino, postazioni, licenza; Ricarica e Gestisci abbonamento (link firmati, un'ora); costo di un render per modello dal listino; Cambia codice |
+
+L'errore «Il saldo AIRENDER non basta» in Genera ha accanto Ricarica e «Vedi
+il saldo». La scelta crediti AIRENDER o chiave Comfy vale per lo Studio
+aperto; senza chiave Comfy sul PC il pulsante non c'è e si spiega dove
+metterla.
+
 ## Schermate sostituite il 2026-10-27
 
 Le cinque schermate della palette di prova (Sorgente, Stile, Risultato,
@@ -890,13 +911,8 @@ contraddicono le nuove, valgono le nuove:
 
 ## Non ancora progettato
 
-- Schermata di configurazione della chiave API e del tetto di spesa (nello
-  Studio c'è solo il segnaposto in grigio). Dal 2026-11-02 diventa **Licenza
-  e saldo**: incolla il codice AIR-…, piano, render disponibili e scadenza,
-  pulsanti Ricarica e Gestisci abbonamento (i link li dà `/api/saldo`), e la
-  chiave Comfy propria come opzione. Il server c'è (`server/`); i quattro
-  stati vanno scritti prima di costruirla. Per ora: `python -m core.cli
-  --licenza` e `--saldo`.
+- Tetto di spesa per la chiave Comfy propria (la Licenza e saldo è costruita,
+  vedi sopra).
 - Il video oltre la scheda Video: montare più video, musica, titoli.
 - Cambia un materiale (clic su una superficie con la mappa di Allplan): i suoi
   stati si scrivono quando la mappa esiste.
