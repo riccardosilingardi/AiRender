@@ -268,6 +268,50 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Tieni la geometria, il ControlNet prima di Nano Banana (2026-11-04)
+
+- Il workflow gira sul deployment della **Comfy Developer Platform** di
+  Riccardo (`core/provider/workflow/tieni-geometria.json`, passi in
+  `workflow/LEGGIMI.md`), indirizzo in `AIRENDER_COMFY_WORKFLOW_URL`. Si chiude
+  con il primo render vero sul deployment: bozza `<id>.geometria.png` e render
+  affiancati alla vista.
+- Il costo è a secondi di GPU del deployment: lo Studio non scrive un numero
+  finché una prima passata vera non lo dà.
+- `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
+  le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
+
+### Stile da esempi (2026-11-04)
+
+- **Che 2-4 render d'esempio diano uno stile più fedele di uno solo**:
+  `ESEMPI_STILE` (bozza 14) è un testo scelto, provato solo con un provider
+  finto. Verifica: stessa vista, uno contro tre esempi, Nano Banana 2.
+- **Gli esempi non si salvano ancora in «I miei preset»**: si ricaricano a mano.
+
+### Finale, l'ingrandimento (2026-11-04)
+
+- **Il corpo di `freepik/ai-image-upscaler-precision-v2`** (image in base64,
+  scale_factor, flavor) e la risposta (`data.generated[0]`, link che scade)
+  vengono dalla documentazione del Router (Comfy-Org/docs, router-schemas, letta
+  il 2026-11-04), **non da una sonda**. Verifica: un Finale ×2 su un render vero,
+  oppure `python scripts/sonda_comfy.py --modello freepik/ai-image-upscaler-precision-v2 --solo-schema`.
+- **Il costo**: il Router lo dice «a misura e ingrandimento» e non lo stima
+  prima dell'invio; lo Studio scrive «non misurato» finché un Finale vero non
+  copia i crediti.
+- **Il peso massimo** di un render 2K come base64 nel corpo, e se un ×4 su 2K
+  (8K) viene accettato.
+
+### Rif. di oggetti e persone e scelta del modello (2026-11-04)
+
+- **Che il modello metta davvero l'oggetto del Rif. dove dice il testo**, con
+  forma, colori, scala e ombra giuste: la regola `INSERTI_REGOLA` (bozza 13) è
+  un testo scelto, provato solo con un provider finto. Verifica: un Cambia e un
+  Ritocca con una foto di poltrona su un render vero, Nano Banana 2.
+- **Che il Router accetti 3-6 immagini in un invio** (render + fino a 4 Rif. +
+  eventuali materiali): con Nano Banana 2 ne sono partite al massimo 3.
+- **Le righe delle schede dei modelli** («Veloce, tiene gli spigoli»,
+  «Fotorealismo marcato»…) sono giudizi, non un confronto sul banco di prova.
+- **Le schede a schermo** sono viste solo in Chromium headless, tema chiaro.
+
 ### Cambia: tutta l'immagine a parole (2026-11-04)
 
 Le scorciatoie di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci

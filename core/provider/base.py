@@ -50,6 +50,10 @@ class RichiestaGenerazione:
     # Solo i modelli il cui schema lo dichiara le accettano: gli altri si
     # fermano prima di partire.
     immagini_in_piu: tuple[bytes, ...] = ()
+    # «Finale»: di quante volte ingrandire e con quale tipo d'immagine
+    # (foto, illustrazione). Zero per tutti gli altri modelli.
+    ingrandimento: int = 0
+    tipo_finale: str = ""
 
 
 @dataclass(frozen=True)
