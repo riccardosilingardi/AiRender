@@ -7,6 +7,7 @@ solo dall'uscita di scripts/sonda_comfy.py.
 
 from __future__ import annotations
 
+import base64
 import email.message
 import io
 import json
@@ -24,6 +25,7 @@ from conftest import (
     vista_shaded,
 )
 from core import config, grana, provider as registro
+from core.immagine import e_marcata, marca_generata, metadati_personali, senza_metadati
 from core.errori import ChiaveMancante, ErroreProvider
 from core.provider import comfy
 from core.provider.base import RichiestaGenerazione, RichiestaRegione
@@ -93,7 +95,7 @@ def test_il_link_dell_immagine_si_scarica_senza_mandare_la_chiave(modello_verifi
     trasporto = router_che_riesce()
     risultato = provider_comfy(trasporto).genera(richiesta())
     assert trasporto.scaricati == ["https://consegna.esempio/render.png?firma=x"]
-    assert risultato.immagine == PNG and risultato.formato == "png"
+    assert risultato.immagine == marca_generata(PNG) and risultato.formato == "png"
 
 
 # --- schema non ancora verificato -------------------------------------------
@@ -426,7 +428,7 @@ def test_gemini_dall_invio_all_immagine_decodificata():
         [router_in_coda(), router_stato("COMPLETED"), risultato_vero])
     esito = provider_comfy(trasporto).genera(
         richiesta(modello="vertexai/gemini-3.1-flash-image"))
-    assert esito.immagine == PNG and trasporto.scaricati == []
+    assert esito.immagine == marca_generata(PNG) and trasporto.scaricati == []
     assert esito.ricetta.parametri["schema_verificato_il"] == "2026-10-27"
     assert esito.ricetta.parametri["corpo"]["contents"][0]["parts"][1]["inlineData"]["data"] == (
         f"<vista sha256:{impronta(PNG)}>")
@@ -547,3 +549,54 @@ def test_gpt_e_seedream_leggono_l_immagine_in_base64_o_link():
     assert comfy._immagine_dati({"data": [{"url": "https://x/y.png"}]}) == ("url", "https://x/y.png")
     with pytest.raises(ErroreProvider):
         comfy._immagine_dati({"data": []})
+
+
+# --- privacy e marcatura ---------------------------------------------------------
+
+
+def _jpeg_col_gps() -> bytes:
+    from PIL import Image
+
+    foto = Image.open(io.BytesIO(PNG)).convert("RGB")
+    exif = Image.Exif()
+    exif[0x010F] = "Telefono di Mario"  # Make
+    exif[0x8825] = {2: (44.0, 38.0, 0.0)}  # GPSInfo: latitudine
+    uscita = io.BytesIO()
+    foto.save(uscita, "JPEG", exif=exif.tobytes())
+    return uscita.getvalue()
+
+
+def test_la_foto_parte_senza_exif_ne_gps(modello_verificato):
+    """Caso: la foto del cantiere fatta col telefono porta le coordinate. Al servizio vanno solo i pixel."""
+    foto = _jpeg_col_gps()
+    assert "exif" in metadati_personali(foto)
+    trasporto = router_che_riesce()
+    risultato = provider_comfy(trasporto).genera(richiesta(foto))
+    _metodo, _url, _intestazioni, corpo = trasporto.poste()[0]
+    inviata = base64.b64decode(corpo["input_image"].split(",", 1)[1])
+    assert metadati_personali(inviata) == []
+    assert b"Telefono di Mario" not in inviata
+    # La ricetta resta legata alla foto com'era: rieseguire con la stessa foto funziona.
+    assert risultato.ricetta.impronta_sorgente == impronta(foto)
+
+
+def test_la_vista_senza_metadati_parte_con_gli_stessi_byte(modello_verificato):
+    """Caso: le viste di Allplan non hanno niente da togliere e non si ricodificano."""
+    assert senza_metadati(PNG) is PNG
+    trasporto = router_che_riesce()
+    provider_comfy(trasporto).genera(richiesta())
+    _metodo, _url, _intestazioni, corpo = trasporto.poste()[0]
+    assert corpo["input_image"] == comfy.immagine_data_uri(PNG)
+
+
+def test_il_render_torna_marcato_come_generato_con_l_ia(modello_verificato):
+    """Caso: AI Act art. 50.2, la marcatura dev'essere leggibile da una macchina, nel file."""
+    from PIL import Image
+
+    risultato = provider_comfy(router_che_riesce()).genera(richiesta())
+    assert e_marcata(risultato.immagine)
+    aperta = Image.open(io.BytesIO(risultato.immagine))
+    aperta.load()
+    assert "trainedAlgorithmicMedia" in aperta.info["XML:com.adobe.xmp"]
+    assert aperta.tobytes() == Image.open(io.BytesIO(PNG)).tobytes()  # i pixel non cambiano
+    assert marca_generata(risultato.immagine) == risultato.immagine  # una volta sola

@@ -7,7 +7,11 @@ cima il render scelto. Tutti alla grandezza del render scelto.
 
 Nel file non entra niente oltre ai pixel: ne' il prompt, ne' la ricetta, ne'
 la chiave (CLAUDE.md, regola 4). I pixel si rileggono e si riscrivono, cosi'
-anche quello che il servizio aveva messo nel file resta fuori.
+anche quello che il servizio aveva messo nel file resta fuori. L'unica cosa
+che si aggiunge, in JPEG e PNG, e' la dichiarazione «generata con l'IA» in XMP
+(AI Act, art. 50.2: marcatura leggibile dalle macchine): una frase fissa, senza
+prompt ne' nomi. Nel PSD no: il formato a livelli scritto qui non ha un posto
+semplice per l'XMP: da fare, e scritto nella sezione NON VERIFICATO del PRD.
 
 Il PSD e' scritto qui, senza librerie in piu': canali non compressi, 8 bit,
 RGB, un canale di trasparenza piena per livello. Pesa (circa 4 byte per pixel
@@ -22,7 +26,7 @@ import struct
 
 from PIL import Image
 
-from . import config
+from . import config, immagine as modulo_immagine
 from .errori import ErroreAirender
 
 FORMATI = ("jpg", "png", "psd")
@@ -60,7 +64,7 @@ def esporta(render: bytes, formato: str, livelli: list[tuple[str, bytes]] | None
         immagine.save(uscita, "JPEG", quality=config.ESPORTA_QUALITA_JPEG, subsampling=0, optimize=True)
     else:
         immagine.save(uscita, "PNG", optimize=True)
-    return uscita.getvalue()
+    return modulo_immagine.marca_generata(uscita.getvalue())
 
 
 # --- PSD ------------------------------------------------------------------------

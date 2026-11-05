@@ -543,7 +543,13 @@ class ProviderComfy(Provider):
                 "Togli le immagini in piu' (maschera, mappa), oppure usa Nano Banana 2.",
             )
 
-        inviata, cornice = con_cornice(richiesta, schema.rapporti) if schema.rapporti else (richiesta, None)
+        # Partono solo i pixel: EXIF (posizione GPS), XMP e testi restano qui.
+        pulita = replace(
+            richiesta,
+            immagine=modulo_immagine.senza_metadati(richiesta.immagine),
+            immagini_in_piu=tuple(modulo_immagine.senza_metadati(d) for d in richiesta.immagini_in_piu),
+        )
+        inviata, cornice = con_cornice(pulita, schema.rapporti) if schema.rapporti else (pulita, None)
         corpo = schema.corpo(inviata)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
         uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
@@ -552,6 +558,8 @@ class ProviderComfy(Provider):
         if cornice is not None:
             dati = modulo_immagine.togli_cornice(dati, cornice)
             dettagli = {**dettagli, "cornice": cornice.come_dizionario()}
+        # Nel file si scrive che e' generata con l'IA (AI Act, art. 50.2).
+        dati = modulo_immagine.marca_generata(dati)
 
         ricetta = Ricetta(
             provider=self.nome,

@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import config
+from . import config, immagine as modulo_immagine
 from .coda import nuovo_identificativo, scrivi_atomico, scrivi_json
 from .errori import ErroreAirender
 from .provider import comfy
@@ -143,7 +143,8 @@ def corpo(richiesta: RichiestaVideo, immagini: list[bytes]) -> dict:
     contenuto: list[dict] = [{"type": "text", "text": richiesta.prompt()}]
     for indice, dati in enumerate(immagini):
         ruolo = ruoli[indice] if ruoli else "reference_image"
-        contenuto.append({"type": "image_url", "image_url": {"url": comfy.immagine_data_uri(dati)},
+        pulita = modulo_immagine.senza_metadati(dati)  # partono solo i pixel, senza EXIF ne' XMP
+        contenuto.append({"type": "image_url", "image_url": {"url": comfy.immagine_data_uri(pulita)},
                           "role": ruolo})
     return {
         "content": contenuto,
