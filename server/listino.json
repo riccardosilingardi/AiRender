@@ -29,6 +29,7 @@
       "postazioni": 1,
       "prezzo_anno": 190,
       "prezzo_mese": 19,
+      "prompt_completo": false,
       "render_mese": 80,
       "studio": false,
       "tipo": "abbonamento"
@@ -43,6 +44,7 @@
       ],
       "nome": "Senza abbonamento",
       "postazioni": 1,
+      "prompt_completo": false,
       "studio": false,
       "tipo": "nessuno"
     },
@@ -60,6 +62,7 @@
       "postazioni": 1,
       "prezzo_anno": 390,
       "prezzo_mese": 39,
+      "prompt_completo": true,
       "render_mese": 200,
       "studio": true,
       "tipo": "abbonamento"
@@ -77,6 +80,7 @@
       "nome": "Prova",
       "postazioni": 1,
       "prezzo": 15,
+      "prompt_completo": false,
       "render": 50,
       "studio": true,
       "tipo": "una_tantum",
@@ -96,6 +100,7 @@
       "postazioni": 3,
       "prezzo_anno": 990,
       "prezzo_mese": 99,
+      "prompt_completo": true,
       "render_mese": 600,
       "studio": true,
       "tipo": "abbonamento"

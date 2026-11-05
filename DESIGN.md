@@ -194,11 +194,18 @@ vista con colori neutri.»
   Con FLUX.1 Kontext (una sola immagine) le anteprime non partono: lo dice e
   Genera si spegne finché non si cambia modello o si tolgono le spunte.
 - **Cosa parte, in breve**: il riassunto delle scelte in italiano.
-- **Mostra e modifica il prompt completo**: il testo vero che parte al
-  modello, in inglese, modificabile, con il numero di caratteri. Se l'utente
+- **Avanzate: mostra e modifica il prompt completo**: il testo vero che parte
+  al modello, in inglese, modificabile, con il numero di caratteri. Se l'utente
   lo modifica, i comandi a sinistra non lo toccano più finché non preme
   **Ricomponi dalle scelte**. È l'unico posto dove si scrive testo libero per
-  il modello.
+  il modello. Solo coi piani Pro e Studio, o con una chiave propria
+  (2026-11-05): negli altri piani il pulsante non c'è, e nemmeno «Il prompt
+  che parte» di Cambia, Ritocca, Rifai tutto e Com'è stato fatto. Il cliente
+  compra il risultato, e un testo in vista si copia.
+- **Look fotografico**: i nomi dicono l'effetto («Nitido da rivista», «Caldo
+  naturale»…), con una riga sotto che dice cosa cambia. La marca della
+  fotocamera o della pellicola resta solo nel prompt. Il look non cambia
+  l'inquadratura: quella resta della vista Allplan.
 - **I miei preset**: «Nessuno — scelte libere» e Salva queste scelte.
 - **Modello**: Nano Banana 2 (predefinito), FLUX.1 Kontext Pro; gli altri
   scritti «non ancora provato» e non selezionabili finché il loro schema non è

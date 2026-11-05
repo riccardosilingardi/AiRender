@@ -70,7 +70,7 @@ const S = {
 // stesso modo. Un pulsante che ha già il suo title tiene il suo.
 const SPIEGA_PULSANTI = {
   "Usa un'altra vista…": "Scegli un'altra cattura dalla cartella delle viste.",
-  "Mostra e modifica il prompt completo": "Mostra il testo in inglese che parte al modello. Lo puoi riscrivere a mano.",
+  "Avanzate: mostra e modifica il prompt completo": "Mostra il testo in inglese che parte al modello. Lo puoi riscrivere a mano.",
   "Ricomponi dalle scelte": "Butta il testo scritto a mano e rifà il prompt dalle scelte.",
   "Salva queste scelte": "Salva le scelte di questa pagina fra I miei preset, per riusarle.",
   "Rinomina": "Cambia il nome di questo preset.",
@@ -262,6 +262,9 @@ function nomeVoce(idAsse, valore) {
   const v = a && a.voci.find((x) => x.id === valore);
   return v ? v.nome : "";
 }
+// Il prompt in inglese si vede (e si riscrive) solo coi piani Pro e Studio, o
+// con una chiave propria: lo dice il server dello Studio (prompt_completo).
+function vedePrompt() { return !!(S.catalogo && S.catalogo.prompt_completo); }
 function modelloScelto() { return S.catalogo.modelli.find((m) => m.id === S.modello); }
 
 // --- I miei preset -------------------------------------------------------
@@ -314,7 +317,7 @@ function caricaMio(nome) {
   S.preset = null;
   S.scelte = { ...p.scelte };
   if (p.modello && S.catalogo.modelli.some((m) => m.id === p.modello)) S.modello = p.modello;
-  S.promptAMano = p.prompt_a_mano || null;
+  S.promptAMano = vedePrompt() ? (p.prompt_a_mano || null) : null;
   if (p.blocchi_cambiati || p.perse.length) {
     S.miei.nota = p.perse.length
       ? `Salvato con i blocchi ${p.versione_blocchi || "di prima"}: ${p.perse.join("; ")}. Il resto è caricato.`
@@ -670,9 +673,15 @@ function chipAsse(idAsse) {
   return h("div", {}, h("div", { classe: "scelte-chip", role: "group", "aria-label": a.titolo },
     a.voci.map((v) => h("button", {
       classe: "chip", "aria-pressed": String(S.scelte[idAsse] === v.id), disabled: !v.attivo || via,
-      title: v.attivo ? null : `In arrivo: ${v.nota}`,
+      title: v.attivo ? (v.descrizione || null) : `In arrivo: ${v.nota}`,
       onclick: v.attivo ? () => cambiaAsse(idAsse, v.id) : null,
-    }, v.nome))), notaSpento(idAsse));
+    }, v.nome))), descrizioneScelta(a, S.scelte[idAsse]), notaSpento(idAsse));
+}
+
+// Una riga sotto le scelte: cosa cambia la voce scelta, in parole semplici.
+function descrizioneScelta(a, valore) {
+  const v = a.voci.find((x) => x.id === valore);
+  return v && v.descrizione ? h("p", { classe: "tenue piccolo" }, `${v.nome}: ${v.descrizione.charAt(0).toLowerCase()}${v.descrizione.slice(1)}`) : null;
 }
 
 function tessereAsse(idAsse) {
@@ -723,7 +732,7 @@ function colonnaStile() {
         : "Miniature illustrative."),
       h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
         (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
-    h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico", spiega("Colore, contrasto, pellicola o digitale · solo per le rese fotografiche")),
+    h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico", spiega("Colore, contrasto e grana · l’inquadratura resta quella di Allplan · solo per le rese fotografiche")),
       chipAsse("look")),
     h("div", { classe: "gruppo" }, h("h3", {}, S.scelte.scena === "esterno" ? "3 · Ora / Luce" : "3 · Luce"), tessereAsse("luce")),
     prodotto
@@ -767,9 +776,9 @@ function colonnaInvio() {
     h("p", { id: "riassunto" }, S.modo === "contesto" && !contestoPerServer()
       ? "Il prompt si compone quando la foto del luogo e l'area ci sono (passo 1)."
       : S.composto ? S.composto.riassunto : "…"),
-    h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
-      S.mostraPrompt ? "Nascondi il prompt" : "Mostra e modifica il prompt completo"),
-    S.mostraPrompt ? h("div", { classe: "sotto-gruppo" },
+    !vedePrompt() ? null : h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
+      S.mostraPrompt ? "Nascondi il prompt" : "Avanzate: mostra e modifica il prompt completo"),
+    S.mostraPrompt && vedePrompt() ? h("div", { classe: "sotto-gruppo" },
       h("p", { classe: "tenue piccolo" }, "Testo vero che parte al modello, in inglese. Se lo modifichi, i comandi a sinistra non lo toccano più finché non premi «Ricomponi»."),
       prompt,
       h("div", { classe: "riga tra" },
@@ -1981,7 +1990,7 @@ function pannelloApplica(base, bloccato) {
   return h("section", { classe: "pannello evidenziato", "aria-label": "Applica le note" },
     h("span", { classe: "etichetta" }, `Note sull'immagine · dal passo ${base.numero}`),
     elencoNote(bloccato),
-    h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-ritocco" })),
+    !vedePrompt() ? null : h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-ritocco" })),
       h("textarea", { classe: "prompt", id: "prompt-ritocco", readonly: true, "aria-label": "Prompt del ritocco" })),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(r, render))),
     rigaDestinazione(r.modello, S.studio.ritocco.modo === "maschera" ? "Il render, con la maschera delle aree," : "Il render, con le aree disegnate sopra,"),
@@ -2412,7 +2421,7 @@ function pannelloNuovoPasso() {
     campo,
     nota("Le scorciatoie scrivono nel campo.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare."),
     h("p", { classe: "tenue piccolo" }, "Solo una parte? Usa Ritocca."),
-    h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
+    !vedePrompt() ? null : h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(n, render))),
     rigaDestinazione(n.modello),
@@ -2441,8 +2450,8 @@ function pannelloPulito(passo) {
     c.senza_aree && c.senza_aree.length ? avviso("attenzione",
       `Le note del ritocco ${c.senza_aree.length === 1 ? "al passo" : "ai passi"} ${c.senza_aree.join(", ")} entrano come richieste a parole, senza le loro aree.`,
       "Dalla vista le aree non valgono più: erano disegnate su un render. Il modello non sa più dove fare quelle modifiche; se servono lì, ritocca dopo.") : null,
-    h("span", { classe: "piccolo tenue" }, `Il prompt che parte, in inglese · ${c.caratteri} caratteri`),
-    prompt,
+    vedePrompt() ? h("span", { classe: "piccolo tenue" }, `Il prompt che parte, in inglese · ${c.caratteri} caratteri`) : null,
+    vedePrompt() ? prompt : null,
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Modello"), h("div", { stile: "min-width:200px" }, sceltaModello(q, render))),
     rigaDestinazione(q.modello),
     q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
@@ -2477,7 +2486,7 @@ function ricettaPasso(passo) {
   return h("section", { classe: "pannello", "aria-label": "Com'è stato fatto" },
     h("span", { classe: "etichetta" }, "Com'è stato fatto"),
     h("dl", { classe: "ricetta" }, righe.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])),
-    passo.prompt ? h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, `Il prompt, in inglese${passo.prompt_a_mano ? " · scritto a mano" : ""}`)), prompt) : null,
+    passo.prompt && vedePrompt() ? h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, `Il prompt, in inglese${passo.prompt_a_mano ? " · scritto a mano" : ""}`)), prompt) : null,
     padre === null && passo.da !== "0" ? h("p", { classe: "tenue piccolo" }, "Il passo da cui era partito non c'è più nell'albero.") : null);
 }
 

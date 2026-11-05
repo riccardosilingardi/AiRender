@@ -24,6 +24,7 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import contesto as modulo_contesto
+from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
@@ -158,6 +159,7 @@ class Studio:
         apri: Callable[[Path], None] = apri_nel_sistema,
         adesso: Callable[[], datetime] = _adesso,
         cartella_miniature: Path = modulo_miniature.CARTELLA,
+        leggi_saldo: Callable[[], dict] = modulo_licenza.saldo,
     ) -> None:
         self.cartella = Path(cartella).resolve()
         self.cartella.mkdir(parents=True, exist_ok=True)
@@ -168,6 +170,8 @@ class Studio:
         self._adesso = adesso
         self.cartella_miniature = Path(cartella_miniature)
         self.percorsi = modulo_coda.cartelle(self.cartella)
+        self._leggi_saldo = leggi_saldo
+        self._prompt_completo: bool | None = None
         # Il server risponde a piu' richieste insieme: l'albero dei passi lo
         # allinea e lo scrive una richiesta alla volta.
         self._blocco_albero = threading.Lock()
@@ -416,6 +420,7 @@ class Studio:
             "scene": scene,
             "rese": _rese(),
             "varianti_massime": config.VARIANTI_MASSIME,
+            "prompt_completo": self.prompt_completo(),
             "modelli": [self._modello_dict(m) for m in MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
             "risoluzioni": [
@@ -432,6 +437,24 @@ class Studio:
                 "ricerca_web_verificata": False,
             },
         }
+
+    def prompt_completo(self) -> bool:
+        """Vero se l'utente puo' vedere e riscrivere il prompt in inglese.
+
+        Con una chiave propria (Comfy, Magnific) si': il conto e' suo. Coi
+        crediti AIRENDER lo dice il piano della licenza (LISTINO, voce
+        "prompt_completo": Pro e Studio). Se il server non risponde il prompt
+        resta nascosto, e si richiede alla prossima apertura dello Studio.
+        """
+        if self.provider != "airender":
+            return True
+        if self._prompt_completo is None:
+            try:
+                funzioni = self._leggi_saldo().get("funzioni") or {}
+            except ErroreAirender:
+                return False
+            self._prompt_completo = bool(funzioni.get("prompt_completo"))
+        return self._prompt_completo
 
     # --- i miei preset ------------------------------------------------
 
@@ -465,7 +488,8 @@ class Studio:
             if scena not in valide:
                 continue
             voci = [
-                {"id": b.identificativo, "nome": b.nome, "attivo": True, "origine": b.origine}
+                {"id": b.identificativo, "nome": b.nome, "descrizione": b.descrizione,
+                 "attivo": True, "origine": b.origine}
                 for b in blocchi.voci(asse, scena).values()
             ]
             titolo = _TITOLI_ASSI[asse]
@@ -633,6 +657,11 @@ class Studio:
         l'altro, e ognuno e' un invio pagato. Il costo per N l'ha mostrato
         destinazione() prima del clic.
         """
+        if _prompt_a_mano(dati) and not self.prompt_completo():
+            raise RichiestaStudioNonValida(
+                "Il prompt scritto a mano si usa solo con i piani Pro e Studio.",
+                "Ricarica lo Studio: il prompt si ricompone dalle scelte. Per scriverlo a mano serve Pro o Studio.",
+            )
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)

@@ -268,6 +268,19 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Prompt nascosto e look per effetto (2026-11-05)
+
+Il prompt in inglese si vede solo con Pro e Studio o con la chiave propria:
+la regola gira nello Studio e nel server (LISTINO, «prompt_completo»), provata
+con un saldo finto e in Chromium, mai con una licenza vera. Nascondere il
+prompt dalla pagina scoraggia chi copia, ma non lo impedisce: i blocchi
+viaggiano dentro il pacchetto installato (core/blocchi.py) e la risposta di
+/api/componi contiene ancora il testo. Per proteggerli davvero il prompt va
+composto sul server AIRENDER. Le descrizioni dei look («Caldo naturale:
+colori caldi e terrosi…») le ho scritte leggendo il testo dei blocchi, non
+guardando render: nessun look è stato confrontato su una vista vera (il piano
+«look» del banco di prova è quello che lo fa).
+
 ### Cambia: tutta l'immagine a parole (2026-11-04)
 
 Le scorciatoie di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci
