@@ -68,26 +68,17 @@ export function creaDb(ambiente = process.env, chiama = fetch) {
     return `${base()}/storage/v1${signedURL}`;
   }
 
-  // Elenca un livello del bucket "risultati": file e cartelle (una per licenza).
-  async function elencaRisultati(prefisso = "") {
-    const r = await chiama(`${base()}/storage/v1/object/list/risultati`, {
-      method: "POST",
-      headers: { ...intestazioni(), "content-type": "application/json" },
-      body: JSON.stringify({ prefix: prefisso, limit: 1000, offset: 0, sortBy: { column: "created_at", order: "asc" } }),
-    });
-    if (!r.ok) throw new Error(`Supabase Storage: ${r.status} ${(await r.text()).slice(0, 300)}`);
-    return r.json();
-  }
-
-  async function cancellaRisultati(percorsi) {
-    if (!percorsi.length) return;
+  // Cancella dal bucket "risultati" i file indicati (al massimo 1000 per
+  // chiamata, il limite dell'API dello Storage).
+  async function rimuoviRisultati(nomi) {
+    if (!nomi.length) return;
     const r = await chiama(`${base()}/storage/v1/object/risultati`, {
       method: "DELETE",
       headers: { ...intestazioni(), "content-type": "application/json" },
-      body: JSON.stringify({ prefixes: percorsi }),
+      body: JSON.stringify({ prefixes: nomi }),
     });
     if (!r.ok) throw new Error(`Supabase Storage: ${r.status} ${(await r.text()).slice(0, 300)}`);
   }
 
-  return { rpc, select, aggiorna, inserisci, caricaRisultato, elencaRisultati, cancellaRisultati };
+  return { rpc, select, aggiorna, inserisci, caricaRisultato, rimuoviRisultati };
 }

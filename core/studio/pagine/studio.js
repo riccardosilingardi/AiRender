@@ -41,6 +41,9 @@ const S = {
   contestoTenuto: null,
   inFila: [],             // le altre varianti dello stesso Genera, ancora da seguire
   ultimoEsito: null,      // ultimo lavoro finito in errore o annullato, per Genera
+  // Licenza e saldo: cosa dice /api/licenza, e il modulo per incollare il codice.
+  licenza: null,
+  attiva: { codice: "", inCorso: false, errore: null, cambia: false },
   errore: null,           // errore di una richiesta, con fatto e cosa_fare
   secco: null,            // risposta della prova a secco
   viste_viste: new Set(),
@@ -456,6 +459,7 @@ function seguiLavoro(lavoro) {
       } else if (!ora.attivo) {
         clearInterval(giroStato);
         S.lavoroAttivo = null;
+        if (S.licenza && S.licenza.provider === "airender") caricaLicenza().then(render);
         S.risultato.scelto = ora.identificativo;
         if (S.scheda === "passi") {
           // Chi lavora per passi resta nell'albero, sul passo appena nato.
@@ -557,7 +561,9 @@ function disegnaTestata() {
     h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
     S.descrizione && S.descrizione.camera ? h("span", { classe: "tenue" }, `· ${S.descrizione.camera}`) : null,
   ].filter(Boolean));
-  for (const voce of document.querySelectorAll(".voce-rotaia[data-scheda]")) {
+  const posto = document.getElementById("licenza-testata");
+  if (posto) posto.replaceChildren(...[pastigliaLicenza()].filter(Boolean));
+  for (const voce of document.querySelectorAll("[data-scheda]")) {
     voce.classList.toggle("attiva", voce.dataset.scheda === S.scheda);
     if (voce.dataset.scheda === S.scheda) voce.setAttribute("aria-current", "page"); else voce.removeAttribute("aria-current");
   }
@@ -1316,6 +1322,7 @@ function schermataGenera() {
     sopra.push(h("div", { classe: "avviso errore", role: "alert" },
       h("b", {}, e.stato === "annullato" ? "Lavoro annullato." : "L'invio non è andato."),
       h("span", {}, e.fatto || ""), e.cosa_fare ? h("span", { classe: "cosa-fare" }, e.cosa_fare) : null,
+      saldoFinito(e.fatto) ? h("div", { classe: "riga" }, pulsanteRicarica(), h("a", { classe: "btn link", href: "#licenza" }, "Vedi il saldo")) : null,
       h("span", { classe: "piccolo tenue" }, `Le scelte sono rimaste: ${e.preset_nome} · ${e.modello_nome}. Puoi rifarlo da Risultato con la stessa ricetta.`)));
   }
   if (S.modo === "contesto") {
@@ -3196,6 +3203,168 @@ for (const tipo of ["pointerup", "pointercancel"]) {
   }, true);
 }
 
+// --- Licenza e saldo ------------------------------------------------------------
+// Bozza A scelta il 2026-11-05: una scheda intera, il saldo in breve in
+// testata. Quattro stati (DESIGN.md): vuoto, in corso, errore, pieno.
+
+async function caricaLicenza() {
+  try { S.licenza = await get("/api/licenza"); } catch (e) { S.licenza = { presente: false, errore: { fatto: e.fatto, cosa_fare: e.cosa_fare } }; }
+}
+
+// La stessa frase che scrive il server quando il saldo non copre il render.
+function saldoFinito(fatto) { return /saldo AIRENDER non basta/.test(fatto || ""); }
+
+function pulsanteRicarica() {
+  const l = S.licenza;
+  const url = l && l.saldo && l.saldo.ricarica_url;
+  return url
+    ? h("a", { classe: "btn primario", href: url, target: "_blank", rel: "noopener" }, "Ricarica")
+    : h("button", { classe: "btn primario", disabled: true, title: "Il link per ricaricare arriva dal server AIRENDER: riapri la scheda Licenza." }, "Ricarica");
+}
+
+function nomeServer() {
+  try { return new URL(S.licenza.server).host; } catch (e) { return "server AIRENDER"; }
+}
+
+function nomePiano(saldo) { return (saldo.funzioni && saldo.funzioni.nome) || saldo.piano || ""; }
+
+// La pastiglia in testata: quello che conta, sempre visibile.
+function pastigliaLicenza() {
+  const l = S.licenza;
+  if (!l) return null;
+  if (usaComfy()) return h("a", { classe: "pastiglia", href: "#licenza" }, "Chiave Comfy tua");
+  if (!l.presente) return h("a", { classe: "pastiglia attenzione", href: "#licenza" }, "Nessuna licenza");
+  if (!l.saldo) return h("a", { classe: "pastiglia attenzione", href: "#licenza", title: l.errore ? l.errore.fatto : "" }, "Saldo non letto");
+  return h("a", { classe: "pastiglia ok", href: "#licenza" }, h("b", {}, String(l.saldo.saldo)), ` render · ${nomePiano(l.saldo)}`);
+}
+
+async function attivaLicenza(evento) {
+  if (evento) evento.preventDefault();
+  if (S.attiva.inCorso) return;
+  S.attiva.inCorso = true; S.attiva.errore = null; render();
+  try {
+    S.licenza = await post("/api/licenza", { codice: S.attiva.codice });
+    S.attiva = { codice: "", inCorso: false, errore: null, cambia: false };
+    if (S.vista) await caricaDestinazione();
+  } catch (e) {
+    S.attiva.inCorso = false; S.attiva.errore = e;
+  }
+  render();
+}
+
+async function usaServizio(provider) {
+  try {
+    S.licenza = await post("/api/licenza/servizio", { provider });
+    S.attiva.errore = null;
+    if (S.vista) await caricaDestinazione();
+  } catch (e) { S.attiva.errore = e; }
+  render();
+}
+
+function moduloCodice() {
+  const a = S.attiva;
+  const campo = h("input", {
+    id: "codice-licenza", classe: "codice" + (a.errore ? " sbagliato" : ""), placeholder: "AIR-XXXX-XXXX-XXXX-XXXX",
+    autocomplete: "off", spellcheck: "false", disabled: a.inCorso, value: a.codice,
+    "aria-describedby": "dove-va-il-codice", oninput: (e) => { S.attiva.codice = e.target.value; },
+  });
+  return h("form", { classe: "modulo-codice", onsubmit: attivaLicenza },
+    h("label", { for: "codice-licenza", classe: "etichetta-campo" }, "Codice licenza"),
+    h("div", { classe: "riga" }, campo,
+      h("button", { classe: "btn primario", type: "submit", disabled: a.inCorso }, a.errore && a.errore.fatto.includes("non risponde") ? "Riprova" : "Attiva")),
+    a.inCorso
+      ? h("div", { classe: "riga", role: "status" }, h("span", { classe: "giro", "aria-hidden": "true" }),
+          h("span", { classe: "tenue" }, `Chiedo al server AIRENDER (${nomeServer()}) se il codice è valido.`))
+      : h("p", { id: "dove-va-il-codice", classe: "tenue piccolo" }, `Il codice si controlla con il server AIRENDER: `, h("span", { classe: "mono" }, nomeServer()),
+          ". Se va, resta salvato solo su questo PC."),
+    a.errore ? avviso("errore", a.errore.fatto, a.errore.cosa_fare) : null);
+}
+
+// La chiave Comfy propria vale solo se c'e' davvero sul PC.
+function usaComfy() { return !!(S.licenza && S.licenza.provider === "comfy" && S.licenza.chiave_comfy); }
+
+function pannelloComfy() {
+  const l = S.licenza;
+  if (usaComfy()) {
+    return h("div", { classe: "pannello" },
+      h("p", {}, h("b", {}, "I render usano la tua chiave Comfy."), " Paghi Comfy direttamente; i crediti AIRENDER non si toccano."),
+      l.presente ? h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: () => usaServizio("airender") }, "Torna ai crediti AIRENDER")) : null);
+  }
+  return h("div", { classe: "pannello" },
+    h("p", {}, h("b", {}, "Hai una chiave Comfy tua?"), " Puoi usarla al posto dei crediti AIRENDER: paghi Comfy direttamente."),
+    l.chiave_comfy ? h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: () => usaServizio("comfy") }, "Usa la mia chiave Comfy")) : null,
+    l.chiave_comfy ? null : h("p", { classe: "tenue piccolo" }, "Su questo PC non c'è ancora: va messa nella variabile d'ambiente COMFY_API_KEY di Windows, poi si riapre lo Studio."));
+}
+
+function tabellaCosti(saldo) {
+  const righe = [];
+  for (const [modello, perDimensione] of Object.entries(saldo.pesi || {})) {
+    const m = (S.catalogo.modelli || []).find((x) => x.id === modello);
+    for (const [dimensione, render] of Object.entries(perDimensione)) {
+      righe.push(h("tr", {}, h("td", {}, `${m ? m.nome : modello}, ${dimensione}`), h("td", {}, String(render))));
+    }
+  }
+  if (!righe.length) return null;
+  return h("table", { classe: "costi" },
+    h("thead", {}, h("tr", {}, h("th", {}, "Quanto costa un render"), h("th", {}, "render"))),
+    h("tbody", {}, ...righe));
+}
+
+function giorno(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? String(iso).split("T")[0] : d.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function pannelloSaldo() {
+  const l = S.licenza, s = l.saldo;
+  const scadenza = s.prossima_scadenza;
+  const post_ = s.postazioni || {};
+  return h("div", { classe: "pannello" },
+    h("h2", {}, `Piano ${nomePiano(s)}`),
+    h("div", { classe: "riga saldo" }, h("span", { classe: "numero" }, String(s.saldo)),
+      h("span", { classe: "tenue" }, `render disponibili${s.in_attesa ? `, più ${s.in_attesa} in corso` : ""}`)),
+    h("dl", { classe: "dati" },
+      scadenza ? [h("dt", {}, "Scadenza"), h("dd", {}, `${scadenza.quantita} render scadono il ${giorno(scadenza.il)}`)] : null,
+      post_.massimo ? [h("dt", {}, "Postazioni"), h("dd", {}, `${post_.usate} di ${post_.massimo} usate`)] : null,
+      h("dt", {}, "Licenza"), h("dd", {}, `…${s.ultime_cifre || l.ultime_cifre}${s.email ? ` · ${s.email}` : ""}`)),
+    h("div", { classe: "riga" }, pulsanteRicarica(),
+      s.gestisci_url ? h("a", { classe: "btn", href: s.gestisci_url, target: "_blank", rel: "noopener" }, "Gestisci abbonamento") : null),
+    h("p", { classe: "tenue piccolo" }, "Ricarica e Gestisci aprono il browser; i link valgono un'ora."),
+    tabellaCosti(s),
+    h("div", { classe: "riga" }, h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice")));
+}
+
+function schermataLicenza() {
+  const l = S.licenza;
+  const titolo = h("h1", {}, "Licenza e saldo");
+  if (!l) return [titolo, h("p", { classe: "tenue" }, "Leggo la licenza…")];
+  const blocchi = [titolo];
+  // Vuoto, in corso, errore del codice: il modulo.
+  if (!l.presente || S.attiva.cambia) {
+    blocchi.push(h("div", { classe: "pannello" },
+      h("h2", {}, S.attiva.cambia ? "Cambia codice" : "Attiva AIRENDER"),
+      h("p", {}, "Incolla il codice licenza che hai ricevuto per email dopo l'acquisto. Senza codice i render con i crediti AIRENDER non partono."),
+      moduloCodice(),
+      S.attiva.cambia
+        ? h("div", { classe: "riga" }, h("button", { classe: "btn link", onclick: () => { S.attiva = { codice: "", inCorso: false, errore: null, cambia: false }; render(); } }, "Lascia il codice di prima"))
+        : (!l.presente ? h("div", { classe: "riga" }, h("a", { classe: "btn link", href: `${l.server}/#prezzi`, target: "_blank", rel: "noopener" }, "Non hai una licenza? Vedi i piani")) : null)));
+  } else if (l.saldo) {
+    // Pieno.
+    blocchi.push(pannelloSaldo());
+  } else if (l.errore) {
+    // Codice salvato, ma il server non ha dato il saldo.
+    blocchi.push(h("div", { classe: "pannello" },
+      h("h2", {}, `Licenza …${l.ultime_cifre}`),
+      avviso("errore", l.errore.fatto, l.errore.cosa_fare),
+      h("div", { classe: "riga" },
+        h("button", { classe: "btn", onclick: async () => { await caricaLicenza(); render(); } }, "Riprova"),
+        h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice"))));
+  }
+  if (S.attiva.errore && l.presente && !S.attiva.cambia) blocchi.push(avviso("errore", S.attiva.errore.fatto, S.attiva.errore.cosa_fare));
+  blocchi.push(pannelloComfy());
+  return h("div", { classe: "schermata-licenza" }, ...blocchi);
+}
+
 function render() {
   if (trascinando) { ridisegnoInAttesa = true; return; }
   disegnaTestata();
@@ -3212,7 +3381,8 @@ function render() {
   const cursore = prima && typeof prima.selectionStart === "number"
     ? { inizio: prima.selectionStart, fine: prima.selectionEnd, direzione: prima.selectionDirection, alto: prima.scrollTop } : null;
   const scorrimento = window.scrollY;
-  const contenuto = S.scheda === "video" ? schermataVideo()
+  const contenuto = S.scheda === "licenza" ? schermataLicenza()
+    : S.scheda === "video" ? schermataVideo()
     : S.scheda === "risultato" ? schermataRisultato()
     : S.scheda === "passi" ? schermataPassi()
     : S.scheda === "ritocca" ? schermataRitocca() : schermataGenera();
@@ -3232,7 +3402,7 @@ function render() {
 
 function leggiScheda() {
   const s = (location.hash || "#genera").slice(1);
-  S.scheda = ["genera", "risultato", "passi", "ritocca", "video"].includes(s) ? s : "genera";
+  S.scheda = ["genera", "risultato", "passi", "ritocca", "video", "licenza"].includes(s) ? s : "genera";
 }
 
 window.addEventListener("hashchange", async () => {
@@ -3241,6 +3411,7 @@ window.addEventListener("hashchange", async () => {
   if ((S.scheda === "passi" || S.scheda === "ritocca") && S.vista) await caricaPassi();
   if (S.scheda === "ritocca") await prontoRitocca();
   if (S.scheda === "video") await caricaVideo();
+  if (S.scheda === "licenza") await caricaLicenza();
   render();
   window.scrollTo(0, 0);
 });
@@ -3275,7 +3446,13 @@ async function avvia() {
   leggiScheda();
   try {
     [S.studio, S.catalogo] = await Promise.all([get("/api/studio"), get("/api/catalogo")]);
-    await caricaMiei();
+    await Promise.all([caricaMiei(), caricaLicenza()]);
+    // Senza codice e senza una chiave Comfy propria non parte niente: lo
+    // Studio si apre sulla scheda Licenza (bozza A, 2026-11-05).
+    if (S.licenza && !S.licenza.presente && !S.licenza.chiave_comfy && S.scheda !== "licenza") {
+      history.replaceState(null, "", "#licenza");
+      S.scheda = "licenza";
+    }
     const primo = S.catalogo.scene.esterno.preset[0];
     S.preset = primo.id;
     S.scelte = { ...primo.scelte };

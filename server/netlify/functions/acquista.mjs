@@ -16,7 +16,7 @@
 
 import { facoltativa, serve } from "../../lib/ambiente.mjs";
 import { leggiFirma } from "../../lib/codice.mjs";
-import { errore } from "../../lib/risposte.mjs";
+import { errore, protetto } from "../../lib/risposte.mjs";
 import { creaStripe, PRODOTTI } from "../../lib/stripe.mjs";
 
 // La versione dei testi in docs/legale/: si cambia insieme ai testi.
@@ -76,6 +76,6 @@ export async function gestisci(req, { ambiente = process.env, stripe = creaStrip
   return new Response(null, { status: 303, headers: { location: sessione.url } });
 }
 
-export default (req) => gestisci(req);
+export default protetto("acquista", (req) => gestisci(req));
 
 export const config = { path: "/api/acquista" };

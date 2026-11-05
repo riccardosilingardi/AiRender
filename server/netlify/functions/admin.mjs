@@ -16,7 +16,7 @@ import { serve } from "../../lib/ambiente.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { creaEmail } from "../../lib/email.mjs";
 import { listino } from "../../lib/listino.mjs";
-import { errore, json } from "../../lib/risposte.mjs";
+import { errore, json, protetto } from "../../lib/risposte.mjs";
 import { accredita, cambiaPiano, nuovaLicenza, nuovoCodice, traMesi } from "../../lib/vendite.mjs";
 
 function autorizzato(req, ambiente) {
@@ -79,6 +79,6 @@ export async function gestisci(req, { ambiente = process.env, db = creaDb(ambien
   return errore(400, "azione_sconosciuta", `Azione sconosciuta: ${a.azione}.`, "Vedi l'elenco in testa a server/netlify/functions/admin.mjs.");
 }
 
-export default (req) => gestisci(req);
+export default protetto("admin", (req) => gestisci(req));
 
 export const config = { path: "/api/admin" };

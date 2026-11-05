@@ -7,7 +7,7 @@ import { firma } from "../../lib/codice.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { intestazioniCliente, licenzaDi } from "../../lib/licenza.mjs";
 import { funzioni, listino } from "../../lib/listino.mjs";
-import { json } from "../../lib/risposte.mjs";
+import { json, protetto } from "../../lib/risposte.mjs";
 
 export async function gestisci(req, { ambiente = process.env, db = creaDb(ambiente) } = {}) {
   const { licenza, risposta } = await licenzaDi(db, intestazioniCliente(req).codice);
@@ -30,6 +30,6 @@ export async function gestisci(req, { ambiente = process.env, db = creaDb(ambien
   });
 }
 
-export default (req) => gestisci(req);
+export default protetto("saldo", (req) => gestisci(req));
 
 export const config = { path: "/api/saldo" };

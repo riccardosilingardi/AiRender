@@ -14,7 +14,7 @@ cliente come fatte.
 - Il server non salva né le viste né i prompt. Le immagini generate troppo
   grandi per la risposta vanno in un archivio privato con link firmato che
   scade dopo 24 ore. Una funzione oraria le cancella dopo 48 ore
-  (`server/netlify/functions/pulizia-risultati.mjs`).
+  (`server/netlify/functions/pulizia.mjs`).
 - La destinazione (servizio e modello) si vede nell'interfaccia prima di ogni
   invio. Il ripiego su altri fornitori è spento (`fallback_provider=false`).
 - Ogni immagine generata porta nel file un'indicazione XMP «generata con

@@ -24,6 +24,7 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 | `/api/stripe-webhook` | `stripe-webhook.mjs` | Crea licenze, accredita, manda il codice, fattura |
 | `/api/admin` | `admin.mjs` | Licenze manuali (rivendita Serteco), accrediti, sospensioni. Da `scripts/licenze.py` |
 | `/api/listino` | `listino.mjs` | Il listino per la pagina prezzi |
+| (ogni ora) | `pulizia.mjs` | Cancella dallo Storage i risultati piu' vecchi di 48 ore |
 
 Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 `listino.json` si riscrive con `python scripts/scrivi_listino.py` e
@@ -33,8 +34,9 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 
 1. **Supabase.** Nuovo progetto in regione UE, Francoforte (`eu-central-1`):
    la regione non si cambia dopo. SQL editor: incolla ed esegui
-   `supabase/migrations/001_crediti.sql`. Crea anche il bucket privato
-   `risultati`. Copia URL e chiave `service_role`.
+   `supabase/migrations/001_crediti.sql`, poi
+   `supabase/migrations/002_pulizia_risultati.sql`. Crea anche il bucket
+   privato `risultati`. Copia URL e chiave `service_role`.
 2. **Stripe.** Catalogo prodotti: un prodotto per piano con i prezzi del
    listino (Prova 15 € e Ricarica 10 € una tantum; Base 19/190, Pro 39/390,
    Studio 99/990 ricorrenti mese/anno), IVA esclusa. Copia gli id `price_…`.
@@ -71,7 +73,7 @@ Il codice parte per email al cliente (o `--senza-email` e lo stampa).
 ## Test
 
 ```
-cd server && npm test                       # 30 test, nessuna rete (quello SQL si salta)
+cd server && npm test                       # 35 test, nessuna rete (quello SQL si salta)
 AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgres vuoto
 ```
 
@@ -85,7 +87,7 @@ AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgr
   corpo Gemini.
 - GDPR: DPA con Comfy (e i suoi fornitori), Supabase, Netlify, Stripe, Resend; le viste passano dal
   server ma non si salvano, tranne i risultati sopra 4,5 MB (Storage, link di
-  24 ore, cancellati dopo 48 ore da `pulizia-risultati.mjs`, funzione
+  24 ore, cancellati dopo 48 ore da `pulizia.mjs`, funzione
   programmata ogni ora). Prima di inoltrare, il router toglie dalle immagini
   EXIF, XMP e testi (`lib/pulisci.mjs`). Comfy non ha un DPA (mail del
   2026-11-05): testi e stato in `docs/legale/`.

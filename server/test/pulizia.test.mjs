@@ -1,33 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pulisci } from "../netlify/functions/pulizia-risultati.mjs";
+import { ORE, pulisci } from "../netlify/functions/pulizia.mjs";
 import { corpoPulito, jpegPulito, pngPulito } from "../lib/pulisci.mjs";
 import { zlibSync } from "./png-finto.mjs";
 
-const ADESSO = Date.parse("2026-11-05T12:00:00Z");
-
-function storageFinto(file) {
-  const cancellati = [];
+function dbConFile(nomi) {
+  const restanti = [...nomi];
+  const chiamate = [];
   return {
-    cancellati,
-    async elencaRisultati(prefisso) {
-      if (!prefisso) return [...new Set(file.map((f) => f.percorso.split("/")[0]))].map((name) => ({ name, id: null }));
-      return file.filter((f) => f.percorso.startsWith(prefisso))
-        .map((f) => ({ name: f.percorso.slice(prefisso.length), id: "x", created_at: f.creato }));
-    },
-    async cancellaRisultati(percorsi) { cancellati.push(...percorsi); },
+    chiamate,
+    restanti,
+    rpc: async (nome, a) => { chiamate.push([nome, a]); return restanti.slice(0, a.p_quanti); },
+    rimuoviRisultati: async (tolti) => { for (const n of tolti) restanti.splice(restanti.indexOf(n), 1); },
   };
 }
 
-test("la pulizia cancella solo i risultati piu' vecchi di 48 ore", async () => {
-  const db = storageFinto([
-    { percorso: "L1/vecchio-0.png", creato: "2026-11-02T10:00:00Z" },
-    { percorso: "L1/recente-0.png", creato: "2026-11-05T09:00:00Z" },
-    { percorso: "L2/vecchio-0.jpeg", creato: "2026-11-01T10:00:00Z" },
-  ]);
-  const esito = await pulisci({ db, adesso: ADESSO });
-  assert.deepEqual(db.cancellati.sort(), ["L1/vecchio-0.png", "L2/vecchio-0.jpeg"]);
-  assert.equal(esito.cancellati, 2);
+test("la pulizia toglie i risultati scaduti a giri di 500 e chiede quelli piu' vecchi di 48 ore", async () => {
+  const db = dbConFile(Array.from({ length: 1203 }, (_, i) => `L1/r${i}-0.png`));
+  const tolti = await pulisci({ db, log: () => {} });
+  assert.equal(tolti, 1203);
+  assert.equal(db.restanti.length, 0);
+  assert.equal(ORE, 48);
+  assert.deepEqual(db.chiamate[0], ["airender_risultati_vecchi", { p_ore: 48, p_quanti: 500 }]);
+});
+
+test("senza file vecchi non cancella niente", async () => {
+  const db = dbConFile([]);
+  assert.equal(await pulisci({ db, log: () => {} }), 0);
 });
 
 // Un PNG minimo valido, con un blocco tEXt e uno eXIf in mezzo.
