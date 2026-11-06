@@ -979,6 +979,25 @@ contraddicono le nuove, valgono le nuove:
 | 4 — Materiali | Studio · Ritocca, in grigio; Materiali a parole in Genera | La direzione del 2026-10-22 (zone dalla mappa di Allplan, unisci e separa) resta, dentro Ritocca |
 | 5 — Livelli | Studio · Passi (dal 2026-10-28) | Non più livelli sopra un render ma un albero di passi, ognuno con la sua ricetta; costruito il 2026-10-30 |
 
+## Web app · Accedi, costruita il 2026-11-06
+
+La web app è lo Studio stesso, servito da `airender-server.netlify.app/studio/`
+invece che da 127.0.0.1 (decisione di Riccardo, 2026-11-06: «Lo Studio vero nel
+browser»). L'unica schermata nuova è l'ingresso, prima dello Studio, con lo
+stile dello Studio. Sotto, sempre, lo stato del motore che si prepara nel
+browser. Con un codice già salvato in quel browser si entra senza ripetere.
+
+| Stato | Cosa si vede |
+|---|---|
+| Vuoto | «Accedi ad AIRENDER Studio», la frase su dove restano le immagini e dove va la vista quando si preme Genera, Email, Codice licenza, Entra, «Vedi i piani» |
+| In corso | Entra spento, «Chiedo al server AIRENDER (<host>) se email e codice sono di una licenza.»; poi «Licenza trovata. Aspetto che lo Studio sia pronto nel browser…» |
+| Errore | Email e codice col bordo rosso e la frase del server, che non dice quale dei due è sbagliato; motore non partito o browser senza JSPI: la ragione e «Apri la web app con Chrome o Edge aggiornati»; seconda scheda: «Lo Studio è già aperto in un'altra scheda» |
+| Pieno | Lo Studio, come sul PC |
+
+Nella web app «Apri cartella» risponde che le immagini stanno nel browser;
+«Esporta per il cliente» scarica il file. I testi dello Studio che parlano
+della palette restano fino alla PR 2.
+
 ## Decisioni visive
 
 - **Ribaltata il 2026-10-27:** vista di partenza e render ~~affiancati, non in

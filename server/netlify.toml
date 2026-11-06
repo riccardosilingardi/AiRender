@@ -1,5 +1,8 @@
 # Netlify legge questo file se la "Base directory" del sito e' server/.
 [build]
+  # La web app dello Studio (public/studio/) si costruisce dallo Studio sul
+  # PC a ogni deploy: vedi scripts/scrivi_web.py.
+  command = "python3 ../scripts/scrivi_web.py"
   publish = "public"
   functions = "netlify/functions"
 
