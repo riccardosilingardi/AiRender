@@ -1031,13 +1031,14 @@ LISTINO = _registra(Costante(
 
 SERVER_AIRENDER = _registra(Costante(
     nome="SERVER_AIRENDER",
-    valore="https://airender.netlify.app",
+    valore="https://airender-server.netlify.app",
     origine=SCELTA,
     ragione=(
         "Indirizzo del server AIRENDER (funzioni Netlify) che riceve la vista "
         "con il codice licenza e la passa al Comfy Router con la chiave di "
-        "Riccardo. Il dominio vero non c'e' ancora: si cambia qui o con la "
-        "variabile d'ambiente AIRENDER_SERVER."
+        "Riccardo. Progetto Netlify airender-server, online dal 2026-11-06. "
+        "Quando ci sara' un dominio proprio si cambia qui o con la variabile "
+        "d'ambiente AIRENDER_SERVER."
     ),
 ))
 
