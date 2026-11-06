@@ -283,8 +283,11 @@ non si sa se Pillow si carica, se `run_sync` con JSPI lascia rispondere lo
 Studio mentre un render aspetta, se IDBFS tiene i render fra una visita e
 l'altra, e quanto pesa davvero il primo caricamento (stimato 20 MB). Serve
 Chrome o Edge recenti (JSPI); Firefox e Safari si fermano con un messaggio.
-Testi dello Studio che parlano di palette e cartelle del PC sono rimasti
-(PR 2). Ogni browser conta come una postazione. Verifica: aprire
+Sul web (pagina sotto `/studio/`) lo Studio non mostra la cartella delle
+viste né il riquadro della chiave Comfy, e dice «nuova scheda» e «questo
+browser» al posto di browser e PC; «Tieni la geometria» è grigia senza chiave
+Comfy propria; la tabella materiali resta quella di Allplan (sul web il lazo
+è in un altro thread); altri testi che parlano di palette sono rimasti (PR 2). Ogni browser conta come una postazione. Verifica: aprire
 l'anteprima Netlify della PR in Edge, entrare, caricare una vista, un render,
 saldo sceso di 1; chiudere e riaprire, il render c'e' ancora.
 
