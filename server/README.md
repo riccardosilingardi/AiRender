@@ -52,7 +52,8 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 4. **Fatture in Cloud.** Token personale con permesso documenti emessi;
    id azienda, id dell'aliquota IVA e del conto di incasso. Lascia
    `FIC_INVIA_SDI` vuoto finché le prime fatture non sono giuste.
-5. **Resend.** Dominio mittente verificato, chiave API.
+5. **Email.** Mailjet (UE): API key e secret key, mittente verificato
+   (`EMAIL_MITTENTE`). In alternativa Resend: dominio verificato, chiave API.
 6. **Netlify.** Nuovo sito dal repository, *Base directory* `server`. Tutte le
    variabili di `.env.example`. Poi `SERVER_AIRENDER` in `core/config.py` (o
    `AIRENDER_SERVER` sul PC) con l'indirizzo vero.
@@ -87,7 +88,7 @@ AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgr
   scritta di Comfy. Nessuna fattura prima di averla. Rischi e mail a Comfy in
   `docs/termini-comfy-rivendita.md`. Alternativa: Vertex AI diretto, stesso
   corpo Gemini.
-- GDPR: DPA con Comfy (e i suoi fornitori), Supabase, Netlify, Stripe, Resend; le viste passano dal
+- GDPR: DPA con Comfy (e i suoi fornitori), Supabase, Netlify, Stripe, Mailjet; le viste passano dal
   server ma non si salvano, tranne i risultati sopra 4,5 MB (Storage, link di
   24 ore, cancellati dopo 48 ore da `pulizia.mjs`, funzione
   programmata ogni ora). Prima di inoltrare, il router toglie dalle immagini

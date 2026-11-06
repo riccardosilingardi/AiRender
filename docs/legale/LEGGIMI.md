@@ -44,5 +44,5 @@ La versione dei termini in vigore è in `server/netlify/functions/acquista.mjs`
 - Dati di uso (tabella `render`) cancellati dopo 24 mesi: la cancellazione
   automatica non c'è (`sicurezza.md`, da fare).
 - Marcatura «generata con l'IA» nel PSD e nei video: non c'è.
-- Regione UE di Supabase, Netlify e Resend: dipende da come si creano gli
+- Regione UE di Supabase e Netlify (Mailjet è già in UE): dipende da come si creano gli
   account.

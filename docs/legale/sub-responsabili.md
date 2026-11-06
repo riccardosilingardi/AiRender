@@ -13,7 +13,7 @@ fornitore: va controllato prima di pubblicarla.
 | Supabase, Inc. | Database licenze e crediti; archivio temporaneo dei risultati (48 ore) | Email, dati fiscali, impronta del codice, movimenti; immagini generate grandi | UE, Francoforte (`eu-central-1`, progetto `airender`, creato il 2026-11-06) | DPA Supabase, SCC | Da fare: firmare il DPA dal cruscotto (Organization settings > Legal documents) |
 | Stripe Payments Europe, Ltd. | Pagamenti e abbonamenti | Dati di pagamento e fatturazione | UE (Irlanda), con trasferimenti a Stripe USA | DPA Stripe, SCC/DPF | Accettato con l'account |
 | TeamSystem S.p.A. (Fatture in Cloud) | Fatture elettroniche | Dati fiscali | Italia | DPA TeamSystem | Da verificare |
-| Resend (Plus Five Five, Inc.) | Email con il codice licenza | Email, nome del piano, codice | USA (regione di invio configurabile) | DPA Resend, SCC | Da verificare: regione UE |
+| Sinch Mailjet SAS | Email con il codice licenza | Email, nome del piano, codice | UE (Francia) | DPA Mailjet (nei termini del servizio) | Da verificare: DPA accettato con l'account di Riccardo. Resend (USA) resta solo come alternativa nel codice, non attiva |
 | Serteco | Rivenditore | Dati per attivare la licenza | Italia | Accordo di rivendita con clausola privacy | Da scrivere |
 
 Solo i modelli del listino partono con i crediti AIRENDER (oggi Nano Banana 2
