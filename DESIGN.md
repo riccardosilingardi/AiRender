@@ -721,10 +721,18 @@ sparisce il render precedente e i passi, non va bene, deve rimanere storico» e
 «se avevo già aggiunto persone e gli dico di aggiungerne altre in un posto con
 una auto mi ha fatto sparire quelle precedenti». Niente interfaccia a nodi.
 
-**Storico: la striscia in alto, in ogni scheda**
-- Una tessera per immagine: ogni cattura, render, modifica, ritocco e video.
-  Un gruppo per vista, la vista catturata per ultima a sinistra; dentro il
-  gruppo l'ordine in cui sono nate. Etichette di una o due parole («Vista»,
+**Storico: la colonna a sinistra, in ogni scheda** (era una striscia in alto;
+colonna scelta da Riccardo il 2026-11-05, mock B, perché con molte viste la
+striscia si allungava di lato senza fine)
+- Un gruppo per vista, uno sotto l'altro, la vista catturata per ultima in
+  alto. Ogni gruppo si apre e si chiude dalla sua testa (freccia, miniatura
+  della vista, nome, quante immagini fatte); senza una scelta a mano è
+  aperta la vista su cui si lavora e quella appena catturata. Si scorre in
+  verticale, dentro la colonna.
+- «Chiudi» in cima riduce la colonna a una barra sottile «Storico», per
+  dare all'immagine tutta la larghezza; la scelta resta su questo PC.
+- Dentro il gruppo una tessera per immagine, su due colonne: ogni cattura,
+  render, modifica, ritocco e video, nell'ordine in cui sono nate. Etichette di una o due parole («Vista»,
   «Render 1», «Ritocco 3», «Video»); il resto (stato, data) al passaggio del
   mouse.
 - Un clic porta all'immagine: la cattura in Genera, un render o un ritocco in
@@ -732,9 +740,9 @@ una auto mi ha fatto sparire quelle precedenti». Niente interfaccia a nodi.
   in Video.
 - Una cattura nuova dalla palette apre un gruppo nuovo con «Nuova»: i gruppi
   di prima restano. In Genera, senza lavori in corso, la cattura nuova si
-  apre subito; altrove resta nella striscia e quello su cui si lavora non
+  apre subito; altrove resta nello storico e quello su cui si lavora non
   cambia.
-- **Vuoto:** nessuna vista nella cartella: la striscia non c'è.
+- **Vuoto:** nessuna vista nella cartella: la colonna non c'è.
 - **In corso:** la tessera del lavoro c'è già, e pulsa finché non finisce.
 - **Errore:** la tessera dice «Errore» o «Annullato»; un file dei passi
   rotto lascia nel suo gruppo solo la cattura, gli altri gruppi restano.

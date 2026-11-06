@@ -62,9 +62,12 @@ const S = {
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
   video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
            durata: null, risoluzione: null, audio: false, secco: null, errore: null, caricando: false, scegliPer: null },
-  // Lo storico: tutte le immagini di tutte le viste, nella striscia in alto.
+  // Lo storico: tutte le immagini di tutte le viste, nella colonna a sinistra.
   // Una cattura nuova si aggiunge; niente di quello che c'era sparisce.
-  storico: { gruppi: [], firma: "", disegnata: "" },
+  // aperte: le viste aperte o chiuse a mano (nome -> true/false); senza una
+  // scelta a mano e' aperta la vista su cui si lavora. ridotta: la colonna
+  // chiusa, per dare spazio all'immagine.
+  storico: { gruppi: [], firma: "", disegnata: "", aperte: {}, ridotta: leggiRidotta(), vistaMostrata: null },
   // Le azioni sotto l'immagine in Risultato: per quale render, il video in un clic.
   azioni: { per: null, video: false, movimento: null, mandato: false, errore: null },
 };
@@ -1581,7 +1584,7 @@ function pannelloEsporta(l) {
 
 // --- da questa immagine: Ritocca · Variante · Video (proposte 3 e 4) ---------------
 // Sotto l'immagine, le stesse tre azioni per ogni render. Il risultato nasce
-// accanto a questa immagine nella striscia dello storico e, finito, e' gia'
+// accanto a questa immagine nello storico e, finito, e' gia'
 // quello scelto. Il video chiede solo il movimento della camera: durata e
 // risoluzione sono le prime della scheda Video, dove si cambiano.
 
@@ -1736,7 +1739,7 @@ function pannelloPorta(l) {
   if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo stile e ritocchi di questa immagine…");
   if (p.mandato) {
     return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, `In coda sulla vista ${p.mandato}.`),
-      h("span", { classe: "piccolo tenue" }, "La trovi nella striscia in alto, sotto quella vista. Poi in Video la usi come fotogramma."));
+      h("span", { classe: "piccolo tenue" }, "La trovi nello storico a sinistra, sotto quella vista. Poi in Video la usi come fotogramma."));
   }
   const d = p.dati;
   if (!d.viste.length) {
@@ -1791,7 +1794,7 @@ function videoVeloce(l) {
   if (!c) return h("p", { classe: "tenue piccolo" }, "Leggo dove va il video…");
   if (az.mandato) {
     return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, "Video in coda."),
-      h("span", { classe: "piccolo tenue" }, "Lo trovi nella striscia in alto, accanto a questa immagine."));
+      h("span", { classe: "piccolo tenue" }, "Lo trovi nello storico a sinistra, accanto a questa immagine."));
   }
   const spento = !c.fa_video ? "Il servizio scelto non fa video."
     : videoInCorso() ? "Un video è già in lavorazione: aspetta che finisca."
@@ -2915,7 +2918,7 @@ function postoVideo(indice, titolo) {
 }
 
 // I render fatti, di tutte le viste, da scegliere per un posto del video:
-// le stesse immagini della striscia dello storico, senza viste e video.
+// le stesse immagini dello storico, senza viste e video.
 function sceltaDaiRender(indice) {
   const v = S.video;
   const voci = S.storico.gruppi.flatMap((g) => g.voci).filter((x) => x.immagine && x.tipo !== "cattura" && x.tipo !== "video");
@@ -3126,9 +3129,57 @@ function schermataVideo() {
 }
 
 // --- storico --------------------------------------------------------------------
-// La striscia in alto, uguale in ogni scheda: una tessera per immagine, un
-// gruppo per vista. Un clic porta all'immagine: la cattura in Genera, un
-// render o un ritocco in Risultato, un video in Video.
+// La colonna a sinistra, uguale in ogni scheda: un gruppo per vista, che si
+// apre e si chiude, e dentro una tessera per immagine su due colonne. Si
+// scorre in verticale: con molte viste la pagina non si allunga di lato.
+// Un clic porta all'immagine: la cattura in Genera, un render o un ritocco in
+// Risultato, un video in Video.
+
+function leggiRidotta() {
+  try { return localStorage.getItem("airender.storico.ridotta") === "1"; } catch (e) { return false; }
+}
+
+function riduciStorico(si) {
+  S.storico.ridotta = si;
+  try { localStorage.setItem("airender.storico.ridotta", si ? "1" : "0"); } catch (e) { /* resta per questa volta */ }
+  S.storico.disegnata = "";
+  disegnaStorico();
+}
+
+function gruppoAperto(g) {
+  const scelta = S.storico.aperte[g.vista || ""];
+  if (scelta !== undefined) return scelta;
+  if (!g.vista) return false;
+  return g.vista === S.vista || !S.viste_viste.has(g.vista);
+}
+
+function apriChiudiGruppo(g) {
+  S.storico.aperte[g.vista || ""] = !gruppoAperto(g);
+  S.storico.disegnata = "";
+  disegnaStorico();
+}
+
+function nomeVista(nome) {
+  return nome.replace(/\.[^.]+$/, "");
+}
+
+function gruppoStorico(g) {
+  const aperto = gruppoAperto(g);
+  const nome = g.vista ? nomeVista(g.vista) : "Video da immagini caricate";
+  const nuova = g.vista && !S.viste_viste.has(g.vista);
+  const conta = g.voci.filter((v) => v.tipo !== "cattura").length;
+  const qui = g.vista && g.vista === S.vista;
+  const corpo = `corpo-storico-${(g.vista || "video").replace(/[^A-Za-z0-9_-]/g, "_")}`;
+  return h("section", { classe: `gruppo-storico${qui ? " qui" : ""}`, "aria-label": g.vista ? `Vista ${g.vista}` : nome, "data-vista": g.vista || "" },
+    h("button", { classe: "testa-gruppo", "aria-expanded": String(aperto), "aria-controls": corpo,
+      title: aperto ? `Chiudi ${nome}` : `Apri ${nome}`, onclick: () => apriChiudiGruppo(g) },
+      h("span", { classe: "freccia", "aria-hidden": "true" }, aperto ? "▾" : "▸"),
+      g.vista ? h("img", { classe: "miniatura-gruppo", src: `/file/vista/${enc(g.vista)}`, alt: "", loading: "lazy", decoding: "async" }) : null,
+      h("span", { classe: "nome-gruppo" }, nome),
+      nuova ? h("span", { classe: "segno-testa" }, "Nuova") : null,
+      h("span", { classe: "conta tenue", title: conta === 1 ? "1 immagine fatta" : `${conta} immagini fatte` }, String(conta))),
+    aperto ? h("div", { classe: "tessere-gruppo", id: corpo }, g.voci.map(tesseraStorico)) : null);
+}
 
 async function caricaStorico() {
   try { S.storico.gruppi = (await get("/api/storico")).gruppi; } catch (e) { /* la prossima volta */ }
@@ -3188,14 +3239,34 @@ function disegnaStorico() {
   if (!nav) return;
   const gruppi = S.storico.gruppi || [];
   // Si ridisegna solo se e' cambiato qualcosa: le immagini non si ricaricano
-  // a ogni giro e la striscia non salta.
+  // a ogni giro e la colonna non salta.
   const firma = JSON.stringify([gruppi, S.scheda, S.vista, S.risultato.scelto, S.passi.scelto, S.ritocca.da, S.ritocca.esito, [...S.viste_viste]]);
   if (firma === S.storico.disegnata) return;
   S.storico.disegnata = firma;
-  const scorrimento = nav.scrollLeft;
-  nav.replaceChildren(...gruppi.map((g) => h("div", { classe: "gruppo-storico", role: "group", "aria-label": g.vista ? `Vista ${g.vista}` : "Video da immagini caricate" },
-    g.voci.map(tesseraStorico))));
-  nav.scrollLeft = scorrimento;
+  nav.classList.toggle("ridotta", S.storico.ridotta);
+  if (!gruppi.length) { nav.replaceChildren(); return; }
+  if (S.storico.ridotta) {
+    nav.replaceChildren(h("button", { classe: "apri-storico", onclick: () => riduciStorico(false),
+      title: "Apri lo storico: tutte le immagini, vista per vista." },
+      h("span", { "aria-hidden": "true" }, "▸"), h("span", { classe: "verticale" }, "Storico")));
+    return;
+  }
+  const elenco = nav.querySelector(".elenco-storico");
+  const scorrimento = elenco ? elenco.scrollTop : 0;
+  const nuovoElenco = h("div", { classe: "elenco-storico" }, gruppi.map(gruppoStorico));
+  nav.replaceChildren(
+    h("div", { classe: "testa-storico" },
+      h("span", { classe: "etichetta" }, "Storico"),
+      h("button", { classe: "btn link piccolo", onclick: () => riduciStorico(true),
+        title: "Chiudi la colonna: l'immagine prende tutta la larghezza." }, "Chiudi")),
+    nuovoElenco);
+  nuovoElenco.scrollTop = scorrimento;
+  // Quando cambia la vista su cui si lavora, la si porta in vista nella colonna.
+  if (S.vista !== S.storico.vistaMostrata) {
+    S.storico.vistaMostrata = S.vista;
+    const qui = nuovoElenco.querySelector(".gruppo-storico.qui");
+    if (qui) qui.scrollIntoView({ block: "nearest" });
+  }
 }
 
 // Mentre si trascina (un'area, il rettangolo del fotoinserimento, un
@@ -3443,7 +3514,7 @@ async function controllaStudio() {
     if (firma !== S.storico.firma || videoInCorso) { S.storico.firma = firma; await caricaStorico(); }
     if (!S.vista && ora.viste.length) { await caricaVista(ora.viste[0].nome); return; }
     // Una cattura nuova dalla palette: in Genera, senza lavori in corso, la
-    // si apre subito. Altrove resta nella striscia con «Nuova», e quello
+    // si apre subito. Altrove resta nello storico con «Nuova», e quello
     // su cui si sta lavorando non cambia.
     if (nuove.length && S.scheda === "genera" && !S.lavoroAttivo) { await caricaVista(nuove[0].nome); return; }
     render();
@@ -3498,5 +3569,12 @@ inviaPulito = unInvioAllaVolta(inviaPulito);
 rifaiPasso = unInvioAllaVolta(rifaiPasso);
 generaVideo = unInvioAllaVolta(generaVideo);
 applicaFinale = unInvioAllaVolta(applicaFinale);
+
+// La colonna dello storico e' alta quanto la finestra meno la testata.
+(() => {
+  const testata = document.querySelector(".testata");
+  if (!testata || typeof ResizeObserver === "undefined") return;
+  new ResizeObserver(() => document.documentElement.style.setProperty("--alto-testata", `${testata.offsetHeight}px`)).observe(testata);
+})();
 
 avvia();
