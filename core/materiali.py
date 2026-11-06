@@ -124,6 +124,10 @@ class Cambio:
     diventa: str
     anteprima: str | None = None  # percorso del PNG
     riferimento: str | None = None  # percorso della foto di riferimento
+    # True quando il campione non e' l'anteprima di Allplan ma un ritaglio
+    # della vista stessa, fatto con la selezione libera (web app, immagini
+    # che non vengono da Allplan): cambia solo la frase del prompt.
+    dalla_vista: bool = False
 
     def __post_init__(self) -> None:
         if not self.diventa.strip():
@@ -136,8 +140,11 @@ class Cambio:
         return [p for p in (self.anteprima, self.riferimento) if p]
 
     def a_dizionario(self) -> dict:
-        return {"nome": self.nome, "diventa": self.diventa,
+        dati = {"nome": self.nome, "diventa": self.diventa,
                 "anteprima": self.anteprima, "riferimento": self.riferimento}
+        if self.dalla_vista:
+            dati["dalla_vista"] = True
+        return dati
 
     @classmethod
     def da_dizionario(cls, dati: object) -> "Cambio":
@@ -145,7 +152,8 @@ class Cambio:
             raise MaterialeNonValido("Un materiale da cambiare non e' scritto bene.",
                                      "Rimetti il lavoro in coda dallo Studio.")
         return cls(str(dati.get("nome") or ""), str(dati.get("diventa") or ""),
-                   dati.get("anteprima") or None, dati.get("riferimento") or None)
+                   dati.get("anteprima") or None, dati.get("riferimento") or None,
+                   bool(dati.get("dalla_vista")))
 
 
 def controlla_cambi(cambi: tuple[Cambio, ...]) -> tuple[Cambio, ...]:
@@ -182,7 +190,12 @@ def prompt(base: str, cambi: tuple[Cambio, ...], prima_immagine: int) -> str:
     righe = ["Material changes. Image 1 is the view to render. Keep the geometry of image 1 exactly."]
     numero = prima_immagine
     for cambio in cambi:
-        if cambio.anteprima:
+        if cambio.anteprima and cambio.dalla_vista:
+            frase = (f"Image {numero} is a crop of image 1 that shows the material «{cambio.nome}» "
+                     "(the flat grey around it is outside the selection, ignore it): "
+                     f"every surface in image 1 with this material becomes: {cambio.diventa.strip()}.")
+            numero += 1
+        elif cambio.anteprima:
             frase = (f"Image {numero} is a sample of the material «{cambio.nome}» as the CAD model shows it: "
                      f"every surface in image 1 that looks like this sample becomes: {cambio.diventa.strip()}.")
             numero += 1
