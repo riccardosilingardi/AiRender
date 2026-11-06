@@ -35,8 +35,9 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 1. **Supabase.** Nuovo progetto in regione UE, Francoforte (`eu-central-1`):
    la regione non si cambia dopo. SQL editor: incolla ed esegui
    `supabase/migrations/001_crediti.sql`, poi
-   `supabase/migrations/002_pulizia_risultati.sql`. Crea anche il bucket
-   privato `risultati`. Copia URL e chiave `service_role`.
+   `supabase/migrations/002_pulizia_risultati.sql` e
+   `supabase/migrations/003_funzioni_chiuse.sql` (le funzioni dei crediti le
+   esegue solo `service_role`). Il bucket privato `risultati` lo crea la 001. Copia URL e chiave `service_role`.
 2. **Stripe.** Catalogo prodotti: un prodotto per piano con i prezzi del
    listino (Prova 15 € e Ricarica 10 € una tantum; Base 19/190, Pro 39/390,
    Studio 99/990 ricorrenti mese/anno), IVA esclusa. Copia gli id `price_…`.
