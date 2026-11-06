@@ -4,6 +4,9 @@
   # PC a ogni deploy: vedi scripts/scrivi_web.py.
   command = "python3 ../scripts/scrivi_web.py"
   publish = "public"
+  # Netlify salta il deploy se non cambia niente nella base directory
+  # (server/): la web app nasce anche da core/, web/ e scripts/.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../core ../web ../scripts"
   functions = "netlify/functions"
 
 [functions]
