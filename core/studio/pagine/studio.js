@@ -5,6 +5,10 @@
 // errore, pieno. Lo stato vuoto non mostra dati finti.
 "use strict";
 
+// La web app serve lo Studio sotto /studio/ (scripts/scrivi_web.py): li' la
+// cartella sta nel browser, non c'e' Allplan accanto e non c'e' Windows.
+const SUL_WEB = location.pathname.startsWith("/studio/");
+
 const S = {
   scheda: "genera",
   miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
@@ -324,7 +328,7 @@ function caricaMio(nome) {
   const p = S.miei.preset.find((x) => x.nome === nome);
   if (!p) { render(); return; }
   S.preset = null;
-  S.scelte = { ...p.scelte };
+  S.scelte = { ...p.scelte, fedelta: undefined };  // Fedeltà al disegno tolta (2026-11-06): vale sempre la regola predefinita
   if (p.modello && S.catalogo.modelli.some((m) => m.id === p.modello)) S.modello = p.modello;
   S.promptAMano = vedePrompt() ? (p.prompt_a_mano || null) : null;
   if (p.blocchi_cambiati || p.perse.length) {
@@ -356,7 +360,7 @@ function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -364,7 +368,7 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -562,9 +566,9 @@ function disegnaTestata() {
   c.append(...[
     h("span", { classe: attiva ? "punto" : "punto fermo", "aria-hidden": "true" }),
     h("span", {}, attiva ? "Coda dei lavori attiva" : "Coda dei lavori ferma"),
-    h("span", { classe: "tenue" }, "·"),
-    h("span", { classe: "tenue" }, "Cartella delle viste: "),
-    h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
+    SUL_WEB ? null : h("span", { classe: "tenue" }, "·"),
+    SUL_WEB ? null : h("span", { classe: "tenue" }, "Cartella delle viste: "),
+    SUL_WEB ? null : h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
     S.descrizione && S.descrizione.camera ? h("span", { classe: "tenue" }, `· ${S.descrizione.camera}`) : null,
   ].filter(Boolean));
   const posto = document.getElementById("licenza-testata");
@@ -587,7 +591,7 @@ function striscia() {
       h("span", { classe: "piccolo", stile: "color:#A1A4AB" },
         l.stato === "in coda" && !S.studio.coda_attiva
           ? "La coda dei lavori è ferma: il lavoro aspetta che riparta."
-          : `${l.preset_nome} · ${l.modello_nome}. Allplan resta libero.`),
+          : `${l.preset_nome} · ${l.modello_nome}.${SUL_WEB ? "" : " Allplan resta libero."}`),
       h("button", { classe: "btn", onclick: annulla }, "Annulla")));
 }
 
@@ -599,8 +603,10 @@ function sezioneVista() {
   if (!S.vista) {
     figura.append(h("div", { classe: "vista-vuota" },
       h("h2", {}, "Nessuna vista ancora."),
-      h("p", {}, "Catturala dalla palette in Allplan, oppure scegli un file con Usa un'altra vista…"),
-      h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
+      SUL_WEB
+        ? h("p", {}, "Scegli un'immagine della vista con Usa un'altra vista…: resta in questo browser finché non la mandi al servizio.")
+        : h("p", {}, "Catturala dalla palette in Allplan, oppure scegli un file con Usa un'altra vista…"),
+      SUL_WEB ? null : h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
   } else {
     figura.append(h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}` }));
     if (S.lavoroAttivo) figura.append(striscia());
@@ -814,11 +820,6 @@ function colonnaInvio() {
       classe: "seg", "aria-pressed": String(S.scelte.qualita === v.id), onclick: () => cambiaAsse("qualita", v.id),
     }, v.id === "32k" ? "Altissima definizione (32k)" : v.nome)));
 
-  const fedelta = h("div", { classe: "switch", role: "group", "aria-label": "Fedeltà al disegno" },
-    asse("fedelta").voci.map((v) => h("button", {
-      classe: "seg", "aria-pressed": String((S.scelte.fedelta || "bilanciata") === v.id), onclick: () => cambiaAsse("fedelta", v.id),
-    }, v.nome)));
-
   const risoluzione = h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del render" },
     S.catalogo.risoluzioni.map((r) => h("button", {
       classe: "seg", "aria-pressed": String((S.scelte.risoluzione || "1k") === r.id),
@@ -830,8 +831,6 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
-    ...(S.modo === "contesto" ? [] : [h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
-    nota("Quanto il modello può allontanarsi dalla vista.", "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -955,13 +954,19 @@ async function scegliRiferimento(file) {
   render();
 }
 // «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
-function geometriaGenera() { return S.modo !== "contesto" && S.geometria; }
+// La prima passata gira su un workflow del Comfy Developer Platform pagato
+// con la chiave Comfy propria: coi crediti AIRENDER non passa (ne' sul PC ne' sul web).
+function geometriaPossibile() { return usaComfy(); }
+function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
 function pannelloGeometria() {
-  const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria,
+  const possibile = geometriaPossibile();
+  const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
-  return h("div", { classe: "geometria" },
+  return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
+    possibile ? null : h("p", { classe: "tenue piccolo" },
+      "Serve una chiave Comfy tua: la prima passata gira su un workflow Comfy che i crediti AIRENDER non coprono, quindi coi crediti non si può spuntare."),
     h("p", { classe: "tenue piccolo" },
       "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
       "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."));
@@ -2537,7 +2542,7 @@ function rigaPasso(passo) {
     attivo ? h("div", { classe: "striscia in-riga", role: "status" },
       h("div", { classe: "riga tra" }, h("span", {}, h("b", {}, (attivo.destinazione || "").split(" (")[0]), ` · ${attivo.stato}`), h("span", { classe: "mono" }, tempo(attivo.secondi))),
       h("div", { classe: "barra" }, h("span")),
-      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan resta libero."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
+      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, SUL_WEB ? "" : "Allplan resta libero."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
     h("button", {
       classe: "btn link piccolo", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null,
       onclick: () => apriNuovoPasso(passo),
@@ -3358,7 +3363,7 @@ function moduloCodice() {
       ? h("div", { classe: "riga", role: "status" }, h("span", { classe: "giro", "aria-hidden": "true" }),
           h("span", { classe: "tenue" }, `Chiedo al server AIRENDER (${nomeServer()}) se il codice è valido.`))
       : h("p", { id: "dove-va-il-codice", classe: "tenue piccolo" }, `Il codice si controlla con il server AIRENDER: `, h("span", { classe: "mono" }, nomeServer()),
-          ". Se va, resta salvato solo su questo PC."),
+          SUL_WEB ? ". Se va, resta salvato solo in questo browser." : ". Se va, resta salvato solo su questo PC."),
     a.errore ? avviso("errore", a.errore.fatto, a.errore.cosa_fare) : null);
 }
 
@@ -3411,7 +3416,7 @@ function pannelloSaldo() {
       h("dt", {}, "Licenza"), h("dd", {}, `…${s.ultime_cifre || l.ultime_cifre}${s.email ? ` · ${s.email}` : ""}`)),
     h("div", { classe: "riga" }, pulsanteRicarica(),
       s.gestisci_url ? h("a", { classe: "btn", href: s.gestisci_url, target: "_blank", rel: "noopener" }, "Gestisci abbonamento") : null),
-    h("p", { classe: "tenue piccolo" }, "Ricarica e Gestisci aprono il browser; i link valgono un'ora."),
+    h("p", { classe: "tenue piccolo" }, SUL_WEB ? "Ricarica e Gestisci aprono una nuova scheda; i link valgono un'ora." : "Ricarica e Gestisci aprono il browser; i link valgono un'ora."),
     tabellaCosti(s),
     h("div", { classe: "riga" }, h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice")));
 }
@@ -3443,7 +3448,7 @@ function schermataLicenza() {
         h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice"))));
   }
   if (S.attiva.errore && l.presente && !S.attiva.cambia) blocchi.push(avviso("errore", S.attiva.errore.fatto, S.attiva.errore.cosa_fare));
-  blocchi.push(pannelloComfy());
+  if (!SUL_WEB) blocchi.push(pannelloComfy());  // sul web non c'e' dove mettere COMFY_API_KEY
   return h("div", { classe: "schermata-licenza" }, ...blocchi);
 }
 
@@ -3537,7 +3542,7 @@ async function avvia() {
     }
     const primo = S.catalogo.scene.esterno.preset[0];
     S.preset = primo.id;
-    S.scelte = { ...primo.scelte };
+    S.scelte = { ...primo.scelte, fedelta: undefined };
     S.modello = S.studio.modello_predefinito;
     await Promise.all([caricaDestinazione(), aggiornaComposto(true)]);
     const attivo = S.studio.lavori_attivi[0];
