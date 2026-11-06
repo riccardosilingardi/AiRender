@@ -80,7 +80,8 @@ modulo_ponte.installa_attesa(lambda secondi: run_sync(dormi_js(secondi)))
 ponte = modulo_ponte.Ponte(Path(CASA) / "viste", postazione=POSTAZIONE)
 
 def rispondi(metodo, percorso, intestazioni_json, corpo):
-    dati = corpo.to_bytes() if corpo is not None else b""
+    # Da JavaScript un corpo assente arriva come null (JsNull in Pyodide), non come None.
+    dati = corpo.to_bytes() if hasattr(corpo, "to_bytes") else b""
     stato, intestazioni, risposta = ponte.rispondi(metodo, percorso, json.loads(intestazioni_json), dati)
     file = ponte.prendi_da_scaricare()
     return to_js({
@@ -176,7 +177,7 @@ async function richiesta(porta, dati) {
 
 async function esegui(porta, { id, metodo, url, intestazioni, corpo }) {
   try {
-    const esito = await rispondi.callPromising(metodo, url, JSON.stringify(intestazioni || {}), corpo ? new Uint8Array(corpo) : null);
+    const esito = await rispondi.callPromising(metodo, url, JSON.stringify(intestazioni || {}), corpo ? new Uint8Array(corpo) : undefined);
     if (metodo === "POST") { sporco = true; salva(); }
     if (esito.scarica) dimmi({ tipo: "scarica", nome: esito.scarica.nome, corpo: esito.scarica.corpo }, [esito.scarica.corpo.buffer]);
     porta.postMessage({ id, stato: esito.stato, intestazioni: esito.intestazioni, corpo: esito.corpo.buffer }, [esito.corpo.buffer]);
