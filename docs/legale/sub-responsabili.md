@@ -1,6 +1,6 @@
 # Sub-responsabili e fornitori di AIRENDER
 
-**Bozza, 2026-11-05.** Fornitori che toccano dati dei clienti, con cosa
+**Bozza, 2026-11-05; Netlify e Supabase aggiornati il 2026-11-06.** Fornitori che toccano dati dei clienti, con cosa
 ricevono, dove e con quale garanzia. «Da verificare» vuol dire che la
 sessione che ha scritto questa pagina non ha potuto leggere il documento del
 fornitore: va controllato prima di pubblicarla.
@@ -9,8 +9,8 @@ fornitore: va controllato prima di pubblicarla.
 |---|---|---|---|---|---|
 | Comfy Org, Inc. | Comfy Router: passa la richiesta al modello | Immagini (senza metadati) e testo del prompt | USA | **Nessun DPA** (mail di Yoland Yan, 2026-11-05) | **Da chiudere**: chiedere DPA con SCC |
 | Google LLC (Vertex AI) | Modelli Nano Banana 2 e Pro | Immagini e prompt, tramite Comfy | Endpoint «global»: regione non garantita | Contratto fra Comfy e Google; Google Cloud DPA e SCC | Da verificare: conservazione e uso dei dati con l'account di Comfy |
-| Netlify, Inc. | Server (funzioni) e sito | Immagini in transito, codice licenza, email all'acquisto | USA (regione delle funzioni configurabile) | DPA Netlify, SCC/DPF | Da verificare: regione UE delle funzioni |
-| Supabase, Inc. | Database licenze e crediti; archivio temporaneo dei risultati (48 ore) | Email, dati fiscali, impronta del codice, movimenti; immagini generate grandi | UE (Francoforte), se il progetto è creato lì | DPA Supabase, SCC | Da fare: creare il progetto in regione UE |
+| Netlify, Inc. | Server (funzioni) e sito | Immagini in transito, codice licenza, email all'acquisto | Funzioni: USA, Ohio (regione predefinita del piano Free); pagine statiche dalla CDN | DPA Netlify (dentro il Self-Serve Subscription Agreement, accettato con l'account), SCC 2021/914 e certificazione DPF | Da fare: piano Pro (20 $/mese) e regione delle funzioni su Francoforte, poi nuovo deploy |
+| Supabase, Inc. | Database licenze e crediti; archivio temporaneo dei risultati (48 ore) | Email, dati fiscali, impronta del codice, movimenti; immagini generate grandi | UE, Francoforte (`eu-central-1`, progetto `airender`, creato il 2026-11-06) | DPA Supabase, SCC | Da fare: firmare il DPA dal cruscotto (Organization settings > Legal documents) |
 | Stripe Payments Europe, Ltd. | Pagamenti e abbonamenti | Dati di pagamento e fatturazione | UE (Irlanda), con trasferimenti a Stripe USA | DPA Stripe, SCC/DPF | Accettato con l'account |
 | TeamSystem S.p.A. (Fatture in Cloud) | Fatture elettroniche | Dati fiscali | Italia | DPA TeamSystem | Da verificare |
 | Resend (Plus Five Five, Inc.) | Email con il codice licenza | Email, nome del piano, codice | USA (regione di invio configurabile) | DPA Resend, SCC | Da verificare: regione UE |
