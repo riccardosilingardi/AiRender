@@ -18,7 +18,7 @@ import { creaFatture, fattura } from "../../lib/fatture.mjs";
 import { listino, renderDelPeriodo } from "../../lib/listino.mjs";
 import { json, protetto } from "../../lib/risposte.mjs";
 import { creaStripe, datiFiscali, firmaValida, prodottoDelPrezzo } from "../../lib/stripe.mjs";
-import { accredita, cambiaPiano, nuovaLicenza, traMesi } from "../../lib/vendite.mjs";
+import { accredita, cambiaPiano, mandaCodice, nuovaLicenza, traMesi } from "../../lib/vendite.mjs";
 
 export function servizi(ambiente = process.env, chiama = fetch) {
   return {
@@ -64,10 +64,11 @@ async function sessioneCompletata(s, sessione) {
     const lic = await nuovaLicenza(s, {
       email: dati.email, piano: "prova", origine: "stripe", riferimento: sessione.id,
       stripe_cliente: sessione.customer, dati_fiscali: dati,
-      codice_sconto: sessione.discounts?.[0]?.promotion_code || null,
+      codice_sconto: sessione.discounts?.[0]?.promotion_code || null, manda_email: false,
     });
     licenzaId = lic.id;
     await accredita(s, licenzaId, "prova", p.render, traMesi(p.validita_mesi), sessione.id);
+    await mandaCodice(s, licenzaId, dati.email, lic.codice, p.nome);
     descrizione = `AIRENDER ${p.nome}: ${p.render} render validi ${p.validita_mesi} mesi`;
   } else if (prodotto === "ricarica") {
     const r = listino.ricarica;
@@ -124,8 +125,9 @@ async function fatturaPagata(s, invoice) {
       email: dati.email || invoice.customer_email, piano: prodotto.piano, origine: "stripe",
       riferimento: sessione.id, stripe_cliente: invoice.customer, stripe_abbonamento: abbonamento,
       dati_fiscali: dati, codice_sconto: sessione.discounts?.[0]?.promotion_code || null,
+      manda_email: false,
     });
-    licenza = { id: lic.id, piano: prodotto.piano, dati_fiscali: dati };
+    licenza = { id: lic.id, piano: prodotto.piano, dati_fiscali: dati, email: dati.email || invoice.customer_email, codice: lic.codice };
   } else if (licenza.piano !== prodotto.piano) {
     await cambiaPiano(s, licenza.id, prodotto.piano);
   }
@@ -138,6 +140,7 @@ async function fatturaPagata(s, invoice) {
     const scade = fine ? new Date(fine * 1000).toISOString() : traMesi(prodotto.intervallo === "anno" ? 12 : 1);
     await accredita(s, licenza.id, "piano", quanti, scade, invoice.id);
   }
+  await mandaCodice(s, licenza.id, licenza.email, licenza.codice, listino.piani[prodotto.piano].nome);
 
   if (s.fatture && invoice.amount_paid > 0) {
     const p = listino.piani[prodotto.piano];
