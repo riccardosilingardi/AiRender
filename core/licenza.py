@@ -38,6 +38,10 @@ if TYPE_CHECKING:
 
 VARIABILE = "AIRENDER_LICENZA"
 VARIABILE_SERVER = "AIRENDER_SERVER"
+# Solo la web app le imposta (web/ponte.py): il canale "web" e un'impronta
+# del browser al posto di quella della macchina. Nel plugin restano vuote.
+VARIABILE_CANALE = "AIRENDER_CANALE"
+VARIABILE_POSTAZIONE = "AIRENDER_POSTAZIONE"
 INTESTAZIONE = "X-Airender-Licenza"
 INTESTAZIONE_POSTAZIONE = "X-Airender-Postazione"
 INTESTAZIONE_CANALE = "X-Airender-Canale"
@@ -130,6 +134,9 @@ def postazione() -> str:
 
     Non manda il nome della macchina ne' dell'utente, solo l'hash.
     """
+    propria = os.environ.get(VARIABILE_POSTAZIONE, "").strip()
+    if propria:
+        return hashlib.sha256(propria.encode("utf-8")).hexdigest()[:_IMPRONTA]
     try:
         utente = getpass.getuser()
     except Exception:  # pylint: disable=broad-exception-caught
@@ -142,7 +149,7 @@ def intestazioni(codice: str, canale: str = "plugin") -> dict:
     return {
         INTESTAZIONE: codice,
         INTESTAZIONE_POSTAZIONE: postazione(),
-        INTESTAZIONE_CANALE: canale,
+        INTESTAZIONE_CANALE: os.environ.get(VARIABILE_CANALE, "").strip() or canale,
     }
 
 

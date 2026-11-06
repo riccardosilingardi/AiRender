@@ -569,3 +569,5 @@ input.codice.sbagliato { border-color: var(--errore); }
 .geometria { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--bordo); }
 .geometria .riga-spunta { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .geometria p { margin: 0; }
+.geometria.spento b { color: var(--spento); }
+.geometria.spento input { cursor: not-allowed; }
