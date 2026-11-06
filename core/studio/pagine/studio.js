@@ -33,7 +33,10 @@ const S = {
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
   // quelli spuntati ({ chiave: { diventa, riferimento } }), la ricerca.
-  mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null },
+  // Senza l'elenco di Allplan (web app, immagini da altri programmi) i
+  // materiali si scelgono con la selezione libera sulla vista: `zone` tiene
+  // contorno, campione ritagliato, «diventa» e foto; `lazo` dice se si disegna.
+  mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null, zone: [], lazo: false },
   // Inserisci nel contesto: l'immagine del luogo portata dall'utente, il
   // rettangolo dove va l'edificio (coordinate da 0 a 1), l'inquadratura,
   // «pulisci la mappa» e il luogo a parole.
@@ -399,7 +402,7 @@ async function caricaVista(nome) {
   S.secco = null;
   S.risultato = { ...S.risultato, lavori: [], scelto: null, ricetta: null, caricato: false, confronto: "vista", rifai: false };
   S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
-  S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null };
+  S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null, zone: [], lazo: false };
   S.inserti = [];
   S.esempi = [];
   if (!nome) { render(); return; }
@@ -608,7 +611,8 @@ function sezioneVista() {
         : h("p", {}, "Catturala dalla palette in Allplan, oppure scegli un file con Usa un'altra vista…"),
       SUL_WEB ? null : h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
   } else {
-    figura.append(h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}` }));
+    figura.append(S.mat.lazo || S.mat.zone.length ? telaZone()
+      : h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}` }));
     if (S.lavoroAttivo) figura.append(striscia());
   }
   const sotto = h("div", { classe: "riga tra" });
@@ -859,11 +863,14 @@ function colonnaInvio() {
 
 function materialiPerServer() {
   if (S.modo === "contesto") return [];
-  return Object.entries(S.mat.scelti).map(([chiave, v]) => ({ chiave, diventa: v.diventa || "", riferimento: v.riferimento ? v.riferimento.nome : null }));
+  return Object.entries(S.mat.scelti).map(([chiave, v]) => ({ chiave, diventa: v.diventa || "", riferimento: v.riferimento ? v.riferimento.nome : null }))
+    .concat(S.mat.zone.map((z) => ({ campione: z.campione.nome, diventa: z.diventa || "", riferimento: z.riferimento ? z.riferimento.nome : null })));
 }
 function immaginiMateriali() {
-  if (S.modo === "contesto" || !S.mat.dati) return 0;
-  return Object.entries(S.mat.scelti).reduce((n, [chiave, v]) => {
+  if (S.modo === "contesto") return 0;
+  const daZone = S.mat.zone.reduce((n, z) => n + 1 + (z.riferimento ? 1 : 0), 0);
+  if (!S.mat.dati) return daZone;
+  return daZone + Object.entries(S.mat.scelti).reduce((n, [chiave, v]) => {
     const m = S.mat.dati.materiali.find((x) => x.chiave === chiave);
     return n + (m && m.anteprima ? 1 : 0) + (v.riferimento ? 1 : 0);
   }, 0);
@@ -894,8 +901,7 @@ function pannelloMateriali() {
     h("p", { classe: "piccolo tenue" }, "Cattura una vista dalla palette."));
   if (S.mat.errore) return h("section", { classe: "pannello" }, testa, avviso("errore", S.mat.errore.fatto, S.mat.errore.cosa_fare));
   if (!d) return h("section", { classe: "pannello" }, testa, h("p", { classe: "piccolo tenue" }, "Leggo i materiali…"));
-  if (!d.letti) return h("section", { classe: "pannello", "aria-label": "Materiali di questo progetto" }, testa,
-    h("p", { classe: "piccolo tenue" }, "Materiali non letti: cattura di nuovo la vista dalla palette."));
+  if (!d.letti) return pannelloZone(d.massimo);
   if (d.errore) return h("section", { classe: "pannello" }, testa,
     avviso("errore", `I materiali non si sono letti: ${d.errore}`, "Cattura di nuovo la vista. Se si ripete, manda diario-materiali.txt."));
   if (!d.materiali.length) return h("section", { classe: "pannello" }, testa,
@@ -937,6 +943,146 @@ function pannelloMateriali() {
       ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Facciate: scrivile in «Materiali a parole».") : null,
     h("p", { classe: "piccolo tenue", title: "Al modello partono la vista e, per ogni riga spuntata, l'anteprima di Allplan, il testo e la foto. Due materiali che nella vista sembrano uguali possono confondersi." }, "Allplan non viene toccato. ⓘ"),
     scelti ? h("p", { classe: "piccolo" }, h("b", {}, `${scelti === 1 ? "1 materiale" : `${scelti} materiali`} da cambiare`), conRif ? ` · ${conRif === 1 ? "1 foto" : `${conRif} foto`} di riferimento` : "") : null);
+}
+
+// --- materiali scelti sulla vista ----------------------------------------------
+// Senza l'elenco di Allplan (web app, render e foto da altri programmi) un
+// materiale si indica con la selezione libera: si disegna il contorno attorno
+// a una superficie della vista, la pagina ritaglia quel pezzo (fuori dal
+// contorno grigio piatto) e lo salva fra i riferimenti. Il ritaglio parte come
+// campione, al posto dell'anteprima di Allplan; il resto della riga e' uguale.
+// Il modello riconosce il materiale dall'aspetto: due superfici che sembrano
+// uguali si possono confondere (Trappole note in CLAUDE.md).
+
+// Lato massimo del campione ritagliato, in pixel: basta a leggere grana e colore.
+const CAMPIONE_LATO_MASSIMO = 512;
+const GRIGIO_FUORI = "#808080";  // numero-non-configurabile: grigio medio, fuori dal contorno del campione
+
+async function ritagliaCampione(img, punti) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const xs = punti.map((p) => p[0] * W), ys = punti.map((p) => p[1] * H);
+  const x0 = Math.floor(Math.min(...xs)), y0 = Math.floor(Math.min(...ys));
+  const w = Math.max(1, Math.ceil(Math.max(...xs)) - x0), hh = Math.max(1, Math.ceil(Math.max(...ys)) - y0);
+  const scala = Math.min(1, CAMPIONE_LATO_MASSIMO / Math.max(w, hh));
+  const tela = document.createElement("canvas");
+  tela.width = Math.max(1, Math.round(w * scala)); tela.height = Math.max(1, Math.round(hh * scala));
+  const c = tela.getContext("2d");
+  c.fillStyle = GRIGIO_FUORI;
+  c.fillRect(0, 0, tela.width, tela.height);
+  c.beginPath();
+  punti.forEach(([px, py], i) => { const x = (px * W - x0) * scala, y = (py * H - y0) * scala; if (i) c.lineTo(x, y); else c.moveTo(x, y); });
+  c.closePath();
+  c.clip();
+  c.drawImage(img, x0, y0, w, hh, 0, 0, tela.width, tela.height);
+  return new Promise((ok, no) => tela.toBlob((b) => (b ? ok(b) : no(new Error("ritaglio vuoto"))), "image/png"));
+}
+
+async function aggiungiZona(img, punti) {
+  try {
+    const blob = await ritagliaCampione(img, punti);
+    const campione = await post("/api/riferimenti", blob, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(`campione-${S.mat.zone.length + 1}.png`) });
+    S.mat.zone.push({ punti, campione, diventa: "", riferimento: null });
+    S.errore = null;
+  } catch (e) {
+    S.errore = e && e.fatto ? e : { fatto: "Il pezzo selezionato non si è potuto ritagliare dalla vista.", cosa_fare: "Ricarica la pagina e disegna di nuovo il contorno." };
+  }
+  if (S.mat.zone.length >= (S.mat.dati ? S.mat.dati.massimo : 0)) S.mat.lazo = false;
+  await materialiCambiati();
+  const campo = document.getElementById(`zona-diventa-${S.mat.zone.length - 1}`);
+  if (campo) campo.focus();
+}
+
+async function togliZona(i) {
+  S.mat.zone.splice(i, 1);
+  await materialiCambiati();
+}
+
+async function riferimentoZona(i, file) {
+  if (!file) return;
+  try {
+    S.mat.zone[i].riferimento = await post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  await materialiCambiati();
+}
+
+function telaZone() {
+  const img = h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}`, draggable: "false" });
+  const contenitore = h("div");
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${
+    S.mat.zone.map((z) => `<polygon class="contorno-area" points="${attributoPunti(z.punti)}"></polygon>`).join("")
+  }<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline");
+  const numeri = S.mat.zone.map((z, i) => {
+    const [x, y] = z.punti[0];
+    return h("span", { classe: "numero-area", stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
+  });
+  const tela = h("div", { classe: `tela-ritocco${S.mat.lazo ? "" : " bloccata"}` }, img, disegno, ...numeri);
+  if (!S.mat.lazo) return tela;
+  let tratto = null;
+  const punto = (ev) => {
+    const b = img.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
+  };
+  tela.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    tela.setPointerCapture(ev.pointerId);
+    tratto = [punto(ev)];
+  });
+  tela.addEventListener("pointermove", (ev) => {
+    if (!tratto || !tela.hasPointerCapture(ev.pointerId)) return;
+    const p = punto(ev), ultimo = tratto[tratto.length - 1];
+    if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) >= LAZO_PASSO_MINIMO) tratto.push(p);
+    traccia.setAttribute("points", attributoPunti(tratto));
+  });
+  const chiudi = () => {
+    if (!tratto) return;
+    const t = tratto; tratto = null;
+    traccia.setAttribute("points", "");
+    if (t.length < 3) return;
+    const xs = t.map((p) => p[0]), ys = t.map((p) => p[1]);
+    if (Math.max(...xs) - Math.min(...xs) < AREA_MINIMA || Math.max(...ys) - Math.min(...ys) < AREA_MINIMA) return;
+    aggiungiZona(img, t.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]));
+  };
+  tela.addEventListener("pointerup", chiudi);
+  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); });
+  return tela;
+}
+
+function pannelloZone(massimo) {
+  const testa = h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Materiali della vista",
+    spiega("Disegna a mano libera, come il lazo di Photoshop, attorno a una superficie della vista. Il pezzo dentro il contorno parte come campione del materiale, insieme al testo e alla foto. Il modello cambia tutte le superfici che somigliano al campione: due materiali che nella vista sembrano uguali possono confondersi.")));
+  const pieno = S.mat.zone.length >= massimo;
+  const comando = S.mat.lazo
+    ? h("button", { classe: "btn piccolo", onclick: () => { S.mat.lazo = false; render(); } }, "Fine selezione")
+    : h("button", { classe: "btn piccolo", disabled: pieno, onclick: () => { S.mat.lazo = true; render(); } }, "+ Seleziona un materiale");
+  const righe = S.mat.zone.map((z, i) => {
+    const diventa = h("input", { classe: "campo", id: `zona-diventa-${i}`, placeholder: "diventa…", "aria-label": `Materiale ${i + 1} diventa`, value: z.diventa });
+    diventa.addEventListener("input", () => { z.diventa = diventa.value; S.secco = null; aggiornaComposto(); });
+    const file = h("input", { type: "file", accept: "image/jpeg,image/png", hidden: true, onchange: (e) => riferimentoZona(i, e.target.files[0]) });
+    const rif = z.riferimento
+      ? h("span", { classe: "riga" }, h("img", { classe: "rif-materiale", src: `/file/riferimento/${enc(z.riferimento.nome)}`, alt: "Foto di riferimento" }),
+          h("button", { classe: "btn link piccolo", onclick: () => { z.riferimento = null; materialiCambiati(); } }, "Togli"))
+      : h("button", { classe: "btn piccolo", onclick: () => file.click() }, "+ Riferimento");
+    return h("div", { classe: "materiale scelto" },
+      h("img", { classe: "cubo", src: `/file/riferimento/${enc(z.campione.nome)}`, alt: `Campione del materiale ${i + 1}, ritagliato dalla vista` }),
+      h("div", { classe: "nome-materiale" }, h("b", {}, `Materiale ${i + 1}`), h("span", { classe: "tenue piccolo" }, "dalla vista")),
+      h("button", { classe: "btn link piccolo", onclick: () => togliZona(i) }, "Togli"),
+      h("div", { classe: "diventa" }, diventa, rif, file));
+  });
+  const vuote = S.mat.zone.some((z) => !z.diventa.trim());
+  return h("section", { classe: "pannello materiali", "aria-label": "Materiali della vista" }, testa,
+    S.mat.lazo
+      ? h("p", { classe: "piccolo" }, h("b", {}, "Disegna sulla vista"), " il contorno di una superficie tenendo premuto. Quando lasci, il pezzo diventa una riga qui sotto.")
+      : h("p", { classe: "piccolo tenue" }, S.mat.zone.length
+          ? `${S.mat.zone.length} di massimo ${massimo} materiali scelti sulla vista.`
+          : SUL_WEB ? "Indica sulla vista le superfici da cambiare: per ognuna scrivi cosa diventa."
+          : "Questa vista non ha l'elenco dei materiali di Allplan: indica sulla vista le superfici da cambiare."),
+    righe, h("div", { classe: "riga" }, comando),
+    pieno ? h("p", { classe: "piccolo tenue" }, `Al massimo ${massimo} materiali per invio: gli altri li cambi con un passo dopo.`) : null,
+    vuote ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Scrivi cosa diventa ogni materiale, o toglilo: senza testo non parte.") : null);
 }
 
 // Immagine di riferimento per lo stile: parte come seconda immagine, solo con

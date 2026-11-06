@@ -898,7 +898,12 @@ class Studio:
         return modulo_materiali.controlla_anteprima(self.cartella, nome)
 
     def _cambi_scelti(self, dati: dict, vista: Path | None = None) -> tuple:
-        """I materiali spuntati, con anteprima e foto prese dalle loro cartelle, mai dalla pagina."""
+        """I materiali spuntati, con anteprima e foto prese dalle loro cartelle, mai dalla pagina.
+
+        Una voce con `campione` viene dalla selezione libera sulla vista (web
+        app, viste che non vengono da Allplan): il campione e' un ritaglio
+        della vista che la pagina ha salvato fra i riferimenti.
+        """
         scelti = dati.get("materiali") or []
         if not scelti:
             return ()
@@ -910,6 +915,16 @@ class Studio:
         per_chiave = {m.chiave: m for m in (elenco["materiali"] if elenco else [])}
         cambi = []
         for voce in scelti:
+            if isinstance(voce, dict) and voce.get("campione"):
+                # Un materiale scelto con la selezione libera sulla vista: il
+                # campione e' un ritaglio della vista, salvato fra i riferimenti.
+                riferimento = voce.get("riferimento")
+                cambi.append(modulo_materiali.Cambio(
+                    f"materiale {len(cambi) + 1}", str(voce.get("diventa") or ""),
+                    str(self.percorso_riferimento(str(voce["campione"]))),
+                    str(self.percorso_riferimento(str(riferimento))) if riferimento else None,
+                    dalla_vista=True))
+                continue
             chiave = str((voce or {}).get("chiave") or "")
             materiale = per_chiave.get(chiave)
             if materiale is None:
@@ -2247,7 +2262,7 @@ def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: 
         quante = (2 if riferimento else 1) + materiali
         immagini = "1 immagine" if materiali == 1 else f"{materiali} immagini"
         return (f"Partono {quante} immagini: {prima}, poi {immagini} dei materiali da cambiare "
-                "(anteprime di Allplan e foto di riferimento).")
+                "(campioni dei materiali e foto di riferimento).")
     if contesto:
         return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
                 "poi la vista.")
