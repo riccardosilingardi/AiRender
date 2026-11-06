@@ -61,6 +61,8 @@ test("se l'email era fallita, l'evento ripetuto genera un codice nuovo e lo mand
   const s = servizi();
   s.email.inviaCodice = async () => { throw new Error("giu'"); };
   assert.equal((await gestisci(evento("checkout.session.completed", sessioneProva)(), s)).status, 500);
+  assert.deepEqual(s.db.stato.lotti.map((x) => x.residuo).sort((a, b) => a - b), [10, 50],
+    "i render pagati ci sono anche se l'email non e' partita");
   const vecchio = s.db.stato.licenze[0].hash_codice;
   const mandate = [];
   s.email.inviaCodice = async (a, codice) => { mandate.push(codice); };
@@ -73,6 +75,13 @@ test("se l'email era fallita, l'evento ripetuto genera un codice nuovo e lo mand
 const fatturaPro = (motivo, id = "in_1") => ({
   id, subscription: "sub_1", customer: "cus_2", billing_reason: motivo, amount_paid: 4758, total_excluding_tax: 3900,
   lines: { data: [{ price: { id: "price_pm" }, period: { end: 1_765_000_000 } }] },
+});
+
+test("abbonamento: se l'email non parte il mese e' accreditato lo stesso", async () => {
+  const s = servizi();
+  s.email.inviaCodice = async () => { throw new Error("giu'"); };
+  assert.equal((await gestisci(evento("invoice.paid", fatturaPro("subscription_create"))(), s)).status, 500);
+  assert.equal(s.db.stato.lotti.filter((x) => x.origine === "piano").length, 1);
 });
 
 test("il primo pagamento di un abbonamento crea la licenza dalla sessione e accredita il mese", async () => {
