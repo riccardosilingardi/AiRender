@@ -186,13 +186,30 @@ vista con colori neutri.»
   obbligatorio) e **+ Riferimento** (foto facoltativa). Al massimo
   `MATERIALI_CAMBIATI_MASSIMI` spunte (scelto). Ricerca e «Mostra tutti» oltre
   le prime righe; sotto, gli elementi senza materiale (es. facciate).
-  - *Vuoto:* «Materiali non letti: cattura di nuovo la vista dalla palette.»
+  - *Vuoto:* la vista non ha l'elenco di Allplan (web app, immagini da altri
+    programmi): al posto della tabella compare **Materiali della vista**, sotto.
     Nessuna riga d'esempio.
   - *In corso:* «Carico i materiali…».
   - *Errore:* il messaggio scritto dalla palette, con cosa fare.
   - *Pieno:* la tabella e una riga «N da cambiare, M immagini in più».
   Con FLUX.1 Kontext (una sola immagine) le anteprime non partono: lo dice e
   Genera si spegne finché non si cambia modello o si tolgono le spunte.
+- **Materiali della vista** (2026-11-06, ok di Riccardo al lazo libero): quando
+  la vista non ha l'elenco dei materiali di Allplan. **+ Seleziona un
+  materiale** mette la vista in modo disegno: si traccia il contorno a mano
+  libera tenendo premuto, come il lazo del Ritocca, e al rilascio la pagina
+  ritaglia il pezzo (fuori dal contorno grigio piatto). Il ritaglio è il
+  campione della riga, al posto del cubetto di Allplan; il resto è come sopra:
+  «diventa» obbligatorio, **+ Riferimento** facoltativo, **Togli**. I contorni
+  restano sulla vista, numerati. **Fine selezione** esce dal disegno. Al
+  massimo `MATERIALI_CAMBIATI_MASSIMI` materiali. Il flusso Allplan non cambia.
+  - *Vuoto:* «Indica sulla vista le superfici da cambiare: per ognuna scrivi
+    cosa diventa.» e il pulsante. Nessuna riga d'esempio.
+  - *In corso:* «Disegna sulla vista il contorno di una superficie…».
+  - *Errore:* «Il pezzo selezionato non si è potuto ritagliare dalla vista.»
+    con cosa fare; una riga senza «diventa» lo dice e non parte.
+  - *Pieno:* le righe con il campione, «N di massimo M materiali scelti sulla
+    vista».
 - **Cosa parte, in breve**: il riassunto delle scelte in italiano.
 - **Avanzate: mostra e modifica il prompt completo**: il testo vero che parte
   al modello, in inglese, modificabile, con il numero di caratteri. Se l'utente

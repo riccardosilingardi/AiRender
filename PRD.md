@@ -269,6 +269,18 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Materiali scelti sulla vista con il lazo (2026-11-06)
+
+Senza l'elenco di Allplan (web app, immagini da altri programmi) un materiale si
+indica disegnando a mano libera sulla vista; la pagina ritaglia il pezzo e lo
+manda come campione, con una frase sua nel prompt («a crop of image 1»).
+Provato con i test (motore e coda) e in Chromium sullo Studio del PC con un
+provider finto: contorno disegnato, riga creata, campione salvato, prompt
+composto. **Mai provato con un render vero**: non si sa se Nano Banana cambia
+bene tutte le superfici simili al ritaglio, né se il grigio attorno al
+campione lo confonde. Mai provato nella web app con Pyodide vero (il ritaglio
+usa una canvas sull'immagine servita dal service worker).
+
 ### Web app: lo Studio nel browser (2026-11-06)
 
 Lo Studio gira nel browser: Python con Pyodide 0.29.3 in un Web Worker
