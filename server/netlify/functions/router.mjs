@@ -55,6 +55,34 @@ export function haImmagine(uscita) {
   return parti.some((p) => p?.inlineData?.data || p?.fileData?.fileUri);
 }
 
+// Il corpo che parte verso il Router ha la forma che manda il plugin
+// (core/provider/comfy.py, _corpo_gemini) e nient'altro: parti di testo e
+// immagini inline, responseModalities solo IMAGE, rapporto e grandezza.
+// Senza questo filtro un codice licenza valido potrebbe chiedere a Gemini
+// solo testo (nessuna immagine = render annullato, quindi gratis per il
+// cliente e pagato da Riccardo), piu' candidati per un prezzo solo
+// (candidateCount), o fileData con un indirizzo che Google andrebbe a
+// leggere. Tutto il resto si butta in silenzio.
+export function corpoVersoComfy(corpo) {
+  const parti = [];
+  for (const contenuto of Array.isArray(corpo?.contents) ? corpo.contents : []) {
+    for (const p of Array.isArray(contenuto?.parts) ? contenuto.parts : []) {
+      if (typeof p?.text === "string") parti.push({ text: p.text });
+      else if (typeof p?.inlineData?.data === "string") {
+        parti.push({ inlineData: { mimeType: String(p.inlineData.mimeType || "image/png"), data: p.inlineData.data } });
+      }
+    }
+  }
+  const richiesta = corpo?.generationConfig?.imageConfig || {};
+  const imageConfig = {};
+  if (typeof richiesta.aspectRatio === "string") imageConfig.aspectRatio = richiesta.aspectRatio;
+  if (typeof richiesta.imageSize === "string") imageConfig.imageSize = richiesta.imageSize;
+  return {
+    contents: [{ role: "user", parts: parti }],
+    generationConfig: { responseModalities: ["IMAGE"], imageConfig },
+  };
+}
+
 export function chiaveVersoComfy(licenzaId, chiave) {
   return createHash("sha256").update(`${licenzaId}:${chiave}`).digest("hex");
 }
@@ -81,6 +109,9 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
     return errore(400, "corpo_non_valido", "La richiesta non e' un JSON leggibile.", "Riprova; se si ripete, aggiorna il plugin.");
   }
   const dimensione = dimensioneDaCorpo(corpo);
+  // Fuori dal try della chiamata: un errore qui e' un nostro difetto, non un
+  // Router irraggiungibile, e non deve lasciare una riserva aperta.
+  const uscente = corpoPulito(corpoVersoComfy(corpo));
   const quanto = dimensione && peso(modello, dimensione);
   if (!quanto) {
     return errore(403, "modello_non_incluso",
@@ -126,7 +157,7 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify(corpoPulito(corpo)),
+      body: JSON.stringify(uscente),
       signal: AbortSignal.timeout(ATTESA_COMFY_MS),
     });
   } catch {
