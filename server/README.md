@@ -37,7 +37,8 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
    `supabase/migrations/001_crediti.sql`, poi
    `supabase/migrations/002_pulizia_risultati.sql` e
    `supabase/migrations/003_funzioni_chiuse.sql` (le funzioni dei crediti le
-   esegue solo `service_role`). Il bucket privato `risultati` lo crea la 001. Copia URL e chiave `service_role`.
+   esegue solo `service_role`). Il bucket privato `risultati` lo crea la 001. Copia l'URL e la chiave
+   segreta (`sb_secret_…`, in `SUPABASE_SECRET_KEY`).
 2. **Stripe.** Catalogo prodotti: un prodotto per piano con i prezzi del
    listino (Prova 15 € e Ricarica 10 € una tantum; Base 19/190, Pro 39/390,
    Studio 99/990 ricorrenti mese/anno), IVA esclusa. Copia gli id `price_…`.
@@ -74,7 +75,7 @@ Il codice parte per email al cliente (o `--senza-email` e lo stampa).
 ## Test
 
 ```
-cd server && npm test                       # 35 test, nessuna rete (quello SQL si salta)
+cd server && npm test                       # 37 test, nessuna rete (quello SQL si salta)
 AIRENDER_PG=postgresql://... npm test       # anche le funzioni SQL su un Postgres vuoto
 ```
 

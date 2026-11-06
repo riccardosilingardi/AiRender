@@ -3,12 +3,20 @@
 // troppo pesanti. La chiave di servizio vive solo nelle variabili d'ambiente
 // di Netlify.
 
-import { serve } from "./ambiente.mjs";
+import { facoltativa, serve } from "./ambiente.mjs";
 
 export function creaDb(ambiente = process.env, chiama = fetch) {
   const base = () => serve("SUPABASE_URL", ambiente).replace(/\/$/, "");
-  const chiave = () => serve("SUPABASE_SERVICE_ROLE_KEY", ambiente);
-  const intestazioni = () => ({ apikey: chiave(), authorization: `Bearer ${chiave()}` });
+  // Chiave segreta nuova (sb_secret_...) o, finche' Supabase la tiene, la
+  // service_role vecchia. La nuova va solo nell'intestazione apikey: se
+  // viaggia anche in Authorization: Bearer, Supabase la rifiuta perche' non
+  // e' un JWT (guida «Migrating to publishable and secret API keys»).
+  const chiave = () =>
+    facoltativa("SUPABASE_SECRET_KEY", ambiente) || serve("SUPABASE_SERVICE_ROLE_KEY", ambiente);
+  const intestazioni = () => {
+    const k = chiave();
+    return k.startsWith("sb_") ? { apikey: k } : { apikey: k, authorization: `Bearer ${k}` };
+  };
 
   async function rpc(nome, argomenti = {}) {
     const r = await chiama(`${base()}/rest/v1/rpc/${nome}`, {
