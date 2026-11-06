@@ -39,10 +39,10 @@ cliente come fatte.
 ## Da fare prima di vendere
 
 - [ ] Autenticazione a due fattori su GitHub, Netlify, Supabase, Stripe,
-      Comfy, Resend, Fatture in Cloud e sull'email di Riccardo.
+      Comfy, Mailjet, Fatture in Cloud e sull'email di Riccardo.
 - [ ] Progetto Supabase in regione UE (Francoforte): la regione non si cambia
       dopo la creazione.
-- [ ] Regione UE per le funzioni Netlify e per l'invio di Resend, se il piano
+- [ ] Regione UE per le funzioni Netlify (le email partono da Mailjet, UE), se il piano
       lo permette.
 - [ ] Cancellazione automatica dei dati di uso (tabella `render`) dopo 24 mesi.
 - [ ] Registro dei trattamenti (art. 30 GDPR).
