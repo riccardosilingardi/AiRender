@@ -215,3 +215,17 @@ def test_licenza_si_importa_per_prima_senza_import_circolare(primo):
     esito = subprocess.run([sys.executable, "-c", f"import {primo}"], cwd=radice,
                            capture_output=True, text=True)
     assert esito.returncode == 0, esito.stderr
+
+
+@pytest.mark.parametrize("indirizzo", ["http://server.prova", "server.prova", "ftp://server.prova"])
+def test_il_codice_licenza_non_parte_mai_in_chiaro_verso_un_altro_pc(monkeypatch, indirizzo):
+    monkeypatch.setenv("AIRENDER_SERVER", indirizzo)
+    with pytest.raises(ErroreProvider) as errore:
+        licenza.server()
+    assert "https" in errore.value.fatto
+
+
+@pytest.mark.parametrize("indirizzo", ["https://server.prova", "http://localhost:8888", "http://127.0.0.1:8888/"])
+def test_https_o_lo_stesso_pc_vanno_bene(monkeypatch, indirizzo):
+    monkeypatch.setenv("AIRENDER_SERVER", indirizzo)
+    assert licenza.server() == indirizzo.rstrip("/")

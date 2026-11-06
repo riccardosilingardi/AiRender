@@ -22,6 +22,7 @@ import platform
 import re
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import TYPE_CHECKING
 
 from . import config
@@ -102,8 +103,26 @@ def salva(codice: str) -> Path:
     return percorso
 
 
+_LOCALI = ("localhost", "127.0.0.1", "::1")
+
+
 def server() -> str:
-    return (os.environ.get(VARIABILE_SERVER, "").strip() or config.SERVER_AIRENDER).rstrip("/")
+    """L'indirizzo del server AIRENDER: quello di config o, per le prove, AIRENDER_SERVER.
+
+    Il codice licenza viaggia in ogni richiesta e vale come una chiave: verso
+    un server che non e' sul PC stesso parte solo in https.
+    """
+    indirizzo = (os.environ.get(VARIABILE_SERVER, "").strip() or config.SERVER_AIRENDER).rstrip("/")
+    parti = urlsplit(indirizzo)
+    locale = parti.scheme == "http" and parti.hostname in _LOCALI
+    if parti.scheme != "https" and not locale:
+        raise ErroreProvider(
+            f"L'indirizzo del server AIRENDER ({indirizzo}) non e' https: il codice licenza "
+            "viaggerebbe in chiaro, quindi non parte niente.",
+            f"Togli la variabile d'ambiente {VARIABILE_SERVER} (vale il server ufficiale) "
+            "o scrivi un indirizzo che comincia con https://, poi riapri lo Studio.",
+        )
+    return indirizzo
 
 
 def postazione() -> str:
