@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from conftest import OrologioFinto, TrasportoComfyFinto, router_in_coda, router_stato, vista_shaded
@@ -202,3 +206,12 @@ def test_una_mappa_a_pochi_colori_resta_png_e_non_mescola_i_colori():
     ridotta = Image.open(io.BytesIO(modulo_immagine.riduci_lato(uscita.getvalue(), 500)))
     assert ridotta.format == "PNG" and ridotta.size == (500, 250)
     assert sorted(c for _, c in ridotta.getcolors(16)) == [(0, 0, 255), (255, 0, 0)]
+
+
+@pytest.mark.parametrize("primo", ["core.licenza", "core.cli"])
+def test_licenza_si_importa_per_prima_senza_import_circolare(primo):
+    """`python -m core.cli` carica licenza prima di provider: un tempo falliva."""
+    radice = Path(__file__).resolve().parent.parent
+    esito = subprocess.run([sys.executable, "-c", f"import {primo}"], cwd=radice,
+                           capture_output=True, text=True)
+    assert esito.returncode == 0, esito.stderr

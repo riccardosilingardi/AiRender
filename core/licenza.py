@@ -22,10 +22,18 @@ import platform
 import re
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import config
 from .errori import ChiaveMancante, ErroreProvider
-from .provider.trasporto import ErroreRete, TrasportoConIntestazioni, TrasportoHTTP
+
+if TYPE_CHECKING:
+    from .provider.trasporto import TrasportoConIntestazioni
+
+# Il trasporto si importa dentro saldo(): core.provider, all'import, chiede a
+# questo modulo se c'e' un codice licenza (provider.predefinito). Importarlo
+# qui in cima rendeva circolare `python -m core.cli`, che carica licenza prima
+# di provider.
 
 VARIABILE = "AIRENDER_LICENZA"
 VARIABILE_SERVER = "AIRENDER_SERVER"
@@ -132,6 +140,8 @@ def saldo(codice: str | None = None, trasporto: TrasportoConIntestazioni | None 
             "Non hai ancora incollato un codice licenza AIRENDER.",
             "Incollalo con: python -m core.cli --licenza AIR-XXXX-XXXX-XXXX-XXXX",
         )
+    from .provider.trasporto import ErroreRete, TrasportoHTTP
+
     trasporto = trasporto or TrasportoHTTP()
     try:
         stato, _, corpo = trasporto.chiama(
