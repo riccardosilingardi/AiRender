@@ -16,12 +16,30 @@
       "4K": 2
     }
   },
+  "pesi_azioni": {
+    "finale_x2": 2,
+    "finale_x4": 4,
+    "video_1080p_al_secondo": 8,
+    "video_720p_al_secondo": 4
+  },
   "piani": {
     "base": {
       "canali": [
-        "web"
+        "web",
+        "plugin"
       ],
       "dimensione_massima": "2K",
+      "funzioni": {
+        "crea_stile": false,
+        "finale": false,
+        "materiali": true,
+        "riferimenti_massimi": 1,
+        "scene": false,
+        "stile_da_esempi": false,
+        "tieni_geometria": false,
+        "varianti_massime": 2,
+        "video": null
+      },
       "modelli": [
         "vertexai/gemini-3.1-flash-image"
       ],
@@ -31,21 +49,33 @@
       "prezzo_mese": 19,
       "prompt_completo": false,
       "render_mese": 80,
-      "studio": false,
+      "studio": true,
       "tipo": "abbonamento"
     },
     "nessuno": {
       "canali": [
-        "web"
+        "web",
+        "plugin"
       ],
       "dimensione_massima": "2K",
+      "funzioni": {
+        "crea_stile": false,
+        "finale": false,
+        "materiali": true,
+        "riferimenti_massimi": 1,
+        "scene": false,
+        "stile_da_esempi": false,
+        "tieni_geometria": false,
+        "varianti_massime": 2,
+        "video": null
+      },
       "modelli": [
         "vertexai/gemini-3.1-flash-image"
       ],
       "nome": "Senza abbonamento",
       "postazioni": 1,
       "prompt_completo": false,
-      "studio": false,
+      "studio": true,
       "tipo": "nessuno"
     },
     "pro": {
@@ -54,6 +84,20 @@
         "plugin"
       ],
       "dimensione_massima": "4K",
+      "funzioni": {
+        "crea_stile": false,
+        "finale": true,
+        "materiali": true,
+        "riferimenti_massimi": 4,
+        "scene": true,
+        "stile_da_esempi": true,
+        "tieni_geometria": false,
+        "varianti_massime": 4,
+        "video": {
+          "risoluzione_massima": "720p",
+          "secondi_massimi": 10
+        }
+      },
       "modelli": [
         "vertexai/gemini-3.1-flash-image",
         "vertexai/gemini-3-pro-image"
@@ -73,6 +117,20 @@
         "plugin"
       ],
       "dimensione_massima": "4K",
+      "funzioni": {
+        "crea_stile": false,
+        "finale": true,
+        "materiali": true,
+        "riferimenti_massimi": 4,
+        "scene": true,
+        "stile_da_esempi": true,
+        "tieni_geometria": false,
+        "varianti_massime": 4,
+        "video": {
+          "risoluzione_massima": "720p",
+          "secondi_massimi": 10
+        }
+      },
       "modelli": [
         "vertexai/gemini-3.1-flash-image",
         "vertexai/gemini-3-pro-image"
@@ -92,6 +150,20 @@
         "plugin"
       ],
       "dimensione_massima": "4K",
+      "funzioni": {
+        "crea_stile": true,
+        "finale": true,
+        "materiali": true,
+        "riferimenti_massimi": 4,
+        "scene": true,
+        "stile_da_esempi": true,
+        "tieni_geometria": true,
+        "varianti_massime": 4,
+        "video": {
+          "risoluzione_massima": "1080p",
+          "secondi_massimi": 30
+        }
+      },
       "modelli": [
         "vertexai/gemini-3.1-flash-image",
         "vertexai/gemini-3-pro-image"
@@ -117,5 +189,5 @@
     "sconto_segnalazione": 20
   },
   "valuta": "EUR",
-  "versione": "2026-11-02"
+  "versione": "2026-11-05"
 }

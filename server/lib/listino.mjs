@@ -31,7 +31,7 @@ export function fuoriDalPiano(nomePiano, modello, dimensione, canale, l = listin
     return {
       tipo: "canale_non_incluso",
       messaggio: canale === "plugin"
-        ? `Il piano ${p.nome} non comprende il plugin per Allplan: e' nella web app.`
+        ? `Il piano ${p.nome} non comprende il plugin per Allplan.`
         : `Il piano ${p.nome} non comprende la web app.`,
       cosa_fare: "Passa al piano Pro dalla pagina dei prezzi di AIRENDER, o usa la web app.",
     };
@@ -70,5 +70,8 @@ export function funzioni(nomePiano, l = listino) {
     studio: p.studio,
     prompt_completo: Boolean(p.prompt_completo),
     postazioni: p.postazioni,
+    // Cosa apre il piano nello Studio (varianti, riferimenti, scene, Finale,
+    // video...): lo legge lo Studio per mettere in grigio quello che manca.
+    ...(p.funzioni || {}),
   };
 }

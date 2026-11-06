@@ -911,7 +911,7 @@ NANO_BANANA_PRO = "vertexai/gemini-3-pro-image"
 LISTINO = _registra(Costante(
     nome="LISTINO",
     valore={
-        "versione": "2026-11-02",
+        "versione": "2026-11-05",
         "valuta": "EUR",
         "iva": "esclusa",
         # Quanti render costa un invio, per modello e grandezza. Un modello che
@@ -920,42 +920,91 @@ LISTINO = _registra(Costante(
             NANO_BANANA_2: {"1K": 1, "2K": 1, "4K": 2},
             NANO_BANANA_PRO: {"1K": 2, "2K": 2, "4K": 3},
         },
+        # Pesi delle azioni che non sono un invio a Nano Banana. Il server non
+        # le inoltra ancora coi crediti AIRENDER (il router legge solo corpi
+        # Gemini): stanno qui perche' il prezzo si decide in un posto solo.
+        # Regola: ogni credito costa ad AIRENDER al massimo 0,09 EUR.
+        # Finale x2 ~36 crediti Comfy (~0,15 EUR); x4 non misurato.
+        # Video Seedance 2.5 1080p 5 s ~865 crediti Comfy (~3,60 EUR, stima
+        # del listino Comfy) = ~0,72 EUR/s -> 8 crediti al secondo; 720p
+        # stimato a meta' -> 4 al secondo. Nessuno dei due e' misurato.
+        "pesi_azioni": {
+            "finale_x2": 2,
+            "finale_x4": 4,
+            "video_720p_al_secondo": 4,
+            "video_1080p_al_secondo": 8,
+        },
         "benvenuto": {"render": 10, "validita_mesi": 12},
         # "prompt_completo": il cliente vede e riscrive il prompt in inglese
         # («Avanzate» dello Studio). Solo Pro e Studio: chi compra il risultato
         # non ha bisogno del testo, e un testo in vista si copia (Riccardo,
         # 2026-11-05). E' una scelta di prodotto, non una misura.
+        #
+        # "funzioni": cosa apre il piano nello Studio. AIRENDER nasce per
+        # Allplan (Riccardo, 2026-11-05): il plugin e' in tutti i piani e i
+        # piani si dividono per qualita' e funzioni, non per canale. La
+        # tabella materiali e' in Base perche' e' quello che l'AI Visualizer
+        # di Allplan non fa. video = None: niente video; altrimenti la
+        # risoluzione e la durata massime.
         "piani": {
             "prova": {
                 "nome": "Prova", "tipo": "una_tantum", "prezzo": 15,
                 "render": 50, "validita_mesi": 12, "postazioni": 1,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
                 "canali": ["web", "plugin"], "studio": True, "prompt_completo": False,
+                "funzioni": {
+                    "varianti_massime": 4, "riferimenti_massimi": 4, "materiali": True,
+                    "scene": True, "finale": True, "stile_da_esempi": True,
+                    "video": {"risoluzione_massima": "720p", "secondi_massimi": 10},
+                    "tieni_geometria": False, "crea_stile": False,
+                },
             },
             "base": {
                 "nome": "Base", "tipo": "abbonamento", "prezzo_mese": 19, "prezzo_anno": 190,
                 "render_mese": 80, "postazioni": 1,
                 "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
-                "canali": ["web"], "studio": False, "prompt_completo": False,
+                "canali": ["web", "plugin"], "studio": True, "prompt_completo": False,
+                "funzioni": {
+                    "varianti_massime": 2, "riferimenti_massimi": 1, "materiali": True,
+                    "scene": False, "finale": False, "stile_da_esempi": False,
+                    "video": None, "tieni_geometria": False, "crea_stile": False,
+                },
             },
             "pro": {
                 "nome": "Pro", "tipo": "abbonamento", "prezzo_mese": 39, "prezzo_anno": 390,
                 "render_mese": 200, "postazioni": 1,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
                 "canali": ["web", "plugin"], "studio": True, "prompt_completo": True,
+                "funzioni": {
+                    "varianti_massime": 4, "riferimenti_massimi": 4, "materiali": True,
+                    "scene": True, "finale": True, "stile_da_esempi": True,
+                    "video": {"risoluzione_massima": "720p", "secondi_massimi": 10},
+                    "tieni_geometria": False, "crea_stile": False,
+                },
             },
             "studio": {
                 "nome": "Studio", "tipo": "abbonamento", "prezzo_mese": 99, "prezzo_anno": 990,
                 "render_mese": 600, "postazioni": 3,
                 "modelli": [NANO_BANANA_2, NANO_BANANA_PRO], "dimensione_massima": "4K",
                 "canali": ["web", "plugin"], "studio": True, "prompt_completo": True,
+                "funzioni": {
+                    "varianti_massime": 4, "riferimenti_massimi": 4, "materiali": True,
+                    "scene": True, "finale": True, "stile_da_esempi": True,
+                    "video": {"risoluzione_massima": "1080p", "secondi_massimi": 30},
+                    "tieni_geometria": True, "crea_stile": True,
+                },
             },
             # Abbonamento finito: restano i crediti di ricarica e benvenuto,
             # con le funzioni di Base.
             "nessuno": {
                 "nome": "Senza abbonamento", "tipo": "nessuno", "postazioni": 1,
                 "modelli": [NANO_BANANA_2], "dimensione_massima": "2K",
-                "canali": ["web"], "studio": False, "prompt_completo": False,
+                "canali": ["web", "plugin"], "studio": True, "prompt_completo": False,
+                "funzioni": {
+                    "varianti_massime": 2, "riferimenti_massimi": 1, "materiali": True,
+                    "scene": False, "finale": False, "stile_da_esempi": False,
+                    "video": None, "tieni_geometria": False, "crea_stile": False,
+                },
             },
         },
         "ricarica": {"nome": "Ricarica", "prezzo": 10, "render": 100, "validita_mesi": 12},
@@ -963,16 +1012,20 @@ LISTINO = _registra(Costante(
     },
     origine=SCELTA,
     ragione=(
-        "Prezzi e pesi decisi il 2026-11-02 nel thread di vendita: ipotesi da "
-        "pilota, non misurati sul mercato. I pesi seguono il costo vero: Nano "
-        "Banana 2 circa 0,08 USD a render (17,17 crediti Comfy, misurato), Pro "
-        "circa il doppio, 4K circa una volta e mezza (prezzi Google, da "
-        "verificare). Annuale = 10 mensilita'. Scelte di questa sessione, da "
-        "confermare con Riccardo: la Prova ha le funzioni di Pro e apre anche "
-        "il plugin (chi usa Allplan deve poterlo provare); l'annuale accredita "
-        "12 mesi di render in un lotto solo, validi 12 mesi; i render del piano "
-        "non si sommano da un mese all'altro; il plugin Allplan e' nei canali "
-        "da Pro in su, la web app in tutti."
+        "Prezzi decisi il 2026-11-02, piani rivisti il 2026-11-05 (thread "
+        "«Definire i piani e le funzioni incluse»): ipotesi da pilota, non "
+        "misurate sul mercato. I pesi seguono il costo vero: Nano Banana 2 "
+        "circa 0,07 EUR a render (17,17 crediti Comfy, misurato), Pro circa il "
+        "doppio, 4K circa una volta e mezza (listino Comfy e prezzi Google, "
+        "stime). Ogni credito costa al massimo ~0,09 EUR: a 10 EUR per 100 la "
+        "ricarica rende ~6%; i prezzi si decidono nel thread del posizionamento "
+        "rispetto ai concorrenti e qui non cambiano. Annuale = 10 mensilita'. "
+        "Il plugin Allplan e' in tutti i piani (AIRENDER nasce per Allplan); "
+        "Base e' Nano Banana 2 fino a 2K con Ritocca, Altra vista e tabella "
+        "materiali; Pro aggiunge Pro, 4K, scene, Finale e video a 720p fino a "
+        "10 s; Studio 3 postazioni, video 1080p e le funzioni a due invii. "
+        "L'annuale accredita 12 mesi di render in un lotto solo; i render del "
+        "piano non si sommano da un mese all'altro."
     ),
 ))
 
