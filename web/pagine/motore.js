@@ -147,22 +147,44 @@ async function girandoLaCoda() {
     const fatto = await giroCoda.callPromising();
     if (fatto) await salva();
   } catch (e) {
-    dimmi({ tipo: "avviso", testo: `La coda dei lavori si è fermata un momento: ${e && e.message ? e.message.split("\n").slice(-2).join(" ") : e}` });
+    dimmi({ tipo: "avviso", testo: `La coda dei lavori si è fermata un momento: ${causa(e)}` });
+    console.error("AIRENDER coda", e);
   } finally {
     codaInCorso = false;
   }
 }
 
-async function richiesta(porta, { id, metodo, url, intestazioni, corpo }) {
+// Le richieste della pagina passano una alla volta: lo Studio ne manda molte
+// insieme all'avvio. Solo la coda dei lavori gira accanto a loro.
+let fila = Promise.resolve();
+function inFila(lavoro) {
+  const turno = fila.then(lavoro, lavoro);
+  fila = turno.catch(() => {});
+  return turno;
+}
+
+// L'ultima riga utile di un errore Python o JavaScript, per dirla a schermo.
+function causa(e) {
+  const testo = String((e && (e.message || e)) || "errore sconosciuto");
+  const righe = testo.split("\n").map((r) => r.trim()).filter(Boolean);
+  return righe.slice(-1)[0].slice(0, 300);
+}
+
+async function richiesta(porta, dati) {
+  return inFila(() => esegui(porta, dati));
+}
+
+async function esegui(porta, { id, metodo, url, intestazioni, corpo }) {
   try {
     const esito = await rispondi.callPromising(metodo, url, JSON.stringify(intestazioni || {}), corpo ? new Uint8Array(corpo) : null);
     if (metodo === "POST") { sporco = true; salva(); }
     if (esito.scarica) dimmi({ tipo: "scarica", nome: esito.scarica.nome, corpo: esito.scarica.corpo }, [esito.scarica.corpo.buffer]);
     porta.postMessage({ id, stato: esito.stato, intestazioni: esito.intestazioni, corpo: esito.corpo.buffer }, [esito.corpo.buffer]);
   } catch (e) {
+    console.error("AIRENDER motore", metodo, url, e);
     const corpo = new TextEncoder().encode(JSON.stringify({ errore: {
-      fatto: "Il motore dello Studio nel browser ha avuto un problema con questa richiesta.",
-      cosa_fare: "Ricarica la pagina; se si ripete, scrivi a AIRENDER." } })).buffer;
+      fatto: `Il motore dello Studio nel browser ha avuto un problema con ${metodo} ${url}: ${causa(e)}`,
+      cosa_fare: "Ricarica la pagina; se si ripete, manda questo messaggio a AIRENDER." } })).buffer;
     porta.postMessage({ id, stato: 500, intestazioni: { "Content-Type": "application/json; charset=utf-8" }, corpo }, [corpo]);
   }
 }
