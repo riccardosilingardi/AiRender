@@ -1,0 +1,6 @@
+# Il sito Netlify airender-server pubblica solo il server di vendita, che
+# vive in server/ (vedi server/netlify.toml e server/README.md). Senza questa
+# riga Netlify costruisce dalla radice del repository e non trova ne' la
+# pagina prezzi ne' le funzioni.
+[build]
+  base = "server"
