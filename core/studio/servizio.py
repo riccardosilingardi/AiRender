@@ -729,7 +729,7 @@ class Studio:
                 if dei_rif and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
                                    if (riferimento or contesto or dei_materiali or dei_rif) else None),
-            "geometria": _geometria_dict(quante) if geometria and not contesto else None,
+            "geometria": _geometria_dict(quante, self.provider) if geometria and not contesto else None,
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -2204,10 +2204,10 @@ def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int
         False, stile, modulo_materiali.quante_immagini(cambi)), inserti)
 
 
-def _geometria_dict(varianti: int) -> dict:
+def _geometria_dict(varianti: int, provider: str = "") -> dict:
     """La prima passata di «Tieni la geometria»: dove va e cosa costa, prima del clic (regola 5)."""
     try:
-        dove, errore, cosa_fare = modulo_geometria.destinazione(), None, None
+        dove, errore, cosa_fare = modulo_geometria.destinazione(provider), None, None
     except ErroreAirender as problema:
         dove, errore, cosa_fare = None, problema.fatto, problema.cosa_fare
     return {
@@ -2217,10 +2217,20 @@ def _geometria_dict(varianti: int) -> dict:
         "workflow": modulo_geometria.NOME_WORKFLOW,
         "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet sugli spigoli; "
                        "poi il suo render parte verso il modello al posto della vista."),
-        # Regola 3: un workflow si paga a secondi di GPU del deployment, non a immagine: nessun numero.
-        "costo": ("a secondi di GPU del deployment" if varianti == 1
-                  else f"{varianti} prime passate, a secondi di GPU del deployment"),
+        "costo": _costo_geometria(varianti, provider),
     }
+
+
+def _costo_geometria(varianti: int, provider: str) -> str:
+    """Coi crediti AIRENDER il listino dice quanto; con la chiave propria nessun numero (regola 3)."""
+    if provider == modulo_geometria.PROVIDER_AIRENDER:
+        peso = modulo_geometria.peso_airender() * varianti
+        prime = "la prima passata" if varianti == 1 else f"{varianti} prime passate"
+        return (f"{peso} render AIRENDER in più per {prime} (prezzo provvisorio), "
+                "scalati solo se il workflow riesce")
+    # Un workflow con la chiave propria si paga a secondi di GPU del deployment, non a immagine.
+    return ("a secondi di GPU del deployment" if varianti == 1
+            else f"{varianti} prime passate, a secondi di GPU del deployment")
 
 
 def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0, esempi: int = 0) -> str:

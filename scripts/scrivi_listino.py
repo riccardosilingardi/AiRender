@@ -1,4 +1,4 @@
-"""Riscrive server/listino.json da core/config.py.
+"""Riscrive server/listino.json e server/geometria.json da core/config.py.
 
     python scripts/scrivi_listino.py
 
@@ -19,15 +19,33 @@ sys.path.insert(0, str(RADICE))
 from core import config  # noqa: E402
 
 FILE = RADICE / "server" / "listino.json"
+FILE_GEOMETRIA = RADICE / "server" / "geometria.json"
 
 
 def testo() -> str:
     return json.dumps(config.LISTINO, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
+def testo_geometria() -> str:
+    from core.provider import geometria  # noqa: E402  pylint: disable=import-outside-toplevel
+
+    dati = {
+        "workflow": json.loads(geometria.WORKFLOW.read_text(encoding="utf-8")),
+        "nodi": {"immagine": geometria.NODO_IMMAGINE, "lato": geometria.NODO_LATO,
+                 "prompt": geometria.NODO_PROMPT, "forza": geometria.NODO_FORZA,
+                 "campionatore": geometria.NODO_CAMPIONATORE},
+        "lato_massimo": config.GEOMETRIA_LATO_MASSIMO,
+        "forza": config.GEOMETRIA_FORZA,
+        "passi": config.GEOMETRIA_PASSI,
+        "nome": geometria.NOME_WORKFLOW,
+    }
+    return json.dumps(dati, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
 def main() -> int:
     FILE.write_text(testo(), encoding="utf-8")
-    print(f"Scritto {FILE.relative_to(RADICE)}")
+    FILE_GEOMETRIA.write_text(testo_geometria(), encoding="utf-8")
+    print(f"Scritti {FILE.relative_to(RADICE)} e {FILE_GEOMETRIA.relative_to(RADICE)}")
     return 0
 
 

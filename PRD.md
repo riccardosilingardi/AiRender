@@ -315,6 +315,27 @@ Storage), due giorni dopo il bucket `risultati` vuoto.
 - `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
   le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
 
+### Tieni la geometria coi crediti AIRENDER (2026-11-06)
+
+Plugin e web app (provider `airender`) mandano la prima passata al server
+AIRENDER, `/geometria/api/v2/*` (`server/netlify/functions/geometria.mjs`),
+col codice licenza; il server la passa al deployment di Riccardo con
+`COMFY_API_KEY` e `AIRENDER_COMFY_WORKFLOW_URL` (variabili di Netlify). Solo il
+piano Studio la comprende (`LISTINO`, funzioni). Provato solo con un deployment
+finto, nei test del server e del motore. **Non verificato**:
+- il peso, `pesi_azioni.tieni_geometria` = 1 render in più del render di Nano
+  Banana, è **provvisorio**: il costo a secondi di GPU del deployment non è
+  letto. Si rivede con la prima fattura;
+- che il deployment risponda a `/api/v2/jobs/{id}` (il server ricostruisce il
+  link, non segue quello dell'API) e che il caricamento multipart rifatto dal
+  server sia accettato;
+- che l'uscita passi in streaming oltre i 6 MB di una risposta Netlify;
+- che asset e invio stiano nei 10 s di una funzione Netlify a freddo.
+Verifica: Netlify, impostare `AIRENDER_COMFY_WORKFLOW_URL`; Studio con una
+licenza Studio, spunta «Tieni la geometria», Genera; nel saldo devono scendere
+2 render (1 + 1 di Nano Banana 2) e in `lavori/fatto` deve esserci
+`<id>.geometria.png`. Con una licenza Pro deve fermarsi con «non comprende».
+
 ### Stile da esempi (2026-11-04)
 
 - **Che 2-4 render d'esempio diano uno stile più fedele di uno solo**:

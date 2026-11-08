@@ -24,6 +24,7 @@ import { creaDb } from "../../lib/db.mjs";
 import { intestazioniCliente, licenzaDi } from "../../lib/licenza.mjs";
 import { dimensioneDaCorpo, fuoriDalPiano, peso } from "../../lib/listino.mjs";
 import { corpoPulito } from "../../lib/pulisci.mjs";
+import { rifiutoDellaRiserva } from "../../lib/riserva.mjs";
 import { errore, json, protetto } from "../../lib/risposte.mjs";
 
 export const COMFY = "https://api.comfy.org/v2/models";
@@ -100,20 +101,8 @@ async function invia(req, { modello }, cliente, licenza, { db, ambiente, chiama 
     p_licenza: licenza.id, p_postazione: cliente.postazione, p_canale: cliente.canale,
     p_chiave: chiave, p_modello: modello, p_dimensione: dimensione, p_peso: quanto,
   });
-  if (riserva.esito === "saldo") {
-    return errore(402, "insufficient_credits",
-      `Il saldo AIRENDER non basta: questo render costa ${quanto} e ne restano ${Math.max(0, riserva.disponibile)}. Non e' partito niente.`,
-      "Premi Ricarica (o apri la pagina dei prezzi di AIRENDER), poi rilancia.",
-      { saldo: Math.max(0, riserva.disponibile), peso: quanto });
-  }
-  if (riserva.esito === "postazioni") {
-    return errore(403, "postazioni_esaurite",
-      `Questa licenza e' gia' usata su ${riserva.usate} postazioni, il massimo del piano.`,
-      "Passa al piano Studio (3 postazioni) o scrivi a AIRENDER per liberare una postazione.");
-  }
-  if (riserva.esito !== "ok") {
-    return errore(403, "licenza_sospesa", "La licenza non e' attiva.", "Scrivi a AIRENDER per riattivarla.");
-  }
+  const rifiuto = rifiutoDellaRiserva(riserva, quanto);
+  if (rifiuto) return rifiuto;
 
   const query = new URLSearchParams({ fallback_provider: FALLBACK });
   let r;

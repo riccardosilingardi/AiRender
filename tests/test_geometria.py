@@ -17,7 +17,7 @@ from PIL import Image
 
 from core import blocchi, coda as modulo_coda, config
 from core.coda import ERRORE, FATTO, Lavoro, LavoroNonValido, leggi_stato
-from core.errori import ErroreProvider
+from core.errori import ErroreAirender, ErroreProvider
 from core.provider import geometria as modulo_geometria
 from core.studio.servizio import RichiestaStudioNonValida, Studio
 from test_passi import NANO, VISTA, ProviderCheRende, _dest, cartella, chiamate  # noqa: F401
@@ -71,7 +71,7 @@ def _studio(cartella, chiamate):
 
 def _coda(cartella, chiamate, finto):
     return modulo_coda.Coda(cartella, crea_provider=lambda _n: ProviderCheRende(chiamate), dire=lambda _t: None,
-                            crea_geometria=lambda controlla: _client(finto, controlla=controlla))
+                            crea_geometria=lambda controlla, _p: _client(finto, controlla=controlla))
 
 
 def _genera(studio, **altro):
@@ -229,7 +229,7 @@ def test_se_la_prima_passata_cambia_indirizzo_dopo_il_clic_non_parte_niente(cart
     studio, finto = _studio(cartella, chiamate), ComfyFinto()
     identificativo = _genera(studio)
     coda = modulo_coda.Coda(cartella, crea_provider=lambda _n: ProviderCheRende(chiamate), dire=lambda _t: None,
-                            crea_geometria=lambda c: modulo_geometria.Geometria(
+                            crea_geometria=lambda c, _p: modulo_geometria.Geometria(
                                 finto, chiave="k", base="https://altro.run.comfy.app", controlla=c))
     coda.esegui_uno()
     assert leggi_stato(cartella, identificativo)["stato"] == ERRORE
@@ -260,3 +260,94 @@ def test_un_file_del_formato_10_senza_destinazione_o_da_un_passo_si_rifiuta(cart
                    {"partenza": "x.png", "parte_da": "y"}):
         with pytest.raises(LavoroNonValido):
             Lavoro.da_dizionario({**scritto, **guasto})
+
+
+# --- coi crediti AIRENDER (plugin e web app) -----------------------------------------
+
+
+SERVER = "https://airender.prova"
+
+
+class ServerFinto(ComfyFinto):
+    """Il server AIRENDER sotto /geometria: stessa API v2, link relativi al server."""
+
+    def chiama(self, metodo, url, intestazioni, corpo=None):
+        stato, intest, dati = super().chiama(metodo, url, intestazioni, corpo)
+        if isinstance(dati, dict) and dati.get("urls"):
+            dati["urls"] = {"self": "/geometria/api/v2/jobs/job-1", "cancel": "/geometria/api/v2/jobs/job-1/cancel"}
+        if isinstance(dati, dict) and dati.get("outputs"):
+            dati["outputs"] = [{"node_id": "16", "url": "/geometria/api/v2/jobs/job-1/outputs/0"}]
+        return stato, intest, dati
+
+
+def test_coi_crediti_airender_la_prima_passata_va_al_server_col_codice_licenza(monkeypatch):
+    monkeypatch.setenv("AIRENDER_SERVER", SERVER)
+    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    for nome in ("COMFY_API_KEY", "AIRENDER_COMFY_API_KEY"):
+        monkeypatch.delenv(nome, raising=False)
+    finto = ServerFinto()
+    client = modulo_geometria.GeometriaAirender(finto, codice="AIR-0000-1111-2222-3333", dormi=lambda _s: None)
+    immagine, lavoro = client.esegui(_png(), "a house", 7)
+    assert lavoro == "job-1" and immagine.startswith(b"\x89PNG")
+    assert [c[1] for c in finto.chiamate] == [
+        f"{SERVER}/geometria/api/v2/assets", f"{SERVER}/geometria/api/v2/jobs",
+        f"{SERVER}/geometria/api/v2/jobs/job-1", f"{SERVER}/geometria/api/v2/jobs/job-1",
+        f"{SERVER}/geometria/api/v2/jobs/job-1/outputs/0"]
+    for chiamata in finto.chiamate:
+        assert chiamata[2]["X-Airender-Licenza"] == "AIR-0000-1111-2222-3333"
+        assert "Authorization" not in chiamata[2], "nessuna chiave Comfy dal PC del cliente"
+    assert client.destinazione() == ("server AIRENDER (airender.prova) → Comfy Developer Platform, "
+                                     "workflow Z-Image-Turbo + ControlNet sugli spigoli")
+
+
+def test_coi_crediti_airender_senza_codice_non_parte_niente(monkeypatch):
+    monkeypatch.setenv("AIRENDER_LICENZA", "")
+    finto = ServerFinto()
+    with pytest.raises(ErroreAirender, match="codice licenza"):
+        modulo_geometria.GeometriaAirender(finto, codice="").esegui(_png(), "x", 1)
+    assert not finto.chiamate
+
+
+def test_un_rifiuto_del_server_si_mostra_con_le_sue_parole(monkeypatch):
+    class Rifiuta(ServerFinto):
+        def manda_byte(self, url, intestazioni, dati):
+            return 403, {}, {"error": {"type": "funzione_non_inclusa",
+                                       "message": "Il piano Pro non comprende «Tieni la geometria»."},
+                             "cosa_fare": "Togli la spunta per mandare solo a Nano Banana."}
+    monkeypatch.setenv("AIRENDER_SERVER", SERVER)
+    with pytest.raises(ErroreProvider, match="Il piano Pro non comprende") as errore:
+        modulo_geometria.GeometriaAirender(Rifiuta(), codice="AIR-0000-1111-2222-3333").esegui(_png(), "x", 1)
+    assert errore.value.cosa_fare == "Togli la spunta per mandare solo a Nano Banana."
+
+
+def test_il_servizio_del_lavoro_sceglie_la_strada(monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
+    finto = ComfyFinto()
+    assert isinstance(modulo_geometria.crea("airender", finto), modulo_geometria.GeometriaAirender)
+    assert type(modulo_geometria.crea("comfy", finto)) is modulo_geometria.Geometria  # noqa: E721
+
+
+def test_coi_crediti_airender_lo_studio_dice_dove_va_e_quanto_costa(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv("AIRENDER_SERVER", SERVER)
+    monkeypatch.delenv(modulo_geometria.VARIABILE_URL, raising=False)
+    studio = Studio(cartella, provider="airender", crea_provider=lambda _n: ProviderCheRende(chiamate),
+                    coda_attiva=lambda: True, apri=lambda _p: None)
+    prima = studio.destinazione(NANO, geometria=True)["geometria"]
+    assert prima["errore"] is None
+    assert prima["destinazione"].startswith("server AIRENDER (airender.prova) → Comfy Developer Platform")
+    peso = config.LISTINO["pesi_azioni"]["tieni_geometria"]
+    assert prima["costo"].startswith(f"{peso} render AIRENDER in più per la prima passata")
+    assert "solo se il workflow riesce" in prima["costo"]
+
+
+def test_la_coda_passa_il_servizio_del_lavoro_alla_prima_passata(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
+    studio, finto, visti = _studio(cartella, chiamate), ComfyFinto(), []
+    _genera(studio)
+
+    def crea(controlla, provider):
+        visti.append(provider)
+        return _client(finto, controlla=controlla)
+    modulo_coda.Coda(cartella, crea_provider=lambda _n: ProviderCheRende(chiamate), dire=lambda _t: None,
+                     crea_geometria=crea).esegui_uno()
+    assert visti == ["prova"]
