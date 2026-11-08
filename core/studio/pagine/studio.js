@@ -5,6 +5,10 @@
 // errore, pieno. Lo stato vuoto non mostra dati finti.
 "use strict";
 
+// La web app serve lo Studio sotto /studio/ (scripts/scrivi_web.py): li' la
+// cartella sta nel browser, non c'e' Allplan accanto e non c'e' Windows.
+const SUL_WEB = location.pathname.startsWith("/studio/");
+
 const S = {
   scheda: "genera",
   miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
@@ -29,7 +33,10 @@ const S = {
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
   // quelli spuntati ({ chiave: { diventa, riferimento } }), la ricerca.
-  mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null },
+  // Senza l'elenco di Allplan (web app, immagini da altri programmi) i
+  // materiali si scelgono con la selezione libera sulla vista: `zone` tiene
+  // contorno, campione ritagliato, «diventa» e foto; `lazo` dice se si disegna.
+  mat: { dati: null, scelti: {}, cerca: "", tutti: false, errore: null, zone: [], lazo: false },
   // Inserisci nel contesto: l'immagine del luogo portata dall'utente, il
   // rettangolo dove va l'edificio (coordinate da 0 a 1), l'inquadratura,
   // «pulisci la mappa» e il luogo a parole.
@@ -324,7 +331,7 @@ function caricaMio(nome) {
   const p = S.miei.preset.find((x) => x.nome === nome);
   if (!p) { render(); return; }
   S.preset = null;
-  S.scelte = { ...p.scelte };
+  S.scelte = { ...p.scelte, fedelta: undefined };  // Fedeltà al disegno tolta (2026-11-06): vale sempre la regola predefinita
   if (p.modello && S.catalogo.modelli.some((m) => m.id === p.modello)) S.modello = p.modello;
   S.promptAMano = vedePrompt() ? (p.prompt_a_mano || null) : null;
   if (p.blocchi_cambiati || p.perse.length) {
@@ -356,7 +363,7 @@ function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -364,7 +371,7 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: S.scelte.fedelta, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -395,7 +402,7 @@ async function caricaVista(nome) {
   S.secco = null;
   S.risultato = { ...S.risultato, lavori: [], scelto: null, ricetta: null, caricato: false, confronto: "vista", rifai: false };
   S.passi = { ...S.passi, dati: null, errore: null, caricato: false, scelto: null, nuovo: null, pulito: null, rifai: false };
-  S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null };
+  S.mat = { dati: null, scelti: {}, cerca: "", tutti: false, errore: null, zone: [], lazo: false };
   S.inserti = [];
   S.esempi = [];
   if (!nome) { render(); return; }
@@ -562,9 +569,9 @@ function disegnaTestata() {
   c.append(...[
     h("span", { classe: attiva ? "punto" : "punto fermo", "aria-hidden": "true" }),
     h("span", {}, attiva ? "Coda dei lavori attiva" : "Coda dei lavori ferma"),
-    h("span", { classe: "tenue" }, "·"),
-    h("span", { classe: "tenue" }, "Cartella delle viste: "),
-    h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
+    SUL_WEB ? null : h("span", { classe: "tenue" }, "·"),
+    SUL_WEB ? null : h("span", { classe: "tenue" }, "Cartella delle viste: "),
+    SUL_WEB ? null : h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
     S.descrizione && S.descrizione.camera ? h("span", { classe: "tenue" }, `· ${S.descrizione.camera}`) : null,
   ].filter(Boolean));
   const posto = document.getElementById("licenza-testata");
@@ -587,7 +594,7 @@ function striscia() {
       h("span", { classe: "piccolo", stile: "color:#A1A4AB" },
         l.stato === "in coda" && !S.studio.coda_attiva
           ? "La coda dei lavori è ferma: il lavoro aspetta che riparta."
-          : `${l.preset_nome} · ${l.modello_nome}. Allplan resta libero.`),
+          : `${l.preset_nome} · ${l.modello_nome}.${SUL_WEB ? "" : " Allplan resta libero."}`),
       h("button", { classe: "btn", onclick: annulla }, "Annulla")));
 }
 
@@ -599,10 +606,13 @@ function sezioneVista() {
   if (!S.vista) {
     figura.append(h("div", { classe: "vista-vuota" },
       h("h2", {}, "Nessuna vista ancora."),
-      h("p", {}, "Catturala dalla palette in Allplan, oppure scegli un file con Usa un'altra vista…"),
-      h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
+      SUL_WEB
+        ? h("p", {}, "Scegli un'immagine della vista con Usa un'altra vista…: resta in questo browser finché non la mandi al servizio.")
+        : h("p", {}, "Catturala dalla palette in Allplan, oppure scegli un file con Usa un'altra vista…"),
+      SUL_WEB ? null : h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
   } else {
-    figura.append(h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}` }));
+    figura.append(S.mat.lazo || S.mat.zone.length ? telaZone()
+      : h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}` }));
     if (S.lavoroAttivo) figura.append(striscia());
   }
   const sotto = h("div", { classe: "riga tra" });
@@ -814,11 +824,6 @@ function colonnaInvio() {
       classe: "seg", "aria-pressed": String(S.scelte.qualita === v.id), onclick: () => cambiaAsse("qualita", v.id),
     }, v.id === "32k" ? "Altissima definizione (32k)" : v.nome)));
 
-  const fedelta = h("div", { classe: "switch", role: "group", "aria-label": "Fedeltà al disegno" },
-    asse("fedelta").voci.map((v) => h("button", {
-      classe: "seg", "aria-pressed": String((S.scelte.fedelta || "bilanciata") === v.id), onclick: () => cambiaAsse("fedelta", v.id),
-    }, v.nome)));
-
   const risoluzione = h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del render" },
     S.catalogo.risoluzioni.map((r) => h("button", {
       classe: "seg", "aria-pressed": String((S.scelte.risoluzione || "1k") === r.id),
@@ -830,8 +835,6 @@ function colonnaInvio() {
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
-    ...(S.modo === "contesto" ? [] : [h("span", { classe: "etichetta" }, "Fedeltà al disegno"), fedelta,
-    nota("Quanto il modello può allontanarsi dalla vista.", "Quanto il modello può allontanarsi dalla vista. Rigida: stessa sagoma, stesse aperture, cambia meno. Bilanciata: la regola di sempre. Libera: tiene volumi e aperture, può aggiungere dettagli costruttivi. Tre testi scelti, non ancora confrontati sul banco di prova.")]),
     h("span", { classe: "etichetta" }, "Varianti per invio"),
     h("div", { classe: "switch", role: "group", "aria-label": "Varianti per invio" },
       Array.from({ length: S.catalogo.varianti_massime }, (_, i) => i + 1).map((n) => h("button", {
@@ -860,11 +863,14 @@ function colonnaInvio() {
 
 function materialiPerServer() {
   if (S.modo === "contesto") return [];
-  return Object.entries(S.mat.scelti).map(([chiave, v]) => ({ chiave, diventa: v.diventa || "", riferimento: v.riferimento ? v.riferimento.nome : null }));
+  return Object.entries(S.mat.scelti).map(([chiave, v]) => ({ chiave, diventa: v.diventa || "", riferimento: v.riferimento ? v.riferimento.nome : null }))
+    .concat(S.mat.zone.map((z) => ({ campione: z.campione.nome, diventa: z.diventa || "", riferimento: z.riferimento ? z.riferimento.nome : null })));
 }
 function immaginiMateriali() {
-  if (S.modo === "contesto" || !S.mat.dati) return 0;
-  return Object.entries(S.mat.scelti).reduce((n, [chiave, v]) => {
+  if (S.modo === "contesto") return 0;
+  const daZone = S.mat.zone.reduce((n, z) => n + 1 + (z.riferimento ? 1 : 0), 0);
+  if (!S.mat.dati) return daZone;
+  return daZone + Object.entries(S.mat.scelti).reduce((n, [chiave, v]) => {
     const m = S.mat.dati.materiali.find((x) => x.chiave === chiave);
     return n + (m && m.anteprima ? 1 : 0) + (v.riferimento ? 1 : 0);
   }, 0);
@@ -895,8 +901,7 @@ function pannelloMateriali() {
     h("p", { classe: "piccolo tenue" }, "Cattura una vista dalla palette."));
   if (S.mat.errore) return h("section", { classe: "pannello" }, testa, avviso("errore", S.mat.errore.fatto, S.mat.errore.cosa_fare));
   if (!d) return h("section", { classe: "pannello" }, testa, h("p", { classe: "piccolo tenue" }, "Leggo i materiali…"));
-  if (!d.letti) return h("section", { classe: "pannello", "aria-label": "Materiali di questo progetto" }, testa,
-    h("p", { classe: "piccolo tenue" }, "Materiali non letti: cattura di nuovo la vista dalla palette."));
+  if (!d.letti) return pannelloZone(d.massimo);
   if (d.errore) return h("section", { classe: "pannello" }, testa,
     avviso("errore", `I materiali non si sono letti: ${d.errore}`, "Cattura di nuovo la vista. Se si ripete, manda diario-materiali.txt."));
   if (!d.materiali.length) return h("section", { classe: "pannello" }, testa,
@@ -940,6 +945,146 @@ function pannelloMateriali() {
     scelti ? h("p", { classe: "piccolo" }, h("b", {}, `${scelti === 1 ? "1 materiale" : `${scelti} materiali`} da cambiare`), conRif ? ` · ${conRif === 1 ? "1 foto" : `${conRif} foto`} di riferimento` : "") : null);
 }
 
+// --- materiali scelti sulla vista ----------------------------------------------
+// Senza l'elenco di Allplan (web app, render e foto da altri programmi) un
+// materiale si indica con la selezione libera: si disegna il contorno attorno
+// a una superficie della vista, la pagina ritaglia quel pezzo (fuori dal
+// contorno grigio piatto) e lo salva fra i riferimenti. Il ritaglio parte come
+// campione, al posto dell'anteprima di Allplan; il resto della riga e' uguale.
+// Il modello riconosce il materiale dall'aspetto: due superfici che sembrano
+// uguali si possono confondere (Trappole note in CLAUDE.md).
+
+// Lato massimo del campione ritagliato, in pixel: basta a leggere grana e colore.
+const CAMPIONE_LATO_MASSIMO = 512;
+const GRIGIO_FUORI = "#808080";  // numero-non-configurabile: grigio medio, fuori dal contorno del campione
+
+async function ritagliaCampione(img, punti) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const xs = punti.map((p) => p[0] * W), ys = punti.map((p) => p[1] * H);
+  const x0 = Math.floor(Math.min(...xs)), y0 = Math.floor(Math.min(...ys));
+  const w = Math.max(1, Math.ceil(Math.max(...xs)) - x0), hh = Math.max(1, Math.ceil(Math.max(...ys)) - y0);
+  const scala = Math.min(1, CAMPIONE_LATO_MASSIMO / Math.max(w, hh));
+  const tela = document.createElement("canvas");
+  tela.width = Math.max(1, Math.round(w * scala)); tela.height = Math.max(1, Math.round(hh * scala));
+  const c = tela.getContext("2d");
+  c.fillStyle = GRIGIO_FUORI;
+  c.fillRect(0, 0, tela.width, tela.height);
+  c.beginPath();
+  punti.forEach(([px, py], i) => { const x = (px * W - x0) * scala, y = (py * H - y0) * scala; if (i) c.lineTo(x, y); else c.moveTo(x, y); });
+  c.closePath();
+  c.clip();
+  c.drawImage(img, x0, y0, w, hh, 0, 0, tela.width, tela.height);
+  return new Promise((ok, no) => tela.toBlob((b) => (b ? ok(b) : no(new Error("ritaglio vuoto"))), "image/png"));
+}
+
+async function aggiungiZona(img, punti) {
+  try {
+    const blob = await ritagliaCampione(img, punti);
+    const campione = await post("/api/riferimenti", blob, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(`campione-${S.mat.zone.length + 1}.png`) });
+    S.mat.zone.push({ punti, campione, diventa: "", riferimento: null });
+    S.errore = null;
+  } catch (e) {
+    S.errore = e && e.fatto ? e : { fatto: "Il pezzo selezionato non si è potuto ritagliare dalla vista.", cosa_fare: "Ricarica la pagina e disegna di nuovo il contorno." };
+  }
+  if (S.mat.zone.length >= (S.mat.dati ? S.mat.dati.massimo : 0)) S.mat.lazo = false;
+  await materialiCambiati();
+  const campo = document.getElementById(`zona-diventa-${S.mat.zone.length - 1}`);
+  if (campo) campo.focus();
+}
+
+async function togliZona(i) {
+  S.mat.zone.splice(i, 1);
+  await materialiCambiati();
+}
+
+async function riferimentoZona(i, file) {
+  if (!file) return;
+  try {
+    S.mat.zone[i].riferimento = await post("/api/riferimenti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  await materialiCambiati();
+}
+
+function telaZone() {
+  const img = h("img", { src: `/file/vista/${enc(S.vista)}`, alt: `Vista di partenza ${S.vista}`, draggable: "false" });
+  const contenitore = h("div");
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${
+    S.mat.zone.map((z) => `<polygon class="contorno-area" points="${attributoPunti(z.punti)}"></polygon>`).join("")
+  }<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline");
+  const numeri = S.mat.zone.map((z, i) => {
+    const [x, y] = z.punti[0];
+    return h("span", { classe: "numero-area", stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
+  });
+  const tela = h("div", { classe: `tela-ritocco${S.mat.lazo ? "" : " bloccata"}` }, img, disegno, ...numeri);
+  if (!S.mat.lazo) return tela;
+  let tratto = null;
+  const punto = (ev) => {
+    const b = img.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
+  };
+  tela.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    tela.setPointerCapture(ev.pointerId);
+    tratto = [punto(ev)];
+  });
+  tela.addEventListener("pointermove", (ev) => {
+    if (!tratto || !tela.hasPointerCapture(ev.pointerId)) return;
+    const p = punto(ev), ultimo = tratto[tratto.length - 1];
+    if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) >= LAZO_PASSO_MINIMO) tratto.push(p);
+    traccia.setAttribute("points", attributoPunti(tratto));
+  });
+  const chiudi = () => {
+    if (!tratto) return;
+    const t = tratto; tratto = null;
+    traccia.setAttribute("points", "");
+    if (t.length < 3) return;
+    const xs = t.map((p) => p[0]), ys = t.map((p) => p[1]);
+    if (Math.max(...xs) - Math.min(...xs) < AREA_MINIMA || Math.max(...ys) - Math.min(...ys) < AREA_MINIMA) return;
+    aggiungiZona(img, t.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]));
+  };
+  tela.addEventListener("pointerup", chiudi);
+  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); });
+  return tela;
+}
+
+function pannelloZone(massimo) {
+  const testa = h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Materiali della vista",
+    spiega("Disegna a mano libera, come il lazo di Photoshop, attorno a una superficie della vista. Il pezzo dentro il contorno parte come campione del materiale, insieme al testo e alla foto. Il modello cambia tutte le superfici che somigliano al campione: due materiali che nella vista sembrano uguali possono confondersi.")));
+  const pieno = S.mat.zone.length >= massimo;
+  const comando = S.mat.lazo
+    ? h("button", { classe: "btn piccolo", onclick: () => { S.mat.lazo = false; render(); } }, "Fine selezione")
+    : h("button", { classe: "btn piccolo", disabled: pieno, onclick: () => { S.mat.lazo = true; render(); } }, "+ Seleziona un materiale");
+  const righe = S.mat.zone.map((z, i) => {
+    const diventa = h("input", { classe: "campo", id: `zona-diventa-${i}`, placeholder: "diventa…", "aria-label": `Materiale ${i + 1} diventa`, value: z.diventa });
+    diventa.addEventListener("input", () => { z.diventa = diventa.value; S.secco = null; aggiornaComposto(); });
+    const file = h("input", { type: "file", accept: "image/jpeg,image/png", hidden: true, onchange: (e) => riferimentoZona(i, e.target.files[0]) });
+    const rif = z.riferimento
+      ? h("span", { classe: "riga" }, h("img", { classe: "rif-materiale", src: `/file/riferimento/${enc(z.riferimento.nome)}`, alt: "Foto di riferimento" }),
+          h("button", { classe: "btn link piccolo", onclick: () => { z.riferimento = null; materialiCambiati(); } }, "Togli"))
+      : h("button", { classe: "btn piccolo", onclick: () => file.click() }, "+ Riferimento");
+    return h("div", { classe: "materiale scelto" },
+      h("img", { classe: "cubo", src: `/file/riferimento/${enc(z.campione.nome)}`, alt: `Campione del materiale ${i + 1}, ritagliato dalla vista` }),
+      h("div", { classe: "nome-materiale" }, h("b", {}, `Materiale ${i + 1}`), h("span", { classe: "tenue piccolo" }, "dalla vista")),
+      h("button", { classe: "btn link piccolo", onclick: () => togliZona(i) }, "Togli"),
+      h("div", { classe: "diventa" }, diventa, rif, file));
+  });
+  const vuote = S.mat.zone.some((z) => !z.diventa.trim());
+  return h("section", { classe: "pannello materiali", "aria-label": "Materiali della vista" }, testa,
+    S.mat.lazo
+      ? h("p", { classe: "piccolo" }, h("b", {}, "Disegna sulla vista"), " il contorno di una superficie tenendo premuto. Quando lasci, il pezzo diventa una riga qui sotto.")
+      : h("p", { classe: "piccolo tenue" }, S.mat.zone.length
+          ? `${S.mat.zone.length} di massimo ${massimo} materiali scelti sulla vista.`
+          : SUL_WEB ? "Indica sulla vista le superfici da cambiare: per ognuna scrivi cosa diventa."
+          : "Questa vista non ha l'elenco dei materiali di Allplan: indica sulla vista le superfici da cambiare."),
+    righe, h("div", { classe: "riga" }, comando),
+    pieno ? h("p", { classe: "piccolo tenue" }, `Al massimo ${massimo} materiali per invio: gli altri li cambi con un passo dopo.`) : null,
+    vuote ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Scrivi cosa diventa ogni materiale, o toglilo: senza testo non parte.") : null);
+}
+
 // Immagine di riferimento per lo stile: parte come seconda immagine, solo con
 // i modelli che ne ricevono piu' di una. Il server la salva con la sua
 // impronta; la ricetta tiene l'impronta, non l'immagine.
@@ -955,13 +1100,29 @@ async function scegliRiferimento(file) {
   render();
 }
 // «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
-function geometriaGenera() { return S.modo !== "contesto" && S.geometria; }
+// La prima passata gira su un workflow della Comfy Developer Platform: con la
+// chiave Comfy propria sempre; coi crediti AIRENDER (PC e web) se il piano la
+// comprende (funzioni.tieni_geometria, oggi solo Studio). Il server lo
+// ricontrolla comunque prima di riservare.
+function geometriaCoiCrediti() {
+  const s = S.licenza && S.licenza.presente && S.licenza.saldo;
+  return !!(s && s.funzioni && s.funzioni.tieni_geometria);
+}
+function geometriaPossibile() { return usaComfy() || geometriaCoiCrediti(); }
+function perchéGeometriaSpenta() {
+  const s = S.licenza && S.licenza.presente && S.licenza.saldo;
+  if (s) return `Il piano ${nomePiano(s)} non comprende «Tieni la geometria»: è nel piano Studio, oppure con una chiave Comfy tua.`;
+  return "Per sapere se il tuo piano comprende «Tieni la geometria» serve il saldo dal server AIRENDER: apri la scheda Licenza.";
+}
+function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
 function pannelloGeometria() {
-  const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria,
+  const possibile = geometriaPossibile();
+  const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
-  return h("div", { classe: "geometria" },
+  return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
+    possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
       "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
       "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."));
@@ -2537,7 +2698,7 @@ function rigaPasso(passo) {
     attivo ? h("div", { classe: "striscia in-riga", role: "status" },
       h("div", { classe: "riga tra" }, h("span", {}, h("b", {}, (attivo.destinazione || "").split(" (")[0]), ` · ${attivo.stato}`), h("span", { classe: "mono" }, tempo(attivo.secondi))),
       h("div", { classe: "barra" }, h("span")),
-      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan resta libero."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
+      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, SUL_WEB ? "" : "Allplan resta libero."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
     h("button", {
       classe: "btn link piccolo", disabled: !passo.si_parte, title: passo.motivo_non_si_parte || null,
       onclick: () => apriNuovoPasso(passo),
@@ -3358,7 +3519,7 @@ function moduloCodice() {
       ? h("div", { classe: "riga", role: "status" }, h("span", { classe: "giro", "aria-hidden": "true" }),
           h("span", { classe: "tenue" }, `Chiedo al server AIRENDER (${nomeServer()}) se il codice è valido.`))
       : h("p", { id: "dove-va-il-codice", classe: "tenue piccolo" }, `Il codice si controlla con il server AIRENDER: `, h("span", { classe: "mono" }, nomeServer()),
-          ". Se va, resta salvato solo su questo PC."),
+          SUL_WEB ? ". Se va, resta salvato solo in questo browser." : ". Se va, resta salvato solo su questo PC."),
     a.errore ? avviso("errore", a.errore.fatto, a.errore.cosa_fare) : null);
 }
 
@@ -3411,7 +3572,7 @@ function pannelloSaldo() {
       h("dt", {}, "Licenza"), h("dd", {}, `…${s.ultime_cifre || l.ultime_cifre}${s.email ? ` · ${s.email}` : ""}`)),
     h("div", { classe: "riga" }, pulsanteRicarica(),
       s.gestisci_url ? h("a", { classe: "btn", href: s.gestisci_url, target: "_blank", rel: "noopener" }, "Gestisci abbonamento") : null),
-    h("p", { classe: "tenue piccolo" }, "Ricarica e Gestisci aprono il browser; i link valgono un'ora."),
+    h("p", { classe: "tenue piccolo" }, SUL_WEB ? "Ricarica e Gestisci aprono una nuova scheda; i link valgono un'ora." : "Ricarica e Gestisci aprono il browser; i link valgono un'ora."),
     tabellaCosti(s),
     h("div", { classe: "riga" }, h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice")));
 }
@@ -3443,7 +3604,7 @@ function schermataLicenza() {
         h("button", { classe: "btn link", onclick: () => { S.attiva.cambia = true; render(); } }, "Cambia codice"))));
   }
   if (S.attiva.errore && l.presente && !S.attiva.cambia) blocchi.push(avviso("errore", S.attiva.errore.fatto, S.attiva.errore.cosa_fare));
-  blocchi.push(pannelloComfy());
+  if (!SUL_WEB) blocchi.push(pannelloComfy());  // sul web non c'e' dove mettere COMFY_API_KEY
   return h("div", { classe: "schermata-licenza" }, ...blocchi);
 }
 
@@ -3537,7 +3698,7 @@ async function avvia() {
     }
     const primo = S.catalogo.scene.esterno.preset[0];
     S.preset = primo.id;
-    S.scelte = { ...primo.scelte };
+    S.scelte = { ...primo.scelte, fedelta: undefined };
     S.modello = S.studio.modello_predefinito;
     await Promise.all([caricaDestinazione(), aggiornaComposto(true)]);
     const attivo = S.studio.lavori_attivi[0];

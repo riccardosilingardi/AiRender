@@ -238,3 +238,53 @@ def test_un_lavoro_del_formato_6_senza_materiali_si_rifiuta():
             "formato": modulo_coda.FORMATO_MATERIALI, "identificativo": "x", "vista": "v.png",
             "provider": "prova", "modello": NANO, "destinazione": "d",
         })
+
+
+# --- materiali scelti sulla vista (selezione libera, senza Allplan) -------------
+
+
+def test_il_campione_dalla_vista_ha_una_frase_sua_e_il_flusso_allplan_resta_uguale():
+    dalla_vista = modulo_materiali.Cambio("materiale 1", "lamiera grecata", "c.png", "r.jpg", dalla_vista=True)
+    allplan = modulo_materiali.Cambio("mattone", "corten", "a.png")
+    testo = modulo_materiali.prompt("Base.", (dalla_vista, allplan), prima_immagine=2)
+    assert "Image 2 is a crop of image 1 that shows the material «materiale 1»" in testo
+    assert "Image 3 is a photo of the new material" in testo
+    assert "Image 4 is a sample of the material «mattone» as the CAD model shows it" in testo
+    assert "dalla_vista" not in allplan.a_dizionario()
+    assert modulo_materiali.Cambio.da_dizionario(dalla_vista.a_dizionario()) == dalla_vista
+
+
+def test_genera_con_un_materiale_scelto_sulla_vista_manda_il_ritaglio(tmp_path, chiamate):
+    """Caso web app: la vista non ha l'elenco di Allplan, il campione e' un ritaglio salvato fra i riferimenti."""
+    viste = tmp_path / "viste"
+    viste.mkdir()
+    (viste / "vista-1.png").write_bytes(vista_shaded(640, 400))
+    studio = _studio(viste, chiamate)
+    campione = studio.carica_riferimento(_jpeg((90, 90, 200)))["nome"]
+    foto = _jpeg((20, 140, 60))
+    rif = studio.carica_riferimento(foto)["nome"]
+    scelti = [{"campione": campione, "diventa": "lamiera grecata", "riferimento": rif}]
+    assert studio.prova_a_secco(_richiesta(studio, scelti))["destinazione"]["immagini"] == 3
+    risposta = studio.invia(_richiesta(studio, scelti))
+    scritto = json.loads((viste / "lavori" / "in-attesa" / f"{risposta['identificativo']}.json").read_text("utf-8"))
+    assert scritto["materiali"][0]["dalla_vista"] is True
+
+    Coda(viste, crea_provider=lambda _n: ProviderConPiuImmagini(chiamate), dire=lambda _t: None).esegui_uno()
+    assert leggi_stato(viste, risposta["identificativo"])["stato"] == "fatto"
+    (richiesta,) = chiamate
+    ritaglio, seconda = richiesta.immagini_in_piu
+    assert seconda == foto
+    with Image.open(io.BytesIO(ritaglio)) as immagine:
+        assert abs(immagine.getpixel((5, 5))[2] - 200) < 10
+    assert "Image 2 is a crop of image 1 that shows the material «materiale 1»" in richiesta.prompt
+    assert "becomes: lamiera grecata" in richiesta.prompt
+
+
+def test_un_campione_che_non_e_fra_i_riferimenti_si_rifiuta(tmp_path, chiamate):
+    viste = tmp_path / "viste"
+    viste.mkdir()
+    (viste / "vista-1.png").write_bytes(vista_shaded(640, 400))
+    studio = _studio(viste, chiamate)
+    with pytest.raises(Exception):
+        studio._cambi_scelti({"vista": "vista-1.png",  # pylint: disable=protected-access
+                              "materiali": [{"campione": "../../win.ini", "diventa": "x"}]})

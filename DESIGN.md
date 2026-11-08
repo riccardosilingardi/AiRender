@@ -186,13 +186,30 @@ vista con colori neutri.»
   obbligatorio) e **+ Riferimento** (foto facoltativa). Al massimo
   `MATERIALI_CAMBIATI_MASSIMI` spunte (scelto). Ricerca e «Mostra tutti» oltre
   le prime righe; sotto, gli elementi senza materiale (es. facciate).
-  - *Vuoto:* «Materiali non letti: cattura di nuovo la vista dalla palette.»
+  - *Vuoto:* la vista non ha l'elenco di Allplan (web app, immagini da altri
+    programmi): al posto della tabella compare **Materiali della vista**, sotto.
     Nessuna riga d'esempio.
   - *In corso:* «Carico i materiali…».
   - *Errore:* il messaggio scritto dalla palette, con cosa fare.
   - *Pieno:* la tabella e una riga «N da cambiare, M immagini in più».
   Con FLUX.1 Kontext (una sola immagine) le anteprime non partono: lo dice e
   Genera si spegne finché non si cambia modello o si tolgono le spunte.
+- **Materiali della vista** (2026-11-06, ok di Riccardo al lazo libero): quando
+  la vista non ha l'elenco dei materiali di Allplan. **+ Seleziona un
+  materiale** mette la vista in modo disegno: si traccia il contorno a mano
+  libera tenendo premuto, come il lazo del Ritocca, e al rilascio la pagina
+  ritaglia il pezzo (fuori dal contorno grigio piatto). Il ritaglio è il
+  campione della riga, al posto del cubetto di Allplan; il resto è come sopra:
+  «diventa» obbligatorio, **+ Riferimento** facoltativo, **Togli**. I contorni
+  restano sulla vista, numerati. **Fine selezione** esce dal disegno. Al
+  massimo `MATERIALI_CAMBIATI_MASSIMI` materiali. Il flusso Allplan non cambia.
+  - *Vuoto:* «Indica sulla vista le superfici da cambiare: per ognuna scrivi
+    cosa diventa.» e il pulsante. Nessuna riga d'esempio.
+  - *In corso:* «Disegna sulla vista il contorno di una superficie…».
+  - *Errore:* «Il pezzo selezionato non si è potuto ritagliare dalla vista.»
+    con cosa fare; una riga senza «diventa» lo dice e non parte.
+  - *Pieno:* le righe con il campione, «N di massimo M materiali scelti sulla
+    vista».
 - **Cosa parte, in breve**: il riassunto delle scelte in italiano.
 - **Avanzate: mostra e modifica il prompt completo**: il testo vero che parte
   al modello, in inglese, modificabile, con il numero di caratteri. Se l'utente
@@ -952,6 +969,15 @@ già com'era).
   `77-invio-due-destinazioni.png`. La bozza della prima passata resta accanto al
   render (`<id>.geometria.png`), non ancora mostrata nello Studio.
 
+Coi crediti AIRENDER (2026-11-06, plugin e web app) la stessa spunta: la prima
+passata va a «**server AIRENDER (airender-server.netlify.app) → Comfy
+Developer Platform, workflow Z-Image-Turbo + ControlNet sugli spigoli**», costo
+«**1 render AIRENDER in più per la prima passata (prezzo provvisorio), scalati
+solo se il workflow riesce**». Se il piano non la comprende la spunta è grigia
+con «Il piano <nome> non comprende «Tieni la geometria»: è nel piano Studio,
+oppure con una chiave Comfy tua.»; senza saldo letto, si rimanda alla scheda
+Licenza. Il server rifiuta comunque con la stessa idea prima di riservare.
+
 ## Finale, costruito il 2026-11-04
 
 Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto
@@ -978,6 +1004,25 @@ contraddicono le nuove, valgono le nuove:
 | 3 — Risultato | Studio · Risultato | Prima/dopo con la linea come vista predefinita, affiancati come seconda scelta |
 | 4 — Materiali | Studio · Ritocca, in grigio; Materiali a parole in Genera | La direzione del 2026-10-22 (zone dalla mappa di Allplan, unisci e separa) resta, dentro Ritocca |
 | 5 — Livelli | Studio · Passi (dal 2026-10-28) | Non più livelli sopra un render ma un albero di passi, ognuno con la sua ricetta; costruito il 2026-10-30 |
+
+## Web app · Accedi, costruita il 2026-11-06
+
+La web app è lo Studio stesso, servito da `airender-server.netlify.app/studio/`
+invece che da 127.0.0.1 (decisione di Riccardo, 2026-11-06: «Lo Studio vero nel
+browser»). L'unica schermata nuova è l'ingresso, prima dello Studio, con lo
+stile dello Studio. Sotto, sempre, lo stato del motore che si prepara nel
+browser. Con un codice già salvato in quel browser si entra senza ripetere.
+
+| Stato | Cosa si vede |
+|---|---|
+| Vuoto | «Accedi ad AIRENDER Studio», la frase su dove restano le immagini e dove va la vista quando si preme Genera, Email, Codice licenza, Entra, «Vedi i piani» |
+| In corso | Entra spento, «Chiedo al server AIRENDER (<host>) se email e codice sono di una licenza.»; poi «Licenza trovata. Aspetto che lo Studio sia pronto nel browser…» |
+| Errore | Email e codice col bordo rosso e la frase del server, che non dice quale dei due è sbagliato; motore non partito o browser senza JSPI: la ragione e «Apri la web app con Chrome o Edge aggiornati»; seconda scheda: «Lo Studio è già aperto in un'altra scheda» |
+| Pieno | Lo Studio, come sul PC |
+
+Nella web app «Apri cartella» risponde che le immagini stanno nel browser;
+«Esporta per il cliente» scarica il file. I testi dello Studio che parlano
+della palette restano fino alla PR 2.
 
 ## Decisioni visive
 

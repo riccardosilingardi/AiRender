@@ -813,11 +813,18 @@ def metti_in_coda(
 
 
 def _cambio_controllato(radice: Path, cambio: modulo_materiali.Cambio) -> modulo_materiali.Cambio:
-    """Il cambio con i file controllati: anteprima dalla cartella delle anteprime, foto dai riferimenti."""
-    anteprima = (str(modulo_materiali.controlla_anteprima(radice, Path(cambio.anteprima).name).resolve())
-                 if cambio.anteprima else None)
+    """Il cambio con i file controllati: anteprima dalla cartella delle anteprime, foto dai riferimenti.
+
+    Un campione ritagliato dalla vista (`dalla_vista`) sta fra i riferimenti, non fra le anteprime di Allplan.
+    """
+    if cambio.anteprima and cambio.dalla_vista:
+        anteprima = str(controlla_riferimento(radice, Path(cambio.anteprima)))
+    elif cambio.anteprima:
+        anteprima = str(modulo_materiali.controlla_anteprima(radice, Path(cambio.anteprima).name).resolve())
+    else:
+        anteprima = None
     riferimento = str(controlla_riferimento(radice, Path(cambio.riferimento))) if cambio.riferimento else None
-    return modulo_materiali.Cambio(cambio.nome, cambio.diventa, anteprima, riferimento)
+    return modulo_materiali.Cambio(cambio.nome, cambio.diventa, anteprima, riferimento, cambio.dalla_vista)
 
 
 def chiedi_annullamento(radice: Path, identificativo: str) -> Path:

@@ -134,3 +134,29 @@ test("un risultato troppo pesante per Netlify diventa un link firmato allo Stora
   assert.match(parti[1].fileData.fileUri, /^https:\/\/storage\.finto\/L1\/R1-1\.png/);
   assert.equal(db.stato.caricati.length, 1);
 });
+
+test("verso Comfy parte solo la forma del plugin: niente testo da solo, candidati in piu' o file esterni", async () => {
+  const db = conLicenza();
+  const chiama = fetchFinto([[(u) => u.includes("/requests?"), { stato: 201, corpo: { request_id: "req-1" } }]]);
+  const corpo = {
+    contents: [{ role: "model", parts: [
+      { text: "rendi la vista" },
+      { inlineData: { mimeType: "image/png", data: "iVBORw0KGgo=" } },
+      { fileData: { fileUri: "https://altrove.example/x.png" } },
+    ] }],
+    generationConfig: { responseModalities: ["TEXT"], candidateCount: 8, imageConfig: { aspectRatio: "16:9", imageSize: "2K" } },
+    systemInstruction: { parts: [{ text: "rispondi solo a parole" }] },
+    tools: [{ googleSearch: {} }],
+  };
+  const r = await gestisci(invio(corpo), { db, ambiente, chiama });
+  assert.equal(r.status, 201);
+  const partito = JSON.parse(chiama.chiamate[0].body);
+  assert.deepEqual(partito, {
+    contents: [{ role: "user", parts: [
+      { text: "rendi la vista" },
+      { inlineData: { mimeType: "image/png", data: "iVBORw0KGgo=" } },
+    ] }],
+    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9", imageSize: "2K" } },
+  });
+  assert.equal(db.stato.render[0].dimensione, "2K");
+});

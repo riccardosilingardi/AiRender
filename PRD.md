@@ -269,6 +269,40 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Materiali scelti sulla vista con il lazo (2026-11-06)
+
+Senza l'elenco di Allplan (web app, immagini da altri programmi) un materiale si
+indica disegnando a mano libera sulla vista; la pagina ritaglia il pezzo e lo
+manda come campione, con una frase sua nel prompt («a crop of image 1»).
+Provato con i test (motore e coda) e in Chromium sullo Studio del PC con un
+provider finto: contorno disegnato, riga creata, campione salvato, prompt
+composto. **Mai provato con un render vero**: non si sa se Nano Banana cambia
+bene tutte le superfici simili al ritaglio, né se il grigio attorno al
+campione lo confonde. Mai provato nella web app con Pyodide vero (il ritaglio
+usa una canvas sull'immagine servita dal service worker).
+
+### Web app: lo Studio nel browser (2026-11-06)
+
+Lo Studio gira nel browser: Python con Pyodide 0.29.3 in un Web Worker
+(`web/pagine/motore.js`), lo stesso `core/` dello Studio sul PC attraverso
+`web/ponte.py`, un service worker che fa da 127.0.0.1 (`web/pagine/sw.js`), e
+la cartella delle viste in IndexedDB. Si entra con email e codice licenza
+(`/api/accedi`). Provato con CPython (il ponte, nei test) e in Chromium con un
+motore finto che inoltra al ponte vero: accesso giusto e sbagliato, Studio
+aperto, vista caricata e mostrata, rientro dopo una ricarica. **Mai provato
+con Pyodide vero**: dal container di sviluppo jsdelivr non si raggiunge, quindi
+non si sa se Pillow si carica, se `run_sync` con JSPI lascia rispondere lo
+Studio mentre un render aspetta, se IDBFS tiene i render fra una visita e
+l'altra, e quanto pesa davvero il primo caricamento (stimato 20 MB). Serve
+Chrome o Edge recenti (JSPI); Firefox e Safari si fermano con un messaggio.
+Sul web (pagina sotto `/studio/`) lo Studio non mostra la cartella delle
+viste né il riquadro della chiave Comfy, e dice «nuova scheda» e «questo
+browser» al posto di browser e PC; «Tieni la geometria» è grigia se il piano non la
+comprende (dal 2026-11-06 coi crediti AIRENDER passa dal server, solo piano Studio); la tabella materiali resta quella di Allplan (sul web il lazo
+è in un altro thread); altri testi che parlano di palette sono rimasti (PR 2). Ogni browser conta come una postazione. Verifica: aprire
+l'anteprima Netlify della PR in Edge, entrare, caricare una vista, un render,
+saldo sceso di 1; chiudere e riaprire, il render c'e' ancora.
+
 ### Funzioni per piano e video nel Pro (2026-11-05)
 
 La voce `funzioni` dei piani arriva allo Studio con il saldo, ma lo Studio non

@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 dist/
+
+# La web app si costruisce a ogni deploy (scripts/scrivi_web.py)
+server/public/studio/

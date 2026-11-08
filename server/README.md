@@ -19,6 +19,8 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 | `/` | `public/index.html` | Pagina prezzi: Base, Pro, Studio (mensile/annuale), Prova, Ricarica |
 | `/v2/models/*` | `router.mjs` | Stesso protocollo del Comfy Router: invio, stato, risultato. Riserva all'invio, addebita al risultato con immagine, annulla se il Router fallisce |
 | `/geometria/api/v2/*` | `geometria.mjs` | «Tieni la geometria» (solo piano Studio): stessa API v2 dei workflow della Developer Platform. Il grafo lo ricostruisce il server da `geometria.json`; riserva all'invio, addebita a lavoro riuscito, annulla se fallisce o si ferma |
+| `/studio/` | `public/studio/` (costruita) | La web app: lo Studio nel browser, costruito a ogni deploy da `scripts/scrivi_web.py` |
+| `/api/accedi` | `accedi.mjs` | Accesso alla web app: email e codice della stessa licenza |
 | `/api/saldo` | `saldo.mjs` | Piano, saldo, scadenza, funzioni, link firmati Ricarica e Gestisci |
 | `/api/acquista?prodotto=…` | `acquista.mjs` | Apre il Checkout (dati fiscali, codici sconto) |
 | `/api/gestisci?t=…` | `gestisci.mjs` | Portale clienti Stripe (cambio piano, disdetta) |

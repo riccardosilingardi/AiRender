@@ -22,6 +22,7 @@ import platform
 import re
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import TYPE_CHECKING
 
 from . import config
@@ -37,6 +38,10 @@ if TYPE_CHECKING:
 
 VARIABILE = "AIRENDER_LICENZA"
 VARIABILE_SERVER = "AIRENDER_SERVER"
+# Solo la web app le imposta (web/ponte.py): il canale "web" e un'impronta
+# del browser al posto di quella della macchina. Nel plugin restano vuote.
+VARIABILE_CANALE = "AIRENDER_CANALE"
+VARIABILE_POSTAZIONE = "AIRENDER_POSTAZIONE"
 INTESTAZIONE = "X-Airender-Licenza"
 INTESTAZIONE_POSTAZIONE = "X-Airender-Postazione"
 INTESTAZIONE_CANALE = "X-Airender-Canale"
@@ -102,8 +107,26 @@ def salva(codice: str) -> Path:
     return percorso
 
 
+_LOCALI = ("localhost", "127.0.0.1", "::1")
+
+
 def server() -> str:
-    return (os.environ.get(VARIABILE_SERVER, "").strip() or config.SERVER_AIRENDER).rstrip("/")
+    """L'indirizzo del server AIRENDER: quello di config o, per le prove, AIRENDER_SERVER.
+
+    Il codice licenza viaggia in ogni richiesta e vale come una chiave: verso
+    un server che non e' sul PC stesso parte solo in https.
+    """
+    indirizzo = (os.environ.get(VARIABILE_SERVER, "").strip() or config.SERVER_AIRENDER).rstrip("/")
+    parti = urlsplit(indirizzo)
+    locale = parti.scheme == "http" and parti.hostname in _LOCALI
+    if parti.scheme != "https" and not locale:
+        raise ErroreProvider(
+            f"L'indirizzo del server AIRENDER ({indirizzo}) non e' https: il codice licenza "
+            "viaggerebbe in chiaro, quindi non parte niente.",
+            f"Togli la variabile d'ambiente {VARIABILE_SERVER} (vale il server ufficiale) "
+            "o scrivi un indirizzo che comincia con https://, poi riapri lo Studio.",
+        )
+    return indirizzo
 
 
 def postazione() -> str:
@@ -111,6 +134,9 @@ def postazione() -> str:
 
     Non manda il nome della macchina ne' dell'utente, solo l'hash.
     """
+    propria = os.environ.get(VARIABILE_POSTAZIONE, "").strip()
+    if propria:
+        return hashlib.sha256(propria.encode("utf-8")).hexdigest()[:_IMPRONTA]
     try:
         utente = getpass.getuser()
     except Exception:  # pylint: disable=broad-exception-caught
@@ -123,7 +149,7 @@ def intestazioni(codice: str, canale: str = "plugin") -> dict:
     return {
         INTESTAZIONE: codice,
         INTESTAZIONE_POSTAZIONE: postazione(),
-        INTESTAZIONE_CANALE: canale,
+        INTESTAZIONE_CANALE: os.environ.get(VARIABILE_CANALE, "").strip() or canale,
     }
 
 
