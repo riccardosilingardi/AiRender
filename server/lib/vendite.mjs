@@ -40,11 +40,19 @@ export async function nuovaLicenza({ db, email }, dati, casuale) {
       codiceDaMandare = codice;
     }
   }
-  if (codiceDaMandare && email && dati.manda_email !== false) {
-    await email.inviaCodice(dati.email, codiceDaMandare, p.nome);
-    await db.aggiorna("licenze", `id=eq.${creata.id}`, { email_inviata_il: new Date().toISOString() });
+  if (codiceDaMandare && dati.manda_email !== false) {
+    await mandaCodice({ db, email }, creata.id, dati.email, codiceDaMandare, p.nome);
   }
   return { id: creata.id, nuova: creata.nuova, codice: codiceDaMandare };
+}
+
+// Manda il codice per email e segna che e' partito. Il webhook di Stripe la
+// chiama dopo aver accreditato i render pagati: se l'email non parte, i
+// crediti ci sono comunque e Stripe ripete l'evento, che rigenera il codice.
+export async function mandaCodice({ db, email }, licenzaId, indirizzo, codice, nomePiano) {
+  if (!codice || !email) return;
+  await email.inviaCodice(indirizzo, codice, nomePiano);
+  await db.aggiorna("licenze", `id=eq.${licenzaId}`, { email_inviata_il: new Date().toISOString() });
 }
 
 // Un codice nuovo per una licenza esistente (codice perso o finito in mani
