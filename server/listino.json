@@ -1,4 +1,8 @@
 {
+  "accesso": {
+    "link_massimi_ora": 5,
+    "link_minuti": 15
+  },
   "benvenuto": {
     "render": 10,
     "validita_mesi": 12

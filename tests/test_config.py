@@ -684,3 +684,15 @@ def test_server_invio_massimo_mb_in_base64_sta_sotto_i_6_mb_di_netlify():
     assert config.SERVER_INVIO_MASSIMO_MB * 4 / 3 < 6
     assert config.costante("SERVER_INVIO_MASSIMO_MB").origine == config.VINCOLO
     # LISTINO ha i suoi casi in tests/test_listino.py
+
+
+# --- accesso alla web app ----------------------------------------------------
+
+
+def test_link_accesso_arriva_al_server_col_listino():
+    """Caso: LINK_ACCESSO_MINUTI o LINK_ACCESSO_MASSIMI_ORA cambiano qui ma il server ne usa altri."""
+    import json
+    letto = json.loads((Path(__file__).resolve().parent.parent / "server" / "listino.json").read_text(encoding="utf-8"))
+    assert letto["accesso"] == {"link_minuti": config.LINK_ACCESSO_MINUTI,
+                                "link_massimi_ora": config.LINK_ACCESSO_MASSIMI_ORA}
+    assert 5 <= config.LINK_ACCESSO_MINUTI <= 60

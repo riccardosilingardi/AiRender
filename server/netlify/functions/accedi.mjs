@@ -1,14 +1,19 @@
-// POST /api/accedi {email, codice}: l'accesso alla web app. Una licenza e'
+// POST /api/accedi {email, codice} oppure {link}: l'accesso alla web app. Una licenza e'
 // l'account del cliente (email + codice, migrazione 001): si entra se il
 // codice esiste, e' attivo ed e' di quell'email. Il codice resta nel browser
 // del cliente (web/ponte.py lo salva come lo Studio sul PC); il server non
 // tiene sessioni.
 //
 // Un rifiuto non dice quale dei due e' sbagliato: chi prova email a caso non
-// scopre quali sono clienti. Piu' avanti l'accesso passa a un link via email
-// (stesso account, stessa tabella licenze).
+// scopre quali sono clienti.
+//
+// Col link (POST /api/link-accesso lo manda per email) il server non puo'
+// ridare il codice dell'acquisto, che tiene solo come SHA-256: crea una
+// chiave nuova per questo browser, nella stessa forma AIR-..., legata alla
+// stessa licenza (migrazione 004), e la restituisce una volta sola.
 
-import { valido } from "../../lib/codice.mjs";
+import { createHash } from "node:crypto";
+import { generaCodice, hashCodice, ultimeCifre, valido } from "../../lib/codice.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { licenzaDi } from "../../lib/licenza.mjs";
 import { funzioni } from "../../lib/listino.mjs";
@@ -20,11 +25,46 @@ const NON_CORRISPONDONO = () => errore(401, "accesso_rifiutato",
 
 export const normalizzaEmail = (email) => String(email || "").trim().toLowerCase();
 
-export async function gestisci(req, { ambiente = process.env, db = creaDb(ambiente) } = {}) {
+const datiAccesso = (licenza) => ({
+  email: licenza.email,
+  piano: licenza.piano,
+  funzioni: funzioni(licenza.piano),
+  ultime_cifre: licenza.ultime_cifre,
+  saldo: Math.max(0, licenza.saldo.disponibile),
+});
+
+async function colLink(db, gettone, genera) {
+  const chiave = genera();
+  const licenza = await db.rpc("airender_usa_link", {
+    p_hash_gettone: createHash("sha256").update(gettone).digest("hex"),
+    p_hash_chiave: hashCodice(chiave),
+    p_ultime_cifre: ultimeCifre(chiave),
+  });
+  if (!licenza) {
+    return errore(401, "link_scaduto",
+      "Questo link di accesso non vale piu': scade dopo pochi minuti e si usa una volta sola.",
+      "Chiedine un altro dalla pagina di accesso, con la tua email.");
+  }
+  if (licenza.stato !== "attiva") {
+    return errore(403, "licenza_sospesa", `La licenza che finisce con ${licenza.ultime_cifre} e' ${licenza.stato}.`,
+      "Scrivi a AIRENDER per riattivarla.");
+  }
+  return json(200, { ...datiAccesso(licenza), codice: chiave });
+}
+
+export async function gestisci(req, { ambiente = process.env, db = creaDb(ambiente), genera = generaCodice } = {}) {
   if (req.method !== "POST") {
     return errore(405, "metodo", "Questa pagina accetta solo l'invio del modulo di accesso.", "Torna alla pagina di accesso.");
   }
   const dati = await req.json().catch(() => ({}));
+  if (dati.link) {
+    const gettone = String(dati.link);
+    if (gettone.length < 20 || gettone.length > 100) {
+      return errore(400, "link_non_valido", "Il link di accesso e' incompleto.",
+        "Riaprilo dall'email copiandolo tutto, o chiedine un altro.");
+    }
+    return colLink(db, gettone, genera);
+  }
   const email = normalizzaEmail(dati.email);
   const codice = String(dati.codice || "").trim();
   if (!email.includes("@")) {
@@ -43,13 +83,7 @@ export async function gestisci(req, { ambiente = process.env, db = creaDb(ambien
     return risposta.status === 403 ? risposta : NON_CORRISPONDONO();
   }
   if (normalizzaEmail(licenza.email) !== email) return NON_CORRISPONDONO();
-  return json(200, {
-    email: licenza.email,
-    piano: licenza.piano,
-    funzioni: funzioni(licenza.piano),
-    ultime_cifre: licenza.ultime_cifre,
-    saldo: Math.max(0, licenza.saldo.disponibile),
-  });
+  return json(200, datiAccesso(licenza));
 }
 
 export default protetto("accedi", (req) => gestisci(req));

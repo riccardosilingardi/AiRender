@@ -28,15 +28,32 @@ export function testoEmail(codice, nomePiano, sito) {
   ].join("\n");
 }
 
+// L'email col link di accesso alla web app: una riga per licenza attiva
+// di quell'email (un cliente puo' averne piu' d'una, ognuna col suo saldo).
+export function testoLink(voci, minuti) {
+  const righe = [
+    "Hai chiesto di entrare in AIRENDER Studio online.",
+    "",
+  ];
+  for (const v of voci) {
+    righe.push(`Licenza ${v.nomePiano} (finisce con ${v.ultime_cifre}):`, `    ${v.link}`, "");
+  }
+  righe.push(
+    `Ogni link vale ${minuti} minuti e una volta sola. Aprilo nel browser dove`,
+    "vuoi usare lo Studio: quel browser restera' collegato alla licenza.",
+    "",
+    "Se non l'hai chiesto tu, ignora questa email: senza un clic non succede niente.",
+  );
+  return righe.join("\n");
+}
+
 export function mittente(testo) {
   const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(testo || "");
   return m ? { nome: m[1].replace(/^"|"$/g, ""), indirizzo: m[2].trim() } : { nome: "", indirizzo: (testo || "").trim() };
 }
 
 export function creaEmail(ambiente = process.env, chiama = fetch) {
-  const oggetto = "Il tuo codice licenza AIRENDER";
-
-  async function viaMailjet(destinatario, testo) {
+  async function viaMailjet(destinatario, oggetto, testo) {
     const da = mittente(serve("EMAIL_MITTENTE", ambiente));
     const credenziali = Buffer.from(`${serve("MAILJET_API_KEY", ambiente)}:${serve("MAILJET_SECRET_KEY", ambiente)}`).toString("base64");
     return chiama("https://api.mailjet.com/v3.1/send", {
@@ -53,7 +70,7 @@ export function creaEmail(ambiente = process.env, chiama = fetch) {
     });
   }
 
-  async function viaResend(destinatario, testo) {
+  async function viaResend(destinatario, oggetto, testo) {
     return chiama("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${serve("RESEND_API_KEY", ambiente)}`, "content-type": "application/json" },
@@ -61,12 +78,16 @@ export function creaEmail(ambiente = process.env, chiama = fetch) {
     });
   }
 
-  async function inviaCodice(destinatario, codice, nomePiano) {
-    const testo = testoEmail(codice, nomePiano, serve("SITO_URL", ambiente));
+  async function invia(destinatario, oggetto, testo) {
     const r = facoltativa("MAILJET_API_KEY", ambiente)
-      ? await viaMailjet(destinatario, testo)
-      : await viaResend(destinatario, testo);
+      ? await viaMailjet(destinatario, oggetto, testo)
+      : await viaResend(destinatario, oggetto, testo);
     if (!r.ok) throw new Error(`Email: ${r.status} ${(await r.text()).slice(0, 300)}`);
   }
-  return { inviaCodice };
+
+  const inviaCodice = (destinatario, codice, nomePiano) =>
+    invia(destinatario, "Il tuo codice licenza AIRENDER", testoEmail(codice, nomePiano, serve("SITO_URL", ambiente)));
+  const inviaLink = (destinatario, voci, minuti) =>
+    invia(destinatario, "Il tuo link per entrare in AIRENDER Studio", testoLink(voci, minuti));
+  return { inviaCodice, inviaLink };
 }

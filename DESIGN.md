@@ -1004,11 +1004,18 @@ browser»). L'unica schermata nuova è l'ingresso, prima dello Studio, con lo
 stile dello Studio. Sotto, sempre, lo stato del motore che si prepara nel
 browser. Con un codice già salvato in quel browser si entra senza ripetere.
 
+Dal 2026-11-06 sera (PR 2) si entra di solito con un **link via email**: si
+scrive l'email, «Mandami il link», e arriva un link per ogni licenza attiva di
+quell'email, valido 15 minuti (SCELTA) e una volta sola. Il codice licenza
+resta a un clic, «Ho il codice licenza». Il link porta il browser dentro anche
+se è aperto in un'altra scheda: la scheda nuova lo passa a quella con lo
+Studio e dice di tornarci.
+
 | Stato | Cosa si vede |
 |---|---|
-| Vuoto | «Accedi ad AIRENDER Studio», la frase su dove restano le immagini e dove va la vista quando si preme Genera, Email, Codice licenza, Entra, «Vedi i piani» |
-| In corso | Entra spento, «Chiedo al server AIRENDER (<host>) se email e codice sono di una licenza.»; poi «Licenza trovata. Aspetto che lo Studio sia pronto nel browser…» |
-| Errore | Email e codice col bordo rosso e la frase del server, che non dice quale dei due è sbagliato; motore non partito o browser senza JSPI: la ragione e «Apri la web app con Chrome o Edge aggiornati»; seconda scheda: «Lo Studio è già aperto in un'altra scheda» |
+| Vuoto | «Accedi ad AIRENDER Studio», la frase su dove restano le immagini e dove va la vista quando si preme Genera, Email, «Mandami il link», «Ho il codice licenza», la frase su come arriva il link, «Vedi i piani» |
+| In corso | Pulsante spento, «Chiedo al server AIRENDER (<host>) di mandarti il link.»; poi «Se <email> è l'email di una licenza AIRENDER, ti abbiamo mandato un link per entrare. Vale 15 minuti. Se non arriva, guarda nella posta indesiderata.» (uguale per ogni email: non si scopre chi è cliente). Col link: «Controllo il link con il server AIRENDER…», poi «Licenza trovata. Aspetto che lo Studio sia pronto nel browser…» |
+| Errore | Link usato o scaduto: «Questo link di accesso non vale più» e «Chiedine un altro»; col codice: email e codice col bordo rosso e la frase del server, che non dice quale dei due è sbagliato; motore non partito o browser senza JSPI: la ragione e «Apri la web app con Chrome o Edge aggiornati»; seconda scheda: «Lo Studio è già aperto in un'altra scheda» |
 | Pieno | Lo Studio, come sul PC |
 
 Nella web app «Apri cartella» risponde che le immagini stanno nel browser;

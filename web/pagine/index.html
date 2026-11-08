@@ -6,7 +6,7 @@
 <title>AIRENDER Studio</title>
 <link rel="stylesheet" href="/studio/pagine/studio.css">
 <style>
-  .ingresso { max-width: 460px; margin: 48px auto; padding: 0 16px; display: grid; gap: 16px; }
+  .ingresso { max-width: 460px; margin: 48px auto; padding: 0 16px; display: grid; gap: 16px; align-content: start; }
   .ingresso h1 { font-size: 20px; margin: 0; }
   .ingresso form { display: grid; gap: 10px; }
   .ingresso label { display: grid; gap: 4px; font-size: 13px; }
@@ -31,15 +31,16 @@
     <label>Email
       <input id="email" type="email" autocomplete="email" required placeholder="nome@studio.it">
     </label>
-    <label>Codice licenza
-      <input id="codice" type="text" autocomplete="off" spellcheck="false" required placeholder="AIR-XXXX-XXXX-XXXX-XXXX">
+    <label id="riga-codice" hidden>Codice licenza
+      <input id="codice" type="text" autocomplete="off" spellcheck="false" placeholder="AIR-XXXX-XXXX-XXXX-XXXX">
     </label>
     <div class="azioni">
-      <button class="btn primario" id="entra" type="submit">Entra</button>
+      <button class="btn primario" id="entra" type="submit">Mandami il link</button>
+      <button class="btn link" id="col-codice" type="button">Ho il codice licenza</button>
     </div>
     <p class="tenue piccolo" id="stato-accesso" role="status" aria-live="polite"></p>
     <div id="errore-accesso" hidden></div>
-    <p class="tenue piccolo">Il codice è nell'email che hai ricevuto dopo l'acquisto. Non hai una licenza? <a href="/#prezzi">Vedi i piani</a>.</p>
+    <p class="tenue piccolo" id="spiega-accesso">Ti mandiamo un link all'email con cui hai comprato AIRENDER: lo apri in questo browser e sei dentro. Non hai una licenza? <a href="/#prezzi">Vedi i piani</a>.</p>
   </form>
 
   <p class="tenue motore" id="motore" role="status" aria-live="polite">Preparo lo Studio nel browser…</p>

@@ -281,6 +281,21 @@ bene tutte le superfici simili al ritaglio, né se il grigio attorno al
 campione lo confonde. Mai provato nella web app con Pyodide vero (il ritaglio
 usa una canvas sull'immagine servita dal service worker).
 
+### Web app: accesso con link via email (2026-11-06)
+
+Si entra scrivendo l'email: `/api/link-accesso` manda con Mailjet un link per
+licenza attiva (15 minuti, una volta sola, massimo 5 all'ora per licenza;
+SCELTE in `core/config.py`). Il server non ha il codice in chiaro, quindi il
+link crea una **chiave del browser** (stessa forma AIR-…, tabella
+`chiavi_accesso`) che vale come il codice: stesso saldo, stesse postazioni,
+revocabile da sola. Provato: test del server con database finto, SQL della
+migrazione 004 su Postgres 16 locale, e in Chromium con server finto (link
+nella stessa scheda, in una scheda nuova mentre lo Studio è aperto, link
+usato). **Non provato**: l'email vera da Mailjet (arriva? finisce in spam col
+mittente gmail?), la migrazione 004 sul Supabase vero, il link che si apre
+dal client di posta del telefono (finisce in un altro browser: la chiave resta
+lì). Non c'è ancora una schermata per vedere o revocare le chiavi.
+
 ### Web app: lo Studio nel browser (2026-11-06)
 
 Lo Studio gira nel browser: Python con Pyodide 0.29.3 in un Web Worker
@@ -298,8 +313,8 @@ Chrome o Edge recenti (JSPI); Firefox e Safari si fermano con un messaggio.
 Sul web (pagina sotto `/studio/`) lo Studio non mostra la cartella delle
 viste né il riquadro della chiave Comfy, e dice «nuova scheda» e «questo
 browser» al posto di browser e PC; «Tieni la geometria» è grigia senza chiave
-Comfy propria; la tabella materiali resta quella di Allplan (sul web il lazo
-è in un altro thread); altri testi che parlano di palette sono rimasti (PR 2). Ogni browser conta come una postazione. Verifica: aprire
+Comfy propria; senza l'elenco di Allplan i materiali si
+scelgono col lazo (sezione sopra); altri testi che parlano di palette sono rimasti (PR 2). Ogni browser conta come una postazione. Verifica: aprire
 l'anteprima Netlify della PR in Edge, entrare, caricare una vista, un render,
 saldo sceso di 1; chiudere e riaprire, il render c'e' ancora.
 
