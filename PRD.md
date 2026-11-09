@@ -496,15 +496,27 @@ provider finto e in Chromium senza modello. Mai visto se Nano Banana fa un
 interno notturno tenendo arredo e architettura. Verifica: un render di giorno,
 Cambia → Notte → Applica, e i due affiancati.
 
-### Altra vista: fotogrammi coerenti da più viste (2026-11-04)
+### Ricetta su altre viste (2026-11-09, era «Altra vista» del 2026-11-04)
 
-«Altra vista» sotto l'immagine porta stile, modello, richieste e note dei
-ritocchi su un'altra cattura, con l'immagine scelta come seconda immagine e la
-frase RIFERIMENTO_COERENZA (bozza 11). Provato solo con il provider finto: mai
-con Nano Banana vero, quindi non si sa quanto arredo e materiali restino
-uguali. Le aree dei ritocchi passano solo a parole; i materiali cambiati da
-Genera non si portano. Verifica: due viste dello stesso progetto, «Altra
-vista» da un render ritoccato, confronto a occhio degli oggetti aggiunti.
+«Ricetta» sotto l'immagine (era «Altra vista») elenca i passi dell'immagine
+(Genera · stile, Cambia, Popola, Ritocco), li rifà su una o più viste
+spuntate, al massimo `RICETTA_VISTE_MASSIME` (6, scelta) per clic, e li salva
+con un nome in `ricette-utente.json` nella cartella delle viste; in Genera,
+**Le mie ricette** la rifà sulla vista catturata dopo. Ogni vista è un invio
+solo, non un invio per passo: stile e modello del primo render, le richieste e
+le note di tutta la strada a parole, l'immagine come seconda immagine con
+RIFERIMENTO_COERENZA (bozza 11). Il prototipo dei flussi mostrava un invio per
+passo («3 invii per vista»): non l'ho fatto, perché la coda non sa ancora far
+partire un lavoro dal render di un altro lavoro non finito, e un passo per
+volta su ogni vista sposta gli spigoli a ogni giro.
+Provato solo col provider finto e in Chromium (screenshot in
+`docs/ui/studio-ricetta/`), mai in Edge, mai nella web app in Pyodide, mai con
+Nano Banana vero su più viste nello stesso clic. Le aree dei ritocchi e i
+tratti di Popola passano solo a parole; i materiali cambiati da Genera non si
+portano. Non si sa se una ricetta lunga (5-6 passi in un invio) regge come i
+passi fatti uno per volta. Verifica: un render con Cambia e un ritocco,
+Ricetta → due viste spuntate → Rifai su 2 viste, poi i tre render affiancati;
+se una vista perde i ritocchi, rimandare i tre render e la ricetta mostrata.
 
 ### Studio che si ricollega dopo un riavvio (2026-11-04)
 

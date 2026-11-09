@@ -28,7 +28,7 @@ from .. import contesto as modulo_contesto
 from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
-from .. import esporta as modulo_esporta, preset_utente
+from .. import esporta as modulo_esporta, preset_utente, ricette_utente
 from .. import regola as modulo_regola
 from .. import video as modulo_video
 from .. import licenza as modulo_licenza
@@ -1076,7 +1076,32 @@ class Studio:
             richieste += [r for r in passo.richieste if r.strip()]
             richieste += [a.nota for a in passo.aree if a.nota.strip()]
         return {"lavoro": lavoro, "render": render, "vista": vista, "origine": origine,
-                "richieste": richieste}
+                "richieste": richieste, "passi": self._nomi_ricetta(vista, strada, origine)}
+
+    def _nomi_ricetta(self, vista: Path, strada: list[str], origine: modulo_coda.Lavoro) -> list[str]:
+        """I passi della ricetta come li legge l'utente: «Genera · Rivista», «Cambia · Ora blu», ...
+
+        Un passo che non porta niente a parole (Finale, «Rifai» senza
+        richieste) non si elenca: sull'altra vista non cambierebbe niente.
+        """
+        albero = self._albero(vista)
+        nomi = []
+        for identificativo in strada:
+            passo = albero.passo(identificativo)
+            if passo is None:
+                continue
+            if identificativo == origine.identificativo:
+                stile = ("Prompt scritto a mano" if (origine.prompt_a_mano or "").strip()
+                         else _nome_stile(passo))
+                nomi.append(f"Genera · {stile}")
+                # «Rifai tutto dalla vista»: le richieste della strada sono gia' qui.
+                nomi += [f"Passo · {blocchi.nome_richiesta(r) or modulo_passi.nome_breve(r)}"
+                         for r in origine.richieste if r.strip()]
+            elif _richieste_del_passo(passo) and any(r.strip() for r in _richieste_del_passo(passo)):
+                nome = _nome_passo(passo)
+                nomi.append(nome if _tipo_passo(passo) == "ritocco" or nome.startswith(("Cambia", "Popola"))
+                            else f"Passo · {nome}")
+        return nomi
 
     def porta_su_vista(self, identificativo: str, dati: dict) -> dict:
         """Un render nuovo su un'altra vista, coerente con questa immagine.
@@ -1088,21 +1113,62 @@ class Studio:
         """
         ricetta = self.ricetta_da_portare(identificativo)
         lavoro, origine = ricetta["lavoro"], ricetta["origine"]
-        vista = self.percorso_vista(str(dati.get("vista") or ""))
-        if vista.resolve() == ricetta["vista"].resolve():
+        viste = self._viste_della_ricetta(dati, ricetta["vista"])
+        destinazione = self.destinazione(lavoro.modello, riferimento=True)
+        if dati.get("destinazione_mostrata") != destinazione["destinazione"]:
+            # Lo dice anche _metti_in_coda, ma qui va detto prima del primo
+            # invio: con piu' viste, nessuna parte se una non puo' partire.
             raise RichiestaStudioNonValida(
-                "Questa e' la stessa vista dell'immagine: qui serve Variante.",
-                "Cattura in Allplan l'altra inquadratura, poi sceglila qui.")
+                f"La pagina ha mostrato come destinazione {dati.get('destinazione_mostrata')!r}, ma la "
+                f"ricetta partirebbe verso {destinazione['destinazione']}. Non ho inviato niente.",
+                "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.")
+        for vista in viste:
+            descrizione = self.descrivi_vista(vista.name)
+            if not descrizione["idonea"]:
+                raise RichiestaStudioNonValida(
+                    f"{vista.name}: {descrizione['fatto']} Non ho inviato niente, nemmeno sulle altre viste.",
+                    descrizione["cosa_fare"])
         riferimento = self.percorso_riferimento(
             self.carica_riferimento(ricetta["render"].read_bytes(), ricetta["render"].name)["nome"])
-        destinazione = self.destinazione(lavoro.modello, riferimento=True)
-        return self._metti_in_coda(
+        risposte = [self._metti_in_coda(
             vista, origine.scelte, destinazione,
             mostrata=dati.get("destinazione_mostrata"),
             preset=origine.preset, prompt_a_mano=origine.prompt_a_mano,
             richieste=ricetta["richieste"], riferimento=riferimento,
             portato_da=lavoro.identificativo,
-        )
+        ) for vista in viste]
+        risposta = dict(risposte[0])
+        risposta["identificativi"] = [i for r in risposte for i in r["identificativi"]]
+        risposta["viste"] = [v.name for v in viste]
+        return risposta
+
+    def _viste_della_ricetta(self, dati: dict, da: Path) -> list[Path]:
+        """Le viste su cui rifare la ricetta: `viste` (un elenco) o `vista` (una), controllate tutte prima."""
+        nomi = dati.get("viste")
+        if nomi is None:
+            nomi = [dati.get("vista")] if dati.get("vista") else []
+        if not isinstance(nomi, list) or not nomi:
+            raise RichiestaStudioNonValida("Non hai scelto su quale vista rifare la ricetta.",
+                                           "Spunta almeno una vista nell'elenco.")
+        if len(set(map(str, nomi))) != len(nomi):
+            raise RichiestaStudioNonValida("Una vista e' scelta due volte.",
+                                           "Ricarica lo Studio e spunta di nuovo le viste.")
+        massime = config.RICETTA_VISTE_MASSIME
+        if len(nomi) > massime:
+            raise RichiestaStudioNonValida(
+                f"Hai scelto {len(nomi)} viste: una ricetta parte al massimo su {massime} per clic.",
+                f"Togli {'una vista' if len(nomi) - massime == 1 else f'{len(nomi) - massime} viste'}, "
+                "oppure rifalla in due volte.")
+        viste = [self.percorso_vista(str(n or "")) for n in nomi]
+        for vista in viste:
+            if vista.resolve() == da.resolve():
+                raise RichiestaStudioNonValida(
+                    "Questa e' la stessa vista dell'immagine: qui serve Variante.",
+                    "Cattura in Allplan l'altra inquadratura, poi sceglila qui.")
+            if not vista.is_file():
+                raise FileNonTrovato(f"La vista {vista.name} non c'e' piu' nella cartella.",
+                                     "Catturala di nuovo dalla palette, poi riapri Ricetta.")
+        return viste
 
     def anteprima_porta(self, identificativo: str) -> dict:
         """Quello che la pagina mostra prima del clic: da dove viene e cosa porta."""
@@ -1116,9 +1182,53 @@ class Studio:
             "stile": "Prompt scritto a mano" if (origine.prompt_a_mano or "").strip()
                      else (preset.nome if preset else "Scelte libere"),
             "richieste": ricetta["richieste"],
+            "passi": ricetta["passi"],
             "vista": ricetta["vista"].name,
             "viste": [v["nome"] for v in self.elenco_viste() if v["nome"] != ricetta["vista"].name],
+            "massime": config.RICETTA_VISTE_MASSIME,
+            # Il costo per 1, 2, ... viste, scritto come quello di Genera: un
+            # render per vista, mai un numero non misurato.
+            "costi": [testo_costo(modello, n) if modello else "non misurato"
+                      for n in range(1, config.RICETTA_VISTE_MASSIME + 1)],
         }
+
+    # --- le mie ricette -------------------------------------------------
+
+    def mie_ricette(self) -> dict:
+        """Le ricette salvate, ognuna con se si puo' ancora usare e perche' no."""
+        elenco = ricette_utente.leggi(self.cartella)
+        ricette = []
+        for voce in elenco.ricette:
+            riga = {k: voce.get(k) for k in ("nome", "lavoro", "vista", "passi", "salvata_il")}
+            try:
+                anteprima = self.anteprima_porta(voce["lavoro"])
+                riga.update(usabile=True, perche_no=None, modello=anteprima["modello"],
+                            modello_nome=anteprima["modello_nome"], stile=anteprima["stile"],
+                            passi=anteprima["passi"], richieste=anteprima["richieste"],
+                            costi=anteprima["costi"])
+            except ErroreAirender as errore:
+                riga.update(usabile=False, perche_no=f"{errore.fatto} {errore.cosa_fare}".strip())
+            ricette.append(riga)
+        return {"ricette": ricette, "problema": elenco.problema,
+                "file": str(ricette_utente.percorso(self.cartella)),
+                "massime": config.RICETTA_VISTE_MASSIME}
+
+    def salva_mia_ricetta(self, dati: dict) -> dict:
+        """Salva con un nome la ricetta dell'immagine `lavoro`."""
+        identificativo = str(dati.get("lavoro") or "")
+        ricetta = self.ricetta_da_portare(identificativo)
+        ricette_utente.salva(self.cartella, dati.get("nome"), identificativo, ricetta["vista"].name,
+                             ricetta["passi"], sovrascrivi=bool(dati.get("sovrascrivi")))
+        return self.mie_ricette()
+
+    def elimina_mia_ricetta(self, dati: dict) -> dict:
+        ricette_utente.elimina(self.cartella, str(dati.get("nome") or ""))
+        return self.mie_ricette()
+
+    def usa_mia_ricetta(self, dati: dict) -> dict:
+        """Rifa' una ricetta salvata sulle viste scelte: come Ricetta dall'immagine da cui viene."""
+        voce = ricette_utente.trova(self.cartella, str(dati.get("nome") or ""))
+        return self.porta_su_vista(voce["lavoro"], dati)
 
     def rifai(self, identificativo: str, dati: dict) -> dict:
         """Rimette in coda un lavoro con la stessa ricetta: stesse scelte, stesso modello, stessa partenza.

@@ -12,6 +12,7 @@ const SUL_WEB = location.pathname.startsWith("/studio/");
 const S = {
   scheda: "genera",
   miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
+  ricette: { elenco: [], problema: null, scelta: "", dest: null, nota: null, errore: null },  // Le mie ricette
   studio: null,
   catalogo: null,
   vista: null,            // nome del file nella cartella
@@ -833,6 +834,7 @@ function colonnaInvio() {
 
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
     ...pannelloMiei(),
+    ...(S.modo === "contesto" ? [] : pannelloRicette()),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
@@ -1978,7 +1980,7 @@ function barraAzioni(l) {
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
       title: "Un video che parte da questa immagine." }, "Video"),
     h("button", { classe: "btn", "aria-expanded": String(!!az.porta), onclick: () => apriPorta(l),
-      title: "La stessa immagine su un'altra vista catturata in Allplan: stesso stile, stessi ritocchi. Per i fotogrammi di un video." }, "Altra vista"),
+      title: "Rifà i passi di questa immagine su altre viste catturate in Allplan: stesso stile, stessi ritocchi. Si salva per dopo." }, "Ricetta"),
     h("button", { classe: "btn", "aria-expanded": String(!!az.finale), onclick: () => apriFinale(l),
       title: "Ingrandisce questa immagine e aggiunge dettaglio, senza cambiare il disegno. Per la tavola o la stampa." }, "Finale"))];
   // Variante non dice niente da sola (test del 2026-11-04): si scrive da dove
@@ -2183,53 +2185,94 @@ function pannelloFinale(l) {
     h("p", { classe: "tenue piccolo" }, "Esce un passo nuovo sotto questa immagine."));
 }
 
-// --- Altra vista: «Porta su un'altra vista» (2026-11-04) ----------------------
-// Per i fotogrammi di un video: la stessa ricetta (stile, modello, richieste e
-// note dei ritocchi) su un'altra cattura, con questa immagine come seconda
-// immagine perché il modello tenga uguali materiali e oggetti.
+// --- Ricetta: i passi di questa immagine su altre viste (2026-11-09) ----------
+// Era «Altra vista» (2026-11-04), per i fotogrammi di un video. Ora si
+// spuntano piu' viste e la ricetta si salva con un nome per rifarla dopo, da
+// Genera, sulle viste catturate piu' tardi. Ogni vista e' un render: stile e
+// modello del primo render, le richieste e le note di tutti i passi a parole,
+// e questa immagine come seconda immagine perche' materiali e oggetti restino
+// gli stessi.
 
 async function apriPorta(l) {
   const az = S.azioni;
   if (az.porta) { az.porta = null; render(); return; }
-  az.porta = { dati: null, dest: null, vista: null, mandato: null, errore: null };
+  az.porta = { dati: null, dest: null, viste: [], mandato: null, errore: null, nome: "", salvata: null };
   render();
   try {
     const dati = await get(`/api/lavori/${enc(l.identificativo)}/porta`);
     az.porta.dati = dati;
-    az.porta.vista = dati.viste[0] || null;
+    az.porta.viste = dati.viste.slice(0, 1);
+    az.porta.nome = nomeRicetta(dati.passi);
     az.porta.dest = await get(`/api/destinazione?modello=${enc(dati.modello)}&riferimento=1`);
   } catch (e) { if (az.porta) az.porta.errore = e; }
   render();
 }
 
+// Il nome proposto: gli ultimi due passi, solo la loro ultima parte
+// («Ora blu», non «Cambia · Ora blu»), tagliato a parola intera entro 60.
+function nomeRicetta(passi) {
+  const corti = (passi || []).map((p) => p.split(" · ").pop().replace(/…$/, ""));
+  let nome = (corti.length > 1 ? corti.slice(1) : corti).slice(-2).join(" + ");
+  if (nome.length > 60) nome = nome.slice(0, 60).replace(/\s+\S*$/, "");
+  return nome;
+}
+
+function elencoPassiRicetta(passi) {
+  return h("ol", { classe: "piccolo passi-ricetta" }, passi.map((x) => h("li", {}, x)));
+}
+
+function costoViste(costi, n) {
+  return n >= 1 && costi && costi[n - 1] ? costi[n - 1] : "";
+}
+
 function pannelloPorta(l) {
   const p = S.azioni.porta;
-  if (p.errore) return avviso("errore", p.errore.fatto, p.errore.cosa_fare);
-  if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo stile e ritocchi di questa immagine…");
+  if (p.errore && !p.dati) return avviso("errore", p.errore.fatto, p.errore.cosa_fare);
+  if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo i passi di questa immagine…");
   if (p.mandato) {
-    return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, `In coda sulla vista ${p.mandato}.`),
-      h("span", { classe: "piccolo tenue" }, "La trovi nello storico a sinistra, sotto quella vista. Poi in Video la usi come fotogramma."));
+    const n = p.mandato.length;
+    return h("div", { classe: "video-veloce", role: "status" },
+      h("b", {}, n === 1 ? `In coda sulla vista ${p.mandato[0]}.` : `In coda su ${n} viste: ${p.mandato.join(", ")}.`),
+      h("span", { classe: "piccolo tenue" }, "Le trovi nello storico a sinistra, ognuna sotto la sua vista. Aprila: il prima/dopo la confronta con la sua vista Allplan."));
   }
   const d = p.dati;
+  const salva = h("div", { classe: "riga" },
+    h("input", { type: "text", "aria-label": "Nome della ricetta", maxlength: "60", value: p.nome,
+      placeholder: "Per esempio: Ora blu con persone",
+      oninput: (e) => { p.nome = e.target.value; } }),
+    h("button", { classe: "btn", onclick: () => salvaRicetta(l), disabled: !d.passi.length || null,
+      title: "La ritrovi in Genera › Le mie ricette, per rifarla sulle viste che catturi dopo." }, "Salva ricetta"));
+  const testa = [
+    h("span", { classe: "etichetta" }, "Ricetta di questa immagine"),
+    elencoPassiRicetta(d.passi),
+    h("p", { classe: "piccolo tenue" }, `Modello ${d.modello_nome}. I pennelli e le aree dei ritocchi non si portano: sono disegnati su questa inquadratura, passano a parole.`),
+    salva,
+    p.salvata ? h("p", { classe: "piccolo", role: "status" }, p.salvata) : null,
+    p.errore ? avviso("errore", p.errore.fatto, p.errore.cosa_fare) : null,
+  ];
   if (!d.viste.length) {
-    return h("div", { classe: "video-veloce" },
+    return h("div", { classe: "video-veloce" }, ...testa,
       h("b", {}, "Non c'è un'altra vista."),
-      h("span", { classe: "piccolo" }, "In Allplan inquadra il punto di vista del prossimo fotogramma e cattura dalla palette: comparirà qui."));
+      h("span", { classe: "piccolo" }, "In Allplan inquadra un altro punto di vista e cattura dalla palette: comparirà qui. Intanto puoi salvare la ricetta."));
   }
-  const scelta = h("select", { "aria-label": "Vista su cui portare", onchange: (e) => { p.vista = e.target.value; } },
-    d.viste.map((v) => h("option", { value: v, selected: v === p.vista || null }, v)));
+  const n = p.viste.length;
+  const troppe = n > d.massime;
+  const spunte = h("div", { classe: "spunte-viste", role: "group", "aria-label": "Viste su cui rifare la ricetta" },
+    d.viste.map((v) => h("label", { classe: "riga piccolo" },
+      h("input", { type: "checkbox", checked: p.viste.includes(v) || null,
+        onchange: (e) => { p.viste = e.target.checked ? [...p.viste, v] : p.viste.filter((x) => x !== v); render(); } }),
+      v)));
   const spento = S.lavoroAttivo ? "Un lavoro è in corso: si accende quando finisce."
-    : p.dest.cosa_manca || p.dest.riferimento_non_accettato || null;
-  return h("div", { classe: "video-veloce" },
-    h("span", { classe: "etichetta" }, "Su quale vista"),
-    scelta,
-    h("p", { classe: "piccolo" }, `Porta lo stile «${d.stile}», il modello ${d.modello_nome}`,
-      d.richieste.length ? ` e ${d.richieste.length === 1 ? "questa richiesta" : `queste ${d.richieste.length} richieste`}:` : "."),
-    d.richieste.length ? h("ul", { classe: "piccolo" }, d.richieste.map((r) => h("li", {}, r))) : null,
-    h("p", { classe: "piccolo tenue" }, "Questa immagine parte come seconda immagine, perché materiali e oggetti restino gli stessi. Le aree dei ritocchi non si portano: sono disegnate su un'altra inquadratura, passano a parole."),
-    h("p", { classe: "dove" }, "Va a ", h("b", {}, p.dest.destinazione), p.dest.costo ? ` · ${p.dest.costo}` : ""),
+    : p.dest.cosa_manca || p.dest.riferimento_non_accettato
+    || (!n ? "Spunta almeno una vista." : troppe ? `Al massimo ${d.massime} viste per clic.` : null);
+  return h("div", { classe: "video-veloce" }, ...testa,
+    h("span", { classe: "etichetta" }, "Rifalla su"),
+    spunte,
+    h("p", { classe: "dove" }, "Va a ", h("b", {}, p.dest.destinazione),
+      n ? ` · ${costoViste(d.costi, n)} · un render per vista` : ""),
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => porta(l), disabled: !!spento || null }, "Porta su questa vista"),
+      h("button", { classe: "btn primario", onclick: () => porta(l), disabled: !!spento || null },
+        n > 1 ? `Rifai su ${n} viste` : "Rifai su 1 vista"),
       spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
 }
 
@@ -2237,10 +2280,99 @@ async function porta(l) {
   const p = S.azioni.porta;
   p.errore = null;
   try {
-    await post(`/api/lavori/${enc(l.identificativo)}/porta`, { vista: p.vista, destinazione_mostrata: p.dest.destinazione });
-    p.mandato = p.vista;
+    const r = await post(`/api/lavori/${enc(l.identificativo)}/porta`, { viste: p.viste, destinazione_mostrata: p.dest.destinazione });
+    p.mandato = r.viste;
     await caricaStorico();
   } catch (e) { p.errore = e; }
+  render();
+}
+
+async function salvaRicetta(l) {
+  const p = S.azioni.porta;
+  const nome = (p.nome || "").trim();
+  p.errore = null; p.salvata = null;
+  const doppio = S.ricette.elenco.some((r) => r.nome.toLowerCase() === nome.toLowerCase());
+  if (doppio && !window.confirm(`Hai già una ricetta «${nome}». La sostituisco con i passi di questa immagine?`)) return;
+  try {
+    const r = await post("/api/mie-ricette", { lavoro: l.identificativo, nome, sovrascrivi: doppio });
+    S.ricette.elenco = r.ricette; S.ricette.problema = r.problema;
+    p.salvata = `Salvata «${nome}». La ritrovi in Genera › Le mie ricette.`;
+  } catch (e) { p.errore = e; }
+  render();
+}
+
+// --- Le mie ricette, in Genera ------------------------------------------------
+// Una ricetta salvata si rifa' sulla vista di Genera: la vista catturata dopo.
+
+async function caricaRicette() {
+  try {
+    const r = await get("/api/mie-ricette");
+    S.ricette.elenco = r.ricette; S.ricette.problema = r.problema;
+  } catch (e) { S.ricette.problema = e.fatto; }
+}
+
+async function scegliRicetta(nome) {
+  const q = S.ricette;
+  q.scelta = nome; q.dest = null; q.nota = null; q.errore = null;
+  const r = q.elenco.find((x) => x.nome === nome);
+  render();
+  if (r && r.usabile) {
+    try { q.dest = await get(`/api/destinazione?modello=${enc(r.modello)}&riferimento=1`); } catch (e) { q.errore = e; }
+  }
+  render();
+}
+
+function pannelloRicette() {
+  const q = S.ricette;
+  if (!q.elenco.length) {
+    return [h("span", { classe: "etichetta" }, "Le mie ricette"),
+      h("p", { classe: "tenue piccolo" }, "Nessuna ricetta salvata. Sotto un render riuscito apri Ricetta e premi Salva ricetta: qui la rifai sulle viste che catturi dopo."),
+      q.problema ? avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo.") : null];
+  }
+  const scelta = h("select", { "aria-label": "Le mie ricette" },
+    h("option", { value: "", selected: !q.scelta }, "Nessuna"),
+    q.elenco.map((r) => h("option", { value: r.nome, selected: r.nome === q.scelta }, r.usabile ? r.nome : `${r.nome} (non si usa più)`)));
+  scelta.addEventListener("change", () => scegliRicetta(scelta.value));
+  const r = q.elenco.find((x) => x.nome === q.scelta);
+  const righe = [h("span", { classe: "etichetta" }, "Le mie ricette"),
+    h("div", { classe: "riga" }, scelta,
+      r ? h("button", { classe: "btn", onclick: () => eliminaRicetta(r.nome) }, "Elimina") : null)];
+  if (q.problema) righe.push(avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo."));
+  if (q.nota) righe.push(h("p", { classe: "piccolo", role: "status" }, q.nota));
+  if (q.errore) righe.push(avviso("errore", q.errore.fatto, q.errore.cosa_fare));
+  if (!r) return righe;
+  righe.push(elencoPassiRicetta(r.passi || []));
+  if (!r.usabile) { righe.push(avviso("attenzione", "Questa ricetta non si usa più.", r.perche_no)); return righe; }
+  const stessa = r.vista === S.vista;
+  const spento = !S.vista ? "Serve una vista." : stessa ? "È la vista da cui viene la ricetta: qui serve Variante."
+    : S.lavoroAttivo ? "Un lavoro è in corso: si accende quando finisce."
+    : !q.dest ? "Leggo dove va…" : q.dest.cosa_manca || q.dest.riferimento_non_accettato || null;
+  righe.push(h("p", { classe: "piccolo tenue" }, `Viene da un render di ${r.vista}, che parte come seconda immagine. Stile e modello (${r.modello_nome}) sono i suoi: le scelte di questa pagina non contano.`));
+  if (q.dest) righe.push(h("p", { classe: "dove" }, "Va a ", h("b", {}, q.dest.destinazione), ` · ${costoViste(r.costi, 1)}`));
+  righe.push(h("div", { classe: "azioni" },
+    h("button", { classe: "btn", onclick: () => usaRicetta(r), disabled: !!spento || null }, "Rifalla su questa vista"),
+    spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
+  return righe;
+}
+
+async function usaRicetta(r) {
+  const q = S.ricette;
+  q.errore = null; S.errore = null;
+  try {
+    const risposta = await post("/api/mie-ricette/usa", { nome: r.nome, viste: [S.vista], destinazione_mostrata: q.dest.destinazione });
+    q.nota = `«${r.nome}» in coda su ${S.vista}.`;
+    S.inFila = risposta.identificativi.slice(1);
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+async function eliminaRicetta(nome) {
+  if (!window.confirm(`Elimino la ricetta «${nome}»? Le immagini già fatte restano.`)) return;
+  try {
+    const r = await post("/api/mie-ricette/elimina", { nome });
+    S.ricette = { ...S.ricette, elenco: r.ricette, problema: r.problema, scelta: "", dest: null, nota: `Eliminata «${nome}».` };
+  } catch (e) { S.ricette.errore = e; }
   render();
 }
 
@@ -3454,7 +3586,7 @@ function latoPassi(passo) {
   if (passo.aree && passo.aree.length && passo.render) blocchi.push(pannelloFuoriAree(passo));
   if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
   // La stessa barra di Risultato (2026-11-04): Cambia · Ritocca · Variante ·
-  // Altra vista · Video. «Rifai tutto dalla vista» solo quando serve.
+  // Ricetta · Video. «Rifai tutto dalla vista» solo quando serve.
   const serve = passo.avviso || passo.partenza_mancante;
   blocchi.push(h("section", { classe: "pannello", "aria-label": "Da questa immagine" },
     passo.render ? barraAzioni(comeLavoro(passo)) : null,
@@ -4181,7 +4313,7 @@ async function avvia() {
   leggiScheda();
   try {
     [S.studio, S.catalogo] = await Promise.all([get("/api/studio"), get("/api/catalogo")]);
-    await Promise.all([caricaMiei(), caricaLicenza()]);
+    await Promise.all([caricaMiei(), caricaRicette(), caricaLicenza()]);
     // Senza codice e senza una chiave Comfy propria non parte niente: lo
     // Studio si apre sulla scheda Licenza (bozza A, 2026-11-05).
     if (S.licenza && !S.licenza.presente && !S.licenza.chiave_comfy && S.scheda !== "licenza") {
@@ -4216,6 +4348,7 @@ async function avvia() {
 genera = unInvioAllaVolta(genera);
 rifai = unInvioAllaVolta(rifai);
 porta = unInvioAllaVolta(porta);
+usaRicetta = unInvioAllaVolta(usaRicetta);
 applicaRitocco = unInvioAllaVolta(applicaRitocco);
 applicaPasso = unInvioAllaVolta(applicaPasso);
 inviaPulito = unInvioAllaVolta(inviaPulito);

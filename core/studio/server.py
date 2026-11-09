@@ -42,8 +42,10 @@ Rotte:
     POST /api/lavori/<id>/esporta          il render in JPEG, PNG o PSD a livelli, nella cartella esportati
     POST /api/lavori/<id>/regola           {regola}: l'anteprima del render con luce e colore regolati
     POST /api/lavori/<id>/rifai            stesso lavoro, di nuovo in coda («Rifai questo passo»)
-    GET  /api/lavori/<id>/porta            cosa porta «Porta su un'altra vista» e su quali viste
-    POST /api/lavori/<id>/porta            {vista, destinazione_mostrata}: render coerente su un'altra vista
+    GET  /api/lavori/<id>/porta            Ricetta: i passi di questa immagine e su quali viste rifarli
+    POST /api/lavori/<id>/porta            {viste | vista, destinazione_mostrata}: la ricetta su una o piu' viste
+    GET  /api/mie-ricette                  le ricette salvate dall'utente
+    POST /api/mie-ricette                  {lavoro, nome}: salva la ricetta di un'immagine (elimina, usa sotto)
     POST /api/passi/componi                il prompt di un passo nuovo, prima dell'invio
     POST /api/passi/invia                  un passo nuovo dal render di un passo
     POST /api/passi/pulito/componi         il prompt di «Rifai pulito dalla vista»
@@ -194,6 +196,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.ricetta(identificativo))
             case ["api", "lavori", identificativo, "porta"]:
                 self._json(studio.anteprima_porta(identificativo))
+            case ["api", "mie-ricette"]:
+                self._json(studio.mie_ricette())
             case ["file", "vista", nome]:
                 self._file(studio.percorso_vista(nome))
             case ["file", "render", identificativo]:
@@ -268,6 +272,12 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.rifai(identificativo, self._corpo_json()))
             case ["api", "lavori", identificativo, "porta"]:
                 self._json(studio.porta_su_vista(identificativo, self._corpo_json()))
+            case ["api", "mie-ricette"]:
+                self._json(studio.salva_mia_ricetta(self._corpo_json()))
+            case ["api", "mie-ricette", "elimina"]:
+                self._json(studio.elimina_mia_ricetta(self._corpo_json()))
+            case ["api", "mie-ricette", "usa"]:
+                self._json(studio.usa_mia_ricetta(self._corpo_json()))
             case ["api", "passi", "componi"]:
                 self._json(studio.componi_passo(self._corpo_json()))
             case ["api", "passi", "invia"]:
