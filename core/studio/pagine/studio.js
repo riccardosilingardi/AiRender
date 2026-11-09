@@ -3205,14 +3205,16 @@ function palcoGriglia(passo, fratelli, titolo, modi) {
   const cella = (x) => {
     const attivo = S.lavoroAttivo && S.lavoroAttivo.identificativo === x.identificativo;
     return h("button", { classe: "cella-griglia", "aria-current": String(x.identificativo === passo.identificativo),
-      onclick: () => { p.scelto = x.identificativo; render(); } },
+      // Il clic apre subito il prima/dopo di quella scelta: la griglia serve a
+      // scegliere, il confronto A/B col render di partenza resta quello di sempre.
+      onclick: () => { p.scelto = x.identificativo; p.confronto = "prima"; p.modo = "scorri"; render(); } },
       x.render ? h("img", { src: `/file/render/${x.identificativo}`, alt: x.nome })
         : h("span", { classe: "posto-griglia" }, attivo || x.attivo ? `${x.stato}…` : x.stato === "errore" ? "non riuscito" : x.stato || "—"),
       h("span", { classe: "piccolo" }, h("b", { classe: "numero" }, x.numero), " ", x.nome));
   };
   return h("div", { classe: "palco" },
     h("div", { classe: "riga tra" }, titolo, modi),
-    h("p", { classe: "tenue piccolo" }, `Partono tutti da ${padre ? `passo ${padre.numero}` : "Vista Allplan"}. Clic su uno per sceglierlo e andare avanti da lì: gli altri restano nell'albero.`),
+    h("p", { classe: "tenue piccolo" }, `Partono tutti da ${padre ? `passo ${padre.numero}` : "Vista Allplan"}. Clic su uno per vederlo in prima/dopo col render di partenza e andare avanti da lì: gli altri restano nell'albero.`),
     h("div", { classe: "griglia-confronto" },
       h("figure", { classe: "cella-griglia partenza" }, h("img", { src: partenza, alt: "Partenza" }),
         h("figcaption", { classe: "piccolo tenue" }, padre ? `Partenza · passo ${padre.numero}` : "Partenza · Vista Allplan")),

@@ -975,8 +975,9 @@ Costo: …» e il bottone è **Applica N**.
 **Griglia** (Passi): quando un passo ha fratelli (passi nati dallo stesso
 render) il confronto ha una terza voce, **Griglia (N)**: la partenza
 tratteggiata e tutti i fratelli affiancati; quelli non ancora finiti mostrano
-lo stato su sfondo a righe. Un clic sceglie il passo da cui andare avanti; gli
-altri restano nell'albero. Dopo Applica con più scelte lo Studio va in Passi
+lo stato su sfondo a righe. Un clic sceglie il passo e apre subito il suo
+**Prima / dopo** contro il render di partenza (il confronto A/B resta sempre, è
+una regola di Riccardo del 2026-11-09); gli altri restano nell'albero. Dopo Applica con più scelte lo Studio va in Passi
 con la griglia aperta. I nomi nell'albero sono «Cambia · Ora blu» (più il testo
 libero, se c'è).
 
