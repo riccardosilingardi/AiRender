@@ -953,7 +953,17 @@ AREE_MASCHERA = Blocco(
 )
 
 
-def componi_aree(modo: Blocco, note: list[str], inserti: list[int | None] | None = None) -> str:
+# Come una riga del ritocco dice cosa fare in un tratto di pennello (bozza
+# «flussi», 2026-11-09). «cambia» non aggiunge niente: la riga resta quella
+# di prima. Testi mai provati con il modello.
+AZIONI_AREE = {
+    "aggiungi": "add this inside the area, keep what is around it",
+    "togli": "remove this from the area and rebuild what is behind it, matching the surroundings",
+}
+
+
+def componi_aree(modo: Blocco, note: list[str], inserti: list[int | None] | None = None,
+                 azioni: list[str] | None = None) -> str:
     """Il prompt di un invio con aree: come sono indicate, una riga per nota, cosa evitare.
 
     Le note passano come le scrive l'utente, anche in italiano, come i materiali.
@@ -967,8 +977,10 @@ def componi_aree(modo: Blocco, note: list[str], inserti: list[int | None] | None
             "Scrivi una nota per ogni area, oppure togli l'area.",
         )
     inserti = list(inserti or [None] * len(pulite))
-    righe = [f"Area {numero}: {nota}" + (f"; {NOTA_CON_INSERTO.format(numero=rif)}." if rif else ".")
-             for numero, (nota, rif) in enumerate(zip(pulite, inserti), start=1)]
+    azioni = list(azioni or [None] * len(pulite))
+    righe = [f"Area {numero}" + (f" ({AZIONI_AREE[azione]})" if azione in AZIONI_AREE else "") + f": {nota}"
+             + (f"; {NOTA_CON_INSERTO.format(numero=rif)}." if rif else ".")
+             for numero, (nota, rif, azione) in enumerate(zip(pulite, inserti, azioni), start=1)]
     return " ".join([modo.testo, *righe, COSA_EVITARE.testo])
 
 

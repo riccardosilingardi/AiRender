@@ -645,6 +645,33 @@ RITOCCO_INCOLLA_SFUMATURA_PX = _registra(Costante(
     unita=" px",
 ))
 
+PENNELLO_SPESSORE = _registra(Costante(
+    nome="PENNELLO_SPESSORE",
+    valore=0.04,
+    origine=SCELTA,
+    ragione=(
+        "Studio · Ritocca: lo spessore iniziale dei pennelli aggiungi e "
+        "togli, in frazione della larghezza del render (0,04 = 4%: su un "
+        "render largo 2000 px, un tratto di 80 px). Abbastanza largo per "
+        "coprire una persona o un palo con un tratto, abbastanza stretto da "
+        "non prendere la facciata accanto. Giudizio del 2026-11-09 dal "
+        "mockup, mai provato su un ritocco vero; si cambia col cursore."
+    ),
+))
+
+PENNELLO_SPESSORI = _registra(Costante(
+    nome="PENNELLO_SPESSORI",
+    valore=(0.01, 0.15),
+    origine=SCELTA,
+    ragione=(
+        "Studio · Ritocca: lo spessore piu' sottile e piu' grosso del "
+        "cursore dei pennelli, in frazione della larghezza del render. Sotto "
+        "l'1% il tratto e' piu' sottile del contorno disegnato per il "
+        "modello; sopra il 15% conviene un rettangolo. Giudizio del "
+        "2026-11-09."
+    ),
+))
+
 CONTORNO_AREE_PX = _registra(Costante(
     nome="CONTORNO_AREE_PX",
     valore=6,

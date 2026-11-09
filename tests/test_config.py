@@ -448,6 +448,12 @@ def test_ogni_costante_dichiarata_ha_un_test_che_nomina_il_suo_caso():
     assert not mancanti, f"costanti senza un test che le nomini: {mancanti}"
 
 
+def test_lo_spessore_iniziale_del_pennello_sta_dentro_i_suoi_limiti():
+    """Caso: PENNELLO_SPESSORE fuori da PENNELLO_SPESSORI, e il primo tratto si rifiuta."""
+    sottile, grosso = config.PENNELLO_SPESSORI
+    assert 0 < sottile <= config.PENNELLO_SPESSORE <= grosso < 1
+
+
 # --- proporzioni della vista -------------------------------------------------
 
 

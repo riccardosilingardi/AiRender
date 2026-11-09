@@ -410,23 +410,6 @@ select { min-height: 34px; padding: 0 10px; }
   display: flex; align-items: center; justify-content: center; pointer-events: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
 }
-.foglietto {
-  position: absolute; width: 200px; background: #F4D35E; color: #2A2410; border-radius: 4px;
-  padding: 6px 8px 8px; font-size: 12px; line-height: 1.4; box-shadow: 0 6px 16px rgba(0, 0, 0, .45);
-  display: flex; flex-direction: column; gap: 4px; cursor: auto;
-}
-.testata-foglietto { display: flex; justify-content: space-between; align-items: center; gap: 6px; cursor: grab; touch-action: none; }
-.testata-foglietto:active { cursor: grabbing; }
-.foglietto textarea {
-  font: inherit; color: inherit; background: rgba(255, 255, 255, .45); border: 1px solid rgba(42, 36, 16, .25);
-  border-radius: 3px; padding: 4px 6px; resize: vertical; min-height: 38px; width: 100%; box-sizing: border-box;
-}
-.foglietto textarea:focus-visible { outline: 2px solid #2A2410; outline-offset: 1px; }
-.foglietto .togli {
-  font: inherit; font-size: 16px; line-height: 1; background: transparent; border: 0; color: #2A2410;
-  cursor: pointer; padding: 0 4px; min-height: 24px; min-width: 24px;
-}
-.foglietto .manca-nota { color: #7A1F12; font-weight: 600; }
 .manca-nota { color: var(--errore); font-size: 12px; }
 .manca-nota[hidden] { display: none; }
 .elenco-note { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -438,6 +421,27 @@ select { min-height: 34px; padding: 0 10px; }
 }
 .elenco-verifiche { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--testo-2); }
 .vuoto-ritocco { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+/* Ritocca, compositore (2026-11-09): verde = aggiungi, rosso = togli; giallo resta «cambia». */
+.contorno-area.aggiungi { fill: rgba(92, 194, 139, .28); stroke: #5CC28B; }
+.contorno-area.togli { fill: rgba(240, 123, 107, .28); stroke: #F07B6B; }
+.contorno-area.in-corso.tratto { fill: rgba(255, 255, 255, .22); stroke: #FFFFFF; stroke-dasharray: none; }
+.numero-area.aggiungi, .numero-elenco.aggiungi { background: #5CC28B; color: #0B1220; }
+.numero-area.togli, .numero-elenco.togli { background: #F07B6B; color: #0B1220; }
+.compositore-ritocco { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.compositore {
+  font: inherit; font-size: 15px; color: var(--testo); background: var(--pannello-2); border: 1px solid var(--bordo-forte);
+  border-radius: 8px; padding: 10px 12px; resize: vertical; min-height: 48px; width: 100%; box-sizing: border-box;
+}
+.compositore:focus-visible { outline: 2px solid var(--accento); outline-offset: 1px; }
+.menzioni { flex-wrap: wrap; gap: 6px; }
+.menzione { min-width: 40px; font-weight: 700; }
+.menzione.cambia { border-color: #F4D35E; }
+.menzione.aggiungi { border-color: #5CC28B; }
+.menzione.togli { border-color: #F07B6B; }
+.strumento-aggiungi[aria-pressed="true"] { box-shadow: inset 0 -3px 0 #5CC28B; }
+.strumento-togli[aria-pressed="true"] { box-shadow: inset 0 -3px 0 #F07B6B; }
+.spessore { gap: 8px; }
+.spessore input { width: 120px; }
 
 /* Genera: i due modi, render della vista o inserisci in un luogo. */
 .scelta-modo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

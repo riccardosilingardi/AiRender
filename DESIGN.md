@@ -446,6 +446,45 @@ del formato 3), `core/studio/`; screenshot di ogni stato in
   del PRD (incollare il render di partenza fuori dalle aree, con il bordo
   sfumato) non è in questo PR: prima si guarda cosa fa il modello da solo.
 
+### Ritocca col compositore, costruita il 2026-11-09
+
+Dalla proposta «flussi» approvata da Riccardo il 2026-11-09 (Design canvas
+«AIRENDER Studio flussi», schermata A4). Codice in `core/aree.py`
+(`da_testo`, `contorno_tratto`, azione e spessore dell'area),
+`core/blocchi.py` (`AZIONI_AREE`), `core/studio/pagine/studio.js`. La web app
+usa la stessa pagina, quindi cambia insieme. Screenshot con un provider finto:
+`docs/ui/studio-ritocca/55-ritocca-compositore-tre-aree.png` e
+`56-ritocca-esito-pennelli.png`. Cosa cambia rispetto a sopra:
+
+- **Una frase sola al posto delle note adesive.** Sotto il render c'è un
+  campo unico: «rivesti @1 di legno chiaro, metti persone in @2, togli il palo
+  in @3». Ogni area disegnata entra nel testo come @N dove sta il cursore;
+  sotto il campo, un bottone per area rimette la sua @. Il server divide la
+  frase ai punti, alle virgole e ai punto e virgola: ogni pezzo va alle aree
+  che chiama, un pezzo senza @ va con quello prima. Con un'area sola tutta la
+  frase è sua. A destra, per ogni area, si legge la parte di testo che le
+  tocca: quello che parte non è mai una sorpresa.
+- **Pennello aggiungi (verde) e pennello togli (rosso)**, accanto a
+  rettangolo e selezione libera, con il cursore dello spessore
+  (`PENNELLO_SPESSORE`, `PENNELLO_SPESSORI`, SCELTE). Un tratto è un'area come
+  le altre: il motore ne ricava il contorno (punte tonde) e lo disegna, lo
+  maschera, lo misura e lo incolla come un poligono. Nel prompt la riga di un
+  tratto dice «add» o «remove and rebuild what is behind»; un tratto «togli»
+  che la frase non chiama toglie e basta.
+- **Rif. per area**: «+ Rif.» nell'elenco delle aree, come prima «+
+  Immagine» nella nota.
+- **Togliere un'area rinumera il testo**: la sua @ sparisce, quelle dopo
+  scalano di uno.
+- **Errori**: un'area che la frase non chiama («L'area 2 non è nel testo»)
+  o una @ che non esiste ferma Applica, con il motivo accanto.
+- **Restano uguali**: un invio solo, destinazione e costo prima di Applica,
+  il risultato come passo figlio, la misura fuori dalle aree, «Clicca una
+  superficie» in grigio. Il testo della frase non si salva nel lavoro: si
+  salvano le note per area che ne escono, come prima.
+- **Non fatto in questo PR**: «Punti» come campione di materiale sul render
+  (la selezione libera dei materiali c'è già in Genera) e «Popola» con
+  «Decide il modello»; vengono col PR di Cambia e Popola.
+
 ## Studio v1, costruito il 2026-10-28
 
 Codice in `core/studio/`, screenshot di ogni stato (anche a 1280×800) in
