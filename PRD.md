@@ -270,6 +270,22 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Cambia con le miniature e Popola (2026-11-09)
+
+Tredici miniature di ora e mood e tre cose di Popola, con i testi per il
+modello in `core/blocchi.py` (bozza 15). Provato con i test (un passo per
+miniatura, testo libero in ognuno, nomi nell'albero, Popola nel passo e nei
+tratti verdi del ritocco, rifiuti prima dell'invio) e in Chromium sullo Studio
+del PC con un provider finto che rende tinte piatte: miniature, Applica 3,
+griglia dei fratelli, pannello Popola, Ritocca in modo Popola. **Nessun testo
+provato con un render vero**: non si sa se Nano Banana cambia solo ora e tempo
+tenendo i materiali, né se mette persone, alberi e auto alla grandezza giusta
+(scala legata a porte e piani: il punto più debole) e solo dove si dipinge.
+Le miniature sono disegni, non render. Mai provato nella web app con Pyodide
+vero. `CAMBIA_SCELTE_MASSIME` (6) è un giudizio. Si esce con un giro di banco su
+una vista vera: tre miniature (Alba, Ora blu, Nebbia) e i due modi di Popola
+con le persone, giudicati a occhio da Riccardo.
+
 ### Regola, prima di esportare (2026-11-09)
 
 Sei cursori e una curva, calcolati in `core/regola.py` e applicati con Pillow;
