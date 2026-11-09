@@ -638,8 +638,8 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "Misura ora",
         "Variante",
         "Prima serve un render. Generane uno da Genera.",            # Ritocca, vuoto
-        "Disegna un'area, poi scrivi cosa cambiare nella sua nota.",
-        "Un'area senza nota non dice al modello cosa fare.",
+        "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.",  # dal compositore, 2026-11-09
+        "Scrivi cosa cambiare, e chiama le aree con @1, @2.",
     ):
         assert testo in script, testo
 

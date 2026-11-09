@@ -216,6 +216,8 @@ class Studio:
                 "modo": config.RITOCCO_MODO_AREE,
                 "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
                 "origine": config.costante("RITOCCO_MODO_AREE").origine,
+                "pennello": config.PENNELLO_SPESSORE,
+                "pennelli": list(config.PENNELLO_SPESSORI),
             },
         }
 
@@ -1772,13 +1774,18 @@ class Studio:
         """Vista, albero, passo da ritoccare, il suo render e le aree della richiesta.
 
         I Rif. citati dalle note si leggono con _inserti_scelti: una nota che
-        cita un Rif. che non c'e' si ferma qui, prima di comporre.
+        cita un Rif. che non c'e' si ferma qui, prima di comporre. Con
+        `testo` (il compositore: una frase con @1, @2) le note delle aree le
+        scrive modulo_aree.da_testo.
         """
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         albero = self._albero(vista)
         passo, render = self._passo_di_partenza(albero, dati.get("da"))
         try:
-            aree = modulo_aree.da_elenco(dati.get("aree"))
+            elenco = dati.get("aree")
+            if "testo" in dati:
+                elenco = modulo_aree.da_testo(dati.get("testo"), elenco)
+            aree = modulo_aree.da_elenco(elenco)
         except modulo_aree.AreaNonValida as errore:
             raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
         quanti = len(self._inserti_scelti(dati))
@@ -1801,6 +1808,7 @@ class Studio:
             "prompt": prompt,
             "caratteri": len(prompt),
             "note": len(aree),
+            "note_aree": [a.nota for a in aree],
             "modo": config.RITOCCO_MODO_AREE,
             "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
             "da_numero": str(passo.get("numero")),

@@ -357,7 +357,9 @@ def test_lo_studio_dice_come_partono_le_aree_e_che_e_una_scelta(server):
     ritocco = json.loads(risposta)["ritocco"]
     assert ritocco == {"modo": config.RITOCCO_MODO_AREE,
                        "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
-                       "origine": config.SCELTA}
+                       "origine": config.SCELTA,
+                       "pennello": config.PENNELLO_SPESSORE,
+                       "pennelli": list(config.PENNELLO_SPESSORI)}
 
 
 def test_la_voce_ritocca_non_e_piu_grigia(server):

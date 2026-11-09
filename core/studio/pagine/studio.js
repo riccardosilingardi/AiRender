@@ -63,7 +63,7 @@ const S = {
   // Studio · Ritocca: il passo il cui render si ritocca, lo strumento, le
   // aree con le loro note (coordinate da 0 a 1), il lavoro mandato e,
   // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
-  ritocca: { da: null, strumento: "rettangolo", aree: [], modello: null, composto: null, errore: null,
+  ritocca: { da: null, strumento: "rettangolo", aree: [], testo: "", spessore: null, modello: null, composto: null, errore: null,
              inviato: null, esito: null, x: 50 },
   // Studio · Video: il catalogo letto dal server, come partire, i posti
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
@@ -2082,7 +2082,7 @@ async function prontoRitocca() {
 function cambiaBaseRitocco(id) {
   const r = S.ritocca;
   if (r.da === id) return;
-  r.da = id; r.aree = []; r.composto = null; r.errore = null; r.esito = null;
+  r.da = id; r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.esito = null;
   render();
 }
 
@@ -2094,10 +2094,15 @@ function ritoccoBloccato() {
 // delle note, e la nota porta il numero del suo.
 function insertiRitocco() { return S.ritocca.aree.filter((a) => a.rif).map((a) => a.rif); }
 
+// Le aree come le vuole il server: senza la nota (la scrive il server dalla
+// frase, core/aree.py da_testo) e senza il contorno del pennello, che il
+// server ricalcola dai punti.
 function areePerIlServer() {
   let numero = 0;
   return S.ritocca.aree.map((a) => {
-    const area = { forma: a.forma, punti: a.punti, nota: a.nota };
+    const area = { forma: a.forma, punti: a.punti };
+    if (a.azione && a.azione !== "cambia") area.azione = a.azione;
+    if (a.forma === "pennello") area.spessore = a.spessore;
     if (a.rif) area.inserto = ++numero;
     return area;
   });
@@ -2119,29 +2124,31 @@ function bottoneImmagineNota(a, i, bloccato) {
   const m = S.catalogo.modelli.find((x) => x.id === S.ritocca.modello);
   if (a.rif) {
     return h("div", { classe: "riga nota-rif" },
-      h("img", { src: `/file/riferimento/${enc(a.rif.nome)}`, alt: `Rif. ${numeroRif(i)} della nota ${i + 1}` }),
+      h("img", { src: `/file/riferimento/${enc(a.rif.nome)}`, alt: `Rif. ${numeroRif(i)} dell'area ${i + 1}` }),
       h("span", { classe: "piccolo" }, h("b", {}, `Rif. ${numeroRif(i)}`), ` · ${a.rif.da || a.rif.nome}`),
       bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliImmagineNota(i) }, "Togli"));
   }
   if (bloccato) return null;
   const pieni = insertiRitocco().length >= (S.catalogo.inserti_massimi || 4);
-  const file = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": `Foto da inserire con la nota ${i + 1}` });
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": `Immagine di riferimento per l'area ${i + 1}` });
   file.addEventListener("change", () => immagineNota(i, file.files && file.files[0]));
   const spento = pieni || !(m && m.piu_immagini);
   return h("span", {}, file, h("button", {
     classe: "btn link piccolo", onclick: () => file.click(), disabled: spento || null,
-    title: pieni ? "Ci sono già 4 Rif. in questo ritocco." : !(m && m.piu_immagini) ? `${m ? m.nome : "Questo modello"} riceve una sola immagine: scegli Nano Banana 2.` : "La foto dell'oggetto o della persona da mettere in quest'area",
-  }, "+ Immagine"));
+    title: pieni ? "Ci sono già 4 Rif. in questo ritocco." : !(m && m.piu_immagini) ? `${m ? m.nome : "Questo modello"} riceve una sola immagine: scegli Nano Banana 2.` : "Una foto di riferimento per quest'area: un materiale, un arredo, una persona",
+  }, "+ Rif."));
 }
 
-function noteVuote() { return S.ritocca.aree.map((a, i) => (a.nota.trim() ? null : i + 1)).filter(Boolean); }
+// Il testo serve se c'e' un'area che non e' un «togli»: togliere si spiega da solo.
+function testoServe() { return S.ritocca.aree.some((a) => a.azione !== "togli"); }
 
 function motivoApplicaRitoccoSpento() {
   const r = S.ritocca;
   if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
-  if (!r.aree.length) return "Disegna un'area, poi scrivi cosa cambiare nella sua nota.";
-  const vuote = noteVuote();
-  if (vuote.length) return `${vuote.length === 1 ? "L'area" : "Le aree"} ${vuote.join(", ")} ${vuote.length === 1 ? "non ha" : "non hanno"} una nota: scrivila, oppure togli l'area.`;
+  if (!r.aree.length) return "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
+  if (testoServe() && !r.testo.trim()) return "Scrivi cosa cambiare, e chiama le aree con @1, @2.";
+  if (r.errore) return r.errore.cosa_fare || r.errore.fatto;
+  if (!r.composto) return "Preparo il testo che parte…";
   const d = S.passi.dest[r.modello];
   if (d && d.cosa_manca) return d.cosa_manca;
   return "";
@@ -2151,24 +2158,29 @@ let attesaRitocco = null;
 function componiRitocco() {
   const r = S.ritocca;
   clearTimeout(attesaRitocco);
-  if (!r.aree.length || noteVuote().length) { r.composto = null; disegnaApplicaRitocco(); return; }
+  r.composto = null;
+  if (!r.aree.length || (testoServe() && !r.testo.trim())) { r.errore = null; disegnaApplicaRitocco(); return; }
+  disegnaApplicaRitocco();
   attesaRitocco = setTimeout(async () => {
-    try { r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) }); r.errore = null; }
-    catch (e) { r.composto = null; r.errore = e; }
+    try {
+      r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, testo: r.testo, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) });
+      r.errore = null;
+    } catch (e) { r.composto = null; r.errore = e; }
     disegnaApplicaRitocco();
   }, 250);
 }
 
-// Aggiorna Applica, il prompt e gli avvisi delle note mentre si scrive,
-// senza ridisegnare: la nota non perde il cursore.
+function etichettaApplica() {
+  const n = S.ritocca.aree.length;
+  return n ? `Applica il ritocco · ${n === 1 ? "1 area" : `${n} aree`}` : "Applica il ritocco";
+}
+
+// Aggiorna Applica, il prompt, le note delle aree e gli avvisi mentre si
+// scrive, senza ridisegnare: il testo non perde il cursore.
 function disegnaApplicaRitocco() {
   const r = S.ritocca;
-  const n = r.aree.length;
   const bottone = document.getElementById("applica-ritocco");
-  if (bottone) {
-    bottone.disabled = !!motivoApplicaRitoccoSpento();
-    bottone.textContent = n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`}` : "Applica";
-  }
+  if (bottone) { bottone.disabled = !!motivoApplicaRitoccoSpento(); bottone.textContent = etichettaApplica(); }
   const motivo = document.getElementById("motivo-ritocco");
   if (motivo) motivo.textContent = motivoApplicaRitoccoSpento();
   const prompt = document.getElementById("prompt-ritocco");
@@ -2177,30 +2189,86 @@ function disegnaApplicaRitocco() {
   if (car) car.textContent = r.composto ? `${r.composto.caratteri} caratteri` : "";
   const err = document.getElementById("errore-ritocco");
   if (err) err.replaceChildren(r.errore ? avviso("errore", r.errore.fatto, r.errore.cosa_fare) : "");
-  r.aree.forEach((a, i) => {
-    for (const id of [`manca-nota-${i}`, `manca-elenco-${i}`]) {
-      const el = document.getElementById(id);
-      if (el) el.hidden = !!a.nota.trim();
-    }
+  const note = r.composto ? r.composto.note_aree || [] : [];
+  r.aree.forEach((_a, i) => {
+    const el = document.getElementById(`nota-area-${i}`);
+    if (el) el.textContent = note[i] ? `«${note[i]}»` : "La sua parte del testo compare qui.";
   });
 }
 
-function scriviNota(i, testo, da) {
-  const a = S.ritocca.aree[i];
-  if (!a) return;
-  a.nota = testo;
-  // La stessa nota sta sull'immagine e nell'elenco: si tengono uguali.
-  const altro = document.getElementById(da === "foglietto" ? `elenco-nota-${i}` : `foglietto-nota-${i}`);
-  if (altro && altro.value !== testo) altro.value = testo;
+// Una @N nel testo, dove sta il cursore (o in fondo), con uno spazio prima e dopo.
+function inserisciMenzione(numero) {
+  const r = S.ritocca;
+  const campo = document.getElementById("testo-ritocco");
+  const parola = `@${numero}`;
+  const inizio = campo ? campo.selectionStart : r.testo.length;
+  const fine = campo ? campo.selectionEnd : r.testo.length;
+  const prima = r.testo.slice(0, inizio), dopo = r.testo.slice(fine);
+  const pezzo = `${prima && !/\s$/.test(prima) ? " " : ""}${parola}${dopo && /^\s/.test(dopo) ? "" : " "}`;
+  r.testo = prima + pezzo + dopo;
+  if (campo) {
+    campo.value = r.testo;
+    campo.focus();
+    const dove = prima.length + pezzo.length;
+    campo.setSelectionRange(dove, dove);
+  }
   componiRitocco();
-  disegnaApplicaRitocco();
+}
+
+// Togliendo l'area i (da 0), la sua @ sparisce dal testo e quelle dopo scalano di uno.
+function rinumeraTesto(testo, i) {
+  const tolta = i + 1;
+  return testo.replace(/\s?@(\d+)\b/g, (tutto, cifre) => {
+    const n = Number(cifre);
+    if (n === tolta) return "";
+    return n > tolta ? tutto.replace(`@${cifre}`, `@${n - 1}`) : tutto;
+  });
 }
 
 function togliArea(i) {
-  S.ritocca.aree.splice(i, 1);
-  S.ritocca.composto = null;
+  const r = S.ritocca;
+  r.aree.splice(i, 1);
+  r.testo = rinumeraTesto(r.testo, i);
+  r.composto = null;
   render();
   componiRitocco();
+}
+
+// Il contorno di un tratto di pennello, come core/aree.py contorno_tratto:
+// in pixel, per non deformarlo su un render non quadrato.
+const PUNTI_MEZZO_CERCHIO = 8;
+function contornoTratto(punti, raggio) {
+  const t = [punti[0]];
+  for (const p of punti.slice(1)) if (Math.hypot(p[0] - t[t.length - 1][0], p[1] - t[t.length - 1][1]) > 1e-6) t.push(p);
+  if (t.length === 1) {
+    const n = 2 * PUNTI_MEZZO_CERCHIO;
+    return Array.from({ length: n }, (_x, i) => [t[0][0] + raggio * Math.cos(2 * Math.PI * i / n), t[0][1] + raggio * Math.sin(2 * Math.PI * i / n)]);
+  }
+  const normale = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; };
+  const normali = t.map((_p, i) => {
+    const prima = i > 0 ? normale(t[i - 1], t[i]) : null;
+    const dopo = i < t.length - 1 ? normale(t[i], t[i + 1]) : null;
+    const [nx, ny] = prima && dopo ? [(prima[0] + dopo[0]) / 2, (prima[1] + dopo[1]) / 2] : (prima || dopo);
+    const l = Math.hypot(nx, ny) || 1;
+    return [nx / l, ny / l];
+  });
+  const mezzo = (c, v) => {
+    const a = Math.atan2(v[1], v[0]);
+    return Array.from({ length: PUNTI_MEZZO_CERCHIO - 1 }, (_x, k) => {
+      const ang = a + Math.PI / 2 - Math.PI * (k + 1) / PUNTI_MEZZO_CERCHIO;
+      return [c[0] + raggio * Math.cos(ang), c[1] + raggio * Math.sin(ang)];
+    });
+  };
+  const sinistra = t.map((p, i) => [p[0] + normali[i][0] * raggio, p[1] + normali[i][1] * raggio]);
+  const destra = t.map((p, i) => [p[0] - normali[i][0] * raggio, p[1] - normali[i][1] * raggio]);
+  const ultimo = normali[normali.length - 1];
+  return [...sinistra, ...mezzo(t[t.length - 1], [ultimo[1], -ultimo[0]]), ...destra.reverse(), ...mezzo(t[0], [-normali[0][1], normali[0][0]])];
+}
+
+// Il contorno di un tratto in coordinate da 0 a 1, dall'immagine com'e' davvero.
+function contornoNormalizzato(punti, spessore, img) {
+  const w = img.naturalWidth || 1000, hh = img.naturalHeight || 1000;
+  return contornoTratto(punti.map(([x, y]) => [x * w, y * hh]), spessore * w / 2).map(([x, y]) => [x / w, y / hh]);
 }
 
 function puntiSvg(a) {
@@ -2208,17 +2276,17 @@ function puntiSvg(a) {
     const [[x0, y0], [x1, y1]] = a.punti;
     return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   }
+  if (a.forma === "pennello") return a.contorno || a.punti;
   return a.punti;
 }
 function attributoPunti(punti) { return punti.map(([x, y]) => `${(x * 1000).toFixed(1)},${(y * 1000).toFixed(1)}`).join(" "); }
 
-// Dove si attacca la nota di un'area appena chiusa: a destra dell'area se
-// c'e' posto, altrimenti a sinistra; mai fuori dall'immagine.
-function posizioneNota(punti) {
-  const xs = punti.map((p) => p[0]), ys = punti.map((p) => p[1]);
-  const destra = Math.max(...xs), sinistra = Math.min(...xs), alto = Math.min(...ys);
-  const x = destra + 0.02 < 0.72 ? destra + 0.02 : Math.max(0, sinistra - 0.27);
-  return { x, y: Math.min(Math.max(0, alto), 0.8) };
+const NOMI_AREA = { rettangolo: "rettangolo", libera: "selezione libera", aggiungi: "pennello aggiungi", togli: "pennello togli" };
+function nomeArea(a) { return a.forma === "pennello" ? NOMI_AREA[a.azione] : NOMI_AREA[a.forma]; }
+function spessorePennello() {
+  const r = S.ritocca;
+  if (!r.spessore) r.spessore = (S.studio && S.studio.ritocco && S.studio.ritocco.pennello) || 0.04;
+  return r.spessore;
 }
 
 function telaRitocco(base) {
@@ -2229,30 +2297,33 @@ function telaRitocco(base) {
   // spazio dei nomi, e i punti sono solo numeri.
   const contenitore = h("div");
   contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${
-    r.aree.map((a) => `<polygon class="contorno-area" points="${attributoPunti(puntiSvg(a))}"></polygon>`).join("")
-  }<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+    r.aree.map((a) => `<polygon class="contorno-area ${a.azione || "cambia"}" points="${attributoPunti(puntiSvg(a))}"></polygon>`).join("")
+  }<polyline class="contorno-area in-corso" points=""></polyline><polygon class="contorno-area in-corso tratto" points=""></polygon></svg>`;
   const disegno = contenitore.firstElementChild;
   const traccia = disegno.querySelector("polyline");
+  const pennellata = disegno.querySelector("polygon.tratto");
   const numeri = r.aree.map((a, i) => {
-    const [x, y] = puntiSvg(a)[0];
-    return h("span", { classe: "numero-area", stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
+    const [x, y] = a.forma === "pennello" ? a.punti[0] : puntiSvg(a)[0];
+    return h("span", { classe: `numero-area ${a.azione || "cambia"}`, stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
   });
-  const note = r.aree.map((a, i) => foglietto(a, i, bloccato));
   const tela = h("div", { classe: `tela-ritocco${bloccato ? " bloccata" : ""}`, "data-strumento": r.strumento },
-    img, disegno, ...numeri, ...note);
+    img, disegno, ...numeri);
   if (bloccato) return tela;
 
-  // Il disegno: rettangolo da un angolo all'altro, o lazo che si chiude da solo al rilascio.
+  // Il disegno: rettangolo da un angolo all'altro, lazo che si chiude da solo
+  // al rilascio, o tratto di pennello (aggiungi o togli) largo `spessore`.
   let tratto = null;
+  const pennello = r.strumento === "aggiungi" || r.strumento === "togli";
   const punto = (ev) => {
     const b = img.getBoundingClientRect();
     return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
   };
   tela.addEventListener("pointerdown", (ev) => {
-    if (ev.target.closest(".foglietto") || ev.button !== 0) return;
+    if (ev.button !== 0) return;
     ev.preventDefault();
     tela.setPointerCapture(ev.pointerId);
     tratto = { inizio: punto(ev), punti: [punto(ev)] };
+    if (pennello) pennellata.setAttribute("points", attributoPunti(contornoNormalizzato(tratto.punti, spessorePennello(), img)));
   });
   tela.addEventListener("pointermove", (ev) => {
     if (!tratto || !tela.hasPointerCapture(ev.pointerId)) return;
@@ -2260,16 +2331,19 @@ function telaRitocco(base) {
     if (r.strumento === "rettangolo") {
       tratto.punti = [tratto.inizio, p];
       traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: tratto.punti })) + " " + attributoPunti([tratto.inizio]));
-    } else {
-      const ultimo = tratto.punti[tratto.punti.length - 1];
-      if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) >= LAZO_PASSO_MINIMO) tratto.punti.push(p);
-      traccia.setAttribute("points", attributoPunti(tratto.punti));
+      return;
     }
+    const ultimo = tratto.punti[tratto.punti.length - 1];
+    if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) < LAZO_PASSO_MINIMO) return;
+    tratto.punti.push(p);
+    if (pennello) pennellata.setAttribute("points", attributoPunti(contornoNormalizzato(tratto.punti, spessorePennello(), img)));
+    else traccia.setAttribute("points", attributoPunti(tratto.punti));
   });
   const chiudi = () => {
     if (!tratto) return;
     const t = tratto; tratto = null;
     traccia.setAttribute("points", "");
+    pennellata.setAttribute("points", "");
     let area = null;
     if (r.strumento === "rettangolo" && t.punti.length === 2) {
       const [[ax, ay], [bx, by]] = t.punti;
@@ -2281,95 +2355,86 @@ function telaRitocco(base) {
       if (Math.max(...xs) - Math.min(...xs) >= AREA_MINIMA && Math.max(...ys) - Math.min(...ys) >= AREA_MINIMA) {
         area = { forma: "libera", punti: t.punti };
       }
+    } else if (pennello) {
+      // Anche un clic e' un tratto: un cerchio largo quanto il pennello.
+      area = { forma: "pennello", azione: r.strumento, spessore: spessorePennello(), punti: t.punti };
     }
     if (!area) return;
     area.punti = area.punti.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
-    area.nota = "";
-    area.posNota = posizioneNota(puntiSvg(area));
+    if (area.forma === "pennello") area.contorno = contornoNormalizzato(area.punti, area.spessore, img);
+    if (!area.azione) area.azione = "cambia";
     r.aree.push(area);
     r.composto = null;
     r.esito = null;
     render();
-    const campo = document.getElementById(`foglietto-nota-${r.aree.length - 1}`);
-    if (campo) campo.focus();
-    disegnaApplicaRitocco();
+    // L'area nuova entra nel testo come @N, dove si scrive.
+    inserisciMenzione(r.aree.length);
   };
   tela.addEventListener("pointerup", chiudi);
-  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); });
+  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); pennellata.setAttribute("points", ""); });
   return tela;
 }
 
-// La nota adesiva di un'area: si sposta trascinando la sua testata, l'area no.
-function foglietto(a, i, bloccato) {
+// Il compositore: una frase sola, le aree chiamate con @1, @2. Sotto, un
+// bottone per area che mette la sua @ dove sta il cursore.
+function compositoreRitocco(bloccato) {
+  const r = S.ritocca;
   const campo = h("textarea", {
-    id: `foglietto-nota-${i}`, rows: "2", "aria-label": `Nota dell'area ${i + 1}`,
-    placeholder: "Cosa cambiare qui", readonly: bloccato || null,
+    id: "testo-ritocco", rows: "2", classe: "compositore", "aria-label": "Cosa cambiare, con le aree chiamate @1, @2",
+    placeholder: r.aree.length ? "Rivesti @1 di legno chiaro, metti persone che passeggiano in @2, togli il palo in @3" : "Prima disegna un'area sul render",
+    readonly: bloccato || null, disabled: (!r.aree.length && !r.testo) || null,
   });
-  campo.value = a.nota;
-  campo.addEventListener("input", () => scriviNota(i, campo.value, "foglietto"));
-  const testata = h("div", { classe: "testata-foglietto", title: "Trascina per spostare la nota" },
-    h("b", {}, `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}`),
-    bloccato ? null : h("button", { classe: "togli", "aria-label": `Togli l'area ${i + 1} e la sua nota`, onclick: () => togliArea(i) }, "×"));
-  const nota = h("div", { classe: "foglietto", stile: `left:${a.posNota.x * 100}%;top:${a.posNota.y * 100}%` },
-    testata, campo, bottoneImmagineNota(a, i, bloccato),
-    h("span", { classe: "manca-nota", id: `manca-nota-${i}`, hidden: !!a.nota.trim() }, "Scrivi la nota, oppure togli l'area."));
-  if (!bloccato) {
-    testata.addEventListener("pointerdown", (ev) => {
-      if (ev.target.closest("button")) return;
-      ev.preventDefault();
-      testata.setPointerCapture(ev.pointerId);
-      const tela = nota.parentElement.getBoundingClientRect();
-      const b = nota.getBoundingClientRect();
-      const presa = [ev.clientX - b.left, ev.clientY - b.top];
-      const muovi = (e) => {
-        a.posNota = {
-          x: Math.min(1 - b.width / tela.width, Math.max(0, (e.clientX - presa[0] - tela.left) / tela.width)),
-          y: Math.min(1 - b.height / tela.height, Math.max(0, (e.clientY - presa[1] - tela.top) / tela.height)),
-        };
-        nota.style.left = `${a.posNota.x * 100}%`;
-        nota.style.top = `${a.posNota.y * 100}%`;
-      };
-      const lascia = () => { testata.removeEventListener("pointermove", muovi); testata.removeEventListener("pointerup", lascia); };
-      testata.addEventListener("pointermove", muovi);
-      testata.addEventListener("pointerup", lascia);
-    });
-  }
-  return nota;
+  campo.value = r.testo;
+  campo.addEventListener("input", () => { r.testo = campo.value; componiRitocco(); });
+  return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Cosa cambiare" },
+    campo,
+    h("div", { classe: "riga menzioni" },
+      r.aree.map((a, i) => h("button", {
+        classe: `btn piccolo menzione ${a.azione || "cambia"}`, disabled: bloccato || null,
+        title: `Mette @${i + 1} nel testo: ${nomeArea(a)}`, onclick: () => inserisciMenzione(i + 1),
+      }, `@${i + 1}`)),
+      h("span", { classe: "tenue piccolo" }, r.aree.length
+        ? "Ogni pezzo della frase va alle aree che chiama. Un tratto «togli» che il testo non chiama toglie e basta."
+        : "Disegna un'area: entra nel testo come @1.")));
 }
 
 function strumentiRitocco(spenti, ragione) {
   const r = S.ritocca;
-  const voci = [["rettangolo", "Rettangolo"], ["libera", "Selezione libera"]];
+  const voci = [["rettangolo", "Rettangolo"], ["libera", "Selezione libera"], ["aggiungi", "Pennello aggiungi"], ["togli", "Pennello togli"]];
   const aiuti = {
-    rettangolo: "Rettangolo: trascina da un angolo all'altro. Quando lasci, si attacca una nota.",
-    libera: "Selezione libera, come il lazo di Photoshop: disegna il contorno tenendo premuto. Quando lasci, la forma si chiude da sola e si attacca una nota.",
+    rettangolo: "Rettangolo: trascina da un angolo all'altro. L'area entra nel testo come @N.",
+    libera: "Selezione libera, come il lazo di Photoshop: disegna il contorno tenendo premuto; quando lasci si chiude da sola.",
+    aggiungi: "Pennello aggiungi (verde): dipingi dove va una cosa nuova, come persone, alberi o un'auto.",
+    togli: "Pennello togli (rosso): dipingi sopra quello che deve sparire. Il modello ricostruisce quello che sta dietro.",
   };
+  const pennello = r.strumento === "aggiungi" || r.strumento === "togli";
+  const [sottile, grosso] = (S.studio && S.studio.ritocco && S.studio.ritocco.pennelli) || [0.01, 0.15];
+  const cursore = h("input", { type: "range", min: String(sottile), max: String(grosso), step: "0.005", value: String(spessorePennello()),
+    "aria-label": "Spessore del pennello", disabled: spenti || null });
+  cursore.addEventListener("input", () => { r.spessore = Number(cursore.value); });
   return h("div", { classe: "strumenti-ritocco" },
     h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
       voci.map(([id, nome]) => h("button", {
-        classe: "seg", "aria-pressed": String(r.strumento === id), disabled: spenti || null,
+        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || null,
         onclick: () => { r.strumento = id; render(); },
       }, nome)),
       h("button", { classe: "seg", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto())),
+    pennello ? h("label", { classe: "riga piccolo spessore" }, "Spessore", cursore) : null,
     h("span", { classe: "tenue piccolo" }, spenti ? ragione : aiuti[r.strumento]));
 }
 
-function elencoNote(bloccato) {
+function elencoAree(bloccato) {
   const r = S.ritocca;
   if (!r.aree.length) {
-    return h("p", { classe: "tenue piccolo" }, "Qui ritrovi le note delle aree, per rileggerle e correggerle.");
+    return h("p", { classe: "tenue piccolo" }, "Qui ritrovi le aree, con la parte del testo che va a ognuna e il suo Rif.");
   }
-  return h("ol", { classe: "elenco-note" }, r.aree.map((a, i) => {
-    const campo = h("textarea", { id: `elenco-nota-${i}`, rows: "2", "aria-label": `Nota ${i + 1}`, readonly: bloccato || null });
-    campo.value = a.nota;
-    campo.addEventListener("input", () => scriviNota(i, campo.value, "elenco"));
-    return h("li", {},
-      h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, h("b", { classe: "numero-elenco" }, String(i + 1)), a.forma === "rettangolo" ? " rettangolo" : " selezione libera"),
-        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
-      campo,
-      bottoneImmagineNota(a, i, bloccato),
-      h("span", { classe: "manca-nota", id: `manca-elenco-${i}`, hidden: !!a.nota.trim() }, "Un'area senza nota non dice al modello cosa fare."));
-  }));
+  const note = r.composto ? r.composto.note_aree || [] : [];
+  return h("ol", { classe: "elenco-note" }, r.aree.map((a, i) => h("li", {},
+    h("div", { classe: "riga tra" },
+      h("span", { classe: "piccolo" }, h("b", { classe: `numero-elenco ${a.azione || "cambia"}` }, String(i + 1)), ` ${nomeArea(a)}`),
+      bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
+    h("span", { classe: "piccolo tenue", id: `nota-area-${i}` }, note[i] ? `«${note[i]}»` : "La sua parte del testo compare qui."),
+    bottoneImmagineNota(a, i, bloccato))));
 }
 
 function daVerificare() {
@@ -2379,26 +2444,24 @@ function daVerificare() {
     h("ol", { classe: "piccolo elenco-verifiche" },
       h("li", {}, "Fuori dalle aree resta il render di prima: lo Studio incolla il risultato solo nelle aree. Da vedere su un ritocco vero: che il bordo sfumato non si noti."),
       h("li", {}, `Le aree partono come ${modo.modo_nome}`, modo.origine === "SCELTA" ? ": scelta provvisoria, la fissa il piano «aree»." : "."),
-      h("li", {}, "Luce e riflessi fuori dalle aree non seguono il ritocco: per un cambio di materiale grande conviene rifare il render da Genera."),
-      h("li", {}, "«Clicca una superficie» arriva con la mappa dei materiali da Allplan.")));
+      h("li", {}, "Pennelli aggiungi e togli: le parole che li spiegano al modello non sono ancora state provate su un render vero."),
+      h("li", {}, "Luce e riflessi fuori dalle aree non seguono il ritocco: per un cambio di materiale grande conviene rifare il render da Genera.")));
 }
 
 function pannelloApplica(base, bloccato) {
   const r = S.ritocca;
-  const n = r.aree.length;
-  return h("section", { classe: "pannello evidenziato", "aria-label": "Applica le note" },
-    h("span", { classe: "etichetta" }, `Note sull'immagine · dal passo ${base.numero}`),
-    elencoNote(bloccato),
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Applica il ritocco" },
+    h("span", { classe: "etichetta" }, `Aree · dal passo ${base.numero}`),
+    elencoAree(bloccato),
     insertiRitocco().length ? h("p", { classe: "tenue piccolo" },
-      `Partono ${1 + insertiRitocco().length} immagini: il render e ${insertiRitocco().length === 1 ? "1 Rif." : `${insertiRitocco().length} Rif.`} delle note. Testo per il modello scelto, non ancora provato.`) : null,
+      `Partono ${1 + insertiRitocco().length} immagini: il render e ${insertiRitocco().length === 1 ? "1 Rif." : `${insertiRitocco().length} Rif.`} delle aree. Testo per il modello scelto, non ancora provato.`) : null,
     !vedePrompt() ? null : h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-ritocco" })),
       h("textarea", { classe: "prompt", id: "prompt-ritocco", readonly: true, "aria-label": "Prompt del ritocco" })),
     h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(r, render, "ritocca", insertiRitocco().length > 0))),
     rigaDestinazione(r.modello, S.studio.ritocco.modo === "maschera" ? "Il render, con la maschera delle aree," : "Il render, con le aree disegnate sopra,"),
     h("div", { id: "errore-ritocco" }),
     bloccato ? null : h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", id: "applica-ritocco", onclick: applicaRitocco, disabled: true },
-        n ? `Applica ${n === 1 ? "la nota" : `le ${n} note`}` : "Applica"),
+      h("button", { classe: "btn primario", id: "applica-ritocco", onclick: applicaRitocco, disabled: true }, etichettaApplica()),
       h("span", { classe: "tenue piccolo", id: "motivo-ritocco" })),
     h("p", { classe: "tenue piccolo" }, `Esce un passo nuovo sotto il passo ${base.numero}.`));
 }
@@ -2409,7 +2472,7 @@ async function applicaRitocco() {
   try {
     const dest = await destinazioneDi(r.modello);
     const risposta = await post("/api/ritocca/invia", {
-      vista: S.vista, da: r.da, aree: areePerIlServer(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione,
+      vista: S.vista, da: r.da, testo: r.testo, aree: areePerIlServer(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione,
       inserti: insertiRitocco().map((x) => x.nome),
     });
     r.inviato = risposta.identificativo;
@@ -2432,10 +2495,10 @@ async function fineRitocco(ora) {
     // Il prossimo ritocco parte da qui, dall'ultima immagine: non da quella
     // di prima, che non ha ancora quello che questo ritocco ha messo.
     r.da = ora.identificativo;
-    r.aree = []; r.composto = null; r.errore = null;
+    r.aree = []; r.testo = ""; r.composto = null; r.errore = null;
   } else {
     r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
-      cosa_fare: ora.stato === "annullato" ? "Aree e note sono rimaste: puoi applicarle di nuovo." : `${ora.cosa_fare || ""} Aree e note sono rimaste come erano: Applica le rimanda.`.trim() };
+      cosa_fare: ora.stato === "annullato" ? "Aree e testo sono rimasti: puoi applicarli di nuovo." : `${ora.cosa_fare || ""} Aree e testo sono rimasti come erano: Applica li rimanda.`.trim() };
   }
 }
 
@@ -2484,7 +2547,7 @@ function pannelloFuoriAree(passo) {
 
 function ritoccaDa(passo) {
   const r = S.ritocca;
-  if (r.da !== passo.identificativo) { r.aree = []; r.composto = null; r.errore = null; }
+  if (r.da !== passo.identificativo) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
   r.da = passo.identificativo; r.esito = null;
   location.hash = "#ritocca";
 }
@@ -2520,13 +2583,13 @@ function schermataRitocca() {
     h("div", { classe: "palco" },
       h("div", { classe: "riga tra" }, h("h1", {}, `Ritocca · passo ${base.numero}`),
         h("div", { stile: "min-width:260px" }, scegliBase)),
-      strumentiRitocco(bloccato, "Bloccati mentre il ritocco è in corso: aree e note restano come le hai mandate."),
+      strumentiRitocco(bloccato, "Bloccati mentre il ritocco è in corso: aree e testo restano come li hai mandati."),
       attivo ? h("div", { classe: "striscia in-riga", role: "status" },
         h("div", { classe: "riga tra" }, h("span", {}, h("b", {}, (attivo.destinazione || "").split(" (")[0]), ` · ${attivo.stato}`), h("span", { classe: "mono" }, tempo(attivo.secondi))),
         h("div", { classe: "barra" }, h("span")),
         h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan e il resto dello Studio restano liberi."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
       telaRitocco(base),
-      r.aree.length ? null : h("p", { classe: "tenue" }, "Disegna un'area, poi scrivi cosa cambiare nella sua nota.")),
+      compositoreRitocco(bloccato)),
     h("div", { classe: "lato" }, pannelloApplica(base, bloccato), daVerificare()))];
 }
 
