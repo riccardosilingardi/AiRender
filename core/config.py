@@ -476,6 +476,20 @@ VARIANTI_MASSIME = _registra(Costante(
     ),
 ))
 
+CAMBIA_SCELTE_MASSIME = _registra(Costante(
+    nome="CAMBIA_SCELTE_MASSIME",
+    valore=6,
+    origine=SCELTA,
+    ragione=(
+        "Quante miniature di Cambia (ora del giorno, tempo e mood) si possono "
+        "scegliere per un clic: ogni miniatura e' un passo, un invio e un "
+        "credito. 6 e' una riga intera di «Ora del giorno»: abbastanza per "
+        "confrontare le ore di una giornata nella griglia, pochi perche' un "
+        "clic sbagliato non costi una dozzina di render. Giudizio del "
+        "2026-11-09, mai provato da un cliente."
+    ),
+))
+
 PASSI_AVVISO_DA_GENERAZIONE = _registra(Costante(
     nome="PASSI_AVVISO_DA_GENERAZIONE",
     valore=2,

@@ -954,6 +954,53 @@ partenza non c'è più. Resta **Apri cartella**.
 - Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
   preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
+## Cambia con le miniature e Popola, costruiti il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 3; Design canvas, schermate A3 e
+A4; testi nella scheda «Preset nuovi» della pagina Flussi). Studio e web app,
+stessa pagina. Schermate in `docs/ui/studio-cambia/`.
+
+**Cambia** (barra sotto l'immagine): le sei scorciatoie a parole diventano
+miniature disegnate in due righe, **Ora del giorno** (Alba, Mattino,
+Mezzogiorno, Tramonto, Ora blu, Notte) e **Tempo e mood** (Nuvoloso, Pioggia,
+Neve, Nebbia, Drammatico, Nordico, Luci accese). Negli interni restano solo
+quelle che hanno senso (niente neve, pioggia, nebbia, drammatico); per un pezzo
+d'arredo non ci sono miniature e resta il campo a parole. Se ne scelgono fino a
+`CAMBIA_SCELTE_MASSIME` (6, scelta); ognuna è un passo e un invio. Sotto:
+«Miniature disegnate, non render: dicono l'idea.» Il campo libero resta: da
+solo fa un passo come prima, con delle miniature si aggiunge a ognuna. Con più
+scelte la riga sotto la destinazione dice «Partono N invii, uno per scelta.
+Costo: …» e il bottone è **Applica N**.
+
+**Griglia** (Passi): quando un passo ha fratelli (passi nati dallo stesso
+render) il confronto ha una terza voce, **Griglia (N)**: la partenza
+tratteggiata e tutti i fratelli affiancati; quelli non ancora finiti mostrano
+lo stato su sfondo a righe. Un clic sceglie il passo da cui andare avanti; gli
+altri restano nell'albero. Dopo Applica con più scelte lo Studio va in Passi
+con la griglia aperta. I nomi nell'albero sono «Cambia · Ora blu» (più il testo
+libero, se c'è).
+
+**Popola** (barra, dopo Ritocca): Cosa (Persone, Alberi, Auto; negli interni
+solo Persone, per un arredo niente), Quante (Poche, Alcune, Molte), Come (Ferme,
+In movimento; non per gli alberi), Dove:
+- **Dipingo io** (predefinito): il bottone «Dipingi dove, nel Ritocca» apre il
+  Ritocca col pennello verde e gli altri strumenti spenti. Al posto della frase
+  con le @: «Popola · Persone, alcune, ferme» con **Esci da Popola**. Ogni
+  tratto prende la stessa frase, che l'elenco delle aree mostra. Applica dice
+  «Applica Popola · N tratti». Fuori dal verde resta il render di prima.
+- **Decide il modello**: un passo a parole su tutta l'immagine; il pannello
+  dice dove le mette («sui percorsi, sulle terrazze e vicino agli ingressi, mai
+  davanti alla facciata principale») e che ridisegna tutta l'immagine.
+Sempre: «La grandezza delle persone si lega a porte e piani: è il punto dove il
+modello sbaglia di più. Testi scelti, non ancora provati.»
+
+Quattro stati. **Vuoto**: nessuna miniatura e nessun testo, Applica grigio con
+il perché; Popola dipingo senza tratti: «Passa il pennello verde dove le vuoi».
+**In corso**: i passi in coda si seguono uno dopo l'altro, nella griglia le
+celle mostrano lo stato. **Errore**: messaggio del motore sopra Applica; scelte e
+tratti restano; miniature doppie, sconosciute o troppe non mandano niente.
+**Pieno**: i passi nuovi nell'albero e nella griglia.
+
 ## Studio · Licenza e saldo, costruita il 2026-11-05
 
 Bozza A scelta da Riccardo il 2026-11-05 fra due (A scheda intera, B cassetto

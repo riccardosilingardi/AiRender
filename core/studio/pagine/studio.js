@@ -64,7 +64,7 @@ const S = {
   // aree con le loro note (coordinate da 0 a 1), il lavoro mandato e,
   // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
   ritocca: { da: null, strumento: "rettangolo", aree: [], testo: "", spessore: null, modello: null, composto: null, errore: null,
-             inviato: null, esito: null, x: 50 },
+             inviato: null, esito: null, x: 50, popola: null },
   // Studio · Video: il catalogo letto dal server, come partire, i posti
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
   video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
@@ -1961,7 +1961,7 @@ function palcoConAzioni(l) {
 }
 
 function barraAzioni(l) {
-  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null, finale: null };
+  if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null, finale: null, popola: null };
   const az = S.azioni;
   const d = S.passi.dest[l.modello];
   const m = S.catalogo.modelli.find((x) => x.id === l.modello);
@@ -1971,6 +1971,8 @@ function barraAzioni(l) {
       title: "Cambia tutta l'immagine a parole: luce, ora, tempo, atmosfera. Spigoli e arredo restano." }, "Cambia"),
     h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }),
       title: "Disegna un'area e scrivi cosa cambiare. Fuori dall'area resta tutto com'è." }, "Ritocca"),
+    h("button", { classe: "btn", "aria-expanded": String(!!az.popola), onclick: () => apriPopola(l),
+      title: "Persone, alberi o auto: dove dipingi tu col pennello verde, o dove decide il modello." }, "Popola"),
     h("button", { classe: "btn", onclick: () => rifai(l), disabled: occupato || !d || (m && !m.verificato) || null,
       title: occupato ? "Un lavoro è in corso: Variante si accende quando finisce." : "Stessa ricetta, un'altra immagine. Arriva accanto a questa, già scelta." }, "Variante"),
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
@@ -1990,6 +1992,7 @@ function barraAzioni(l) {
   if (az.video) righe.push(videoVeloce(l));
   if (az.porta) righe.push(pannelloPorta(l));
   if (az.finale) righe.push(pannelloFinale(l));
+  if (az.popola) righe.push(pannelloPopola(l));
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
 }
@@ -2012,6 +2015,106 @@ async function apriCambia(l) {
   if (!passo) { S.azioni.errore = new ErroreStudio("Questa immagine non è fra i passi della vista.", "Ricarica la pagina dello Studio."); render(); return; }
   if (!passo.si_parte) { S.azioni.errore = new ErroreStudio(passo.motivo_non_si_parte || "Da questa immagine non si parte.", "Scegli un render riuscito."); render(); return; }
   await apriNuovoPasso(passo);
+}
+
+// --- Popola: persone, alberi, auto (2026-11-09) ------------------------------
+// «Dipingo io» apre il Ritocca col pennello verde: ogni tratto prende la frase
+// di Popola. «Decide il modello» e' un passo a parole su tutta l'immagine.
+// Testi per il modello scelti, non provati: la scala delle persone e' il
+// punto dove Nano Banana sbaglia di piu'.
+
+async function apriPopola(l) {
+  const az = S.azioni;
+  if (az.popola) { az.popola = null; render(); return; }
+  if (!passoDa(l.identificativo)) await caricaPassi();
+  const passo = passoDa(l.identificativo);
+  if (!passo || !passo.si_parte) { az.errore = new ErroreStudio((passo && passo.motivo_non_si_parte) || "Questa immagine non è fra i passi della vista.", "Scegli un render riuscito."); render(); return; }
+  const cose = S.catalogo.popola.cose.filter((c) => c.scene.includes(passo.scena || "esterno"));
+  if (!cose.length) { az.errore = new ErroreStudio("Popola non vale per un pezzo d'arredo fotografato da solo.", "Per un arredo usa Ritocca con un'area."); render(); return; }
+  az.errore = null;
+  az.popola = { da: passo.identificativo, scena: passo.scena || "esterno", cosa: cose[0].id, quante: "alcune", come: "ferme",
+                dove: "dipingo", modello: modelloVerificato(passo.modello), composto: null, errore: null };
+  await destinazioneDi(az.popola.modello);
+  componiPopola();
+}
+
+function sceltePopola(q) { return { cosa: q.cosa, quante: q.quante, come: q.come }; }
+
+async function componiPopola() {
+  const q = S.azioni.popola;
+  if (!q) return;
+  if (q.dove === "dipingo") { q.composto = null; render(); return; }
+  try { q.composto = await post("/api/passi/componi", { vista: S.vista, da: q.da, popola: sceltePopola(q) }); q.errore = null; }
+  catch (e) { q.composto = null; q.errore = e; }
+  render();
+}
+
+async function applicaPopola() {
+  const q = S.azioni.popola;
+  if (q.dove === "dipingo") {
+    const voce = S.catalogo.popola.cose.find((c) => c.id === q.cosa);
+    ritoccaDa({ identificativo: q.da }, { ...sceltePopola(q), nome: nomePopola(q, voce) });
+    S.azioni.popola = null;
+    return;
+  }
+  q.errore = null;
+  try {
+    const dest = await destinazioneDi(q.modello);
+    const risposta = await post("/api/passi/invia", { vista: S.vista, da: q.da, popola: sceltePopola(q), modello: q.modello,
+      destinazione_mostrata: dest && dest.destinazione });
+    S.azioni.popola = null;
+    S.passi.scelto = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+function nomePopola(q, voce) {
+  const quante = S.catalogo.popola.quante.find((x) => x.id === q.quante);
+  const come = S.catalogo.popola.come.find((x) => x.id === q.come);
+  return [voce.nome, quante && quante.nome.toLowerCase(), voce.si_muove && come ? come.nome.toLowerCase() : null].filter(Boolean).join(", ");
+}
+
+function segPopola(etichetta, voci, valore, cambia, spento) {
+  return h("div", { classe: "riga-popola" }, h("span", { classe: "etichetta" }, etichetta),
+    h("div", { classe: "switch", role: "group", "aria-label": etichetta },
+      voci.map(([id, nome]) => h("button", { classe: "seg", "aria-pressed": String(valore === id), disabled: spento || null,
+        onclick: () => { cambia(id); componiPopola(); } }, nome))));
+}
+
+function pannelloPopola(l) {
+  const q = S.azioni.popola;
+  const cat = S.catalogo.popola;
+  const cose = cat.cose.filter((c) => c.scene.includes(q.scena));
+  const voce = cose.find((c) => c.id === q.cosa) || cose[0];
+  const occupato = !!S.lavoroAttivo;
+  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt di Popola" });
+  prompt.value = q.composto ? q.composto.prompt : "";
+  const dipingo = q.dove === "dipingo";
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Popola" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Popola"),
+      h("button", { classe: "btn link", onclick: () => { S.azioni.popola = null; render(); } }, "Chiudi")),
+    segPopola("Cosa", cose.map((c) => [c.id, c.nome]), q.cosa, (id) => { q.cosa = id; }),
+    segPopola("Quante", cat.quante.map((x) => [x.id, x.nome]), q.quante, (id) => { q.quante = id; }),
+    voce.si_muove ? segPopola("Come", cat.come.map((x) => [x.id, x.nome]), q.come, (id) => { q.come = id; }) : null,
+    segPopola("Dove", [["dipingo", "Dipingo io"], ["modello", "Decide il modello"]], q.dove, (id) => { q.dove = id; }),
+    h("p", { classe: "piccolo" }, dipingo
+      ? "Passi il pennello verde dove le vuoi, nel Ritocca. Fuori dal verde l'immagine resta quella di prima, pixel per pixel."
+      : `Il modello le mette ${voce.dove[q.scena] || ""}. Fuori da lì non dovrebbe cambiare niente, ma ridisegna tutta l'immagine: guarda il prima/dopo.`),
+    h("p", { classe: "tenue piccolo" }, "La grandezza delle persone si lega a porte e piani: è il punto dove il modello sbaglia di più. Testi scelti, non ancora provati."),
+    dipingo ? null : [
+      vedePrompt() && q.composto ? h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"),
+        h("span", { classe: "tenue piccolo" }, `${q.composto.caratteri} caratteri`)), prompt) : null,
+      h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(q, render, "popola", false))),
+      rigaDestinazione(q.modello)],
+    q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: applicaPopola, disabled: (!dipingo && (occupato || !q.composto)) || null },
+        dipingo ? "Dipingi dove, nel Ritocca" : "Applica"),
+      !dipingo && occupato ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Applica si accende quando finisce.") : null));
 }
 
 // --- Finale: ingrandire con piu' dettaglio (2026-11-04) -----------------------
@@ -2326,6 +2429,7 @@ async function immagineNota(i, file) {
 function togliImmagineNota(i) { S.ritocca.aree[i].rif = null; componiRitocco(); render(); }
 
 function bottoneImmagineNota(a, i, bloccato) {
+  if (S.ritocca.popola) return null;
   const m = S.catalogo.modelli.find((x) => x.id === S.ritocca.modello);
   if (a.rif) {
     return h("div", { classe: "riga nota-rif" },
@@ -2345,12 +2449,21 @@ function bottoneImmagineNota(a, i, bloccato) {
 }
 
 // Il testo serve se c'e' un'area che non e' un «togli»: togliere si spiega da solo.
-function testoServe() { return S.ritocca.aree.some((a) => a.azione !== "togli"); }
+function testoServe() { return !S.ritocca.popola && S.ritocca.aree.some((a) => a.azione !== "togli"); }
+
+// Cosa parte per il server: la frase con le @, oppure le scelte di Popola.
+function corpoRitocco() {
+  const r = S.ritocca;
+  const corpo = { vista: S.vista, da: r.da, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) };
+  if (r.popola) corpo.popola = { cosa: r.popola.cosa, quante: r.popola.quante, come: r.popola.come };
+  else corpo.testo = r.testo;
+  return corpo;
+}
 
 function motivoApplicaRitoccoSpento() {
   const r = S.ritocca;
   if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
-  if (!r.aree.length) return "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
+  if (!r.aree.length) return r.popola ? "Passa il pennello verde dove le vuoi." : "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
   if (testoServe() && !r.testo.trim()) return "Scrivi cosa cambiare, e chiama le aree con @1, @2.";
   if (r.errore) return r.errore.cosa_fare || r.errore.fatto;
   if (!r.composto) return "Preparo il testo che parte…";
@@ -2368,7 +2481,7 @@ function componiRitocco() {
   disegnaApplicaRitocco();
   attesaRitocco = setTimeout(async () => {
     try {
-      r.composto = await post("/api/ritocca/componi", { vista: S.vista, da: r.da, testo: r.testo, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) });
+      r.composto = await post("/api/ritocca/componi", corpoRitocco());
       r.errore = null;
     } catch (e) { r.composto = null; r.errore = e; }
     disegnaApplicaRitocco();
@@ -2377,6 +2490,7 @@ function componiRitocco() {
 
 function etichettaApplica() {
   const n = S.ritocca.aree.length;
+  if (S.ritocca.popola) return n ? `Applica Popola · ${n === 1 ? "1 tratto" : `${n} tratti`}` : "Applica Popola";
   return n ? `Applica il ritocco · ${n === 1 ? "1 area" : `${n} aree`}` : "Applica il ritocco";
 }
 
@@ -2572,8 +2686,8 @@ function telaRitocco(base) {
     r.composto = null;
     r.esito = null;
     render();
-    // L'area nuova entra nel testo come @N, dove si scrive.
-    inserisciMenzione(r.aree.length);
+    // L'area nuova entra nel testo come @N, dove si scrive. In Popola non c'e' testo.
+    if (r.popola) componiRitocco(); else inserisciMenzione(r.aree.length);
   };
   tela.addEventListener("pointerup", chiudi);
   tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); pennellata.setAttribute("points", ""); });
@@ -2584,6 +2698,13 @@ function telaRitocco(base) {
 // bottone per area che mette la sua @ dove sta il cursore.
 function compositoreRitocco(bloccato) {
   const r = S.ritocca;
+  if (r.popola) {
+    return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Popola" },
+      h("div", { classe: "riga tra" },
+        h("span", {}, h("b", {}, `Popola · ${r.popola.nome}`)),
+        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.popola = null; r.aree = []; r.composto = null; r.strumento = "rettangolo"; render(); } }, "Esci da Popola")),
+      h("span", { classe: "tenue piccolo" }, "Passa il pennello verde dove le vuoi. Ogni tratto prende la stessa frase; fuori dal verde l'immagine resta quella di prima."));
+  }
   const campo = h("textarea", {
     id: "testo-ritocco", rows: "2", classe: "compositore", "aria-label": "Cosa cambiare, con le aree chiamate @1, @2",
     placeholder: r.aree.length ? "Rivesti @1 di legno chiaro, metti persone che passeggiano in @2, togli il palo in @3" : "Prima disegna un'area sul render",
@@ -2620,7 +2741,8 @@ function strumentiRitocco(spenti, ragione) {
   return h("div", { classe: "strumenti-ritocco" },
     h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
       voci.map(([id, nome]) => h("button", {
-        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || null,
+        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || (r.popola && id !== "aggiungi") || null,
+        title: r.popola && id !== "aggiungi" ? "In Popola si dipinge solo col pennello verde." : null,
         onclick: () => { r.strumento = id; render(); },
       }, nome)),
       h("button", { classe: "seg", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto())),
@@ -2676,10 +2798,7 @@ async function applicaRitocco() {
   r.errore = null;
   try {
     const dest = await destinazioneDi(r.modello);
-    const risposta = await post("/api/ritocca/invia", {
-      vista: S.vista, da: r.da, testo: r.testo, aree: areePerIlServer(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione,
-      inserti: insertiRitocco().map((x) => x.nome),
-    });
+    const risposta = await post("/api/ritocca/invia", { ...corpoRitocco(), modello: r.modello, destinazione_mostrata: dest && dest.destinazione });
     r.inviato = risposta.identificativo;
     S.inFila = [];
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
@@ -2700,7 +2819,7 @@ async function fineRitocco(ora) {
     // Il prossimo ritocco parte da qui, dall'ultima immagine: non da quella
     // di prima, che non ha ancora quello che questo ritocco ha messo.
     r.da = ora.identificativo;
-    r.aree = []; r.testo = ""; r.composto = null; r.errore = null;
+    r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.popola = null;
   } else {
     r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
       cosa_fare: ora.stato === "annullato" ? "Aree e testo sono rimasti: puoi applicarli di nuovo." : `${ora.cosa_fare || ""} Aree e testo sono rimasti come erano: Applica li rimanda.`.trim() };
@@ -2750,9 +2869,13 @@ function pannelloFuoriAree(passo) {
     passo.modo_aree_nome ? h("p", { classe: "tenue piccolo" }, `Aree mandate come ${passo.modo_aree_nome}.`) : null);
 }
 
-function ritoccaDa(passo) {
+// Con `popola` (da Popola · Dipingo io) si dipinge solo col verde, senza testo:
+// ogni tratto prende la frase di Popola.
+function ritoccaDa(passo, popola) {
   const r = S.ritocca;
-  if (r.da !== passo.identificativo) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
+  if (r.da !== passo.identificativo || popola || r.popola) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
+  r.popola = popola || null;
+  if (popola) r.strumento = "aggiungi";
   r.da = passo.identificativo; r.esito = null;
   location.hash = "#ritocca";
 }
@@ -2839,7 +2962,7 @@ async function apriNuovoPasso(passo) {
   const p = S.passi;
   p.scelto = passo.identificativo;
   p.rifai = false; p.pulito = null;
-  p.nuovo = { da: passo.identificativo, testo: "", modello: modelloVerificato(passo.modello), composto: null, errore: null, inserti: [] };
+  p.nuovo = { da: passo.identificativo, testo: "", scelte: [], modello: modelloVerificato(passo.modello), composto: null, errore: null, inserti: [] };
   await destinazioneDi(p.nuovo.modello);
   render();
   const campo = document.getElementById("testo-passo");
@@ -2850,9 +2973,12 @@ let attesaPasso = null;
 function componiNuovoPasso() {
   const n = S.passi.nuovo;
   clearTimeout(attesaPasso);
-  if (!n || !n.testo.trim()) { if (n) { n.composto = null; disegnaNuovoPasso(); } return; }
+  if (!n || (!n.testo.trim() && !n.scelte.length)) { if (n) { n.composto = null; disegnaNuovoPasso(); } return; }
   attesaPasso = setTimeout(async () => {
-    try { n.composto = await post("/api/passi/componi", { vista: S.vista, da: n.da, testo: n.testo, inserti: n.inserti.map((r) => r.nome) }); n.errore = null; }
+    try {
+      n.composto = await post("/api/passi/componi", { vista: S.vista, da: n.da, testo: n.testo, variazioni: n.scelte, modello: n.modello, inserti: n.inserti.map((r) => r.nome) });
+      n.errore = null;
+    }
     catch (e) { n.composto = null; n.errore = e; }
     disegnaNuovoPasso();
   }, 250);
@@ -2863,14 +2989,17 @@ function componiNuovoPasso() {
 function disegnaNuovoPasso() {
   const n = S.passi.nuovo;
   if (!n) return;
+  const c = n.composto;
   const prompt = document.getElementById("prompt-passo");
-  if (prompt) prompt.value = n.composto ? n.composto.prompt : "";
+  if (prompt) prompt.value = !c ? "" : c.prompts.length > 1 ? c.prompts.map((x) => `— ${x.nome} —\n${x.prompt}`).join("\n\n") : c.prompt;
   const car = document.getElementById("caratteri-passo");
-  if (car) car.textContent = n.composto ? `${n.composto.caratteri} caratteri` : "";
+  if (car) car.textContent = !c ? "" : c.prompts.length > 1 ? `${c.prompts.length} prompt` : `${c.caratteri} caratteri`;
+  const costo = document.getElementById("costo-cambia");
+  if (costo) costo.textContent = c && c.invii > 1 && c.costo ? `Partono ${c.invii} invii, uno per scelta. Costo: ${c.costo}.` : "";
   const err = document.getElementById("errore-passo");
   if (err) err.replaceChildren(n.errore ? avviso("errore", n.errore.fatto, n.errore.cosa_fare) : "");
   const bottone = document.getElementById("applica-passo");
-  if (bottone) bottone.disabled = !n.testo.trim() || !!S.lavoroAttivo;
+  if (bottone) { bottone.disabled = (!n.testo.trim() && !n.scelte.length) || !!S.lavoroAttivo; bottone.textContent = n.scelte.length > 1 ? `Applica ${n.scelte.length}` : "Applica"; }
   const motivo = document.getElementById("motivo-applica");
   if (motivo) motivo.textContent = motivoApplicaSpento();
 }
@@ -2878,7 +3007,7 @@ function disegnaNuovoPasso() {
 function motivoApplicaSpento() {
   const n = S.passi.nuovo;
   if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
-  if (!n || !n.testo.trim()) return "Scrivi cosa cambiare: un passo senza richiesta non cambia niente.";
+  if (!n || (!n.testo.trim() && !n.scelte.length)) return "Scegli una miniatura o scrivi cosa cambiare: un passo senza richiesta non cambia niente.";
   return "";
 }
 
@@ -2888,13 +3017,15 @@ async function applicaPasso() {
   try {
     const dest = await destinazioneDi(n.modello);
     const risposta = await post("/api/passi/invia", {
-      vista: S.vista, da: n.da, testo: n.testo, modello: n.modello, destinazione_mostrata: dest && dest.destinazione,
+      vista: S.vista, da: n.da, testo: n.testo, variazioni: n.scelte, modello: n.modello, destinazione_mostrata: dest && dest.destinazione,
       inserti: n.inserti.map((r) => r.nome),
     });
     S.passi.nuovo = null;
     S.passi.scelto = risposta.identificativo;
-    S.inFila = [];
+    // Piu' scelte: si seguono una dopo l'altra e si confrontano nella griglia dei Passi.
+    S.inFila = risposta.identificativi.slice(1);
     seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    if (risposta.identificativi.length > 1) { S.passi.modo = "griglia"; if (S.scheda !== "passi") location.hash = "#passi"; }
     await caricaPassi();
     if (S.scheda === "risultato") await caricaRender();
   } catch (e) { n.errore = e; }
@@ -3005,6 +3136,8 @@ function palcoPassi(passo) {
       h("figure", { classe: "riquadro-vista" }, h("img", { src: `/file/vista/${enc(S.vista)}`, alt: "Vista Allplan", stile: "max-height:none" })));
   }
   const titolo = h("h1", {}, `Passo ${passo.numero} · ${passo.nome}`);
+  const confronto = modiConfronto(passo);
+  if (confronto.modo === "griglia") return palcoGriglia(passo, confronto.fratelli, titolo, confronto.modi);
   if (!passo.render) {
     const padre = passo.da !== "0" ? passoDa(passo.da) : null;
     const srcPartenza = padre && padre.render ? `/file/render/${padre.identificativo}` : `/file/vista/${enc(S.vista)}`;
@@ -3025,16 +3158,14 @@ function palcoPassi(passo) {
   const nomeA = contro === "prima" ? `Passo ${padre.numero}` : "Vista Allplan";
   const srcB = `/file/render/${passo.identificativo}`;
   const nomeB = `Passo ${passo.numero}`;
-  const modi = h("div", { classe: "switch", role: "group", "aria-label": "Modo di confronto" },
-    [["scorri", "Prima / dopo"], ["affiancati", "Affiancati"]].map(([id, n]) =>
-      h("button", { classe: "seg", "aria-pressed": String(p.modo === id), onclick: () => { p.modo = id; render(); } }, n)));
+  const { fratelli, modo, modi } = modiConfronto(passo);
   const scegliA = h("select", { "aria-label": "Confronta con" },
     h("option", { value: "vista", selected: contro === "vista" }, "Vista Allplan (passo 0)"),
     h("option", { value: "prima", selected: contro === "prima", disabled: !primaPossibile },
       padre ? `Passo prima (passo ${padre.numero})${primaPossibile ? "" : ": il suo render non c'è più"}` : "Passo prima: è la vista"));
   scegliA.addEventListener("change", () => { p.confronto = scegliA.value; render(); });
   let palco, nota = null;
-  if (p.modo === "scorri") ({ palco, nota } = primaDopo(p, srcA, nomeA, srcB, nomeB));
+  if (modo === "scorri") ({ palco, nota } = primaDopo(p, srcA, nomeA, srcB, nomeB));
   else {
     palco = h("div", { classe: "affiancati" },
       h("figure", {}, h("img", { src: srcA, alt: nomeA }), h("figcaption", { classe: "tenue piccolo" }, nomeA)),
@@ -3044,10 +3175,48 @@ function palcoPassi(passo) {
     h("div", { classe: "riga tra" }, titolo, modi),
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Confronta con"), h("div", { stile: "min-width:240px" }, scegliA)),
     palco,
-    p.modo === "scorri" ? h("div", { classe: "riga tra" },
+    modo === "scorri" ? h("div", { classe: "riga tra" },
       h("span", { classe: "tenue piccolo" }, "Trascina la linea, oppure tasti ← → (con Maiusc il passo è più lungo)"),
       h("span", { classe: "mono", id: "valore-linea" }, `${Math.round(p.x)}%`)) : null,
     nota);
+}
+
+// I fratelli: i passi nati dallo stesso render, come le scelte di un Cambia.
+// Con piu' d'uno, il confronto ha anche la griglia.
+function modiConfronto(passo) {
+  const p = S.passi;
+  const fratelli = p.dati.passi.filter((x) => x.da === passo.da);
+  const modo = p.modo === "griglia" && fratelli.length < 2 ? "scorri" : p.modo;
+  const voci = [["scorri", "Prima / dopo"], ["affiancati", "Affiancati"]];
+  if (fratelli.length > 1) voci.push(["griglia", `Griglia (${fratelli.length})`]);
+  const modi = h("div", { classe: "switch", role: "group", "aria-label": "Modo di confronto" },
+    voci.map(([id, n]) =>
+      h("button", { classe: "seg", "aria-pressed": String(modo === id), onclick: () => { p.modo = id; render(); } }, n)));
+  return { fratelli, modo, modi };
+}
+
+// La griglia: il render di partenza e tutti i passi nati da lui, affiancati.
+// Un clic sceglie quello da tenere per andare avanti; gli altri restano
+// nell'albero, niente si perde.
+function palcoGriglia(passo, fratelli, titolo, modi) {
+  const p = S.passi;
+  const padre = passo.da !== "0" ? passoDa(passo.da) : null;
+  const partenza = padre && padre.render ? `/file/render/${padre.identificativo}` : `/file/vista/${enc(S.vista)}`;
+  const cella = (x) => {
+    const attivo = S.lavoroAttivo && S.lavoroAttivo.identificativo === x.identificativo;
+    return h("button", { classe: "cella-griglia", "aria-current": String(x.identificativo === passo.identificativo),
+      onclick: () => { p.scelto = x.identificativo; render(); } },
+      x.render ? h("img", { src: `/file/render/${x.identificativo}`, alt: x.nome })
+        : h("span", { classe: "posto-griglia" }, attivo || x.attivo ? `${x.stato}…` : x.stato === "errore" ? "non riuscito" : x.stato || "—"),
+      h("span", { classe: "piccolo" }, h("b", { classe: "numero" }, x.numero), " ", x.nome));
+  };
+  return h("div", { classe: "palco" },
+    h("div", { classe: "riga tra" }, titolo, modi),
+    h("p", { classe: "tenue piccolo" }, `Partono tutti da ${padre ? `passo ${padre.numero}` : "Vista Allplan"}. Clic su uno per sceglierlo e andare avanti da lì: gli altri restano nell'albero.`),
+    h("div", { classe: "griglia-confronto" },
+      h("figure", { classe: "cella-griglia partenza" }, h("img", { src: partenza, alt: "Partenza" }),
+        h("figcaption", { classe: "piccolo tenue" }, padre ? `Partenza · passo ${padre.numero}` : "Partenza · Vista Allplan")),
+      fratelli.map(cella)));
 }
 
 function rigaDestinazione(modello, cosaParte) {
@@ -3109,42 +3278,97 @@ function schedeModello(dove, sceltoId, servePiuImmagini, onScegli) {
     h("button", { classe: "btn link piccolo", onclick: () => { modelliAperti.delete(dove); render(); } }, "Chiudi"));
 }
 
-// Cambia: le scorciatoie scrivono una richiesta nel campo, che resta da
-// leggere e correggere. Testi scelti, non provati con il modello.
-const SCORCIATOIE_CAMBIA = [
-  ["Notte", "Stessa scena di notte: cielo scuro, luci artificiali accese, ombre e riflessi dati dalle lampade."],
-  ["Tramonto", "Stessa scena al tramonto: luce calda e radente, ombre lunghe, cielo arancio e rosa."],
-  ["Nuvoloso", "Stessa scena con cielo coperto: luce morbida e diffusa, ombre leggere."],
-  ["Pioggia", "Stessa scena sotto la pioggia: cielo grigio, superfici bagnate e riflettenti."],
-  ["Neve", "Stessa scena d'inverno con neve sulle superfici orizzontali, luce fredda."],
-  ["Luci accese", "Accendi tutte le luci artificiali, la luce naturale resta com'è."],
-];
+// Cambia: miniature disegnate in due righe, «Ora del giorno» e «Tempo e mood»
+// (bozza «flussi», 2026-11-09). Piu' scelte insieme = un passo per scelta,
+// fratelli nell'albero, da confrontare nella griglia. Il campo libero si
+// aggiunge a ogni scelta, o da solo fa un passo come prima. Le miniature sono
+// disegni, non render: dicono l'idea. Testi per il modello scelti, non provati.
+const DISEGNO_CAMBIA = {
+  alba: { c1: "#F2B8A0", c2: "#F8E3C8", ombra: 0.12 },
+  mattino: {},
+  mezzogiorno: { c1: "#5E9DD8", ombra: 0.35 },
+  tramonto: { c1: "#E58A5B", c2: "#F6C98F", ombra: 0.2 },
+  ora_blu: { c1: "#1E2E5A", c2: "#5C6F9C", luci: true, sole: false, ombra: 0.05, terra: "#4B5A48", muro: "#B9B6C4" },
+  notte: { c1: "#0B1020", c2: "#1E2740", luci: true, sole: false, ombra: 0, terra: "#2B3328", muro: "#6C6A72" },
+  nuvoloso: { c1: "#A9B1BA", c2: "#D3D7DB", sole: false, ombra: 0.06 },
+  pioggia: { c1: "#7D8790", c2: "#A9B0B6", sole: false, ombra: 0.03, terra: "#6E7E66", pioggia: true },
+  neve: { c1: "#C9D2DA", c2: "#EEF1F4", sole: false, terra: "#F2F4F6", ombra: 0.05, tetto: "#F2F4F6" },
+  nebbia: { c1: "#C9CDD1", c2: "#E2E4E6", sole: false, nebbia: 0.45, ombra: 0.03 },
+  drammatico: { c1: "#3D4654", c2: "#C98C5A", ombra: 0.5 },
+  nordico: { c1: "#9FB8CC", c2: "#E4ECF1", ombra: 0.15, terra: "#7F9472" },
+  luci_accese: { luci: true },
+};
+let gradientiCambia = 0;
+function disegnoCambia(id) {
+  const o = Object.assign({ c1: "#8DB7DE", c2: "#DCE8F0", muro: "#E9E4DA", tetto: "#5B5F66", vetro: "#7E99B0", terra: "#8FA67A",
+    luci: false, ombra: 0.25, nebbia: 0, sole: true, pioggia: false }, DISEGNO_CAMBIA[id] || {});
+  const g = `cielo-cambia-${gradientiCambia++}`;
+  const vetri = o.luci ? "#F4C66A" : o.vetro;
+  return `<svg viewBox="0 0 640 400" aria-hidden="true"><defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${o.c1}"/><stop offset="1" stop-color="${o.c2}"/></linearGradient></defs>`
+    + `<rect width="640" height="400" fill="url(#${g})"/>`
+    + (o.sole ? `<circle cx="520" cy="80" r="26" fill="#FFF3C4" opacity=".85"/>` : "")
+    + `<rect y="300" width="640" height="100" fill="${o.terra}"/><rect y="292" width="640" height="10" fill="#C9C2B4"/>`
+    + `<polygon points="170,300 470,300 520,330 140,330" fill="#000" opacity="${o.ombra}"/>`
+    + `<rect x="170" y="170" width="300" height="130" fill="${o.muro}"/><rect x="300" y="110" width="170" height="60" fill="${o.muro}"/>`
+    + `<rect x="290" y="100" width="190" height="12" fill="${o.tetto}"/><rect x="160" y="160" width="140" height="12" fill="${o.tetto}"/>`
+    + `<rect x="200" y="200" width="70" height="70" fill="${vetri}"/><rect x="320" y="200" width="120" height="100" fill="${vetri}"/>`
+    + `<rect x="330" y="125" width="110" height="34" fill="${vetri}"/><rect x="380" y="200" width="3" height="100" fill="#3A3D44"/>`
+    + `<ellipse cx="90" cy="250" rx="46" ry="62" fill="#4E7044"/><rect x="86" y="280" width="8" height="24" fill="#5A4636"/>`
+    + `<ellipse cx="560" cy="262" rx="36" ry="48" fill="#557A4A"/><rect x="556" y="288" width="8" height="16" fill="#5A4636"/>`
+    + (o.pioggia ? `<g stroke="#E6ECF2" stroke-width="2" opacity=".6">${Array.from({ length: 24 }, (_x, i) => `<line x1="${i * 28}" y1="${(i * 53) % 260}" x2="${i * 28 - 8}" y2="${(i * 53) % 260 + 30}"/>`).join("")}</g>` : "")
+    + (o.nebbia ? `<rect width="640" height="400" fill="#E6E9EC" opacity="${o.nebbia}"/>` : "")
+    + `</svg>`;
+}
+
+function miniaturaCambia(voce, n) {
+  const scelta = n.scelte.includes(voce.id);
+  const pieno = !scelta && n.scelte.length >= S.catalogo.cambia.massime;
+  const quadro = h("span", { classe: "quadro-mini" });
+  quadro.innerHTML = disegnoCambia(voce.id);
+  return h("button", {
+    classe: "mini-cambia", "aria-pressed": String(scelta), disabled: pieno || null,
+    title: pieno ? `Al massimo ${S.catalogo.cambia.massime} scelte per clic.` : null,
+    onclick: () => {
+      n.scelte = scelta ? n.scelte.filter((x) => x !== voce.id) : [...n.scelte, voce.id];
+      componiNuovoPasso(); render();
+    },
+  }, quadro, h("span", {}, voce.nome));
+}
 
 function pannelloNuovoPasso() {
   const n = S.passi.nuovo;
   const da = passoDa(n.da);
   if (!da) return null;
-  const campo = h("textarea", { id: "testo-passo", rows: "3", placeholder: "Cosa cambiare in tutta l'immagine, a parole: «di notte, con le luci accese»" });
+  const cambia = S.catalogo.cambia;
+  const voci = cambia.voci.filter((v) => v.scene.includes(da.scena || "esterno"));
+  const campo = h("textarea", { id: "testo-passo", rows: "2",
+    placeholder: n.scelte.length ? "In più, in ognuna (facoltativo): «con le luci del portico accese»" : "Oppure a parole: «di notte, con le luci accese»" });
   campo.value = n.testo;
   campo.addEventListener("input", () => { n.testo = campo.value; componiNuovoPasso(); disegnaNuovoPasso(); });
-  const usa = (testo) => { n.testo = testo; campo.value = testo; componiNuovoPasso(); disegnaNuovoPasso(); campo.focus(); };
+  const quante = n.scelte.length;
   return h("section", { classe: "pannello evidenziato", "aria-label": "Cambia" },
-    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Cambia tutta l'immagine, a parole"),
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Cambia tutta l'immagine"),
       h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Chiudi")),
-    h("p", { classe: "piccolo" }, `Spigoli, arredo e inquadratura restano, cambia solo quello che scrivi. Esce un passo nuovo sotto il passo ${da.numero}.`),
-    h("div", { classe: "scelte-chip", role: "group", "aria-label": "Scorciatoie" },
-      SCORCIATOIE_CAMBIA.map(([nome, testo]) => h("button", { classe: "chip", "aria-pressed": String(n.testo === testo), onclick: () => usa(testo) }, nome))),
+    h("p", { classe: "piccolo" }, `Spigoli, arredo e inquadratura restano, cambiano luce e atmosfera. Escono passi nuovi sotto il passo ${da.numero}.`),
+    voci.length ? cambia.gruppi.map((g) => {
+      const del_gruppo = voci.filter((v) => v.gruppo === g.id);
+      return del_gruppo.length ? h("div", { classe: "gruppo-mini", role: "group", "aria-label": g.nome },
+        h("span", { classe: "etichetta" }, g.nome),
+        h("div", { classe: "miniature-cambia" }, del_gruppo.map((v) => miniaturaCambia(v, n)))) : null;
+    }) : h("p", { classe: "tenue piccolo" }, "Per un pezzo d'arredo non ci sono miniature: scrivi cosa cambiare."),
+    voci.length ? h("p", { classe: "tenue piccolo" },
+      `Miniature disegnate, non render: dicono l'idea. Puoi sceglierne fino a ${cambia.massime}; ognuna è un passo e un invio. Alla fine le confronti nella griglia dei Passi.`) : null,
     campo,
-    nota("Le scorciatoie scrivono nel campo.", "Le scorciatoie scrivono una richiesta nel campo: la puoi correggere prima di applicare."),
-    h("p", { classe: "tenue piccolo" }, "Solo una parte? Usa Ritocca."),
+    h("p", { classe: "tenue piccolo" }, quante ? "Il testo, se lo scrivi, si aggiunge a ogni scelta." : "Solo una parte? Usa Ritocca."),
     pannelloInserti(n.inserti, S.catalogo.modelli.find((m) => m.id === n.modello), "Cambia", () => { componiNuovoPasso(); render(); }),
     !vedePrompt() ? null : h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"), h("span", { classe: "tenue piccolo", id: "caratteri-passo" })),
       h("textarea", { classe: "prompt", id: "prompt-passo", readonly: true, "aria-label": "Prompt del passo" })),
-    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(n, render, "cambia", n.inserti.length > 0))),
+    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"), h("div", {}, sceltaModello(n, () => { componiNuovoPasso(); render(); }, "cambia", n.inserti.length > 0))),
     rigaDestinazione(n.modello),
+    h("p", { classe: "destinazione", id: "costo-cambia" }),
     h("div", { id: "errore-passo" }),
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", id: "applica-passo", onclick: applicaPasso, disabled: true }, "Applica"),
+      h("button", { classe: "btn primario", id: "applica-passo", onclick: applicaPasso, disabled: true }, quante > 1 ? `Applica ${quante}` : "Applica"),
       h("span", { classe: "tenue piccolo", id: "motivo-applica" })));
 }
 

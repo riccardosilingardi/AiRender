@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-14"
+VERSIONE = "bozza-15"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -1083,3 +1083,248 @@ def componi_contesto(inquadratura: str, *, pulisci_mappa: bool = False,
     pezzi.append(CONTESTO_PULISCI_MAPPA.testo if pulisci_mappa else CONTESTO_FUORI_INTATTO.testo)
     pezzi.append(COSA_EVITARE.testo)
     return " ".join(pezzi)
+
+
+# --- Cambia: ora e mood (bozza 15, 2026-11-09) ---------------------------------
+
+# Le scorciatoie di Cambia diventano miniature in due righe, «Ora del giorno»
+# e «Tempo e mood» (bozza «flussi», scheda «Preset nuovi»). Ogni voce e' una
+# richiesta di un passo: entra in componi_richieste dopo «Change:», come le
+# richieste scritte a mano, e finisce con cosa tenere. Piu' voci scelte
+# insieme = un invio per voce. Testi scritti con la skill di prompt
+# architettonico; nessuno provato con il modello.
+ORA = "ora"
+MOOD = "mood"
+GRUPPI_VARIAZIONI = {ORA: "Ora del giorno", MOOD: "Tempo e mood"}
+
+_TIENI = "keep the building, every material, every object and the camera exactly as they are"
+
+
+@dataclass(frozen=True)
+class Variazione:
+    """Una miniatura di Cambia: un nome per l'utente, una richiesta per il modello."""
+
+    identificativo: str
+    gruppo: str
+    nome: str
+    testo: str
+    # Le scene in cui ha senso: la neve sui tetti non serve a un pezzo d'arredo.
+    scene: tuple[str, ...] = (ESTERNO, INTERNO)
+    origine: str = config.SCELTA
+
+    def __post_init__(self) -> None:
+        controlla_etichetta(self.nome, f"il nome della variazione {self.identificativo}")
+
+
+def _variazioni(*righe: Variazione) -> dict[str, Variazione]:
+    return {v.identificativo: v for v in righe}
+
+
+VARIAZIONI = _variazioni(
+    Variazione("alba", ORA, "Alba",
+               "only the time of day, to early sunrise: low warm sun just above the horizon from "
+               "the side, soft peach and pale blue sky, long gentle shadows, a thin morning haze "
+               f"in the distance; {_TIENI}"),
+    Variazione("mattino", ORA, "Mattino",
+               "only the time of day, to mid-morning: clear fresh daylight from the side, light "
+               f"blue sky, crisp defined shadows of medium length, neutral white balance; {_TIENI}"),
+    Variazione("mezzogiorno", ORA, "Mezzogiorno",
+               "only the time of day, to midday: high bright sun, deep blue sky, short hard "
+               f"shadows under eaves and balconies, saturated but natural colours; {_TIENI}"),
+    Variazione("tramonto", ORA, "Tramonto",
+               "only the time of day, to sunset: warm low raking light, long shadows, orange and "
+               f"pink sky fading to blue, warm reflections on the glazing; {_TIENI}"),
+    Variazione("ora_blu", ORA, "Ora blu",
+               "only the time of day, to blue hour about twenty minutes after sunset: deep cobalt "
+               "sky with a faint warm glow at the horizon, interior lights on at 3000 K glowing "
+               f"through the glazing, soft ambient light with no hard shadows; {_TIENI}"),
+    Variazione("notte", ORA, "Notte",
+               "only the time of day, to night: dark sky, artificial lights switched on, light and "
+               f"reflections coming only from the lamps, deep soft shadows; {_TIENI}"),
+    Variazione("nuvoloso", MOOD, "Nuvoloso",
+               "only the weather, to an overcast day: even soft diffuse light, light grey sky, "
+               f"faint shadows, calm neutral tones; {_TIENI}"),
+    Variazione("pioggia", MOOD, "Pioggia",
+               "only the weather, to light rain: grey sky, wet reflective ground and surfaces, "
+               f"small puddles, soft diffuse light; {_TIENI}", scene=(ESTERNO,)),
+    Variazione("neve", MOOD, "Neve",
+               "only the season, to winter with fresh snow on the ground, roofs and horizontal "
+               f"surfaces, cold bright light, bare trees; {_TIENI}", scene=(ESTERNO,)),
+    Variazione("nebbia", MOOD, "Nebbia",
+               "only the weather, to a still foggy morning: dense soft fog that fades the "
+               "background and the trees behind the building, diffuse grey-white light, no "
+               "shadows, damp ground with faint reflections; the building stays sharp and readable "
+               f"in the foreground; {_TIENI}", scene=(ESTERNO,)),
+    Variazione("drammatico", MOOD, "Drammatico",
+               "only the mood, to dramatic late afternoon: low sun from the side raking across "
+               "the facade, long crisp shadows, dark storm clouds breaking behind the building "
+               f"with bright gaps of light, strong local contrast in the sky; {_TIENI}",
+               scene=(ESTERNO,)),
+    Variazione("nordico", MOOD, "Nordico",
+               "only the light, to a clear Scandinavian day in early spring: cool bright daylight, "
+               "pale clear sky, crisp air, low-saturation colours, soft but defined shadows; "
+               f"{_TIENI}"),
+    Variazione("luci_accese", MOOD, "Luci accese",
+               "switch on all the artificial lights, warm 3000 K, glowing through the glazing and "
+               f"onto nearby surfaces; keep the daylight as it is and {_TIENI}"),
+)
+
+
+def variazioni(scena: str) -> list[Variazione]:
+    """Le miniature di Cambia che hanno senso in questa scena, nell'ordine delle righe."""
+    return [v for v in VARIAZIONI.values() if scena in v.scene]
+
+
+def variazione(identificativo: object, scena: str) -> Variazione:
+    """La variazione scelta, se esiste ed e' di questa scena."""
+    trovata = VARIAZIONI.get(identificativo) if isinstance(identificativo, str) else None
+    if trovata is None:
+        raise SceltaNonValida(
+            f"\"{identificativo}\" non e' una miniatura di Cambia.",
+            "Scegli una delle miniature di «Ora del giorno» o «Tempo e mood».",
+        )
+    if scena not in trovata.scene:
+        raise SceltaNonValida(
+            f"«{trovata.nome}» non vale per questa scena.",
+            "Scegli una delle miniature che Cambia mostra per questa immagine.",
+        )
+    return trovata
+
+
+# --- Popola: persone, alberi, auto (bozza 15, 2026-11-09) -----------------------
+
+# Due modi di dire dove: «Dipingo io» (pennello verde del Ritocca, la frase
+# diventa la nota di ogni tratto) e «Decide il modello» (un passo a parole su
+# tutta l'immagine, con le regole su dove metterle). La scala delle persone
+# si lega a porte e piani: e' il punto dove Nano Banana sbaglia di piu', da
+# provare. Testi mai provati con il modello.
+PERSONE_POPOLA = "persone"
+ALBERI_POPOLA = "alberi"
+AUTO_POPOLA = "auto"
+
+
+@dataclass(frozen=True)
+class CosaPopola:
+    """Cosa mette Popola: il nome, il soggetto per ogni quantita', come stanno e dove."""
+
+    identificativo: str
+    nome: str
+    # quante -> il soggetto in inglese, con il numero dentro.
+    soggetti: dict
+    descrizione: str
+    # come -> le parole del movimento; vuoto se non si muove.
+    modi: dict
+    # Dove li mette il modello quando decide lui, per scena.
+    dove: dict
+    # Lo stesso dove, come lo legge l'utente prima di applicare.
+    dove_nome: dict
+    scene: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        controlla_etichetta(self.nome, f"il nome di Popola {self.identificativo}")
+        for testo in self.dove_nome.values():
+            controlla_etichetta(testo, f"il dove di Popola {self.identificativo}")
+
+
+QUANTE_POPOLA = {"poche": "Poche", "alcune": "Alcune", "molte": "Molte"}
+COME_POPOLA = {"ferme": "Ferme", "movimento": "In movimento"}
+
+COSE_POPOLA = {c.identificativo: c for c in (
+    CosaPopola(
+        PERSONE_POPOLA, "Persone",
+        {"poche": "two or three people", "alcune": "five to eight people", "molte": "about fifteen people"},
+        "ordinary adults in contemporary everyday clothes, scaled to the doors and floor heights, "
+        "lit from the same direction as the scene, each casting a soft shadow on the ground",
+        {"ferme": "standing or sitting still", "movimento": "walking naturally, with a very slight motion blur"},
+        {ESTERNO: "on the paths, terraces and near the entrances, never in front of the main facade",
+         INTERNO: "in the free floor areas and at the tables, never blocking the main view of the room"},
+        {ESTERNO: "sui percorsi, sulle terrazze e vicino agli ingressi, mai davanti alla facciata principale",
+         INTERNO: "nei passaggi liberi e ai tavoli, mai davanti alla vista principale della stanza"},
+        (ESTERNO, INTERNO),
+    ),
+    CosaPopola(
+        ALBERI_POPOLA, "Alberi",
+        {"poche": "one or two trees", "alcune": "three to five trees", "molte": "a row of eight to ten trees"},
+        "native deciduous species of believable size for a planting about ten years old, trunks "
+        "rooted in the ground, foliage lit like the rest of the scene, shadows following the sun "
+        "direction, not covering windows or the main entrance",
+        {},
+        {ESTERNO: "along the edges of the plot, the paths and the street, never in front of windows "
+                  "or the main entrance"},
+        {ESTERNO: "ai bordi del lotto, lungo i percorsi e la strada, mai davanti alle finestre o all'ingresso"},
+        (ESTERNO,),
+    ),
+    CosaPopola(
+        AUTO_POPOLA, "Auto",
+        {"poche": "one or two cars", "alcune": "three or four cars", "molte": "six to eight cars"},
+        "recent unbranded European models in muted colours, correct perspective and size for the "
+        "street, reflections and shadows consistent with the sky",
+        {"ferme": "parked", "movimento": "moving slowly along the road, with a slight motion blur"},
+        {ESTERNO: "only on roads, driveways and parking spaces, never on lawns or paths"},
+        {ESTERNO: "solo su strade, passi carrai e parcheggi, mai sul prato o sui percorsi"},
+        (ESTERNO,),
+    ),
+)}
+
+
+def _popola(cosa: object, quante: object, come: object, scena: str) -> tuple[CosaPopola, str, str]:
+    voce = COSE_POPOLA.get(cosa) if isinstance(cosa, str) else None
+    if voce is None or scena not in voce.scene:
+        validi = [c.nome.lower() for c in COSE_POPOLA.values() if scena in c.scene]
+        raise SceltaNonValida(
+            f"Popola non sa mettere \"{cosa}\" in questa scena.",
+            f"Scegli fra {', '.join(validi)}." if validi else "Popola non vale per un pezzo d'arredo.",
+        )
+    if quante not in voce.soggetti:
+        raise SceltaNonValida(f"\"{quante}\" non e' una quantita' di Popola.", "Scegli poche, alcune o molte.")
+    if voce.modi and come not in voce.modi:
+        raise SceltaNonValida(f"\"{come}\" non dice come stanno.", "Scegli ferme o in movimento.")
+    return voce, str(quante), str(come) if voce.modi else ""
+
+
+def _soggetto_popola(voce: CosaPopola, quante: str, come: str) -> str:
+    pezzi = [voce.soggetti[quante], voce.descrizione]
+    if come:
+        pezzi.insert(1, voce.modi[come])
+    return ", ".join(pezzi)
+
+
+def nota_popola(cosa: object, quante: object, come: object, scena: str = ESTERNO) -> str:
+    """La nota di ogni tratto verde di «Dipingo io»: cosa aggiungere dentro l'area."""
+    voce, quante, come = _popola(cosa, quante, come, scena)
+    return f"{_soggetto_popola(voce, quante, come)}; do not change anything outside the marked area"
+
+
+def richiesta_popola(cosa: object, quante: object, come: object, scena: str = ESTERNO) -> str:
+    """La richiesta di «Decide il modello»: cosa aggiungere e dove, su tutta l'immagine."""
+    voce, quante, come = _popola(cosa, quante, come, scena)
+    return f"add {_soggetto_popola(voce, quante, come)}, placed {voce.dove[scena]}"
+
+
+def nome_popola(cosa: str, quante: str, come: str) -> str:
+    """Come lo Studio chiama un Popola: «Popola · persone, poche, ferme»."""
+    voce = COSE_POPOLA[cosa]
+    pezzi = [voce.nome.lower(), QUANTE_POPOLA[quante].lower()]
+    if voce.modi and come:
+        pezzi.append(COME_POPOLA[come].lower())
+    return f"Popola · {', '.join(pezzi)}"
+
+
+def _nomi_richieste() -> dict[str, str]:
+    nomi = {v.testo: f"Cambia · {v.nome}" for v in VARIAZIONI.values()}
+    for voce in COSE_POPOLA.values():
+        for scena in voce.scene:
+            for quante in voce.soggetti:
+                for come in (voce.modi or {"": ""}):
+                    nome = nome_popola(voce.identificativo, quante, come)
+                    nomi[nota_popola(voce.identificativo, quante, come, scena)] = nome
+                    nomi[richiesta_popola(voce.identificativo, quante, come, scena)] = nome
+    return nomi
+
+
+_NOMI_RICHIESTE = _nomi_richieste()
+
+
+def nome_richiesta(testo: object) -> str | None:
+    """Il nome in italiano di una richiesta scritta da una miniatura o da Popola, None se scritta a mano."""
+    return _NOMI_RICHIESTE.get(" ".join(str(testo or "").split()).rstrip("."))

@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 14 (2026-11-04)
+# Blocchi di stile — bozza 15 (2026-11-09)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -368,3 +368,39 @@ Fino a 4 immagini (Rif. 1-4) di oggetti o persone da mettere nell'immagine di pa
 Da 2 a 4 render d'esempio (`ESEMPI_STILE_MASSIMO`) al posto del riferimento singolo per lo stile: il primo è il riferimento, gli altri partono subito dopo. La frase sostituisce quella del riferimento; `{ultima}` è il numero dell'ultimo esempio. Testo scelto, non provato con il modello.
 
 > Images 2 to {ultima} are example renders of the style to match: take from them what they have in common, the colour grading, the light, the look of the materials, the photographic treatment and the level of detail. Do not copy their buildings, cameras, objects or compositions; the building and the viewpoint stay the ones in the first image.
+
+## Cambia: ora e mood (bozza 15, 2026-11-09)
+
+Le sei scorciatoie a parole di Cambia (Notte, Tramonto, Nuvoloso, Pioggia, Neve, Luci accese) diventano miniature in due righe, «Ora del giorno» e «Tempo e mood», con Alba, Mattino, Mezzogiorno, Ora blu, Nebbia, Drammatico e Nordico in più (scheda «Preset nuovi» della pagina Flussi). Ogni miniatura è una richiesta di un passo: entra dopo «Change:» con la regola dei passi, come una richiesta scritta a mano; il campo libero, se scritto, si aggiunge a ogni miniatura. Più miniature scelte = un invio per miniatura. **Nessuna provata con il modello.**
+
+| id | Riga | Nome in UI | Scene | Testo per il modello |
+|---|---|---|---|---|
+| `alba` | Ora del giorno | Alba | esterno, interno | only the time of day, to early sunrise: low warm sun just above the horizon from the side, soft peach and pale blue sky, long gentle shadows, a thin morning haze in the distance; keep the building, every material, every object and the camera exactly as they are |
+| `mattino` | Ora del giorno | Mattino | esterno, interno | only the time of day, to mid-morning: clear fresh daylight from the side, light blue sky, crisp defined shadows of medium length, neutral white balance; keep the building, every material, every object and the camera exactly as they are |
+| `mezzogiorno` | Ora del giorno | Mezzogiorno | esterno, interno | only the time of day, to midday: high bright sun, deep blue sky, short hard shadows under eaves and balconies, saturated but natural colours; keep the building, every material, every object and the camera exactly as they are |
+| `tramonto` | Ora del giorno | Tramonto | esterno, interno | only the time of day, to sunset: warm low raking light, long shadows, orange and pink sky fading to blue, warm reflections on the glazing; keep the building, every material, every object and the camera exactly as they are |
+| `ora_blu` | Ora del giorno | Ora blu | esterno, interno | only the time of day, to blue hour about twenty minutes after sunset: deep cobalt sky with a faint warm glow at the horizon, interior lights on at 3000 K glowing through the glazing, soft ambient light with no hard shadows; keep the building, every material, every object and the camera exactly as they are |
+| `notte` | Ora del giorno | Notte | esterno, interno | only the time of day, to night: dark sky, artificial lights switched on, light and reflections coming only from the lamps, deep soft shadows; keep the building, every material, every object and the camera exactly as they are |
+| `nuvoloso` | Tempo e mood | Nuvoloso | esterno, interno | only the weather, to an overcast day: even soft diffuse light, light grey sky, faint shadows, calm neutral tones; keep the building, every material, every object and the camera exactly as they are |
+| `pioggia` | Tempo e mood | Pioggia | esterno | only the weather, to light rain: grey sky, wet reflective ground and surfaces, small puddles, soft diffuse light; keep the building, every material, every object and the camera exactly as they are |
+| `neve` | Tempo e mood | Neve | esterno | only the season, to winter with fresh snow on the ground, roofs and horizontal surfaces, cold bright light, bare trees; keep the building, every material, every object and the camera exactly as they are |
+| `nebbia` | Tempo e mood | Nebbia | esterno | only the weather, to a still foggy morning: dense soft fog that fades the background and the trees behind the building, diffuse grey-white light, no shadows, damp ground with faint reflections; the building stays sharp and readable in the foreground; keep the building, every material, every object and the camera exactly as they are |
+| `drammatico` | Tempo e mood | Drammatico | esterno | only the mood, to dramatic late afternoon: low sun from the side raking across the facade, long crisp shadows, dark storm clouds breaking behind the building with bright gaps of light, strong local contrast in the sky; keep the building, every material, every object and the camera exactly as they are |
+| `nordico` | Tempo e mood | Nordico | esterno, interno | only the light, to a clear Scandinavian day in early spring: cool bright daylight, pale clear sky, crisp air, low-saturation colours, soft but defined shadows; keep the building, every material, every object and the camera exactly as they are |
+| `luci_accese` | Tempo e mood | Luci accese | esterno, interno | switch on all the artificial lights, warm 3000 K, glowing through the glazing and onto nearby surfaces; keep the daylight as it is and keep the building, every material, every object and the camera exactly as they are |
+
+## Popola (bozza 15, 2026-11-09)
+
+Persone, alberi, auto; quante (poche, alcune, molte); ferme o in movimento (persone e auto). Due modi di dire dove. **Dipingo io**: col pennello verde del Ritocca; la frase sotto diventa la nota di ogni tratto, nella riga «Area N (add this inside the area, keep what is around it)». **Decide il modello**: un passo a parole su tutta l'immagine, con la frase «placed …» della scena. Alberi e auto solo negli esterni. Mai provati: la scala delle persone, legata a porte e piani, è il punto dove Nano Banana sbaglia di più.
+
+Esempio, Dipingo io, persone poche ferme:
+
+> two or three people, standing or sitting still, ordinary adults in contemporary everyday clothes, scaled to the doors and floor heights, lit from the same direction as the scene, each casting a soft shadow on the ground; do not change anything outside the marked area
+
+Esempio, Decide il modello, auto alcune in movimento:
+
+> add three or four cars, moving slowly along the road, with a slight motion blur, recent unbranded European models in muted colours, correct perspective and size for the street, reflections and shadows consistent with the sky, placed only on roads, driveways and parking spaces, never on lawns or paths
+
+- **Persone**: poche = «two or three people»; alcune = «five to eight people»; molte = «about fifteen people». Poi: «ordinary adults in contemporary everyday clothes, scaled to the doors and floor heights, lit from the same direction as the scene, each casting a soft shadow on the ground». Come: ferme = «standing or sitting still»; movimento = «walking naturally, with a very slight motion blur». Dove, se decide il modello: esterno «on the paths, terraces and near the entrances, never in front of the main facade»; interno «in the free floor areas and at the tables, never blocking the main view of the room».
+- **Alberi**: poche = «one or two trees»; alcune = «three to five trees»; molte = «a row of eight to ten trees». Poi: «native deciduous species of believable size for a planting about ten years old, trunks rooted in the ground, foliage lit like the rest of the scene, shadows following the sun direction, not covering windows or the main entrance». Dove, se decide il modello: esterno «along the edges of the plot, the paths and the street, never in front of windows or the main entrance».
+- **Auto**: poche = «one or two cars»; alcune = «three or four cars»; molte = «six to eight cars». Poi: «recent unbranded European models in muted colours, correct perspective and size for the street, reflections and shadows consistent with the sky». Come: ferme = «parked»; movimento = «moving slowly along the road, with a slight motion blur». Dove, se decide il modello: esterno «only on roads, driveways and parking spaces, never on lawns or paths».

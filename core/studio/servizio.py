@@ -532,6 +532,19 @@ class Studio:
             "varianti_massime": config.VARIANTI_MASSIME,
             "prompt_completo": self.prompt_completo(),
             "inserti_massimi": config.INSERTI_MASSIMO,
+            "cambia": {
+                "massime": config.CAMBIA_SCELTE_MASSIME,
+                "gruppi": [{"id": g, "nome": n} for g, n in blocchi.GRUPPI_VARIAZIONI.items()],
+                "voci": [{"id": v.identificativo, "gruppo": v.gruppo, "nome": v.nome, "scene": list(v.scene)}
+                         for v in blocchi.VARIAZIONI.values()],
+            },
+            "popola": {
+                "cose": [{"id": c.identificativo, "nome": c.nome, "scene": list(c.scene), "si_muove": bool(c.modi),
+                          "dove": c.dove_nome}
+                         for c in blocchi.COSE_POPOLA.values()],
+                "quante": [{"id": k, "nome": v} for k, v in blocchi.QUANTE_POPOLA.items()],
+                "come": [{"id": k, "nome": v} for k, v in blocchi.COME_POPOLA.items()],
+            },
             "esempi_stile_massimi": config.ESEMPI_STILE_MASSIMO,
             "finale": {
                 "modello": self._modello_dict(MODELLO_FINALE),
@@ -1670,6 +1683,8 @@ class Studio:
             "strada": ["0"] + [str(p.get("numero")) for p in strada],
             "nome": _nome_passo(passo),
             "tipo": _tipo_passo(passo),
+            # Cambia e Popola mostrano solo le voci che valgono per la scena.
+            "scena": self._scena(albero, passo),
             "modello": passo.get("modello"),
             "modello_nome": modello.nome if modello else passo.get("modello"),
             "creato_il": passo.get("creato_il"),
@@ -1724,37 +1739,88 @@ class Studio:
                 return p["scena"]
         return blocchi.ESTERNO
 
+    def _invii_del_passo(self, dati: dict, scena: str) -> list[tuple[str, list[str]]]:
+        """Gli invii di un passo: (nome, richieste) per ognuno.
+
+        Una richiesta a parole e' un invio. Con `variazioni` (le miniature di
+        Cambia) e' un invio per miniatura, con il testo libero in piu' in
+        ognuno. Con `popola` («Decide il modello») e' un invio con la frase di
+        Popola. Tutto si controlla qui, prima che parta il primo.
+        """
+        testo = str(dati.get("testo") or "")
+        popola = dati.get("popola")
+        if popola is not None:
+            if not isinstance(popola, dict):
+                raise RichiestaStudioNonValida("Popola non dice cosa mettere.", "Scegli persone, alberi o auto.")
+            cosa, quante, come = popola.get("cosa"), popola.get("quante"), popola.get("come")
+            richiesta = blocchi.richiesta_popola(cosa, quante, come, scena)
+            return [(blocchi.nome_popola(cosa, quante, come), [richiesta])]
+        scelte = dati.get("variazioni")
+        if not scelte:
+            return [(modulo_passi.nome_breve(testo), [testo])]
+        if not isinstance(scelte, list) or len(set(map(str, scelte))) != len(scelte):
+            raise RichiestaStudioNonValida(
+                "Le miniature di Cambia arrivano doppie o non in un elenco.",
+                "Ricarica lo Studio e scegli di nuovo le miniature.")
+        massime = config.CAMBIA_SCELTE_MASSIME
+        if len(scelte) > massime:
+            raise RichiestaStudioNonValida(
+                f"Hai scelto {len(scelte)} miniature: Cambia ne manda al massimo {massime} per clic.",
+                f"Togli {len(scelte) - massime} miniature, oppure applica in due volte.")
+        extra = [testo] if testo.strip() else []
+        return [(f"Cambia · {v.nome}", [v.testo, *extra])
+                for v in (blocchi.variazione(i, scena) for i in scelte)]
+
     def componi_passo(self, dati: dict) -> dict:
-        """Il prompt di un passo nuovo, da mostrare prima dell'invio."""
+        """Il prompt di un passo nuovo, da mostrare prima dell'invio: uno per invio, se sono piu' d'uno."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         albero = self._albero(vista)
         passo, _render = self._passo_di_partenza(albero, dati.get("da"))
-        prompt = blocchi.componi_richieste(self._scena(albero, passo), [str(dati.get("testo") or "")])
+        scena = self._scena(albero, passo)
         inserti = self._inserti_scelti(dati)
-        prompt = blocchi.aggiungi_inserti(prompt, modulo_coda.prima_immagine_inserti(False, False, 0), len(inserti))
-        return {
-            "prompt": prompt,
-            "caratteri": len(prompt),
+        prompts = []
+        for nome, richieste in self._invii_del_passo(dati, scena):
+            prompt = blocchi.aggiungi_inserti(blocchi.componi_richieste(scena, richieste),
+                                              modulo_coda.prima_immagine_inserti(False, False, 0), len(inserti))
+            prompts.append({"nome": nome, "prompt": prompt, "caratteri": len(prompt)})
+        risposta = {
+            "prompt": prompts[0]["prompt"],
+            "caratteri": prompts[0]["caratteri"],
+            "prompts": prompts,
+            "invii": len(prompts),
+            "scena": scena,
             "da_numero": str(passo.get("numero")),
             "ramo_nuovo": bool(albero.figli(passo["identificativo"])),
             "generazioni": albero.generazioni(passo["identificativo"]) + 1,
         }
+        if dati.get("modello"):
+            risposta["costo"] = testo_costo(self._modello(str(dati["modello"])), len(prompts))
+        return risposta
 
     def invia_passo(self, dati: dict) -> dict:
-        """Un passo nuovo dal render di un passo: la richiesta a parole, sul suo render."""
+        """Un passo nuovo dal render di un passo, o uno per miniatura: tutti figli dello stesso render."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
         albero = self._albero(vista)
         passo, render = self._passo_di_partenza(albero, dati.get("da"))
+        scena = self._scena(albero, passo)
+        invii = self._invii_del_passo(dati, scena)
+        for _nome, richieste in invii:
+            blocchi.componi_richieste(scena, richieste)  # una richiesta vuota si ferma prima del primo invio
         inserti = self._inserti_scelti(dati)
         destinazione = self.destinazione(str(dati.get("modello") or ""), inserti=len(inserti))
-        return self._metti_in_coda(
-            vista, blocchi.Scelte(scena=self._scena(albero, passo)), destinazione,
-            mostrata=dati.get("destinazione_mostrata"),
-            preset=None, prompt_a_mano=None,
-            parte_da=passo["identificativo"], partenza=render,
-            richieste=[str(dati.get("testo") or "")],
-            inserti=inserti,
-        )
+        risposte = [
+            self._metti_in_coda(
+                vista, blocchi.Scelte(scena=scena), destinazione,
+                mostrata=dati.get("destinazione_mostrata"),
+                preset=None, prompt_a_mano=None,
+                parte_da=passo["identificativo"], partenza=render,
+                richieste=richieste,
+                inserti=inserti,
+            )
+            for _nome, richieste in invii
+        ]
+        return {**risposte[0], "identificativi": [r["identificativo"] for r in risposte],
+                "nomi": [nome for nome, _r in invii]}
 
     def _unione(self, albero: modulo_passi.Albero, identificativo: str) -> dict:
         """Le richieste della strada di un passo, unite per un invio solo dalla vista."""
@@ -1836,7 +1902,9 @@ class Studio:
         passo, render = self._passo_di_partenza(albero, dati.get("da"))
         try:
             elenco = dati.get("aree")
-            if "testo" in dati:
+            if dati.get("popola") is not None:
+                elenco = self._aree_popola(dati.get("popola"), elenco, self._scena(albero, passo))
+            elif "testo" in dati:
                 elenco = modulo_aree.da_testo(dati.get("testo"), elenco)
             aree = modulo_aree.da_elenco(elenco)
         except modulo_aree.AreaNonValida as errore:
@@ -1848,6 +1916,23 @@ class Studio:
                     f"La nota {numero} usa il Rif. {area.inserto}, che non c'e'.",
                     "Aggiungi l'immagine alla nota, oppure togli il Rif. dalla nota.")
         return vista, albero, passo, render, aree
+
+    @staticmethod
+    def _aree_popola(popola: object, elenco: object, scena: str) -> list[dict]:
+        """«Popola · Dipingo io»: ogni tratto verde prende la frase di Popola come nota."""
+        if not isinstance(popola, dict):
+            raise RichiestaStudioNonValida("Popola non dice cosa mettere.", "Scegli persone, alberi o auto.")
+        nota = blocchi.nota_popola(popola.get("cosa"), popola.get("quante"), popola.get("come"), scena)
+        if not isinstance(elenco, list) or not elenco:
+            raise modulo_aree.AreaNonValida(
+                "Popola non ha ancora dove: nessun tratto verde.",
+                "Passa il pennello verde dove le vuoi, oppure scegli «Decide il modello».")
+        if not all(isinstance(a, dict) and a.get("forma") == "pennello" and a.get("azione") == modulo_aree.AGGIUNGI
+                   for a in elenco):
+            raise modulo_aree.AreaNonValida(
+                "Popola dipinge solo col pennello verde (aggiungi).",
+                "Togli le altre aree, oppure esci da Popola e usa il Ritocca con il testo.")
+        return [{**a, "nota": nota} for a in elenco]
 
     def componi_ritocco(self, dati: dict) -> dict:
         """Il prompt di un ritocco, da mostrare prima di Applica."""
@@ -2162,10 +2247,19 @@ def _nome_passo(passo: dict) -> str:
     tipo = _tipo_passo(passo)
     if tipo == "ritocco":
         note = _richieste_del_passo(passo)
+        nomi = {blocchi.nome_richiesta(n) for n in note}
+        if len(nomi) == 1 and None not in nomi:
+            # Popola · Dipingo io: la stessa frase in ogni tratto verde.
+            return f"{nomi.pop()} · {'1 area' if len(note) == 1 else f'{len(note)} aree'}"
         quante = "1 nota" if len(note) == 1 else f"{len(note)} note"
         return modulo_passi.nome_breve(f"Ritocco · {quante} · {note[0] if note else ''}")
     if tipo == "passo":
-        breve = modulo_passi.nome_breve((passo.get("richieste") or [""])[0])
+        richieste = passo.get("richieste") or [""]
+        nome = blocchi.nome_richiesta(richieste[0])
+        if nome:
+            # Una miniatura di Cambia o Popola: il nome italiano, piu' il testo libero se c'e'.
+            return modulo_passi.nome_breve(" + ".join([nome, *richieste[1:]]))
+        breve = modulo_passi.nome_breve(richieste[0])
         return breve[:1].upper() + breve[1:] if breve else "Passo senza richiesta"
     if tipo == "pulito":
         return f"Tutto dalla vista · {_nome_stile(passo)}"
@@ -2183,7 +2277,7 @@ def _riassunto_passo(passo: dict, padre: dict | None) -> str:
             f"area {i}, {n}" for i, n in enumerate(note, start=1))
     if tipo == "passo":
         numero = padre.get("numero") if padre else "?"
-        return f"Dal passo {numero}: " + "; ".join(richieste)
+        return f"Dal passo {numero}: " + "; ".join(blocchi.nome_richiesta(r) or r for r in richieste)
     try:
         testo = riassunto(blocchi.Scelte.da_dizionario(passo.get("scelte") or {}), passo.get("preset"))
     except ErroreAirender:

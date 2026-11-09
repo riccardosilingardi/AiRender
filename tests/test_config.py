@@ -469,6 +469,13 @@ def test_ogni_costante_dichiarata_ha_un_test_che_nomina_il_suo_caso():
     assert not mancanti, f"costanti senza un test che le nomini: {mancanti}"
 
 
+def test_cambia_scelte_massime_sta_dentro_una_riga_di_miniature():
+    """Caso: CAMBIA_SCELTE_MASSIME a 0 spegne Cambia, a 20 un clic costa venti render senza vederlo."""
+    from core import blocchi
+    assert 1 <= config.CAMBIA_SCELTE_MASSIME <= len(blocchi.variazioni(blocchi.ESTERNO))
+    assert config.costante("CAMBIA_SCELTE_MASSIME").origine == config.SCELTA
+
+
 def test_lo_spessore_iniziale_del_pennello_sta_dentro_i_suoi_limiti():
     """Caso: PENNELLO_SPESSORE fuori da PENNELLO_SPESSORI, e il primo tratto si rifiuta."""
     sottile, grosso = config.PENNELLO_SPESSORI

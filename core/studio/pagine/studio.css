@@ -590,3 +590,33 @@ input.codice.sbagliato { border-color: var(--errore); }
 #curva-regola .linea-curva { fill: none; stroke: var(--testo); stroke-width: 2; }
 #curva-regola .punto-curva { fill: var(--accento); stroke: var(--testo); stroke-width: 1.5; cursor: grab; }
 #curva-regola .punto-curva:focus { outline: none; stroke-width: 3; }
+
+/* Cambia: miniature di ora e mood (2026-11-09). Disegni, non render. */
+.gruppo-mini { display: flex; flex-direction: column; gap: 6px; }
+.miniature-cambia { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.mini-cambia {
+  display: grid; gap: 4px; padding: 3px; font: inherit; font-size: 12px; text-align: left;
+  color: var(--testo-2); background: none; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+}
+.mini-cambia:hover { border-color: var(--bordo-forte); }
+.mini-cambia[aria-pressed="true"] { border-color: var(--accento); background: var(--scelto); color: var(--testo); }
+.mini-cambia:disabled { opacity: .45; cursor: not-allowed; }
+.quadro-mini { display: block; aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden; background: var(--pannello-2); }
+.quadro-mini svg { width: 100%; height: 100%; display: block; }
+
+/* Passi: la griglia dei fratelli, per confrontare le scelte di un Cambia. */
+.griglia-confronto { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.cella-griglia {
+  margin: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px; font: inherit; text-align: left;
+  color: var(--testo-2); background: var(--pannello); border: 1px solid var(--bordo); border-radius: 10px; cursor: pointer;
+}
+.cella-griglia.partenza { cursor: default; border-style: dashed; }
+.cella-griglia[aria-current="true"] { border-color: var(--accento); background: var(--scelto); color: var(--testo); }
+.cella-griglia img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; border-radius: 6px; }
+.posto-griglia {
+  display: grid; place-items: center; aspect-ratio: 16 / 10; border-radius: 6px; color: var(--tenue);
+  background: repeating-linear-gradient(135deg, var(--tratteggio-1) 0 6px, var(--tratteggio-2) 6px 12px);
+}
+
+/* Popola: una riga per scelta. */
+.riga-popola { display: flex; flex-direction: column; gap: 4px; }
