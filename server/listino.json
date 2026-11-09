@@ -19,6 +19,7 @@
   "pesi_azioni": {
     "finale_x2": 2,
     "finale_x4": 4,
+    "tieni_geometria": 1,
     "video_1080p_al_secondo": 8,
     "video_720p_al_secondo": 4
   },

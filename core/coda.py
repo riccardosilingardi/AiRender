@@ -864,9 +864,9 @@ def dire_sicuro(testo: str) -> None:
         pass  # uscita chiusa: il messaggio e' solo informativo
 
 
-def _geometria_reale(controlla: Callable[[], None]) -> "modulo_geometria.Geometria":
+def _geometria_reale(controlla: Callable[[], None], provider: str = "") -> "modulo_geometria.Geometria":
     from .provider.trasporto import TrasportoHTTP  # pylint: disable=import-outside-toplevel
-    return modulo_geometria.Geometria(TrasportoHTTP(), controlla=controlla)
+    return modulo_geometria.crea(provider, TrasportoHTTP(), controlla=controlla)
 
 
 class Coda:
@@ -878,7 +878,7 @@ class Coda:
         crea_provider: Callable[[str], Provider] = registro.crea,
         dire: Callable[[str], None] = dire_sicuro,
         attesa: Callable[[float], None] = time.sleep,
-        crea_geometria: Callable[[Callable[[], None]], "modulo_geometria.Geometria"] | None = None,
+        crea_geometria: Callable[[Callable[[], None], str], "modulo_geometria.Geometria"] | None = None,
     ) -> None:
         self.radice = Path(radice)
         self.percorsi = cartelle(self.radice)
@@ -1046,7 +1046,8 @@ class Coda:
     def _prima_passata(self, lavoro: Lavoro, richiesta: RichiestaGenerazione, motore: Provider,
                        avanzamento: Callable[[str], None]) -> tuple[RichiestaGenerazione, dict]:
         """«Tieni la geometria»: il workflow col ControlNet, poi il suo render parte al posto della vista."""
-        geometria = self._crea_geometria(lambda: avanzamento(INVIATO))
+        # Coi crediti AIRENDER passa dal server; con la chiave propria va al deployment.
+        geometria = self._crea_geometria(lambda: avanzamento(INVIATO), lavoro.provider)
         annunciata = geometria.destinazione()
         if annunciata != lavoro.destinazione_geometria:
             raise LavoroNonValido(

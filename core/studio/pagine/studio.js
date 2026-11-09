@@ -1100,9 +1100,20 @@ async function scegliRiferimento(file) {
   render();
 }
 // «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
-// La prima passata gira su un workflow del Comfy Developer Platform pagato
-// con la chiave Comfy propria: coi crediti AIRENDER non passa (ne' sul PC ne' sul web).
-function geometriaPossibile() { return usaComfy(); }
+// La prima passata gira su un workflow della Comfy Developer Platform: con la
+// chiave Comfy propria sempre; coi crediti AIRENDER (PC e web) se il piano la
+// comprende (funzioni.tieni_geometria, oggi solo Studio). Il server lo
+// ricontrolla comunque prima di riservare.
+function geometriaCoiCrediti() {
+  const s = S.licenza && S.licenza.presente && S.licenza.saldo;
+  return !!(s && s.funzioni && s.funzioni.tieni_geometria);
+}
+function geometriaPossibile() { return usaComfy() || geometriaCoiCrediti(); }
+function perchéGeometriaSpenta() {
+  const s = S.licenza && S.licenza.presente && S.licenza.saldo;
+  if (s) return `Il piano ${nomePiano(s)} non comprende «Tieni la geometria»: è nel piano Studio, oppure con una chiave Comfy tua.`;
+  return "Per sapere se il tuo piano comprende «Tieni la geometria» serve il saldo dal server AIRENDER: apri la scheda Licenza.";
+}
 function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
 function pannelloGeometria() {
@@ -1111,8 +1122,7 @@ function pannelloGeometria() {
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
-    possibile ? null : h("p", { classe: "tenue piccolo" },
-      "Serve una chiave Comfy tua: la prima passata gira su un workflow Comfy che i crediti AIRENDER non coprono, quindi coi crediti non si può spuntare."),
+    possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
       "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
       "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."));

@@ -1,0 +1,194 @@
+{
+  "forza": 0.8,
+  "lato_massimo": 1536,
+  "nodi": {
+    "campionatore": "9",
+    "forza": "8",
+    "immagine": "1",
+    "lato": "2",
+    "prompt": "6"
+  },
+  "nome": "Z-Image-Turbo + ControlNet sugli spigoli",
+  "passi": 8,
+  "workflow": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "vista.png"
+      }
+    },
+    "10": {
+      "class_type": "ModelPatchLoader",
+      "inputs": {
+        "name": "Z-Image-Turbo-Fun-Controlnet-Union.safetensors"
+      }
+    },
+    "11": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "shift": 3
+      }
+    },
+    "12": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "6",
+          0
+        ]
+      }
+    },
+    "13": {
+      "class_type": "GetImageSize",
+      "inputs": {
+        "image": [
+          "3",
+          0
+        ]
+      }
+    },
+    "14": {
+      "class_type": "EmptySD3LatentImage",
+      "inputs": {
+        "batch_size": 1,
+        "height": [
+          "13",
+          1
+        ],
+        "width": [
+          "13",
+          0
+        ]
+      }
+    },
+    "15": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "7",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "airender-geometria",
+        "images": [
+          "15",
+          0
+        ]
+      }
+    },
+    "2": {
+      "class_type": "ImageScaleToMaxDimension",
+      "inputs": {
+        "image": [
+          "1",
+          0
+        ],
+        "largest_size": 1536,
+        "upscale_method": "lanczos"
+      }
+    },
+    "3": {
+      "class_type": "Canny",
+      "inputs": {
+        "high_threshold": 0.32,
+        "image": [
+          "2",
+          0
+        ],
+        "low_threshold": 0.1
+      }
+    },
+    "4": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "z_image_turbo_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "5": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen_3_4b.safetensors",
+        "device": "default",
+        "type": "lumina2"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "5",
+          0
+        ],
+        "text": "architectural photograph of the building"
+      }
+    },
+    "7": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "ae.safetensors"
+      }
+    },
+    "8": {
+      "class_type": "QwenImageDiffsynthControlnet",
+      "inputs": {
+        "image": [
+          "3",
+          0
+        ],
+        "model": [
+          "4",
+          0
+        ],
+        "model_patch": [
+          "10",
+          0
+        ],
+        "strength": 0.8,
+        "vae": [
+          "7",
+          0
+        ]
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "cfg": 1,
+        "denoise": 1,
+        "latent_image": [
+          "14",
+          0
+        ],
+        "model": [
+          "11",
+          0
+        ],
+        "negative": [
+          "12",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "sampler_name": "res_multistep",
+        "scheduler": "simple",
+        "seed": 0,
+        "steps": 8
+      }
+    }
+  }
+}
