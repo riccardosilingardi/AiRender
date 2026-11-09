@@ -575,3 +575,18 @@ input.codice.sbagliato { border-color: var(--errore); }
 .geometria p { margin: 0; }
 .geometria.spento b { color: var(--spento); }
 .geometria.spento input { cursor: not-allowed; }
+
+/* --- Regola: luce e colore prima di esportare ----------------------------------- */
+.regola { padding: 10px 0 12px; border-bottom: 1px solid var(--bordo); margin-bottom: 4px; }
+.regola-gratis { color: var(--ok); font-weight: 600; }
+.cursore-regola { display: grid; grid-template-columns: 96px 1fr 40px; gap: 10px; align-items: center; font-size: 13px; color: var(--testo-2); }
+.cursore-regola input[type="range"] { width: 100%; accent-color: var(--accento); }
+.valore-regola { text-align: right; font-size: 12px; }
+.editor-curva { display: flex; flex-direction: column; gap: 6px; }
+#curva-regola { width: 100%; max-width: 260px; aspect-ratio: 1; touch-action: none; cursor: crosshair; }
+#curva-regola .fondo-curva { fill: var(--pannello-2); stroke: var(--bordo-forte); }
+#curva-regola .griglia-curva { stroke: var(--bordo); stroke-width: 1; }
+#curva-regola .diagonale-curva { stroke: var(--bordo-forte); stroke-dasharray: 3 3; }
+#curva-regola .linea-curva { fill: none; stroke: var(--testo); stroke-width: 2; }
+#curva-regola .punto-curva { fill: var(--accento); stroke: var(--testo); stroke-width: 1.5; cursor: grab; }
+#curva-regola .punto-curva:focus { outline: none; stroke-width: 3; }

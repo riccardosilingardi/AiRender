@@ -104,6 +104,7 @@ const SPIEGA_PULSANTI = {
   "Copia immagine": "Copia il render negli appunti, da incollare dove vuoi.",
   "Esporta per il cliente": "Salva il render in JPEG, PNG o PSD a livelli, senza prompt né ricetta.",
   "Esporta": "Salva il file nella cartella «esportati».",
+  "Azzera": "Riporta tutti i cursori a 0 e la curva diritta.",
   "Chiudi": "Chiude il riquadro. Non parte niente.",
   "Applica": "Manda questa immagine e la richiesta al servizio scritto sopra. Esce un passo nuovo.",
   "Genera video": "Manda le immagini al servizio video scritto sopra.",
@@ -1553,12 +1554,14 @@ function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
   });
   const proporzioni = () => {
     if (!imgA.naturalWidth || !imgB.naturalWidth) return;
-    palco.style.aspectRatio = `${imgB.naturalWidth} / ${imgB.naturalHeight}`;
-    const ra = imgA.naturalWidth / imgA.naturalHeight, rb = imgB.naturalWidth / imgB.naturalHeight;
+    // L'anteprima di Regola e' piu' piccola del render: la misura vera la porta data-larghezza.
+    const lb = Number(imgB.dataset.larghezza) || imgB.naturalWidth, ab = Number(imgB.dataset.altezza) || imgB.naturalHeight;
+    palco.style.aspectRatio = `${lb} / ${ab}`;
+    const ra = imgA.naturalWidth / imgA.naturalHeight, rb = lb / ab;
     const scarto = Math.abs(ra - rb) / rb;
     nota.textContent = scarto < 0.005
-      ? `${nomeA} riportata a ${imgB.naturalWidth}×${imgB.naturalHeight}, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.`
-      : `${nomeA} (${imgA.naturalWidth}×${imgA.naturalHeight}) stirata a ${imgB.naturalWidth}×${imgB.naturalHeight} per sovrapporla: le proporzioni differiscono del ${(scarto * 100).toFixed(1).replace(".", ",")}%, gli spigoli possono non coincidere per questo.`;
+      ? `${nomeA} riportata a ${lb}×${ab}, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.`
+      : `${nomeA} (${imgA.naturalWidth}×${imgA.naturalHeight}) stirata a ${lb}×${ab} per sovrapporla: le proporzioni differiscono del ${(scarto * 100).toFixed(1).replace(".", ",")}%, gli spigoli possono non coincidere per questo.`;
   };
   imgA.addEventListener("load", proporzioni);
   imgB.addEventListener("load", proporzioni);
@@ -1570,7 +1573,7 @@ function confronto(l) {
   const altro = r.confronto !== "vista" && r.lavori.find((x) => x.identificativo === r.confronto && x.render);
   const srcA = altro ? `/file/render/${altro.identificativo}` : `/file/vista/${enc(S.vista)}`;
   const nomeA = altro ? altro.modello_nome : "Vista Allplan";
-  const srcB = `/file/render/${l.identificativo}`;
+  const srcB = srcRender(l);
   const sottotitolo = {
     scorri: "Una sola immagine: a sinistra della linea il prima, a destra il render.",
     affiancati: "Le due immagini una accanto all'altra, stesso zoom.",
@@ -1595,8 +1598,11 @@ function confronto(l) {
   } else {
     palco = h("div", { classe: "solo" }, h("img", { src: srcB, alt: `Render ${l.modello_nome}` }));
   }
+  segnaRegolato(palco, srcB, l);
   return h("div", { classe: "palco" },
     h("div", { classe: "riga tra" }, h("h1", { title: sottotitolo }, "È ancora il tuo edificio?"), modi),
+    regolaAttiva(l) ? h("p", { classe: "piccolo", role: "status" },
+      h("span", { classe: "regola-gratis" }, "Con le regolazioni"), " · le vedi qui, il file le prende quando esporti. Tieni premuto «Senza regolazioni» per vedere com'era.") : null,
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Confronta con"), h("div", { stile: "min-width:260px" }, scegliA)),
     palco,
     r.modo === "scorri" ? h("div", { classe: "riga tra" },
@@ -1719,7 +1725,9 @@ const FORMATI_ESPORTA = [
 async function esportaRender(l) {
   const r = S.risultato;
   r.esportando = true; r.esportato = null; render();
-  try { r.esportato = await post(`/api/lavori/${l.identificativo}/esporta`, { formato: r.formato }); S.errore = null; }
+  const corpo = { formato: r.formato };
+  if (regolaAttiva(l)) corpo.regola = regolaPerServer(regolaDi(l.identificativo));
+  try { r.esportato = await post(`/api/lavori/${l.identificativo}/esporta`, corpo); S.errore = null; }
   catch (e) { S.errore = e; }
   r.esportando = false;
   render();
@@ -1728,6 +1736,8 @@ function pannelloEsporta(l) {
   const r = S.risultato;
   const e = r.esportato;
   return h("div", { classe: "sotto-gruppo" },
+    pannelloRegola(l),
+    h("span", { classe: "etichetta" }, "Formato"),
     h("div", { classe: "switch", role: "group", "aria-label": "Formato" },
       FORMATI_ESPORTA.map(([id, nome]) => h("button", {
         classe: "seg", "aria-pressed": String(r.formato === id), onclick: () => { r.formato = id; r.esportato = null; render(); },
@@ -1740,7 +1750,202 @@ function pannelloEsporta(l) {
     e ? h("div", { classe: "avviso", role: "status" },
       h("b", {}, `Salvato: ${e.nome}`),
       h("span", {}, `${e.larghezza} × ${e.altezza} px · ${String(e.peso_mb).replace(".", ",")} MB` +
-        (e.livelli ? ` · ${e.livelli.length} livelli: ${e.livelli.join(", ")}` : ""))) : null);
+        (e.livelli ? ` · ${e.livelli.length} livelli: ${e.livelli.join(", ")}` : "")),
+      h("span", {}, e.regolazioni && e.regolazioni.length
+        ? `Con le regolazioni: ${e.regolazioni.join(", ")}.`
+        : "Senza regolazioni: i pixel del render come sono.")) : null);
+}
+
+// --- Regola: luce e colore prima di esportare (DESIGN.md, Regola) -----------------
+// Sei cursori e una curva, come in Photoshop. I numeri li calcola core/regola.py
+// (sul PC o, nella web app, nel browser): qui c'e' solo l'interfaccia. Nessuna
+// immagine parte, non costa crediti. Le regolazioni restano a ogni render
+// finche' lo Studio e' aperto; il file le prende quando si esporta.
+
+const CURVA_DIRITTA = [[0, 0], [255, 255]];
+const LATO_CURVA = 200;           // px della curva a schermo (scelta di disegno)
+const ATTESA_ANTEPRIMA_MS = 90;   // si chiede l'anteprima quando il cursore si ferma un attimo (scelta)
+const regole = {};                 // identificativo -> { valori, curva, anteprima, ... }
+
+function regolaDi(id) {
+  if (!regole[id]) {
+    const valori = {};
+    for (const c of S.studio.regola.cursori) valori[c.id] = 0;
+    regole[id] = { valori, curva: CURVA_DIRITTA.map((p) => p.slice()), anteprima: null, tabella: null,
+                   larghezza: null, altezza: null, senza: false, errore: null, numero: 0, timer: null, curvaAperta: false };
+  }
+  return regole[id];
+}
+function curvaDiritta(curva) { return curva.length === 2 && curva.every(([x, y], i) => x === y && x === CURVA_DIRITTA[i][0]); }
+function regolaNeutra(g) { return Object.values(g.valori).every((v) => v === 0) && curvaDiritta(g.curva); }
+function regolaAttiva(l) { return !!(l && regole[l.identificativo] && !regolaNeutra(regole[l.identificativo])); }
+function regolaPerServer(g) { return { ...g.valori, curva: curvaDiritta(g.curva) ? [] : g.curva }; }
+function srcRender(l) {
+  const g = regole[l.identificativo];
+  return g && g.anteprima && !g.senza && !regolaNeutra(g) ? g.anteprima : `/file/render/${l.identificativo}`;
+}
+function segnaRegolato(nodo, src, l) {
+  // Le immagini del render sul palco: si cambiano sul posto mentre si muovono i cursori.
+  for (const img of nodo.querySelectorAll("img")) {
+    if (img.getAttribute("src") !== src) continue;
+    img.dataset.regolato = l.identificativo;
+    const g = regole[l.identificativo];
+    if (g && g.larghezza) { img.dataset.larghezza = g.larghezza; img.dataset.altezza = g.altezza; }
+  }
+}
+function aggiornaPalcoRegola(l) {
+  const src = srcRender(l);
+  const g = regolaDi(l.identificativo);
+  for (const img of document.querySelectorAll(`img[data-regolato="${l.identificativo}"]`)) {
+    if (g.larghezza) { img.dataset.larghezza = g.larghezza; img.dataset.altezza = g.altezza; }
+    if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+  }
+}
+function segno(v) { return v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0"; }
+
+function chiediAnteprima(l) {
+  const g = regolaDi(l.identificativo);
+  clearTimeout(g.timer);
+  if (regolaNeutra(g)) { g.errore = null; aggiornaPalcoRegola(l); return; }
+  g.timer = setTimeout(async () => {
+    const numero = ++g.numero;
+    try {
+      const esito = await post(`/api/lavori/${l.identificativo}/regola`, { regola: regolaPerServer(g) });
+      if (numero !== g.numero) return;   // e' gia' partita una richiesta piu' nuova
+      Object.assign(g, { anteprima: esito.immagine, tabella: esito.curva, larghezza: esito.larghezza, altezza: esito.altezza, errore: null });
+      aggiornaPalcoRegola(l);
+      disegnaCurva(l);
+    } catch (e) {
+      if (numero !== g.numero) return;
+      g.errore = e; render();
+    }
+  }, ATTESA_ANTEPRIMA_MS);
+}
+
+function cambiaRegola(l) {
+  chiediAnteprima(l);
+  // Il palco dice «Con le regolazioni» appena qualcosa cambia; il ridisegno
+  // aspetta che si lasci il cursore (vedi «trascinando»).
+  render();
+}
+
+function cursoreRegola(l, c) {
+  const g = regolaDi(l.identificativo);
+  const m = S.studio.regola.massimo;
+  const valore = h("output", { classe: "mono valore-regola", id: `regola-${c.id}-valore`, for: `regola-${c.id}` }, segno(g.valori[c.id]));
+  const campo = h("input", { type: "range", id: `regola-${c.id}`, min: String(-m), max: String(m), step: "1", value: String(g.valori[c.id]),
+    title: "Doppio clic: torna a 0" });
+  campo.addEventListener("input", () => { g.valori[c.id] = Number(campo.value); valore.textContent = segno(g.valori[c.id]); chiediAnteprima(l); });
+  campo.addEventListener("change", () => cambiaRegola(l));
+  campo.addEventListener("dblclick", () => { g.valori[c.id] = 0; cambiaRegola(l); });
+  return h("div", { classe: "cursore-regola" }, h("label", { for: `regola-${c.id}` }, c.nome), campo, valore);
+}
+
+// La curva: punti da 0 a 255 su un quadrato. Clic dove non c'e' un punto lo
+// aggiunge, trascinare lo sposta, doppio clic (o Canc sul punto) lo toglie.
+// Con la tastiera: Tab sul punto, frecce per spostarlo (Maiusc: di 10).
+function curvaInSvg(v) { return LATO_CURVA - (v / 255) * LATO_CURVA; }
+function disegnaCurva(l) {
+  const svg = document.getElementById("curva-regola");
+  if (!svg) return;
+  const g = regolaDi(l.identificativo);
+  const linea = svg.querySelector(".linea-curva");
+  // Sotto i punti la curva vera, quella che ha calcolato il motore; mentre si
+  // trascina, finche' non arriva, una spezzata fra i punti.
+  const punti = g.tabella && !g.trascinoCurva
+    ? g.tabella.map((y, x) => `${(x / 255) * LATO_CURVA},${curvaInSvg(y)}`)
+    : [[0, g.curva[0][1]], ...g.curva, [255, g.curva[g.curva.length - 1][1]]].map(([x, y]) => `${(x / 255) * LATO_CURVA},${curvaInSvg(y)}`);
+  linea.setAttribute("points", punti.join(" "));
+  g.curva.forEach(([x, y], i) => {
+    const p = svg.querySelector(`[data-punto="${i}"]`);
+    if (p) {
+      p.setAttribute("cx", (x / 255) * LATO_CURVA); p.setAttribute("cy", curvaInSvg(y));
+      p.setAttribute("aria-label", `Punto ${i + 1}: entra ${x}, esce ${y}. Frecce per spostarlo, Canc per toglierlo.`);
+    }
+  });
+}
+function editorCurva(l) {
+  const g = regolaDi(l.identificativo);
+  // L'SVG si scrive come testo, come le aree di Ritocca: niente indirizzi dello spazio dei nomi.
+  const griglia = [1, 2, 3].map((q) => { const t = (q / 4) * LATO_CURVA; return `<line x1="${t}" y1="0" x2="${t}" y2="${LATO_CURVA}" class="griglia-curva"/><line x1="0" y1="${t}" x2="${LATO_CURVA}" y2="${t}" class="griglia-curva"/>`; }).join("");
+  const cerchi = g.curva.map(([x, y], i) => `<circle r="6" class="punto-curva" tabindex="0" data-punto="${i}" aria-label="Punto ${i + 1}: entra ${x}, esce ${y}. Frecce per spostarlo, Canc per toglierlo."/>`).join("");
+  const contenitore = h("div", { classe: "contenitore-curva" });
+  contenitore.innerHTML = `<svg id="curva-regola" viewBox="-6 -6 ${LATO_CURVA + 12} ${LATO_CURVA + 12}" role="group" aria-label="Curva dei toni: a sinistra i neri, a destra i bianchi"><rect x="0" y="0" width="${LATO_CURVA}" height="${LATO_CURVA}" class="fondo-curva"/>${griglia}<line x1="0" y1="${LATO_CURVA}" x2="${LATO_CURVA}" y2="0" class="diagonale-curva"/><polyline class="linea-curva" points=""/>${cerchi}</svg>`;
+  const svg = contenitore.firstChild;
+  const daPuntatore = (ev) => {
+    const b = svg.getBoundingClientRect();
+    const scala = (LATO_CURVA + 12) / b.width;
+    const x = ((ev.clientX - b.left) * scala - 6) / LATO_CURVA * 255;
+    const y = 255 - ((ev.clientY - b.top) * scala - 6) / LATO_CURVA * 255;
+    return [Math.round(Math.max(0, Math.min(255, x))), Math.round(Math.max(0, Math.min(255, y)))];
+  };
+  // Un punto resta fra il vicino di sinistra e quello di destra: la curva non torna indietro.
+  const sposta = (i, x, y) => {
+    const minimo = i > 0 ? g.curva[i - 1][0] + 1 : 0;
+    const massimo = i < g.curva.length - 1 ? g.curva[i + 1][0] - 1 : 255;
+    g.curva[i] = [Math.max(minimo, Math.min(massimo, x)), Math.max(0, Math.min(255, y))];
+  };
+  const togli = (i) => { if (g.curva.length > 2) { g.curva.splice(i, 1); g.tabella = null; cambiaRegola(l); } };
+  g.curva.forEach((_punto, i) => {
+    const p = svg.querySelector(`[data-punto="${i}"]`);
+    p.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation(); p.setPointerCapture(ev.pointerId); g.trascinoCurva = true;
+      const muovi = (e2) => { sposta(i, ...daPuntatore(e2)); disegnaCurva(l); chiediAnteprima(l); };
+      const fine = () => { p.removeEventListener("pointermove", muovi); g.trascinoCurva = false; g.tabella = null; cambiaRegola(l); };
+      p.addEventListener("pointermove", muovi);
+      p.addEventListener("pointerup", fine, { once: true });
+    });
+    p.addEventListener("dblclick", (ev) => { ev.stopPropagation(); togli(i); });
+    p.addEventListener("keydown", (ev) => {
+      const passo = ev.shiftKey ? 10 : 1;
+      const [px, py] = g.curva[i];
+      const mosse = { ArrowLeft: [-passo, 0], ArrowRight: [passo, 0], ArrowUp: [0, passo], ArrowDown: [0, -passo] };
+      if (mosse[ev.key]) { sposta(i, px + mosse[ev.key][0], py + mosse[ev.key][1]); g.tabella = null; disegnaCurva(l); chiediAnteprima(l); ev.preventDefault(); }
+      if (ev.key === "Delete" || ev.key === "Backspace") { togli(i); ev.preventDefault(); }
+    });
+    p.addEventListener("keyup", (ev) => { if (ev.key.startsWith("Arrow")) cambiaRegola(l); });
+  });
+  svg.addEventListener("pointerdown", (ev) => {
+    if (g.curva.length >= S.studio.regola.curva_punti) return;
+    const [x, y] = daPuntatore(ev);
+    if (g.curva.some(([px]) => px === x)) return;
+    g.curva.push([x, y]); g.curva.sort((a, b) => a[0] - b[0]); g.tabella = null;
+    cambiaRegola(l);
+  });
+  setTimeout(() => disegnaCurva(l), 0);
+  return contenitore;
+}
+
+function pannelloRegola(l) {
+  const g = regolaDi(l.identificativo);
+  const neutra = regolaNeutra(g);
+  const dove = SUL_WEB ? "in questo browser" : "su questo computer";
+  const senza = h("button", { classe: "btn", disabled: neutra || null, "aria-pressed": String(g.senza),
+    title: "Tieni premuto per vedere il render senza regolazioni" }, "Senza regolazioni");
+  const premi = (su) => { g.senza = su; senza.setAttribute("aria-pressed", String(su)); aggiornaPalcoRegola(l); };
+  senza.addEventListener("pointerdown", () => premi(true));
+  for (const t of ["pointerup", "pointerleave", "pointercancel", "blur"]) senza.addEventListener(t, () => { if (g.senza) premi(false); });
+  senza.addEventListener("keydown", (ev) => { if ((ev.key === " " || ev.key === "Enter") && !ev.repeat) { premi(true); ev.preventDefault(); } });
+  senza.addEventListener("keyup", (ev) => { if (ev.key === " " || ev.key === "Enter") premi(false); });
+  const azzera = () => {
+    for (const k of Object.keys(g.valori)) g.valori[k] = 0;
+    g.curva = CURVA_DIRITTA.map((p) => p.slice()); g.tabella = null; g.anteprima = null;
+    cambiaRegola(l);
+  };
+  const punti = S.studio.regola.curva_punti;
+  return h("div", { classe: "sotto-gruppo regola", role: "group", "aria-label": "Regola" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Regola"), h("span", { classe: "piccolo regola-gratis" }, `${dove} · gratis`)),
+    S.studio.regola.cursori.map((c) => cursoreRegola(l, c)),
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn", "aria-expanded": String(g.curvaAperta), onclick: () => { g.curvaAperta = !g.curvaAperta; render(); } },
+        curvaDiritta(g.curva) ? "Curva" : `Curva (${g.curva.length} punti)`),
+      senza,
+      h("button", { classe: "btn", disabled: neutra || null, onclick: azzera }, "Azzera")),
+    g.curvaAperta ? h("div", { classe: "editor-curva" }, editorCurva(l),
+      h("p", { classe: "tenue piccolo" }, `Clic sulla curva per aggiungere un punto (al massimo ${punti}), trascinalo per spostarlo, doppio clic per toglierlo. A sinistra i neri, a destra i bianchi: un punto alzato schiarisce quei toni.`)) : null,
+    g.errore ? avviso("errore", g.errore.fatto, g.errore.cosa_fare) : null,
+    h("p", { classe: "tenue piccolo" },
+      `Nessuna immagine parte: tutto resta ${dove}. Luci e Ombre cambiano i toni chiari e scuri su tutta l'immagine, come una curva: non schiariscono solo le zone in ombra. Doppio clic su un cursore lo riporta a 0.`));
 }
 
 // --- da questa immagine: Ritocca · Variante · Video (proposte 3 e 4) ---------------

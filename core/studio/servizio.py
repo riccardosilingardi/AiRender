@@ -11,6 +11,7 @@ non tocca nient'altro.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -28,6 +29,7 @@ from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
+from .. import regola as modulo_regola
 from .. import video as modulo_video
 from .. import licenza as modulo_licenza
 from .. import provider as registro
@@ -200,6 +202,10 @@ class Studio:
         # Il server risponde a piu' richieste insieme: l'albero dei passi lo
         # allinea e lo scrive una richiesta alla volta.
         self._blocco_albero = threading.Lock()
+        # Regola: il render gia' rimpicciolito per l'anteprima, uno solo
+        # (identificativo, byte). I cursori lo chiedono a ogni movimento.
+        self._base_anteprima: tuple[str, bytes] | None = None
+        self._dimensioni_anteprima: tuple[int, int] = (0, 0)
 
     # --- in testa --------------------------------------------------------
 
@@ -212,6 +218,11 @@ class Studio:
             "viste": viste,
             "lavori_attivi": self.lavori_attivi(),
             "modello_predefinito": MODELLI[0].identificativo,
+            "regola": {
+                "massimo": config.REGOLA_CURSORE_MASSIMO,
+                "curva_punti": config.REGOLA_CURVA_PUNTI_MASSIMI,
+                "cursori": [{"id": nome, "nome": etichetta} for nome, etichetta in modulo_regola.CURSORI],
+            },
             "ritocco": {
                 "modo": config.RITOCCO_MODO_AREE,
                 "modo_nome": modulo_aree.NOMI_MODI[config.RITOCCO_MODO_AREE],
@@ -1307,12 +1318,21 @@ class Studio:
                 "Questo lavoro non ha un render da esportare.",
                 "Scegli un render fatto nell'elenco dei render della vista.",
             )
+        regolazione = modulo_regola.leggi(dati.get("regola"))
         lavoro, _cartella = self._lavoro(identificativo)
         vista = Path(lavoro.vista)
+        pixel = render.read_bytes()
+        regolato = None
+        if not regolazione.neutra():
+            regolato = modulo_immagine.regola(
+                pixel, modulo_regola.tabelle(regolazione), modulo_regola.fattore_saturazione(regolazione))
         livelli = None
         if formato == "psd":
             livelli = self._livelli_della_strada(vista, identificativo, render)
-        contenuto = modulo_esporta.esporta(render.read_bytes(), formato, livelli)
+            if regolato is not None:
+                # Sopra il render com'era, cosi' in Photoshop si spegne e si confronta.
+                livelli.append(("Regola · " + ", ".join(regolazione.descrizione()), regolato))
+        contenuto = modulo_esporta.esporta(regolato if regolato is not None else pixel, formato, livelli)
         numero = self._numero_passo(vista, identificativo)
         istante = self._adesso().astimezone()
         cartella = self.cartella_esportati()
@@ -1329,7 +1349,40 @@ class Studio:
             "file": str(file), "nome": file.name, "cartella": str(cartella), "formato": formato,
             "larghezza": larghezza, "altezza": altezza,
             "livelli": [nome for nome, _dati in livelli] if livelli else None,
+            "regolazioni": regolazione.descrizione(),
             "peso_mb": round(len(contenuto) / _BYTE_PER_MB, 1),
+        }
+
+    def anteprima_regola(self, identificativo: str, dati: dict) -> dict:
+        """Il render scelto con le regolazioni, piccolo, per vederlo mentre si muovono i cursori.
+
+        Tutto qui, sul computer: nessuna immagine parte. Il file esportato si
+        rifa' a grandezza piena con gli stessi numeri (core/regola.py).
+        """
+        self._controlla_id(identificativo)
+        regolazione = modulo_regola.leggi(dati.get("regola"))
+        render = self._render(identificativo)
+        if render is None:
+            raise FileNonTrovato(
+                "Questo lavoro non ha un render da regolare.",
+                "Scegli un render fatto nell'elenco dei render della vista.",
+            )
+        chiave = f"{identificativo}:{render.stat().st_mtime_ns}"
+        if not self._base_anteprima or self._base_anteprima[0] != chiave:
+            dati_render = render.read_bytes()
+            self._dimensioni_anteprima = modulo_immagine.dimensioni(dati_render)
+            self._base_anteprima = (chiave, modulo_immagine.regola(
+                dati_render, modulo_regola.tabelle(modulo_regola.Regolazione()), 1,
+                lato_massimo=config.REGOLA_ANTEPRIMA_LATO_PX, formato="PNG"))
+        anteprima = modulo_immagine.regola(
+            self._base_anteprima[1], modulo_regola.tabelle(regolazione),
+            modulo_regola.fattore_saturazione(regolazione), formato="JPEG")
+        return {
+            "immagine": "data:image/jpeg;base64," + base64.b64encode(anteprima).decode("ascii"),
+            "regolazioni": regolazione.descrizione(),
+            "curva": modulo_regola.tabella_curva(regolazione),
+            # La misura del render vero: l'anteprima e' piu' piccola.
+            "larghezza": self._dimensioni_anteprima[0], "altezza": self._dimensioni_anteprima[1],
         }
 
     def _numero_passo(self, vista: Path, identificativo: str) -> int | None:
