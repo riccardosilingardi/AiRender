@@ -942,17 +942,25 @@ LISTINO = _registra(Costante(
             NANO_BANANA_2: {"1K": 1, "2K": 1, "4K": 2},
             NANO_BANANA_PRO: {"1K": 2, "2K": 2, "4K": 3},
         },
-        # Pesi delle azioni che non sono un invio a Nano Banana. Il server non
-        # le inoltra ancora coi crediti AIRENDER (il router legge solo corpi
-        # Gemini): stanno qui perche' il prezzo si decide in un posto solo.
+        # Pesi delle azioni che non sono un invio a Nano Banana. Finale e video
+        # il server non li inoltra ancora coi crediti AIRENDER (il router
+        # legge solo corpi Gemini); «Tieni la geometria» si' (geometria.mjs).
+        # Stanno qui perche' il prezzo si decide in un posto solo.
         # Regola: ogni credito costa ad AIRENDER al massimo 0,09 EUR.
         # Finale x2 ~36 crediti Comfy (~0,15 EUR); x4 non misurato.
         # Video Seedance 2.5 1080p 5 s ~865 crediti Comfy (~3,60 EUR, stima
         # del listino Comfy) = ~0,72 EUR/s -> 8 crediti al secondo; 720p
         # stimato a meta' -> 4 al secondo. Nessuno dei due e' misurato.
+        # «Tieni la geometria»: la prima passata col ControlNet sulla Comfy
+        # Developer Platform, in piu' del render di Nano Banana che segue.
+        # PROVVISORIO (2026-11-06): il costo a secondi di GPU del deployment
+        # non e' ancora letto; Z-Image-Turbo a 8 passi e 1536 px e' qualche
+        # secondo di GPU, una macchina fredda di piu'. Si rivede alla prima
+        # fattura del deployment.
         "pesi_azioni": {
             "finale_x2": 2,
             "finale_x4": 4,
+            "tieni_geometria": 1,
             "video_720p_al_secondo": 4,
             "video_1080p_al_secondo": 8,
         },

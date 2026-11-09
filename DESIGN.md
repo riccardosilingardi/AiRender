@@ -969,6 +969,15 @@ già com'era).
   `77-invio-due-destinazioni.png`. La bozza della prima passata resta accanto al
   render (`<id>.geometria.png`), non ancora mostrata nello Studio.
 
+Coi crediti AIRENDER (2026-11-06, plugin e web app) la stessa spunta: la prima
+passata va a «**server AIRENDER (airender-server.netlify.app) → Comfy
+Developer Platform, workflow Z-Image-Turbo + ControlNet sugli spigoli**», costo
+«**1 render AIRENDER in più per la prima passata (prezzo provvisorio), scalati
+solo se il workflow riesce**». Se il piano non la comprende la spunta è grigia
+con «Il piano <nome> non comprende «Tieni la geometria»: è nel piano Studio,
+oppure con una chiave Comfy tua.»; senza saldo letto, si rimanda alla scheda
+Licenza. Il server rifiuta comunque con la stessa idea prima di riservare.
+
 ## Finale, costruito il 2026-11-04
 
 Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto

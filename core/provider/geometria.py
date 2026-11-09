@@ -9,9 +9,15 @@ render parte poi verso Nano Banana come prima immagine, con la regola di non
 spostare nessuno spigolo.
 
 Non e' il Router: e' l'API v2 dei workflow (carica la vista come asset, manda
-il grafo, aspetta il lavoro, scarica l'uscita). La chiave e' la stessa del
-Router (COMFY_API_KEY); l'indirizzo del deployment sta in
-AIRENDER_COMFY_WORKFLOW_URL.
+il grafo, aspetta il lavoro, scarica l'uscita). Due strade:
+
+- chiave Comfy propria: la stessa del Router (COMFY_API_KEY), l'indirizzo del
+  deployment in AIRENDER_COMFY_WORKFLOW_URL;
+- crediti AIRENDER (provider "airender", plugin e web app): la stessa API v2
+  sul server AIRENDER sotto /geometria (server/netlify/functions/
+  geometria.mjs), col codice licenza. Il server ricostruisce il grafo dal suo
+  modello, lo manda al deployment di Riccardo con la sua chiave e scala
+  LISTINO["pesi_azioni"]["tieni_geometria"] solo se il workflow riesce.
 """
 
 from __future__ import annotations
@@ -25,11 +31,13 @@ from pathlib import Path
 from typing import Callable, Protocol
 from urllib.parse import urlparse
 
-from .. import config, immagine as modulo_immagine
-from ..errori import ErroreProvider
+from .. import config, immagine as modulo_immagine, licenza as modulo_licenza
+from ..errori import ChiaveMancante, ErroreProvider
 from . import comfy
 
 VARIABILE_URL = "AIRENDER_COMFY_WORKFLOW_URL"
+PROVIDER_AIRENDER = "airender"
+PERCORSO_SERVER = "/geometria"  # dove il server AIRENDER espone l'API v2 dei workflow
 WORKFLOW = Path(__file__).resolve().parent / "workflow" / "tieni-geometria.json"
 NOME_WORKFLOW = "Z-Image-Turbo + ControlNet sugli spigoli"
 REGOLA_PROMPT = (
@@ -71,9 +79,28 @@ def indirizzo() -> str:
     return f"https://{parti.hostname}"
 
 
-def destinazione() -> str:
+def destinazione(provider: str = "") -> str:
     """Il servizio che riceve la vista nella prima passata: si mostra prima dell'invio (regola 5)."""
+    if provider == PROVIDER_AIRENDER:
+        return destinazione_airender()
     return f"Comfy Developer Platform, workflow {NOME_WORKFLOW} su {urlparse(indirizzo()).hostname}"
+
+
+def destinazione_airender() -> str:
+    return (f"server AIRENDER ({urlparse(modulo_licenza.server()).hostname}) → "
+            f"Comfy Developer Platform, workflow {NOME_WORKFLOW}")
+
+
+def peso_airender() -> int:
+    """Quanti render AIRENDER costa una prima passata, dal listino."""
+    return int(config.LISTINO["pesi_azioni"]["tieni_geometria"])
+
+
+def crea(provider: str, trasporto: "TrasportoWorkflow", controlla: Callable[[], None] = lambda: None) -> "Geometria":
+    """Il client giusto per il servizio del lavoro: crediti AIRENDER o chiave Comfy propria."""
+    if provider == PROVIDER_AIRENDER:
+        return GeometriaAirender(trasporto, controlla=controlla)
+    return Geometria(trasporto, controlla=controlla)
 
 
 def workflow(asset: str, prompt: str, seme: int) -> dict:
@@ -191,3 +218,33 @@ class Geometria:
                 "Non mando la chiave fuori dal servizio annunciato. Togli la spunta e segnala il caso.",
             )
         return collegamento
+
+
+class GeometriaAirender(Geometria):
+    """La stessa API v2, sul server AIRENDER, col codice licenza al posto della chiave Comfy.
+
+    Il server sceglie il deployment e ricostruisce il grafo: dal client prende
+    solo l'asset caricato, il prompt e il seme.
+    """
+
+    def __init__(self, trasporto: TrasportoWorkflow, codice: str | None = None, canale: str = "plugin",
+                 **altro) -> None:
+        super().__init__(trasporto, chiave=codice if codice is not None else (modulo_licenza.leggi() or ""),
+                         base=modulo_licenza.server() + PERCORSO_SERVER, **altro)
+        self.canale = canale
+
+    def destinazione(self) -> str:
+        return destinazione_airender()
+
+    def _intestazioni(self) -> dict:
+        if not self.chiave:
+            raise ChiaveMancante(
+                "Non hai ancora incollato il codice licenza AIRENDER: «Tieni la geometria» non parte.",
+                "Incolla il codice ricevuto per email con: python -m core.cli --licenza AIR-XXXX-XXXX-XXXX-XXXX.",
+            )
+        return modulo_licenza.intestazioni(self.chiave, self.canale)
+
+    def _errore(self, cosa: str, stato: int, corpo: object) -> ErroreProvider:
+        if isinstance(corpo, dict) and isinstance(corpo.get("error"), dict) and corpo.get("cosa_fare"):
+            return modulo_licenza.errore_del_server(stato, corpo)
+        return super()._errore(cosa, stato, corpo)

@@ -18,6 +18,7 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 |---|---|---|
 | `/` | `public/index.html` | Pagina prezzi: Base, Pro, Studio (mensile/annuale), Prova, Ricarica |
 | `/v2/models/*` | `router.mjs` | Stesso protocollo del Comfy Router: invio, stato, risultato. Riserva all'invio, addebita al risultato con immagine, annulla se il Router fallisce |
+| `/geometria/api/v2/*` | `geometria.mjs` | «Tieni la geometria» (solo piano Studio): stessa API v2 dei workflow della Developer Platform. Il grafo lo ricostruisce il server da `geometria.json`; riserva all'invio, addebita a lavoro riuscito, annulla se fallisce o si ferma |
 | `/studio/` | `public/studio/` (costruita) | La web app: lo Studio nel browser, costruito a ogni deploy da `scripts/scrivi_web.py` |
 | `/api/accedi` | `accedi.mjs` | Accesso alla web app: email e codice della stessa licenza, oppure il gettone del link (crea la chiave del browser) |
 | `/api/link-accesso` | `link-accesso.mjs` | Manda per email il link di accesso alla web app, uno per licenza attiva (migrazione 004) |
@@ -31,7 +32,8 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 
 Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
 `listino.json` si riscrive con `python scripts/scrivi_listino.py` e
-`tests/test_listino.py` fallisce se diverge.
+`tests/test_listino.py` fallisce se diverge. Lo stesso script scrive
+`geometria.json` (workflow e valori di «Tieni la geometria»).
 
 ## Messa in produzione, in ordine
 
