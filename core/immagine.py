@@ -12,7 +12,7 @@ import math
 import os
 from dataclasses import dataclass
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 from . import config
 from .errori import FileNonTrovato
@@ -628,3 +628,30 @@ def marca_generata(dati: bytes) -> bytes:
         segmento = b"\xff\xe1" + (len(contenuto) + _DUE_BYTE).to_bytes(_DUE_BYTE, "big") + contenuto
         return dati[:posizione] + segmento + dati[posizione:]
     return dati
+
+
+def regola(dati: bytes, tabelle: tuple[list[int], list[int], list[int]], saturazione: float,
+           lato_massimo: int | None = None, formato: str = "PNG") -> bytes:
+    """Il render con luce e colore regolati (core/regola.py dice i numeri), in PNG o JPEG.
+
+    `tabelle` porta, per rosso, verde e blu, il tono d'arrivo di ognuno dei 256
+    toni; `saturazione` e' il fattore del colore (1 = come prima). Con
+    `lato_massimo` l'immagine prima si rimpicciolisce: e' l'anteprima dei
+    cursori. Sempre RGB: la trasparenza di un render non serve al cliente.
+    """
+    immagine = _apri(dati).convert("RGB")
+    if lato_massimo and max(immagine.size) > lato_massimo:
+        fattore = lato_massimo / max(immagine.size)
+        immagine = immagine.resize(
+            (max(1, round(immagine.width * fattore)), max(1, round(immagine.height * fattore))),
+            Image.Resampling.LANCZOS)
+    rosso, verde, blu = tabelle
+    immagine = immagine.point(list(rosso) + list(verde) + list(blu))
+    if saturazione != 1:
+        immagine = ImageEnhance.Color(immagine).enhance(saturazione)
+    uscita = io.BytesIO()
+    if formato == "JPEG":
+        immagine.save(uscita, format="JPEG", quality=config.ESPORTA_QUALITA_JPEG)
+    else:
+        immagine.save(uscita, format="PNG")
+    return uscita.getvalue()

@@ -721,6 +721,48 @@ Alla grandezza del render, senza ingrandire.
 
 Nel file non entrano prompt, ricetta o chiave: si riscrivono solo i pixel.
 
+## Regola, prima di esportare, costruita il 2026-11-09
+
+Richiesta di Riccardo (2026-11-08): «prima di esportare, tool per classici
+ritocchi di illuminazione, contrasto, luci, ombre, curve come fa la palette di
+Photoshop». Mockup: Design canvas, schermata A5 «Consegna», sezione 2 · Regola.
+Per ora vive dentro «Esporta per il cliente» (Studio · Risultato › Adesso), sopra
+la scelta del formato: la schermata Consegna intera (Finale per uso, più immagini
+insieme, TIFF e PDF) arriva con i PR successivi del piano dei flussi.
+
+Gira sul computer: nello Studio sul PC, nella web app dentro il browser. Nessuna
+immagine parte e non costa crediti; lo si scrive in verde accanto al titolo
+(«su questo computer · gratis», sul web «in questo browser · gratis»).
+
+- **Vuoto:** sei cursori a 0 (Esposizione, Contrasto, Luci, Ombre, Temperatura,
+  Saturazione, da −100 a +100), la curva diritta. «Senza regolazioni» e
+  «Azzera» sono grigi: non c'è niente da togliere.
+- **In corso:** il cursore si muove e il render sul palco cambia (anteprima
+  col lato lungo di 1600 px, rifatta dal motore pochi centesimi di secondo dopo
+  che il cursore si ferma). Sopra il palco: «Con le regolazioni · le vedi qui,
+  il file le prende quando esporti». **Senza regolazioni** si tiene premuto (col
+  mouse, o Spazio dalla tastiera) e mostra il render com'era. Doppio clic su un
+  cursore lo riporta a 0. **Curva** apre un quadrato coi toni: clic aggiunge un
+  punto (al massimo 8), trascinare lo sposta, doppio clic o Canc lo toglie,
+  frecce lo spostano di 1 (Maiusc: 10). Sotto i punti la curva vera calcolata
+  dal motore.
+- **Errore:** un valore che il motore rifiuta (un cursore fuori misura, due
+  punti sullo stesso tono) dice il fatto e cosa fare nel pannello; il file non
+  si scrive.
+- **Pieno:** dopo Esporta, sotto «Salvato: …» una riga dice cosa c'è dentro:
+  «Con le regolazioni: Esposizione +8, Contrasto +12, Curva (3 punti).» oppure
+  «Senza regolazioni: i pixel del render come sono.». Nel PSD le regolazioni
+  sono un livello in più in cima («Regola · Esposizione +8, …»), sopra il
+  render com'era: in Photoshop si spegne e si confronta.
+
+Cosa dice di sé: Luci e Ombre cambiano i toni chiari e scuri **su tutta
+l'immagine**, come una curva; non sono il recupero locale di Photoshop che
+schiarisce solo le zone in ombra. La Temperatura non è in kelvin. Tutti i
+numeri (quanti stop dà l'Esposizione, quanto spinge il Contrasto…) sono scelti
+in `core/config.py`, `REGOLA_*`, e non ancora confrontati su render veri.
+Le regolazioni restano a ogni render finché lo Studio è aperto; chiuso lo
+Studio, si ripartono da 0.
+
 ## Studio · Video, costruita il 2026-11-01
 
 Decisione di Riccardo (2026-10-31): «I video li voglio che possa caricare i

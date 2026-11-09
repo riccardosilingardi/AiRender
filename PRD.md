@@ -270,6 +270,18 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Regola, prima di esportare (2026-11-09)
+
+Sei cursori e una curva, calcolati in `core/regola.py` e applicati con Pillow;
+anteprima a 1600 px, file a grandezza piena. Provato con i test (numeri, pixel,
+anteprima ed esportazione dallo Studio) e in Chromium sullo Studio del PC con un
+render finto: cursori, curva a tre punti, palco aggiornato, JPEG esportato con
+la riga «Con le regolazioni». **Mai provato su un render vero né giudicato a
+occhio**: quanto spingono i cursori (`REGOLA_*` in config) è un giudizio. Mai
+provato nella web app con Pyodide vero: non si sa quanto ci mette l'anteprima
+nel browser (sul PC, con un render di 1200 px, meno di un decimo di secondo,
+non misurato con cura). Mai aperto in Photoshop il PSD col livello «Regola».
+
 ### Ritocca col compositore e i pennelli (2026-11-09)
 
 Una frase con @1, @2 si divide in una nota per area; i pennelli aggiungi e

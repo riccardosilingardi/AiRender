@@ -352,6 +352,27 @@ def test_esporta_qualita_jpeg_sta_nel_campo_di_pillow_ed_e_una_scelta():
     assert config.costante("ESPORTA_QUALITA_JPEG").origine == config.SCELTA
 
 
+def test_regola_cursori_e_curva_restano_scelte_dentro_limiti_che_non_rompono_l_immagine():
+    """Caso: un cursore di Regola a fondo corsa brucia il render, o una curva inverte i toni."""
+    from core import regola
+
+    assert config.REGOLA_CURSORE_MASSIMO == 100
+    assert 0 < config.REGOLA_ESPOSIZIONE_STOP <= 2
+    assert 0 < config.REGOLA_CONTRASTO_FORZA <= 1.5
+    assert 0 < config.REGOLA_LUCI_OMBRE_AMPIEZZA <= 0.125  # oltre, la curva torna indietro
+    assert 0 < config.REGOLA_TEMPERATURA_FORZA < 0.5
+    assert 0 < config.REGOLA_SATURAZIONE_MASSIMA <= 2
+    assert 3 <= config.REGOLA_CURVA_PUNTI_MASSIMI <= 16
+    assert 800 <= config.REGOLA_ANTEPRIMA_LATO_PX <= 4096
+    for nome in ("REGOLA_CURSORE_MASSIMO", "REGOLA_ESPOSIZIONE_STOP", "REGOLA_CONTRASTO_FORZA",
+                 "REGOLA_LUCI_OMBRE_AMPIEZZA", "REGOLA_TEMPERATURA_FORZA", "REGOLA_SATURAZIONE_MASSIMA",
+                 "REGOLA_CURVA_PUNTI_MASSIMI", "REGOLA_ANTEPRIMA_LATO_PX"):
+        assert config.costante(nome).origine == config.SCELTA
+    tutto = regola.leggi({"luci": 100, "ombre": -100, "contrasto": 100})
+    for tabella in regola.tabelle(tutto):
+        assert all(a <= b for a, b in zip(tabella, tabella[1:]))
+
+
 def test_geometry_drift_warn_avvisa_solo_sotto_la_soglia_ed_e_una_scelta():
     """Caso: lo Studio avvisa a ogni render, o mai, con una soglia spacciata per misurata."""
     assert 0 < config.GEOMETRY_DRIFT_WARN < 1

@@ -1201,3 +1201,107 @@ GEOMETRIA_INTERVALLO_SECONDI = _registra(Costante(
         "partono; l'API v2 non ha un webhook per i lavori. Scelto."
     ),
 ))
+
+# --- Regola: luce e colore prima di esportare (2026-11-09) --------------------
+# Cursori come quelli di Photoshop o Lightroom, sul computer dell'utente: nessuna
+# immagine parte e non si spendono crediti. Tutti i valori sono giudizi presi
+# dall'abitudine di quei programmi, non confrontati su render veri.
+
+REGOLA_CURSORE_MASSIMO = _registra(Costante(
+    nome="REGOLA_CURSORE_MASSIMO",
+    valore=100,
+    origine=SCELTA,
+    ragione=(
+        "I cursori di Regola vanno da meno questo a piu' questo, con lo zero "
+        "al centro che non cambia niente. Cento passi come Lightroom: abbastanza "
+        "fini col mouse, un numero facile da ricordare e da scrivere."
+    ),
+))
+
+REGOLA_ESPOSIZIONE_STOP = _registra(Costante(
+    nome="REGOLA_ESPOSIZIONE_STOP",
+    valore=1.0,
+    origine=SCELTA,
+    ragione=(
+        "Quanti stop (raddoppi della luce) da' l'Esposizione a fondo cursore. "
+        "Si moltiplica la luce lineare, come una macchina fotografica. Un render "
+        "esce gia' esposto: piu' di un diaframma serve di rado, e un cursore "
+        "piu' ampio diventa troppo sensibile. Scelto, non misurato."
+    ),
+    unita=" stop",
+))
+
+REGOLA_CONTRASTO_FORZA = _registra(Costante(
+    nome="REGOLA_CONTRASTO_FORZA",
+    valore=0.8,
+    origine=SCELTA,
+    ragione=(
+        "Il Contrasto e' una curva a S attorno al grigio medio, x^g / (x^g + "
+        "(1-x)^g), con g = 2 elevato a (cursore/100 * questo). Con 0,8 a fondo "
+        "g vale circa 1,74 (piu' contrasto) o 0,57 (meno): forte ma senza "
+        "bruciare. Neri e bianchi restano al loro posto. Scelto a occhio "
+        "sulla curva, non su un render."
+    ),
+))
+
+REGOLA_LUCI_OMBRE_AMPIEZZA = _registra(Costante(
+    nome="REGOLA_LUCI_OMBRE_AMPIEZZA",
+    valore=0.12,
+    origine=SCELTA,
+    ragione=(
+        "Di quanto Luci e Ombre spostano al massimo un tono (su 1), a meta' "
+        "della loro meta' di toni: Luci tocca solo i toni sopra il grigio "
+        "medio, Ombre solo quelli sotto. Sopra 0,125 la curva si piegherebbe "
+        "all'indietro (un tono piu' chiaro diventerebbe piu' scuro di uno meno "
+        "chiaro): 0,12 resta sotto. E' una curva uguale su tutta l'immagine, "
+        "non il recupero locale di Photoshop. Scelto."
+    ),
+))
+
+REGOLA_TEMPERATURA_FORZA = _registra(Costante(
+    nome="REGOLA_TEMPERATURA_FORZA",
+    valore=0.12,
+    origine=SCELTA,
+    ragione=(
+        "La Temperatura a fondo cursore alza il rosso e abbassa il blu (o il "
+        "contrario) di questa frazione. Il 12% scalda o raffredda in modo "
+        "chiaro senza dare una dominante da filtro. Non e' in kelvin: il "
+        "render non sa a che luce e' stato fatto. Scelto."
+    ),
+))
+
+REGOLA_SATURAZIONE_MASSIMA = _registra(Costante(
+    nome="REGOLA_SATURAZIONE_MASSIMA",
+    valore=1.0,
+    origine=SCELTA,
+    ragione=(
+        "Quanto colore in piu' da' la Saturazione a fondo cursore: 1 vuol dire "
+        "il doppio. All'altro capo l'immagine diventa in bianco e nero. Come "
+        "il cursore di Lightroom; scelto, non misurato."
+    ),
+))
+
+REGOLA_CURVA_PUNTI_MASSIMI = _registra(Costante(
+    nome="REGOLA_CURVA_PUNTI_MASSIMI",
+    valore=8,
+    origine=SCELTA,
+    ragione=(
+        "Quanti punti al massimo sulla curva, estremi compresi. Una curva a S o "
+        "un ritocco dei soli neri ne chiedono tre o quattro; con piu' di otto "
+        "la curva ondeggia e il cielo si riempie di bande. Scelto."
+    ),
+))
+
+REGOLA_ANTEPRIMA_LATO_PX = _registra(Costante(
+    nome="REGOLA_ANTEPRIMA_LATO_PX",
+    valore=1600,
+    origine=SCELTA,
+    ragione=(
+        "Il lato lungo dell'anteprima mentre si muovono i cursori. Il file "
+        "esportato e' sempre alla grandezza del render; l'anteprima e' piu' "
+        "piccola perche' si rifa' a ogni movimento, anche nella web app dove "
+        "Python gira nel browser. 1600 riempie il palco dello Studio. Scelto, "
+        "tempi non misurati."
+    ),
+    unita=" px",
+))
