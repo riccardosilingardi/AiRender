@@ -1106,6 +1106,12 @@ con «Il piano <nome> non comprende «Tieni la geometria»: è nel piano Studio,
 oppure con una chiave Comfy tua.»; senza saldo letto, si rimanda alla scheda
 Licenza. Il server rifiuta comunque con la stessa idea prima di riservare.
 
+Tre controlli (2026-11-09, richiesta di Riccardo: «tutte 3 con spunte e easy
+descrizione»): con la spunta accesa, sotto compaiono **Spigoli** (acceso),
+**Profondità** e **Linee dritte**, ognuno con una frase su cosa tiene. Almeno uno
+resta acceso (l'ultimo non si toglie). Sotto: «Più controlli insieme tengono di
+più ma lasciano meno libertà al render. Il costo non cambia.»
+
 ## Finale, costruito il 2026-11-04
 
 Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto

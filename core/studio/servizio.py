@@ -858,7 +858,16 @@ class Studio:
             inserti=inserti,
             esempi=esempi,
             geometria_mostrata=dati.get("destinazione_geometria_mostrata") if geometria else None,
+            controlli_geometria=self._controlli_geometria(dati) if geometria else (),
         )
+
+    @staticmethod
+    def _controlli_geometria(dati: dict) -> tuple[str, ...]:
+        """Spigoli, Profondita', Linee dritte: quelli spuntati. Senza la voce, i soli Spigoli."""
+        try:
+            return modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
 
     def _esempi_scelti(self, dati: dict, contesto: bool = False, riferimento: object = True) -> tuple[Path, ...]:
         """Gli esempi di «Stile da esempi» oltre al riferimento: nomi della cartella dei riferimenti."""
@@ -971,7 +980,8 @@ class Studio:
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
-                       esempi: tuple = (), geometria_mostrata: str | None = None) -> dict:
+                       esempi: tuple = (), geometria_mostrata: str | None = None,
+                       controlli_geometria: tuple = ()) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -1032,6 +1042,7 @@ class Studio:
                 finale=finale,
                 esempi=tuple(esempi),
                 destinazione_geometria=prima_passata["destinazione"] if prima_passata else None,
+                controlli_geometria=controlli_geometria if prima_passata else (),
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -1279,7 +1290,19 @@ class Studio:
             "render": render is not None,
             "scostamento_geometria": stato.get("scostamento_geometria"),
             "tenuta": self._tenuta(render),
+            "controlli_geometria": self._nomi_controlli(dati),
         }
+
+    @staticmethod
+    def _nomi_controlli(dati: dict) -> str | None:
+        """«Spigoli + Profondità» per un lavoro con Tieni la geometria, None per gli altri."""
+        if not dati.get("destinazione_geometria"):
+            return None
+        try:
+            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender:
+            return None
+        return " + ".join(modulo_geometria.NOMI_CONTROLLI[c] for c in controlli)
 
     def _tenuta(self, render: Path | None) -> dict | None:
         """La misura degli spigoli di un render, come la mostra lo Studio. None senza render."""
@@ -2385,7 +2408,7 @@ def _geometria_dict(varianti: int, provider: str = "") -> dict:
         "errore": errore,
         "cosa_fare": cosa_fare,
         "workflow": modulo_geometria.NOME_WORKFLOW,
-        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet sugli spigoli; "
+        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet (i controlli spuntati); "
                        "poi il suo render parte verso il modello al posto della vista."),
         "costo": _costo_geometria(varianti, provider),
     }

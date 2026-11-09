@@ -181,7 +181,7 @@ def test_la_destinazione_mostra_anche_la_prima_passata_e_come_si_paga(cartella, 
     studio = _studio(cartella, chiamate)
     assert studio.destinazione(NANO)["geometria"] is None
     prima = studio.destinazione(NANO, geometria=True)["geometria"]
-    assert prima["destinazione"] == ("Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet sugli spigoli "
+    assert prima["destinazione"] == ("Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet "
                                      "su airender-geometria.run.comfy.app")
     assert prima["costo"] == "a secondi di GPU del deployment" and prima["errore"] is None
 
@@ -297,7 +297,7 @@ def test_coi_crediti_airender_la_prima_passata_va_al_server_col_codice_licenza(m
         assert chiamata[2]["X-Airender-Licenza"] == "AIR-0000-1111-2222-3333"
         assert "Authorization" not in chiamata[2], "nessuna chiave Comfy dal PC del cliente"
     assert client.destinazione() == ("server AIRENDER (airender.prova) → Comfy Developer Platform, "
-                                     "workflow Z-Image-Turbo + ControlNet sugli spigoli")
+                                     "workflow Z-Image-Turbo + ControlNet")
 
 
 def test_coi_crediti_airender_senza_codice_non_parte_niente(monkeypatch):
@@ -351,3 +351,75 @@ def test_la_coda_passa_il_servizio_del_lavoro_alla_prima_passata(cartella, chiam
     modulo_coda.Coda(cartella, crea_provider=lambda _n: ProviderCheRende(chiamate), dire=lambda _t: None,
                      crea_geometria=crea).esegui_uno()
     assert visti == ["prova"]
+
+
+# --- i tre controlli: Spigoli, Profondita', Linee dritte ----------------------------
+
+
+def test_ogni_insieme_di_controlli_da_un_grafo_incatenato_senza_nodi_orfani():
+    from itertools import combinations
+    for quanti in (1, 2, 3):
+        for scelta in combinations(modulo_geometria.CONTROLLI, quanti):
+            grafo = modulo_geometria.grafo_per(scelta)
+            presenti = [c for c in modulo_geometria.CONTROLLI if modulo_geometria.NODI_CONTROLLO[c][1] in grafo]
+            assert presenti == list(scelta)
+            # La catena: modello -> primo ControlNet -> ... -> campionamento.
+            precedente = ["4", 0]
+            for controllo in scelta:
+                nodo = grafo[modulo_geometria.NODI_CONTROLLO[controllo][1]]
+                assert nodo["inputs"]["model"] == precedente
+                assert nodo["inputs"]["strength"] == modulo_geometria.forza(controllo)
+                precedente = [modulo_geometria.NODI_CONTROLLO[controllo][1], 0]
+            assert grafo["11"]["inputs"]["model"] == precedente
+            for nodo in grafo.values():
+                for valore in nodo["inputs"].values():
+                    if isinstance(valore, list):
+                        assert valore[0] in grafo, (scelta, valore)
+
+
+def test_controlli_vuoti_o_sconosciuti_si_rifiutano_e_l_ordine_e_sempre_lo_stesso():
+    assert modulo_geometria.controlli_validi(None) == ("spigoli",)
+    assert modulo_geometria.controlli_validi(["linee", "spigoli", "linee"]) == ("spigoli", "linee")
+    for guasto in ([], ["canny"], "spigoli"):
+        with pytest.raises(ErroreProvider, match="almeno uno"):
+            modulo_geometria.controlli_validi(guasto)
+
+
+def test_i_controlli_spuntati_arrivano_al_workflow(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
+    studio, finto = _studio(cartella, chiamate), ComfyFinto()
+    identificativo = _genera(studio, controlli_geometria=["profondita", "linee"])
+    scritto = json.loads((cartella / "lavori" / "in-attesa" / f"{identificativo}.json").read_text("utf-8"))
+    assert scritto["controlli_geometria"] == ["profondita", "linee"]
+    _coda(cartella, chiamate, finto).esegui_uno()
+    grafo = finto.chiamate[1][3]["workflow"]
+    assert "8" not in grafo and "18" in grafo and "20" in grafo
+    assert leggi_stato(cartella, identificativo)["geometria"]["controlli"] == ["profondita", "linee"]
+
+
+def test_un_lavoro_di_prima_dei_controlli_parte_coi_soli_spigoli(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
+    identificativo = _genera(_studio(cartella, chiamate))
+    percorso = cartella / "lavori" / "in-attesa" / f"{identificativo}.json"
+    scritto = json.loads(percorso.read_text("utf-8"))
+    del scritto["controlli_geometria"]
+    assert Lavoro.da_dizionario(scritto).controlli_geometria == ("spigoli",)
+    with pytest.raises(LavoroNonValido):
+        Lavoro.da_dizionario({**scritto, "controlli_geometria": []})
+
+
+def test_lo_studio_rifiuta_nessun_controllo(cartella, chiamate, monkeypatch):
+    monkeypatch.setenv(modulo_geometria.VARIABILE_URL, BASE)
+    with pytest.raises(RichiestaStudioNonValida, match="almeno uno"):
+        _genera(_studio(cartella, chiamate), controlli_geometria=[])
+    assert not list(cartella.glob("lavori/in-attesa/*.json"))
+
+
+def test_l_elenco_dei_render_dice_con_quali_controlli_ha_tenuto_la_geometria():
+    """Caso: due render della stessa vista con controlli diversi, e non si capisce quale e' quale."""
+    from core.studio.servizio import Studio  # pylint: disable=import-outside-toplevel
+    nomi = Studio._nomi_controlli  # pylint: disable=protected-access
+    assert nomi({}) is None
+    assert nomi({"destinazione_geometria": "x"}) == "Spigoli"
+    assert nomi({"destinazione_geometria": "x", "controlli_geometria": ["linee", "profondita"]}) == "Profondità + Linee dritte"
+    assert nomi({"destinazione_geometria": "x", "controlli_geometria": []}) is None

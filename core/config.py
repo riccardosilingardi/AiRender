@@ -1170,6 +1170,29 @@ GEOMETRIA_FORZA = _registra(Costante(
     ),
 ))
 
+GEOMETRIA_FORZA_PROFONDITA = _registra(Costante(
+    nome="GEOMETRIA_FORZA_PROFONDITA",
+    valore=0.6,
+    origine=SCELTA,
+    ragione=(
+        "Quanto comanda il controllo «Profondita'» (mappa di profondita' stimata "
+        "con Depth Anything V2) nella prima passata. Tiene volumi, piani e "
+        "prospettiva, non i dettagli: sotto gli Spigoli perche' insieme non "
+        "irrigidiscano il render. Giudizio del 2026-11-09, nessun render fatto."
+    ),
+))
+
+GEOMETRIA_FORZA_LINEE = _registra(Costante(
+    nome="GEOMETRIA_FORZA_LINEE",
+    valore=0.7,
+    origine=SCELTA,
+    ragione=(
+        "Quanto comanda il controllo «Linee dritte» (M-LSD, solo segmenti "
+        "dritti) nella prima passata. Ignora retini e texture, quindi regge una "
+        "forza vicina agli Spigoli. Giudizio del 2026-11-09, nessun render fatto."
+    ),
+))
+
 GEOMETRIA_PASSI = _registra(Costante(
     nome="GEOMETRIA_PASSI",
     valore=8,

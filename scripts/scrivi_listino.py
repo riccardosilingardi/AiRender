@@ -27,16 +27,25 @@ def testo() -> str:
 
 
 def testo_geometria() -> str:
+    from itertools import combinations  # noqa: E402  pylint: disable=import-outside-toplevel
+
     from core.provider import geometria  # noqa: E402  pylint: disable=import-outside-toplevel
 
+    # Un grafo per ogni insieme di controlli (Spigoli, Profondita', Linee
+    # dritte), gia' coi valori di config.py: il server sceglie quello giusto
+    # e riempie solo vista, prompt e seme.
+    grafi = {}
+    for quanti in range(1, len(geometria.CONTROLLI) + 1):
+        for scelta in combinations(geometria.CONTROLLI, quanti):
+            grafi["+".join(scelta)] = geometria.grafo_per(scelta)
     dati = {
-        "workflow": json.loads(geometria.WORKFLOW.read_text(encoding="utf-8")),
-        "nodi": {"immagine": geometria.NODO_IMMAGINE, "lato": geometria.NODO_LATO,
-                 "prompt": geometria.NODO_PROMPT, "forza": geometria.NODO_FORZA,
+        "grafi": grafi,
+        "nodi": {"immagine": geometria.NODO_IMMAGINE, "prompt": geometria.NODO_PROMPT,
                  "campionatore": geometria.NODO_CAMPIONATORE},
+        # Da quale nodo ControlNet si riconosce un controllo nel grafo del
+        # client, nell'ordine dei nomi dei grafi (una lista: le chiavi si ordinano).
+        "controlli": [[c, geometria.NODI_CONTROLLO[c][1]] for c in geometria.CONTROLLI],
         "lato_massimo": config.GEOMETRIA_LATO_MASSIMO,
-        "forza": config.GEOMETRIA_FORZA,
-        "passi": config.GEOMETRIA_PASSI,
         "nome": geometria.NOME_WORKFLOW,
     }
     return json.dumps(dati, ensure_ascii=False, indent=2, sort_keys=True) + "\n"

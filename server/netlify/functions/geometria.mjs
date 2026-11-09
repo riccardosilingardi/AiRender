@@ -1,5 +1,6 @@
 // «Tieni la geometria» coi crediti AIRENDER: la prima passata col ControlNet
-// sugli spigoli, sul deployment della Comfy Developer Platform di Riccardo.
+// (Spigoli, Profondita', Linee dritte), sul deployment della Comfy Developer
+// Platform di Riccardo.
 //
 // Parla la stessa API v2 dei workflow del deployment (carica l'asset, manda
 // il lavoro, leggi lo stato, scarica l'uscita), sotto /geometria/api/v2, cosi'
@@ -84,29 +85,36 @@ export function assetDelCliente(licenzaId, idCliente, chiave) {
   return firmaAsset(licenzaId, asset, chiave) === idCliente.slice(punto + 1) ? asset : null;
 }
 
-// Il grafo da mandare: quello di geometria.json coi valori di config.py, e
-// dal client solo asset, prompt e seme.
-export function grafo(asset, prompt, seme, m = modello) {
-  const g = structuredClone(m.workflow);
+// Il grafo da mandare: quello di geometria.json per i controlli scelti (gia'
+// coi valori di config.py), e dal client solo asset, prompt e seme.
+export function grafo(asset, prompt, seme, controlli = "spigoli", m = modello) {
+  const g = structuredClone(m.grafi[controlli]);
   g[m.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id: asset } };
-  g[m.nodi.lato].inputs.largest_size = m.lato_massimo;
   g[m.nodi.prompt].inputs.text = prompt;
-  g[m.nodi.forza].inputs.strength = m.forza;
   g[m.nodi.campionatore].inputs.seed = seme;
-  g[m.nodi.campionatore].inputs.steps = m.passi;
   return g;
+}
+
+// Quali controlli (Spigoli, Profondita', Linee dritte) ha scelto il client:
+// i nodi ControlNet che ci sono nel suo grafo, nell'ordine di geometria.json.
+export function controlliDalGrafo(g, m = modello) {
+  const scelti = m.controlli.filter(([, nodo]) => g[nodo]).map(([nome]) => nome);
+  const chiave = scelti.join("+");
+  return m.grafi[chiave] ? chiave : null;
 }
 
 // Cosa il client chiede, letto dal grafo che manda il motore.
 export function richiestaDalGrafo(corpo, m = modello) {
   const g = corpo?.workflow;
   if (!g || typeof g !== "object") return null;
+  const controlli = controlliDalGrafo(g, m);
+  if (!controlli) return null;
   const asset = g[m.nodi.immagine]?.inputs?.image?.info?.id;
   const prompt = g[m.nodi.prompt]?.inputs?.text;
   const seme = g[m.nodi.campionatore]?.inputs?.seed;
   if (typeof prompt !== "string" || !prompt.trim() || prompt.length > PROMPT_MASSIMO) return null;
   if (!Number.isInteger(seme) || seme < 0 || seme > SEME_MASSIMO) return null;
-  return { asset, prompt, seme };
+  return { asset, prompt, seme, controlli };
 }
 
 export function pesoGeometria(l = listino) {
@@ -227,7 +235,7 @@ async function invia(req, { db, ambiente, chiama, cliente, licenza }) {
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify({ workflow: grafo(asset, chiesto.prompt, chiesto.seme) }),
+      body: JSON.stringify({ workflow: grafo(asset, chiesto.prompt, chiesto.seme, chiesto.controlli) }),
       signal: AbortSignal.timeout(ATTESA_COMFY_MS),
     });
   } catch {

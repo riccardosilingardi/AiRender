@@ -91,7 +91,8 @@ FORMATO_ESEMPI = 9  # numero-non-configurabile: versione del formato di un lavor
 # Rif. se ci sono.
 FORMATO_GEOMETRIA = 10  # numero-non-configurabile: versione del formato di un lavoro con «Tieni la geometria»
 # Il formato 10 (2026-11-04) avvolge un lavoro di Genera dalla vista: prima
-# parte un workflow col ControlNet sugli spigoli, poi il suo render va a Nano
+# parte un workflow col ControlNet (spigoli, profondita', linee dritte: il
+# file scrive quali in `controlli_geometria`), poi il suo render va a Nano
 # Banana. Il file scrive anche il formato del lavoro avvolto (`formato_base`) e
 # la seconda destinazione. Un motore vecchio rifiuta il 10 invece di mandare
 # solo a Nano Banana quello che l'utente ha chiesto di mandare prima altrove.
@@ -313,6 +314,10 @@ class Lavoro:
     # passata col ControlNet, mostrata prima dell'invio come l'altra (regola
     # 5). Vuota, il lavoro va solo al modello. Solo dalla vista.
     destinazione_geometria: str | None = None
+    # I controlli della prima passata (Spigoli, Profondita', Linee dritte).
+    # Un file del formato 10 senza questa voce e' di prima del 2026-11-09:
+    # parte coi soli Spigoli, come allora.
+    controlli_geometria: tuple[str, ...] = ()
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
@@ -411,7 +416,8 @@ class Lavoro:
             **({"inserti": list(self.inserti)} if self.inserti else {}),
             **({"finale": dict(self.finale)} if self.finale else {}),
             **({"esempi": list(self.esempi)} if self.esempi else {}),
-            **({"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria}
+            **({"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria,
+                "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
                if self.destinazione_geometria else {}),
         }
 
@@ -563,8 +569,12 @@ class Lavoro:
                 "o non parte dalla vista.",
                 "Rimetti il lavoro in coda da Studio · Genera.",
             )
+        try:
+            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender as errore:
+            raise LavoroNonValido(errore.fatto, "Rimetti il lavoro in coda da Studio · Genera.") from None
         avvolto = cls.da_dizionario({**dati, "formato": base})
-        return dataclasses.replace(avvolto, destinazione_geometria=destinazione)
+        return dataclasses.replace(avvolto, destinazione_geometria=destinazione, controlli_geometria=controlli)
 
 
 def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
@@ -664,6 +674,7 @@ def metti_in_coda(
     finale: dict | None = None,
     esempi: tuple[Path, ...] | list[Path] = (),
     destinazione_geometria: str | None = None,
+    controlli_geometria: tuple[str, ...] = (),
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -782,6 +793,7 @@ def metti_in_coda(
         finale=finale,
         esempi=tuple(str(e) for e in esempi),
         destinazione_geometria=destinazione_geometria or None,
+        controlli_geometria=(_controlli_del_lavoro(controlli_geometria) if destinazione_geometria else ()),
     )
     if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
@@ -862,6 +874,13 @@ def dire_sicuro(testo: str) -> None:
         print(testo.encode(codifica, errors="replace").decode(codifica), file=flusso)
     except (OSError, ValueError):
         pass  # uscita chiusa: il messaggio e' solo informativo
+
+
+def _controlli_del_lavoro(controlli: tuple[str, ...]) -> tuple[str, ...]:
+    try:
+        return modulo_geometria.controlli_validi(list(controlli) or None)
+    except ErroreAirender as errore:
+        raise LavoroNonValido(errore.fatto, errore.cosa_fare) from None
 
 
 def _geometria_reale(controlla: Callable[[], None], provider: str = "") -> "modulo_geometria.Geometria":
@@ -1058,14 +1077,15 @@ class Coda:
         self._dire(f"Lavoro {lavoro.identificativo}: prima passata «Tieni la geometria» verso {annunciata}.")
         avanzamento(INVIATO)
         seme = secrets.randbits(31)  # numero-non-configurabile: il seme del campionatore sta in un intero con segno
-        bozza, lavoro_comfy = geometria.esegui(richiesta.immagine, lavoro.prompt_geometria(), seme)
+        controlli = lavoro.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI
+        bozza, lavoro_comfy = geometria.esegui(richiesta.immagine, lavoro.prompt_geometria(), seme, controlli)
         modulo_immagine.misura(bozza)  # solleva se non e' un'immagine
         motore.controlla_prima_dell_invio(lavoro.modello, bozza)
         percorso = self.percorsi[FATTO_DIR] / f"{lavoro.identificativo}{SUFFISSO_GEOMETRIA}.png"
         scrivi_atomico(percorso, bozza)
         return dataclasses.replace(richiesta, immagine=bozza), {"geometria": {
             "bozza": str(percorso), "destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
-            "workflow": modulo_geometria.NOME_WORKFLOW}}
+            "workflow": modulo_geometria.NOME_WORKFLOW, "controlli": list(controlli)}}
 
     def _leggi(self, preso: Path) -> Lavoro:
         try:

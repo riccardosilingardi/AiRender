@@ -39,14 +39,73 @@ VARIABILE_URL = "AIRENDER_COMFY_WORKFLOW_URL"
 PROVIDER_AIRENDER = "airender"
 PERCORSO_SERVER = "/geometria"  # dove il server AIRENDER espone l'API v2 dei workflow
 WORKFLOW = Path(__file__).resolve().parent / "workflow" / "tieni-geometria.json"
-NOME_WORKFLOW = "Z-Image-Turbo + ControlNet sugli spigoli"
+NOME_WORKFLOW = "Z-Image-Turbo + ControlNet"
 REGOLA_PROMPT = (
-    "Image 1 is a draft render made with an edge ControlNet from the architectural view: its "
+    "Image 1 is a draft render made with a ControlNet from the architectural view: its "
     "edges, openings, proportions and camera match the building exactly. Keep every edge, "
     "line and opening where it is; improve only materials, light, shadows and realism."
 )
 # I nodi del workflow che il motore riempie (vedi il file JSON).
 NODO_IMMAGINE, NODO_LATO, NODO_PROMPT, NODO_FORZA, NODO_CAMPIONATORE = "1", "2", "6", "8", "9"
+NODO_MODELLO, NODO_CAMPIONAMENTO = "4", "11"
+
+# I tre controlli che l'utente puo' spuntare, nell'ordine in cui si
+# incatenano sul modello. Ognuno e' un preprocessore che estrae una guida
+# dalla vista e un nodo ControlNet (lo stesso ControlNet Union) che la
+# applica. Gli altri nodi del file restano fuori dal grafo.
+CONTROLLI = ("spigoli", "profondita", "linee")
+CONTROLLI_PREDEFINITI = ("spigoli",)
+NODI_CONTROLLO = {  # controllo: (preprocessore, ControlNet)
+    "spigoli": ("3", "8"),
+    "profondita": ("17", "18"),
+    "linee": ("19", "20"),
+}
+NOMI_CONTROLLI = {"spigoli": "Spigoli", "profondita": "Profondità", "linee": "Linee dritte"}
+
+
+def forza(controllo: str) -> float:
+    return {"spigoli": config.GEOMETRIA_FORZA, "profondita": config.GEOMETRIA_FORZA_PROFONDITA,
+            "linee": config.GEOMETRIA_FORZA_LINEE}[controllo]
+
+
+def controlli_validi(valore: object) -> tuple[str, ...]:
+    """I controlli scelti, in ordine e senza doppioni. Vuoto o sconosciuto: si rifiuta."""
+    if valore is None:
+        return CONTROLLI_PREDEFINITI
+    if not isinstance(valore, (list, tuple)) or not valore or any(v not in CONTROLLI for v in valore):
+        raise ErroreProvider(
+            f"«Tieni la geometria» accetta come controlli {', '.join(CONTROLLI)}: e' arrivato {valore!r}.",
+            "Spunta almeno uno fra Spigoli, Profondità e Linee dritte, oppure togli «Tieni la geometria».",
+        )
+    return tuple(c for c in CONTROLLI if c in valore)
+
+
+def descrivi_controlli(controlli: tuple[str, ...]) -> str:
+    nomi = [NOMI_CONTROLLI[c] for c in controlli]
+    return nomi[0] if len(nomi) == 1 else ", ".join(nomi[:-1]) + " e " + nomi[-1]
+
+
+def grafo_per(controlli: tuple[str, ...]) -> dict:
+    """Il grafo coi soli controlli scelti, incatenati sul modello, e i valori di config.py.
+
+    Restano da riempire solo vista, prompt e seme (workflow()). Lo usa anche
+    scripts/scrivi_listino.py per il server, che non riceve il grafo dal client.
+    """
+    controlli = controlli_validi(controlli)
+    grafo = copy.deepcopy(json.loads(WORKFLOW.read_text(encoding="utf-8")))
+    precedente = [NODO_MODELLO, 0]
+    for controllo in CONTROLLI:
+        preprocessore, controlnet = NODI_CONTROLLO[controllo]
+        if controllo not in controlli:
+            del grafo[preprocessore], grafo[controlnet]
+            continue
+        grafo[controlnet]["inputs"]["model"] = precedente
+        grafo[controlnet]["inputs"]["strength"] = forza(controllo)
+        precedente = [controlnet, 0]
+    grafo[NODO_CAMPIONAMENTO]["inputs"]["model"] = precedente
+    grafo[NODO_LATO]["inputs"]["largest_size"] = config.GEOMETRIA_LATO_MASSIMO
+    grafo[NODO_CAMPIONATORE]["inputs"]["steps"] = config.GEOMETRIA_PASSI
+    return grafo
 STATI_FINITI = ("succeeded", "failed", "expired", "canceled")
 
 
@@ -103,15 +162,12 @@ def crea(provider: str, trasporto: "TrasportoWorkflow", controlla: Callable[[], 
     return Geometria(trasporto, controlla=controlla)
 
 
-def workflow(asset: str, prompt: str, seme: int) -> dict:
-    """Il grafo in formato API, coi valori del lavoro. La nota del file non parte."""
-    grafo = copy.deepcopy(json.loads(WORKFLOW.read_text(encoding="utf-8")))
+def workflow(asset: str, prompt: str, seme: int, controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI) -> dict:
+    """Il grafo in formato API, coi controlli scelti e i valori del lavoro."""
+    grafo = grafo_per(controlli)
     grafo[NODO_IMMAGINE]["inputs"]["image"] = {"__type": "core/ASSET", "info": {"id": asset}}
-    grafo[NODO_LATO]["inputs"]["largest_size"] = config.GEOMETRIA_LATO_MASSIMO
     grafo[NODO_PROMPT]["inputs"]["text"] = prompt
-    grafo[NODO_FORZA]["inputs"]["strength"] = config.GEOMETRIA_FORZA
     grafo[NODO_CAMPIONATORE]["inputs"]["seed"] = seme
-    grafo[NODO_CAMPIONATORE]["inputs"]["steps"] = config.GEOMETRIA_PASSI
     return grafo
 
 
@@ -170,14 +226,15 @@ class Geometria:
             raise self._errore("il caricamento della vista", stato, risposta)
         return str(risposta["id"])
 
-    def esegui(self, immagine: bytes, prompt: str, seme: int) -> tuple[bytes, str]:
+    def esegui(self, immagine: bytes, prompt: str, seme: int,
+               controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI) -> tuple[bytes, str]:
         """Carica la vista, manda il workflow, aspetta e scarica. Torna l'immagine e l'id del lavoro Comfy."""
         asset = self.carica(immagine)
         self.controlla()
         stato, _int, lavoro = self.trasporto.chiama(
             "POST", f"{self.base}/api/v2/jobs",
             {**self._intestazioni(), "Idempotency-Key": str(uuid.uuid4())},
-            {"workflow": workflow(asset, prompt, seme)})
+            {"workflow": workflow(asset, prompt, seme, controlli)})
         if stato not in (200, 201) or not isinstance(lavoro, dict) or not lavoro.get("id"):  # numero-non-configurabile: HTTP OK e Created
             raise self._errore("l'invio del workflow", stato, lavoro)
         identificativo = str(lavoro["id"])

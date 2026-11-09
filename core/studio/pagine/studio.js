@@ -29,6 +29,7 @@ const S = {
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
   geometria: false,       // «Tieni la geometria»: prima un workflow col ControlNet, poi il modello
+  controlliGeometria: ["spigoli"], // quali guide tiene il ControlNet: spigoli, profondita, linee
   esempi: [],             // «Stile da esempi»: render d'esempio oltre al riferimento, stessa forma
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
@@ -515,6 +516,7 @@ async function genera() {
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
       materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
       geometria: geometriaGenera(),
+      controlli_geometria: geometriaGenera() ? S.controlliGeometria : undefined,
       destinazione_geometria_mostrata: S.destinazione && S.destinazione.geometria && S.destinazione.geometria.destinazione,
     });
     S.ultimoEsito = null;
@@ -1117,16 +1119,41 @@ function perchéGeometriaSpenta() {
 }
 function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
+// I tre controlli di «Tieni la geometria», in parole semplici. Si possono
+// spuntare insieme; almeno uno resta acceso.
+const CONTROLLI_GEOMETRIA = [
+  ["spigoli", "Spigoli", "Tiene contorni, finestre e porte dove sono. Il più preciso; può ricalcare anche retini e fughe come righe."],
+  ["profondita", "Profondità", "Tiene volumi, piani e prospettiva (cosa sta davanti e cosa dietro), non i dettagli. Utile per masse e interni."],
+  ["linee", "Linee dritte", "Tiene solo le linee dritte di muri, solai e serramenti, ignora texture e vegetazione. Utile se gli Spigoli ricalcano troppo."],
+];
+
 function pannelloGeometria() {
   const possibile = geometriaPossibile();
   const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
+  const controlli = S.geometria && possibile ? h("div", { classe: "controlli-geometria" },
+    ...CONTROLLI_GEOMETRIA.map(([chiave, nome, testo]) => {
+      const acceso = S.controlliGeometria.includes(chiave);
+      const ultimo = acceso && S.controlliGeometria.length === 1;
+      const id = `geometria-${chiave}`;
+      return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
+        h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
+          onchange: (e) => {
+            const scelti = new Set(S.controlliGeometria);
+            if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
+            S.controlliGeometria = CONTROLLI_GEOMETRIA.map(([c]) => c).filter((c) => scelti.has(c));
+            S.secco = null; render();
+          } }),
+        h("span", {}, h("b", {}, nome), " — ", h("span", { classe: "tenue" }, testo)));
+    }),
+    h("p", { classe: "tenue piccolo" }, "Più controlli insieme tengono di più ma lasciano meno libertà al render. Il costo non cambia.")) : null;
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
-      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
-      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."));
+      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire la vista: spigoli, profondità o linee dritte, quelli che spunti); ",
+      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."),
+    controlli);
 }
 
 function esempiGenera() { return S.modo === "contesto" || !S.riferimento ? [] : S.esempi.map((r) => r.nome); }
@@ -1522,6 +1549,16 @@ function disegnaComposto() {
 
 function nomeRender(l) { return `${l.modello_nome} · ${l.preset_nome} · ${data(l.creato_il)}`; }
 
+// Nell'elenco dei render: con quali controlli ha tenuto la geometria e la
+// quota di spigoli ritrovati, per confrontare i render della stessa vista.
+function tenutaBreve(l) {
+  const parti = [];
+  if (l.controlli_geometria) parti.push(`Tieni: ${l.controlli_geometria}`);
+  const q = l.tenuta && l.tenuta.spigoli;
+  parti.push(typeof q === "number" ? `Spigoli ${percento(q)}` : "Spigoli: non misurati");
+  return parti.join(" · ");
+}
+
 // La linea del prima/dopo, uguale in Risultato e in Passi. `st` tiene la
 // posizione della linea (st.x, da 0 a 100) fra un disegno e l'altro.
 function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
@@ -1621,7 +1658,8 @@ function elencoRender() {
       onclick: async () => { r.scelto = l.identificativo; r.rifai = false; r.esportato = null; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
     },
     l.render ? h("img", { src: `/file/render/${l.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto", stile: "width:64px;height:40px" }),
-    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."));
+    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato),
+      l.render ? h("span", { classe: "tenue piccolo", stile: "display:block" }, tenutaBreve(l)) : null)))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."));
 }
 
 // La misura degli spigoli: un numero solo se il motore l'ha fatta, altrimenti
