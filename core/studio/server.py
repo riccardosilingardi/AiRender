@@ -245,7 +245,9 @@ class _Gestore(BaseHTTPRequestHandler):
             case ["api", "invia"]:
                 self._json(studio.invia(self._corpo_json()))
             case ["api", "viste"]:
-                self._json(studio.carica_vista(self._corpo(), self.headers.get("X-Nome-File", "")))
+                self._json(studio.carica_vista(self._corpo(), self.headers.get("X-Nome-File", ""),
+                                               self.headers.get("X-Tipo-Immagine", ""),
+                                               self.headers.get("X-Scena", "") or "esterno"))
             case ["api", "riferimenti"]:
                 self._json(studio.carica_riferimento(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "contesti"]:

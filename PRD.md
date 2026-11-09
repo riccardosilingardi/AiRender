@@ -270,6 +270,20 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Partenza da un'immagine (2026-11-09)
+
+Foto, render già fatto e schizzo caricati nello Studio, con tre regole nuove
+per il modello in `core/blocchi.py` (bozza 16) e i Punti per i materiali.
+Provato con i test (tipi, misura minima, import senza invio, passi e storico,
+rifiuti, Cambia e Ritocca da una foto, schizzo da Genera, Cosa tenere) e in
+Chromium sullo Studio del PC con un provider finto: pannello, i quattro
+percorsi, Punti su uno schizzo. **Nessuna regola provata con un render vero**:
+non si sa se Nano Banana tiene inquadratura e muri di una foto, gli arredi con
+«Anche gli arredi», le linee di uno schizzo. `PUNTO_LATO` (5% del lato) è un
+giudizio, non misurato. Mai provato nella web app con Pyodide vero né sul PC di
+Riccardo. Si esce con tre render veri (una foto d'interno col look cambiato, uno
+schizzo, un render già fatto con un Cambia) giudicati a occhio da Riccardo.
+
 ### Cambia con le miniature e Popola (2026-11-09)
 
 Tredici miniature di ora e mood e tre cose di Popola, con i testi per il

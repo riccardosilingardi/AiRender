@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-15"
+VERSIONE = "bozza-16"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -136,6 +136,60 @@ FEDELTA_PRODOTTO = _blocchi(
      "as seams, stitching, edge profiles and fixings. Change the look and the "
      "background described below."),
 )
+
+# --- partenza da un'immagine (bozza 16, 2026-11-09) -------------------------
+
+# Da dove viene l'immagine che parte per prima. «vista» e' la vista di
+# Allplan di sempre: regola fissa secondo la fedelta'. Le altre sono
+# un'immagine caricata nello Studio («Da un'immagine»): una foto o un render
+# fatto altrove, oppure uno schizzo o la foto di un plastico. La loro regola
+# prende il posto della fedelta' (che parla di un disegno, e una foto non lo
+# e'). Scritte, non provate col modello.
+VISTA_ALLPLAN = "vista"
+PARTENZA_FOTO = "foto"
+PARTENZA_FOTO_ARREDI = "foto-arredi"
+PARTENZA_SCHIZZO = "schizzo"
+_FOTO_VERA = (
+    "This is a real photograph or a finished render, not a 3D model view. "
+    "Edit this exact image. Keep the camera position, lens and perspective, "
+)
+PARTENZE = _blocchi(
+    (PARTENZA_FOTO, "Foto · tieni muri e finestre",
+     _FOTO_VERA + "every wall, floor, ceiling, window and door exactly as they "
+     "are and, unless the light is described below, the daylight already in "
+     "the image; do not add, remove or reshape any architecture. You may "
+     "replace furniture, finishes and materials to match the look described below."),
+    (PARTENZA_FOTO_ARREDI, "Foto · tieni anche gli arredi",
+     _FOTO_VERA + "every wall, floor, ceiling, window and door, and every piece "
+     "of furniture and every object exactly where and as it is; do not add, "
+     "remove or reshape anything. Change only the light, the colours and the "
+     "materials as described below."),
+    (PARTENZA_SCHIZZO, "Schizzo o plastico",
+     "This is a hand sketch or a photograph of a physical model, not a finished "
+     "image. Keep every line of it: the same camera, framing, proportions, "
+     "volumes and openings; do not add, remove or reshape any architecture. "
+     "Turn it into a finished image with real materials and light as described below."),
+)
+NOMI_PARTENZE = {VISTA_ALLPLAN: "Vista di Allplan", **{i: b.nome for i, b in PARTENZE.items()}}
+# Un pezzo d'arredo ha la sua regola (FEDELTA_PRODOTTO): da una foto vale
+# per esterni e interni.
+SCENE_PARTENZA = (ESTERNO, INTERNO)
+
+
+def partenza_valida(partenza: str | None, scena: str = ESTERNO) -> str:
+    partenza = partenza or VISTA_ALLPLAN
+    if partenza not in NOMI_PARTENZE:
+        raise SceltaNonValida(
+            f"La partenza \"{partenza}\" non esiste.",
+            f"Le partenze possibili sono: {', '.join(NOMI_PARTENZE)}.",
+        )
+    if partenza != VISTA_ALLPLAN and scena not in SCENE_PARTENZA:
+        raise SceltaNonValida(
+            "Da una foto o da uno schizzo si parte con un esterno o un interno, non con un pezzo d'arredo.",
+            "Scegli la scena Esterno o Interno.",
+        )
+    return partenza
+
 
 # SCELTA: e' la regola con cui sono stati fatti tutti i render fino al
 # 2026-10-31. Cambia solo se il piano «fedelta» del banco dice che un'altra
@@ -554,6 +608,10 @@ class Scelte:
     qualita: str = QUALITA_PREDEFINITA
     fedelta: str = FEDELTA_PREDEFINITA
     resa: str = FOTO
+    # Da dove viene l'immagine di partenza (PARTENZE). Il valore di sempre,
+    # la vista di Allplan, non si scrive nel dizionario: i lavori dalla vista
+    # restano uguali a prima, e un motore vecchio li legge ancora.
+    partenza: str = VISTA_ALLPLAN
     # Non e' un blocco di prompt: e' la grandezza del render che si chiede al
     # modello. Sta qui perche' viaggia con le scelte dalla palette alla coda.
     risoluzione: str = config.RISOLUZIONE_RENDER_PREDEFINITA
@@ -566,7 +624,8 @@ class Scelte:
             )
 
     def a_dizionario(self) -> dict:
-        return {f.name: getattr(self, f.name) for f in fields(self)}
+        return {f.name: getattr(self, f.name) for f in fields(self)
+                if not (f.name == "partenza" and self.partenza == VISTA_ALLPLAN)}
 
     @classmethod
     def da_dizionario(cls, dati: dict) -> "Scelte":
@@ -703,8 +762,10 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
             _blocco(asse, getattr(scelte, asse), scelte.scena)
     resa = resa_valida(scelte.resa)
     via = SPENTI_DA_RESA[resa]
-    blocchi = [_blocco("fedelta", scelte.fedelta or FEDELTA_PREDEFINITA, scelte.scena),
-               SCENA[scelte.scena]]
+    partenza = partenza_valida(scelte.partenza, scelte.scena)
+    regola = (_blocco("fedelta", scelte.fedelta or FEDELTA_PREDEFINITA, scelte.scena)
+              if partenza == VISTA_ALLPLAN else PARTENZE[partenza])
+    blocchi = [regola, SCENA[scelte.scena]]
     if resa != FOTO:
         blocchi.append(RESA[resa])
     for asse in ordine:
@@ -725,7 +786,7 @@ def frase_materiali(materiali: str) -> str:
 def componi(scelte: Scelte) -> str:
     """Il prompt che parte al modello, in inglese, nell'ordine fisso."""
     blocchi = blocchi_scelti(scelte)
-    pezzi = [b.testo for b in blocchi[:2]]  # regola fissa (secondo la fedelta'), scena
+    pezzi = [b.testo for b in blocchi[:2]]  # regola fissa (secondo la fedelta' o la partenza), scena
     materiali = frase_materiali(scelte.materiali) if "materiali" not in spenti(scelte) else ""
     if materiali:
         pezzi.append(materiali)

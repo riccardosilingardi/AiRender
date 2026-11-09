@@ -18,7 +18,7 @@ import re
 import subprocess
 import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -27,6 +27,7 @@ from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagi
 from .. import contesto as modulo_contesto
 from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
+from .. import partenza as modulo_partenza
 from .. import passi as modulo_passi
 from .. import esporta as modulo_esporta, preset_utente
 from .. import regola as modulo_regola
@@ -34,7 +35,7 @@ from .. import video as modulo_video
 from .. import licenza as modulo_licenza
 from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
-from ..idoneita import valuta
+from ..idoneita import valuta, valuta_immagine
 from ..preset import MODELLI_PREDEFINITI
 from ..provider import comfy, geometria as modulo_geometria
 from ..provider.base import Provider
@@ -350,9 +351,11 @@ class Studio:
             quota = modulo_immagine.quota_colorata(dati)
         except ErroreAirender as errore:
             return {**descrizione, "leggibile": False, "idonea": False, **_errore_dict(errore)}
-        esito = valuta(statistiche)
+        tipo = modulo_partenza.leggi(percorso)
+        esito = valuta(statistiche) if tipo is None else valuta_immagine(statistiche)
         return {
             **descrizione,
+            **self._partenza_dict(tipo),
             "leggibile": True,
             "idonea": esito.idonea,
             "motivo": esito.motivo,
@@ -363,7 +366,20 @@ class Studio:
             "toni": statistiche.toni_distinti,
             "quota_sfondo": round(statistiche.quota_sfondo, 3),  # numero-non-configurabile: cifre per la pagina
             "quota_colorata": round(quota, 3),  # numero-non-configurabile: cifre per la pagina
-            "colori_come_materiali": quota >= config.QUOTA_COLORATA_AVVISO,
+            # In una foto i colori sono quelli veri: l'avviso vale per le viste di Allplan.
+            "colori_come_materiali": tipo is None and quota >= config.QUOTA_COLORATA_AVVISO,
+        }
+
+    @staticmethod
+    def _partenza_dict(tipo: str | None) -> dict:
+        """Cosa la pagina sa del tipo d'immagine: None per una vista di Allplan."""
+        if tipo is None:
+            return {"tipo": None, "tipo_nome": "Vista di Allplan", "partenze": [], "partenza_predefinita": blocchi.VISTA_ALLPLAN}
+        return {
+            "tipo": tipo,
+            "tipo_nome": modulo_partenza.NOMI[tipo],
+            "partenze": [{"id": p, "nome": blocchi.NOMI_PARTENZE[p]} for p in modulo_partenza.PARTENZE_POSSIBILI[tipo]],
+            "partenza_predefinita": modulo_partenza.PARTENZA_PREDEFINITA[tipo],
         }
 
     @staticmethod
@@ -378,8 +394,18 @@ class Studio:
             return None
         return "Prospettiva centrale" if dati["prospettiva_centrale"] else "Vista parallela"
 
-    def carica_vista(self, dati: bytes, nome_originale: str = "") -> dict:
-        """Salva nella cartella una vista scelta dall'utente, con un nome nuovo."""
+    def carica_vista(self, dati: bytes, nome_originale: str = "", tipo: str = "",
+                     scena: str = blocchi.ESTERNO) -> dict:
+        """Salva nella cartella una vista scelta dall'utente, con un nome nuovo.
+
+        Con `tipo` e' un'immagine caricata con «Da un'immagine» (core/partenza.py):
+        accanto si scrive che cos'e'. Un render gia' fatto o una foto diventano
+        subito anche un risultato, senza invio: da li' partono Cambia, Ritocca,
+        Popola e Finale. Uno schizzo no: prima passa da Genera.
+        """
+        if tipo:
+            modulo_partenza.controlla_tipo(tipo)
+            blocchi.partenza_valida(blocchi.PARTENZA_FOTO, scena or blocchi.ESTERNO)
         massimo = config.STUDIO_CARICAMENTO_MASSIMO_MB
         if len(dati) > massimo * _BYTE_PER_MB:
             raise RichiestaStudioNonValida(
@@ -396,11 +422,28 @@ class Studio:
         istante = self._adesso().astimezone()
         nome = f"vista-{istante:%Y%m%d-%H%M%S}{estensione}"
         indice = 1
-        while (self.cartella / nome).exists():
+        # Libero anche il nome senza estensione: albero dei passi e tipo
+        # d'immagine stanno accanto alla vista col suo nome, e un PNG e un
+        # JPEG caricati nello stesso secondo se li dividerebbero.
+        while any(self.cartella.glob(f"{Path(nome).stem}.*")):
             indice += 1
             nome = f"vista-{istante:%Y%m%d-%H%M%S}-{indice}{estensione}"
+        if tipo:
+            # Si rifiuta qui, prima di metterla nella cartella: un render gia'
+            # fatto diventerebbe un risultato da cui ogni passo verrebbe rifiutato.
+            esito = valuta_immagine(modulo_immagine.misura(dati))
+            if not esito.idonea:
+                raise RichiestaStudioNonValida(esito.fatto, esito.cosa_fare)
         modulo_coda.scrivi_atomico(self.cartella / nome, dati)
-        return {"nome": nome, "da": nome_originale}
+        risposta = {"nome": nome, "da": nome_originale}
+        if not tipo:
+            return risposta
+        modulo_partenza.scrivi(self.cartella / nome, tipo, nome_originale)
+        risposta["tipo"] = tipo
+        if tipo in modulo_partenza.SUBITO_RISULTATO:
+            risposta["lavoro"] = modulo_coda.importa_immagine(
+                self.cartella, self.cartella / nome, scena or blocchi.ESTERNO).identificativo
+        return risposta
 
     # --- immagine di riferimento per lo stile -----------------------------
 
@@ -630,20 +673,31 @@ class Studio:
             assi.append({"id": asse, "titolo": titolo, "voci": voci})
         return assi
 
-    def _scelte(self, dati: object) -> blocchi.Scelte:
+    def _scelte(self, dati: object, vista: Path | None = None, contesto: object = None) -> blocchi.Scelte:
+        """Le scelte della pagina; con la vista, la regola che vale per lei (core/partenza.py).
+
+        Da un'immagine caricata la regola e' quella delle foto o degli schizzi
+        anche se la pagina non la manda. Con «Inserisci nel contesto» la vista
+        e' l'edificio e il prompt e' quello del contesto: la partenza resta la vista.
+        """
         if not isinstance(dati, dict):
             raise RichiestaStudioNonValida(
                 "Le scelte di stile non sono arrivate.",
                 "Ricarica la pagina dello Studio.",
             )
         scelte = blocchi.Scelte.da_dizionario(dati)
+        if vista is not None:
+            partenza = (blocchi.VISTA_ALLPLAN if contesto is not None
+                        else modulo_partenza.partenza_per(vista, scelte.partenza))
+            scelte = replace(scelte, partenza=partenza)
         blocchi.componi(scelte)  # solleva SceltaNonValida con la ragione
         return scelte
 
     def componi(self, dati: dict) -> dict:
         """Il prompt vero, il riassunto in italiano e quanti caratteri."""
-        scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
+        nome_vista = str(dati.get("vista") or "")
+        scelte = self._scelte(dati.get("scelte"), self.percorso_vista(nome_vista) if nome_vista else None, contesto)
         cambi = self._cambi_scelti(dati) if not contesto else ()
         esempi = self._esempi_scelti(dati, contesto is not None)
         stile = (int(bool(dati.get("riferimento"))) + len(esempi)) if not contesto else 0
@@ -763,8 +817,8 @@ class Studio:
     def prova_a_secco(self, dati: dict) -> dict:
         """Tutto quello che farebbe Genera, tranne mandare. Elenca cosa lo fermerebbe."""
         vista = self.percorso_vista(str(dati.get("vista") or ""))
-        scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
+        scelte = self._scelte(dati.get("scelte"), vista, contesto)
         riferimento = self._riferimento_scelto(dati)
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
@@ -835,8 +889,8 @@ class Studio:
                 "Ricarica lo Studio: il prompt si ricompone dalle scelte. Per scriverlo a mano serve Pro o Studio.",
             )
         vista = self.percorso_vista(str(dati.get("vista") or ""))
-        scelte = self._scelte(dati.get("scelte"))
         contesto = self._contesto_scelto(dati)
+        scelte = self._scelte(dati.get("scelte"), vista, contesto)
         riferimento = self._riferimento_scelto(dati)
         cambi = self._cambi_scelti(dati, vista) if not contesto else ()
         inserti = self._inserti_scelti(dati, contesto is not None)
@@ -1052,6 +1106,7 @@ class Studio:
         e l'immagine scelta parte come seconda immagine perche' il modello
         veda come sono venute.
         """
+        self._non_importata(identificativo, "non si porta su un'altra vista: non ha uno stile da rifare")
         lavoro, _cartella = self._lavoro(identificativo)
         if lavoro.contesto is not None:
             raise RichiestaStudioNonValida(
@@ -1126,6 +1181,7 @@ class Studio:
         Per un passo e' «Rifai questo passo»: stesso passo di partenza, stessa
         richiesta, e nell'albero un ramo nuovo accanto.
         """
+        self._non_importata(identificativo, "non si rifa': non e' partita da nessuna parte")
         lavoro, _cartella = self._lavoro(identificativo)
         partenza = Path(lavoro.partenza) if lavoro.partenza else None
         if partenza is not None and not self._render_valido(partenza):
@@ -1236,6 +1292,7 @@ class Studio:
         modello = next((m for m in (*MODELLI, MODELLO_FINALE) if m.identificativo == dati.get("modello")), None)
         preset = blocchi.PRESET_STILE.get(dati.get("preset") or "")
         render = self._render(identificativo, stato)
+        importata = bool(stato.get("importata"))
         richieste = [r for r in (dati.get("richieste") or []) if isinstance(r, str)]
         try:
             scelte = blocchi.Scelte.da_dizionario(dati.get("scelte") or {})
@@ -1263,10 +1320,12 @@ class Studio:
             "vista": Path(dati.get("vista") or "").name,
             "destinazione": dati.get("destinazione"),
             "modello": dati.get("modello"),
-            "modello_nome": modello.nome if modello else dati.get("modello"),
+            "modello_nome": NOME_CARICATA if importata else modello.nome if modello else dati.get("modello"),
+            "importata": importata,
             "preset": dati.get("preset"),
             "preset_nome": (
-                f"Finale ×{finale.get('ingrandimento')}" if finale
+                "nessun invio" if importata
+                else f"Finale ×{finale.get('ingrandimento')}" if finale
                 else "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
                 if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
                 else "Cambia: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
@@ -1274,11 +1333,11 @@ class Studio:
             ),
             "parte_da": dati.get("parte_da"),
             "scelte": dati.get("scelte"),
-            "riassunto": testo_riassunto,
+            "riassunto": "L'immagine che hai caricato, così com'è." if importata else testo_riassunto,
             "prompt_a_mano": bool(dati.get("prompt_a_mano")),
             "render": render is not None,
             "scostamento_geometria": stato.get("scostamento_geometria"),
-            "tenuta": self._tenuta(render),
+            "tenuta": _TENUTA_IMPORTATA if importata else self._tenuta(render),
         }
 
     def _tenuta(self, render: Path | None) -> dict | None:
@@ -1308,9 +1367,21 @@ class Studio:
                 "Questo lavoro non ha un render da misurare.",
                 "Scegli un render fatto nell'elenco dei render della vista.",
             )
+        self._non_importata(identificativo, "non si misura: confrontata con se stessa darebbe un numero falso")
         lavoro, _cartella = self._lavoro(identificativo)
         modulo_coda.scrivi_misura(Path(lavoro.vista), render)
         return self._tenuta(render)
+
+    def _importata(self, identificativo: str) -> bool:
+        """True se il lavoro e' un'immagine caricata come render gia' fatto (coda.importa_immagine)."""
+        return bool((modulo_coda.leggi_stato(self.cartella, identificativo) or {}).get("importata"))
+
+    def _non_importata(self, identificativo: str, perche: str) -> None:
+        if self._importata(identificativo):
+            raise RichiestaStudioNonValida(
+                f"Questa e' l'immagine che hai caricato: {perche}.",
+                "Parti da lei con Cambia, Ritocca, Popola o Finale.",
+            )
 
     # --- esporta per il cliente ----------------------------------------------
 
@@ -1586,7 +1657,8 @@ class Studio:
             nome = voce_vista["nome"]
             vista = self.cartella / nome
             voci = [{"tipo": "cattura", "vista": nome, "identificativo": None,
-                     "etichetta": "Vista", "creato_il": voce_vista["modificata_il"],
+                     "etichetta": _ETICHETTE_PARTENZA.get(modulo_partenza.leggi(vista), "Vista"),
+                     "creato_il": voce_vista["modificata_il"],
                      "stato": modulo_coda.FATTO, "attivo": False, "immagine": True}]
             errore = None
             try:
@@ -1605,7 +1677,8 @@ class Studio:
                     "identificativo": identificativo,
                     "numero": str(passo.get("numero")),
                     "da": albero.padre(passo),
-                    "etichetta": _ETICHETTE_STORICO.get(_tipo_passo(passo), "Render"),
+                    "etichetta": "Caricata" if passo.get("modello") == modulo_coda.MODELLO_CARICATA
+                    else _ETICHETTE_STORICO.get(_tipo_passo(passo), "Render"),
                     "creato_il": passo.get("creato_il"),
                     "stato": passo.get("stato"),
                     "attivo": passo.get("stato") in STATI_ATTIVI,
@@ -1686,11 +1759,13 @@ class Studio:
             # Cambia e Popola mostrano solo le voci che valgono per la scena.
             "scena": self._scena(albero, passo),
             "modello": passo.get("modello"),
-            "modello_nome": modello.nome if modello else passo.get("modello"),
+            "modello_nome": NOME_CARICATA if passo.get("modello") == modulo_coda.MODELLO_CARICATA
+            else modello.nome if modello else passo.get("modello"),
             "creato_il": passo.get("creato_il"),
             "stato": stato,
             "attivo": stato in STATI_ATTIVI,
-            "tenuta": self._tenuta(render) if ha_render else None,
+            "tenuta": (_TENUTA_IMPORTATA if passo.get("modello") == modulo_coda.MODELLO_CARICATA
+                       else self._tenuta(render)) if ha_render else None,
             "render": ha_render,
             "si_parte": motivo is None,
             "motivo_non_si_parte": motivo,
@@ -2205,6 +2280,12 @@ def _nome_livello(passo: dict) -> str:
     return f"{passo.get('numero', '?')} · {cosa}"
 
 
+# Un'immagine caricata come render gia' fatto (coda.importa_immagine).
+NOME_CARICATA = "Immagine caricata"
+_TENUTA_IMPORTATA = {"spigoli": None, "motivo": "è l'immagine che hai caricato, non c'è un render da confrontare",
+                     "da_misurare": False, "avvisa": False, "soglia": config.GEOMETRY_DRIFT_WARN}
+
+
 def _miniatura_dict(preset: str, voce: dict | None) -> dict | None:
     """Cosa la pagina sa di una miniatura vera: dove prenderla e da quando e' un render vero."""
     if voce is None:
@@ -2225,6 +2306,9 @@ def _richieste_del_passo(passo: dict) -> list[str]:
 
 # Come lo storico chiama ogni immagine: una o due parole.
 _ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco"}
+# La prima voce di una vista caricata con «Da un'immagine» dice che cos'e'.
+_ETICHETTE_PARTENZA = {modulo_partenza.RENDER: "Immagine", modulo_partenza.FOTO: "Foto",
+                       modulo_partenza.SCHIZZO: "Schizzo"}
 
 
 def _tipo_passo(passo: dict) -> str:
@@ -2244,6 +2328,8 @@ def _nome_stile(passo: dict) -> str:
 
 def _nome_passo(passo: dict) -> str:
     """Il nome breve della riga: dalle scelte, o dalla richiesta."""
+    if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
+        return NOME_CARICATA
     tipo = _tipo_passo(passo)
     if tipo == "ritocco":
         note = _richieste_del_passo(passo)
@@ -2268,6 +2354,8 @@ def _nome_passo(passo: dict) -> str:
 
 def _riassunto_passo(passo: dict, padre: dict | None) -> str:
     """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
+    if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
+        return "L'immagine che hai caricato, così com'è: nessun invio."
     tipo = _tipo_passo(passo)
     richieste = passo.get("richieste") or []
     if tipo == "ritocco":
@@ -2451,8 +2539,13 @@ def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") 
 def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     """Le scelte in italiano, nell'ordine in cui partono i blocchi."""
     fedelta = scelte.fedelta or blocchi.FEDELTA_PREDEFINITA
-    regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
-        else f"Fedeltà al disegno {blocchi.blocco('fedelta', fedelta, scelte.scena).nome.lower()}"
+    partenza = blocchi.partenza_valida(scelte.partenza, scelte.scena)
+    if partenza != blocchi.VISTA_ALLPLAN:
+        regola = f"Regola fissa da {blocchi.NOMI_PARTENZE[partenza][0].lower()}{blocchi.NOMI_PARTENZE[partenza][1:]}"
+    elif fedelta == blocchi.FEDELTA_PREDEFINITA:
+        regola = "Regola fissa"
+    else:
+        regola = f"Fedeltà al disegno {blocchi.blocco('fedelta', fedelta, scelte.scena).nome.lower()}"
     pezzi = [regola, blocchi.SCENA[scelte.scena].nome.lower() if scelte.scena in blocchi.SCENA else scelte.scena]
     resa = blocchi.resa_valida(scelte.resa)
     via = blocchi.SPENTI_DA_RESA[resa]
