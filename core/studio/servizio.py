@@ -28,6 +28,7 @@ from .. import contesto as modulo_contesto
 from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import passi as modulo_passi
+from .. import punto as modulo_punto
 from .. import esporta as modulo_esporta, preset_utente
 from .. import regola as modulo_regola
 from .. import video as modulo_video
@@ -137,6 +138,7 @@ def _rese() -> list[dict]:
     ]
 
 _TITOLI_ASSI = {
+    "tipo": "Che disegno è",
     "fedelta": "Fedeltà al disegno",
     "look": "Look fotografico",
     "luce": "Ora / Luce",
@@ -340,8 +342,13 @@ class Studio:
             )
         return percorso
 
-    def descrivi_vista(self, nome: str) -> dict:
-        """La vista con il suo esito di idoneita', come la mostra Genera."""
+    def descrivi_vista(self, nome: str, scena: str | None = None) -> dict:
+        """La vista con il suo esito di idoneita', come la mostra Genera.
+
+        `idonea` e' il giudizio per la scena chiesta (senza, una vista in
+        prospettiva); `idonea_pianta` quello per una pianta, che lo Studio usa
+        quando la scena scelta e' «Pianta» senza richiedere la descrizione.
+        """
         percorso = self.percorso_vista(nome)
         descrizione = {"nome": nome, "percorso": str(percorso), "camera": self._camera(percorso)}
         try:
@@ -350,10 +357,13 @@ class Studio:
             quota = modulo_immagine.quota_colorata(dati)
         except ErroreAirender as errore:
             return {**descrizione, "leggibile": False, "idonea": False, **_errore_dict(errore)}
-        esito = valuta(statistiche)
+        esito = valuta(statistiche, scena)
+        pianta = valuta(statistiche, blocchi.PIANTA)
         return {
             **descrizione,
             "leggibile": True,
+            "idonea_pianta": pianta.idonea,
+            "pianta": {"fatto": pianta.fatto, "cosa_fare": pianta.cosa_fare},
             "idonea": esito.idonea,
             "motivo": esito.motivo,
             "fatto": esito.fatto,
@@ -545,6 +555,22 @@ class Studio:
                 "quante": [{"id": k, "nome": v} for k, v in blocchi.QUANTE_POPOLA.items()],
                 "come": [{"id": k, "nome": v} for k, v in blocchi.COME_POPOLA.items()],
             },
+            "pianta": {
+                "stanze": [{"id": k, "nome": n} for k, (n, _t) in blocchi.STANZE_ARREDA.items()],
+                "stili_arreda": [{"id": k, "nome": n} for k, (n, _t) in blocchi.STILI_ARREDA.items()],
+                "stili_punto": [{"id": k, "nome": n} for k, (n, _t) in blocchi.STILI_PUNTO.items()],
+                "altezza_occhi": config.PUNTO_DI_VISTA_ALTEZZA_OCCHI_M,
+                "altezza_soffitto": config.PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M,
+                "trascina_minimo": config.PUNTO_DI_VISTA_TRASCINA_MINIMO,
+                "apertura_gradi": config.PUNTO_DI_VISTA_APERTURA_GRADI,
+                # Il segno nello Studio e' lo stesso che il motore disegna e manda.
+                "cono_lato": config.PUNTO_DI_VISTA_CONO_LATO,
+                "raggio": config.PUNTO_DI_VISTA_RAGGIO,
+                "rosso": list(config.PUNTO_DI_VISTA_ROSSO),
+                "cono_opacita": config.PUNTO_DI_VISTA_CONO_OPACITA,
+                # «In Allplan» (la camera vera) resta in grigio finche' la sonda non risponde.
+                "allplan": config.PUNTO_DI_VISTA_ALLPLAN,
+            },
             "esempi_stile_massimi": config.ESEMPI_STILE_MASSIMO,
             "finale": {
                 "modello": self._modello_dict(MODELLO_FINALE),
@@ -626,7 +652,9 @@ class Studio:
             ]
             titolo = _TITOLI_ASSI[asse]
             if asse == "luce" and scena != blocchi.ESTERNO:
-                titolo = "Luce"
+                titolo = "Luce e ombre" if scena == blocchi.PIANTA else "Luce"
+            if asse == "look" and scena == blocchi.PIANTA:
+                titolo = "Stile della tavola"
             assi.append({"id": asse, "titolo": titolo, "voci": voci})
         return assi
 
@@ -778,7 +806,7 @@ class Studio:
                                 int(riferimento is not None) + len(esempi), len(esempi), cambi, len(inserti),
                                 geometria=geometria)
         problemi = []
-        descrizione = self.descrivi_vista(vista.name)
+        descrizione = self.descrivi_vista(vista.name, scelte.scena)
         if not descrizione["idonea"]:
             problemi.append({"fatto": descrizione["fatto"], "cosa_fare": descrizione["cosa_fare"]})
         else:
@@ -971,7 +999,8 @@ class Studio:
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
-                       esempi: tuple = (), geometria_mostrata: str | None = None) -> dict:
+                       esempi: tuple = (), geometria_mostrata: str | None = None,
+                       punto_di_vista: modulo_punto.PuntoDiVista | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
                 f"La pagina ha mostrato come destinazione {mostrata!r}, ma la vista "
@@ -1008,8 +1037,9 @@ class Studio:
                                            "Scegli Nano Banana 2, oppure togli i Rif.")
         if partenza is None:
             # Da un render l'idoneita' non conta: giudica una vista di
-            # Allplan, e quello che parte e' il render del passo.
-            descrizione = self.descrivi_vista(vista.name)
+            # Allplan, e quello che parte e' il render del passo. Il punto di
+            # vista parte da una pianta: si giudica come una pianta.
+            descrizione = self.descrivi_vista(vista.name, blocchi.PIANTA if punto_di_vista else scelte.scena)
             if not descrizione["idonea"]:
                 raise RichiestaStudioNonValida(descrizione["fatto"], descrizione["cosa_fare"])
         lavori = [
@@ -1032,6 +1062,7 @@ class Studio:
                 finale=finale,
                 esempi=tuple(esempi),
                 destinazione_geometria=prima_passata["destinazione"] if prima_passata else None,
+                punto_di_vista=punto_di_vista,
                 crea_provider=self._crea_provider,
             )
             for _ in range(varianti)
@@ -1150,7 +1181,8 @@ class Studio:
         inserti = tuple(Path(i) for i in lavoro.inserti)
         esempi = tuple(Path(e) for e in lavoro.esempi)
         destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None,
-                                         contesto=lavoro.contesto is not None, inserti=len(inserti),
+                                         contesto=lavoro.contesto is not None,
+                                         inserti=len(inserti) + int(lavoro.punto_di_vista is not None),
                                          esempi=len(esempi))
         return self._metti_in_coda(
             vista, lavoro.scelte, destinazione,
@@ -1169,6 +1201,7 @@ class Studio:
             inserti=inserti,
             finale=lavoro.finale,
             esempi=esempi,
+            punto_di_vista=lavoro.punto_di_vista,
         )
 
     def annulla(self, identificativo: str) -> dict:
@@ -1243,7 +1276,12 @@ class Studio:
         except ErroreAirender:
             testo_riassunto = ""
         finale = dati.get("finale") if isinstance(dati.get("finale"), dict) else None
-        if finale:
+        punto = dati.get("punto_di_vista") if isinstance(dati.get("punto_di_vista"), dict) else None
+        if punto:
+            stile = blocchi.STILI_PUNTO.get(punto.get("stile"), ("",))[0]
+            testo_riassunto = (f"{NOME_PUNTO}, {stile.lower()}. Senza Allplan: altezze e arredi che la "
+                               "pianta non dice li ha immaginati il modello.")
+        elif finale:
             testo_riassunto = _riassunto_finale(finale)
         elif dati.get("partenza"):
             # Un passo su un render: lo stile non riparte, solo la richiesta.
@@ -1266,7 +1304,8 @@ class Studio:
             "modello_nome": modello.nome if modello else dati.get("modello"),
             "preset": dati.get("preset"),
             "preset_nome": (
-                f"Finale ×{finale.get('ingrandimento')}" if finale
+                NOME_PUNTO if punto
+                else f"Finale ×{finale.get('ingrandimento')}" if finale
                 else "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
                 if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
                 else "Cambia: " + modulo_passi.nome_breve(richieste[0]) if dati.get("partenza") and richieste
@@ -1279,6 +1318,8 @@ class Studio:
             "render": render is not None,
             "scostamento_geometria": stato.get("scostamento_geometria"),
             "tenuta": self._tenuta(render),
+            # «stanza immaginata dalla pianta»: lo Studio lo scrive sull'immagine.
+            "immaginata": bool(punto),
         }
 
     def _tenuta(self, render: Path | None) -> dict | None:
@@ -1704,6 +1745,8 @@ class Studio:
             "costo": _costo_passo(passo, modello),
             "fatto": passo.get("fatto"),
             "cosa_fare": passo.get("cosa_fare"),
+            # «stanza immaginata dalla pianta»: l'etichetta che lo Studio mette sull'immagine.
+            "immaginata": bool(passo.get("punto_di_vista")),
             "partenza_file": partenza.get("file"),
             "partenza_mancante": bool(partenza_mancante),
             "percorso_render": passo.get("render"),
@@ -1904,6 +1947,8 @@ class Studio:
             elenco = dati.get("aree")
             if dati.get("popola") is not None:
                 elenco = self._aree_popola(dati.get("popola"), elenco, self._scena(albero, passo))
+            elif dati.get("arreda") is not None:
+                elenco = self._aree_arreda(dati.get("arreda"), elenco, self._scena(albero, passo))
             elif "testo" in dati:
                 elenco = modulo_aree.da_testo(dati.get("testo"), elenco)
             aree = modulo_aree.da_elenco(elenco)
@@ -1933,6 +1978,32 @@ class Studio:
                 "Popola dipinge solo col pennello verde (aggiungi).",
                 "Togli le altre aree, oppure esci da Popola e usa il Ritocca con il testo.")
         return [{**a, "nota": nota} for a in elenco]
+
+    @staticmethod
+    def _aree_arreda(arreda: object, elenco: object, scena: str) -> list[dict]:
+        """«Arreda per zone»: ogni zona (rettangolo o selezione libera) prende la nota della sua stanza."""
+        if scena != blocchi.PIANTA:
+            raise modulo_aree.AreaNonValida(
+                "Arreda per zone vale su una pianta, non su questa immagine.",
+                "Per un interno in prospettiva usa Ritocca con un'area, oppure Popola.")
+        if not isinstance(arreda, dict):
+            raise RichiestaStudioNonValida("Arreda non dice lo stile.", "Scegli uno stile per le zone.")
+        if not isinstance(elenco, list) or not elenco:
+            raise modulo_aree.AreaNonValida(
+                "Arreda non ha ancora zone.",
+                "Disegna un rettangolo per ogni stanza da arredare.")
+        zone = []
+        for numero, area in enumerate(elenco, start=1):
+            if not isinstance(area, dict) or area.get("forma") not in ("rettangolo", "libera"):
+                raise modulo_aree.AreaNonValida(
+                    f"La zona {numero} non e' un rettangolo ne' una selezione libera.",
+                    "In Arreda le zone si disegnano col rettangolo o con la selezione libera.")
+            try:
+                nota = blocchi.nota_arreda(area.get("stanza"), arreda.get("stile"))
+            except blocchi.SceltaNonValida as errore:
+                raise modulo_aree.AreaNonValida(f"Zona {numero}: {errore.fatto}", errore.cosa_fare) from None
+            zone.append({k: v for k, v in area.items() if k != "stanza"} | {"nota": nota})
+        return zone
 
     def componi_ritocco(self, dati: dict) -> dict:
         """Il prompt di un ritocco, da mostrare prima di Applica."""
@@ -1966,6 +2037,59 @@ class Studio:
             parte_da=passo["identificativo"], partenza=render,
             aree=aree, modo_aree=config.RITOCCO_MODO_AREE,
             inserti=inserti,
+        )
+
+    # --- Punto di vista dalla pianta ---------------------------------------
+
+    def _punto(self, dati: dict) -> tuple[Path, modulo_passi.Albero, dict | None, Path | None, modulo_punto.PuntoDiVista]:
+        """Vista, albero, passo di partenza (None: la vista), il suo render e il punto di vista.
+
+        Si parte da una pianta resa (un passo) o dalla vista stessa, se e'
+        gia' una pianta: «da una pianta gia' fatta» (flusso 7).
+        """
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        albero = self._albero(vista)
+        da = str(dati.get("da") or modulo_passi.VISTA)
+        if da == modulo_passi.VISTA:
+            passo, render = None, None
+        else:
+            passo, render = self._passo_di_partenza(albero, da)
+            if self._scena(albero, passo) != blocchi.PIANTA:
+                raise RichiestaStudioNonValida(
+                    "Il punto di vista parte da una pianta, e questa immagine non lo e'.",
+                    "Scegli una pianta resa, oppure la vista se e' gia' una pianta.")
+        try:
+            punto = modulo_punto.da_dizionario(dati.get("punto"))
+        except modulo_punto.PuntoNonValido as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        return vista, albero, passo, render, punto
+
+    def componi_punto(self, dati: dict) -> dict:
+        """Il prompt del punto di vista e la scena che esce, prima di Rendi."""
+        _vista, _albero, passo, _render, punto = self._punto(dati)
+        prompt = punto.prompt()
+        risposta = {
+            "prompt": prompt,
+            "caratteri": len(prompt),
+            "scena": punto.scena,
+            "da_numero": str(passo.get("numero")) if passo else modulo_passi.VISTA,
+            "nome": NOME_PUNTO,
+        }
+        if dati.get("modello"):
+            risposta["costo"] = testo_costo(self._modello(str(dati["modello"])), 1)
+        return risposta
+
+    def invia_punto(self, dati: dict) -> dict:
+        """Il punto di vista: un passo nuovo sotto la pianta, con la pianta e il punto rosso."""
+        vista, _albero, passo, render, punto = self._punto(dati)
+        # Due immagini: la pianta, e la pianta col punto rosso (la disegna il motore).
+        destinazione = self.destinazione(str(dati.get("modello") or ""), inserti=1)
+        return self._metti_in_coda(
+            vista, blocchi.Scelte(scena=punto.scena), destinazione,
+            mostrata=dati.get("destinazione_mostrata"),
+            preset=None, prompt_a_mano=None,
+            parte_da=passo["identificativo"] if passo else None, partenza=render,
+            punto_di_vista=punto,
         )
 
     # --- Finale ----------------------------------------------------------
@@ -2224,12 +2348,17 @@ def _richieste_del_passo(passo: dict) -> list[str]:
 
 
 # Come lo storico chiama ogni immagine: una o due parole.
-_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco"}
+_ETICHETTE_STORICO = {"stile": "Render", "pulito": "Render", "passo": "Cambia", "ritocco": "Ritocco",
+                      "punto": "Punto di vista"}
+# Come lo Studio chiama un punto di vista fatto senza Allplan: lo dice sempre.
+NOME_PUNTO = "Punto di vista · stanza immaginata dalla pianta"
 
 
 def _tipo_passo(passo: dict) -> str:
     """stile (dalla vista), passo (da un render), ritocco (aree e note su un render),
-    pulito (dalla vista con le richieste di una strada)."""
+    pulito (dalla vista con le richieste di una strada), punto (punto di vista dalla pianta)."""
+    if passo.get("punto_di_vista"):
+        return "punto"
     if passo.get("aree"):
         return "ritocco"
     if (passo.get("partenza") or {}).get("passo", modulo_passi.VISTA) != modulo_passi.VISTA:
@@ -2245,9 +2374,14 @@ def _nome_stile(passo: dict) -> str:
 def _nome_passo(passo: dict) -> str:
     """Il nome breve della riga: dalle scelte, o dalla richiesta."""
     tipo = _tipo_passo(passo)
+    if tipo == "punto":
+        return NOME_PUNTO
     if tipo == "ritocco":
         note = _richieste_del_passo(passo)
         nomi = {blocchi.nome_richiesta(n) for n in note}
+        if note and None not in nomi and all(n.startswith("Arreda · ") for n in nomi):
+            # Arreda per zone: una nota per stanza, tutte scritte da Arreda.
+            return f"Arreda · {'1 zona' if len(note) == 1 else f'{len(note)} zone'}"
         if len(nomi) == 1 and None not in nomi:
             # Popola · Dipingo io: la stessa frase in ogni tratto verde.
             return f"{nomi.pop()} · {'1 area' if len(note) == 1 else f'{len(note)} aree'}"
@@ -2270,6 +2404,12 @@ def _riassunto_passo(passo: dict, padre: dict | None) -> str:
     """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
     tipo = _tipo_passo(passo)
     richieste = passo.get("richieste") or []
+    if tipo == "punto":
+        numero = padre.get("numero") if padre else "0, la vista"
+        punto = passo.get("punto_di_vista") or {}
+        stile = blocchi.STILI_PUNTO.get(punto.get("stile"), ("",))[0]
+        return (f"Dal passo {numero}: {NOME_PUNTO.lower()}, {stile.lower()}. Senza Allplan: altezze e "
+                "arredi che la pianta non dice li ha immaginati il modello.")
     if tipo == "ritocco":
         numero = padre.get("numero") if padre else "?"
         note = _richieste_del_passo(passo)
@@ -2454,6 +2594,8 @@ def riassunto(scelte: blocchi.Scelte, preset: str | None = None) -> str:
     regola = "Regola fissa" if fedelta == blocchi.FEDELTA_PREDEFINITA \
         else f"Fedeltà al disegno {blocchi.blocco('fedelta', fedelta, scelte.scena).nome.lower()}"
     pezzi = [regola, blocchi.SCENA[scelte.scena].nome.lower() if scelte.scena in blocchi.SCENA else scelte.scena]
+    if scelte.scena == blocchi.PIANTA:
+        pezzi[-1] = blocchi.blocco("tipo", scelte.tipo or blocchi.TIPO_PREDEFINITO, blocchi.PIANTA).nome.lower()
     resa = blocchi.resa_valida(scelte.resa)
     via = blocchi.SPENTI_DA_RESA[resa]
     if scelte.materiali.strip() and "materiali" not in via:

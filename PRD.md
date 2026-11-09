@@ -270,6 +270,22 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Pianta, planimetria, Arreda e punto di vista (2026-11-09)
+
+Nove preset di pianta, Arreda per zone e il punto di vista dalla pianta, con i
+testi in `core/blocchi.py` (bozza 16) e il segno rosso in `core/punto.py`.
+Provato con i test (blocchi, rifiuti, idoneità di una pianta, zone con la loro
+stanza, due immagini in partenza, segno disegnato dove si è cliccato, formato 11
+della coda) e in Chromium sullo Studio del PC senza coda: scena Pianta, preset,
+pannello Punto di vista col cono. **Nessun testo provato con un render vero**:
+non si sa se Nano Banana tiene muri e aperture della pianta, se arreda solo le
+zone, né se dal punto rosso esce la stanza giusta guardando dalla parte giusta.
+Il modo Arreda del Ritocca non è stato guardato a video (serve un render di
+pianta finito). Altezze 1,6 m e 2,7 m, apertura 60°, misure del segno sono
+giudizi. «In Allplan» aspetta la sonda di PythonParts. Mai provato nella web app
+con Pyodide vero. Si esce con un giro di banco su una pianta vera di Riccardo:
+un preset, Arreda su tre stanze, due punti di vista, giudicati a occhio.
+
 ### Cambia con le miniature e Popola (2026-11-09)
 
 Tredici miniature di ora e mood e tre cose di Popola, con i testi per il

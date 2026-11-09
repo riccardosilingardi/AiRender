@@ -730,3 +730,36 @@ def test_link_accesso_arriva_al_server_col_listino():
     assert letto["accesso"] == {"link_minuti": config.LINK_ACCESSO_MINUTI,
                                 "link_massimi_ora": config.LINK_ACCESSO_MASSIMI_ORA}
     assert 5 <= config.LINK_ACCESSO_MINUTI <= 60
+
+
+# --- punto di vista dalla pianta --------------------------------------------
+
+
+def test_punto_di_vista_scelte_dicono_al_modello_misure_credibili_e_restano_scelte():
+    """Caso: PUNTO_DI_VISTA_ALTEZZA_OCCHI_M o PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M finiscono nel prompt
+    come misure di progetto, o il cono (PUNTO_DI_VISTA_APERTURA_GRADI, PUNTO_DI_VISTA_CONO_LATO,
+    PUNTO_DI_VISTA_RAGGIO, PUNTO_DI_VISTA_ROSSO, PUNTO_DI_VISTA_CONO_OPACITA) copre la stanza."""
+    from core import blocchi
+    assert 1.2 <= float(config.PUNTO_DI_VISTA_ALTEZZA_OCCHI_M) <= 1.8
+    assert 2.4 <= float(config.PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M) <= 3.5
+    assert f"{config.PUNTO_DI_VISTA_ALTEZZA_OCCHI_M} m" in blocchi.PUNTO_DI_VISTA.testo
+    assert 20 <= config.PUNTO_DI_VISTA_APERTURA_GRADI <= 120
+    assert 0 < config.PUNTO_DI_VISTA_CONO_LATO <= 0.3
+    assert 0 < config.PUNTO_DI_VISTA_RAGGIO < config.PUNTO_DI_VISTA_CONO_LATO
+    rosso, verde, blu = config.PUNTO_DI_VISTA_ROSSO
+    assert rosso > 200 and verde < 60 and blu < 60
+    assert 40 <= config.PUNTO_DI_VISTA_CONO_OPACITA <= 200
+    for nome in ("PUNTO_DI_VISTA_ALTEZZA_OCCHI_M", "PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M", "PUNTO_DI_VISTA_APERTURA_GRADI",
+                 "PUNTO_DI_VISTA_CONO_LATO", "PUNTO_DI_VISTA_RAGGIO", "PUNTO_DI_VISTA_ROSSO",
+                 "PUNTO_DI_VISTA_CONO_OPACITA"):
+        assert config.costante(nome).origine == config.SCELTA
+
+
+def test_punto_di_vista_trascina_minimo_scarta_un_clic_ma_non_una_stanza_piccola():
+    """Caso: un clic senza trascinare diventa una camera che guarda a caso (PUNTO_DI_VISTA_TRASCINA_MINIMO)."""
+    assert 0 < config.PUNTO_DI_VISTA_TRASCINA_MINIMO <= 0.05
+
+
+def test_punto_di_vista_allplan_resta_spento_finche_la_sonda_non_risponde():
+    """Caso: «In Allplan» si accende senza che PythonParts sappia mettere la camera (PUNTO_DI_VISTA_ALLPLAN)."""
+    assert config.PUNTO_DI_VISTA_ALLPLAN is False
