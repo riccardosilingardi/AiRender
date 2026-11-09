@@ -20,7 +20,8 @@ Pagina prezzi ─► /api/acquista ─► Stripe Checkout ─► /api/stripe-web
 | `/v2/models/*` | `router.mjs` | Stesso protocollo del Comfy Router: invio, stato, risultato. Riserva all'invio, addebita al risultato con immagine, annulla se il Router fallisce |
 | `/geometria/api/v2/*` | `geometria.mjs` | «Tieni la geometria» (solo piano Studio): stessa API v2 dei workflow della Developer Platform. Il grafo lo ricostruisce il server da `geometria.json`; riserva all'invio, addebita a lavoro riuscito, annulla se fallisce o si ferma |
 | `/studio/` | `public/studio/` (costruita) | La web app: lo Studio nel browser, costruito a ogni deploy da `scripts/scrivi_web.py` |
-| `/api/accedi` | `accedi.mjs` | Accesso alla web app: email e codice della stessa licenza |
+| `/api/accedi` | `accedi.mjs` | Accesso alla web app: email e codice della stessa licenza, oppure il gettone del link (crea la chiave del browser) |
+| `/api/link-accesso` | `link-accesso.mjs` | Manda per email il link di accesso alla web app, uno per licenza attiva (migrazione 004) |
 | `/api/saldo` | `saldo.mjs` | Piano, saldo, scadenza, funzioni, link firmati Ricarica e Gestisci |
 | `/api/acquista?prodotto=…` | `acquista.mjs` | Apre il Checkout (dati fiscali, codici sconto) |
 | `/api/gestisci?t=…` | `gestisci.mjs` | Portale clienti Stripe (cambio piano, disdetta) |
@@ -41,7 +42,8 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
    `supabase/migrations/001_crediti.sql`, poi
    `supabase/migrations/002_pulizia_risultati.sql` e
    `supabase/migrations/003_funzioni_chiuse.sql` (le funzioni dei crediti le
-   esegue solo `service_role`). Il bucket privato `risultati` lo crea la 001. Copia l'URL e la chiave
+   esegue solo `service_role`) e `supabase/migrations/004_accesso_link.sql`
+   (link di accesso via email e chiavi del browser). Il bucket privato `risultati` lo crea la 001. Copia l'URL e la chiave
    segreta (`sb_secret_…`, in `SUPABASE_SECRET_KEY`).
 2. **Stripe.** Catalogo prodotti: un prodotto per piano con i prezzi del
    listino (Prova 15 € e Ricarica 10 € una tantum; Base 19/190, Pro 39/390,

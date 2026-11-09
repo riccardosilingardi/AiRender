@@ -5,7 +5,7 @@
 import { createHmac } from "node:crypto";
 
 export function dbFinto() {
-  const stato = { licenze: [], lotti: [], render: [], fatture: [], chiamate: [], caricati: [] };
+  const stato = { licenze: [], lotti: [], render: [], fatture: [], chiamate: [], caricati: [], link_accesso: [], chiavi_accesso: [] };
   let n = 0;
   const id = () => `id-${++n}`;
   const saldo = (lic) => {
@@ -15,7 +15,8 @@ export function dbFinto() {
   };
   const rpc = {
     airender_licenza: ({ p_hash }) => {
-      const l = stato.licenze.find((x) => x.hash_codice === p_hash);
+      const chiave = stato.chiavi_accesso.find((c) => c.hash_codice === p_hash && !c.revocata_il);
+      const l = stato.licenze.find((x) => x.hash_codice === p_hash || (chiave && x.id === chiave.licenza_id));
       return l ? { ...l, postazioni_usate: 0, saldo: saldo(l.id) } : null;
     },
     airender_crea_licenza: (a) => {
@@ -58,6 +59,21 @@ export function dbFinto() {
       return { esito: "ok", ripetuto: false, saldo: saldo(r.licenza_id) };
     },
     airender_evento_nuovo: () => true,
+    airender_licenze_di: ({ p_email }) => stato.licenze
+      .filter((l) => l.email.toLowerCase() === p_email.trim().toLowerCase() && l.stato === "attiva")
+      .map((l) => ({ id: l.id, piano: l.piano, ultime_cifre: l.ultime_cifre,
+        link_recenti: stato.link_accesso.filter((a) => a.licenza_id === l.id).length })),
+    airender_crea_link: ({ p_hash_gettone, p_licenza, p_minuti }) => {
+      stato.link_accesso.push({ hash_gettone: p_hash_gettone, licenza_id: p_licenza, scade: Date.now() + p_minuti * 60000, usato: false });
+      return null;
+    },
+    airender_usa_link: ({ p_hash_gettone, p_hash_chiave, p_ultime_cifre }) => {
+      const a = stato.link_accesso.find((x) => x.hash_gettone === p_hash_gettone && !x.usato && x.scade > Date.now());
+      if (!a) return null;
+      a.usato = true;
+      stato.chiavi_accesso.push({ hash_codice: p_hash_chiave, licenza_id: a.licenza_id, ultime_cifre: p_ultime_cifre });
+      return rpc.airender_licenza({ p_hash: p_hash_chiave });
+    },
   };
   const filtra = (tabella, query) => {
     const p = new URLSearchParams(query);

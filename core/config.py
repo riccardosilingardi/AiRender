@@ -908,6 +908,28 @@ MATERIALI_CAMBIATI_MASSIMI = _registra(Costante(
 NANO_BANANA_2 = "vertexai/gemini-3.1-flash-image"
 NANO_BANANA_PRO = "vertexai/gemini-3-pro-image"
 
+LINK_ACCESSO_MINUTI = _registra(Costante(
+    nome="LINK_ACCESSO_MINUTI",
+    valore=15,
+    origine=SCELTA,
+    ragione=(
+        "Quanto vale il link di accesso alla web app mandato per email: "
+        "abbastanza per aprire la posta e cliccare, poco per chi trovasse "
+        "l'email dopo. Si usa una volta sola."
+    ),
+    unita=" min",
+))
+
+LINK_ACCESSO_MASSIMI_ORA = _registra(Costante(
+    nome="LINK_ACCESSO_MASSIMI_ORA",
+    valore=5,
+    origine=SCELTA,
+    ragione=(
+        "Quanti link di accesso parte al massimo per licenza in un'ora: chi "
+        "scrive l'email di un altro non gli riempie la casella."
+    ),
+))
+
 LISTINO = _registra(Costante(
     nome="LISTINO",
     valore={
@@ -1017,6 +1039,9 @@ LISTINO = _registra(Costante(
         },
         "ricarica": {"nome": "Ricarica", "prezzo": 10, "render": 100, "validita_mesi": 12},
         "rivendita": {"sconto_segnalazione": 20, "sconto_rivenditore": 30},
+        # Non sono prezzi: viaggiano qui perche' il listino e' l'unica strada
+        # da core/config.py al server (LINK_ACCESSO_*, sopra).
+        "accesso": {"link_minuti": LINK_ACCESSO_MINUTI, "link_massimi_ora": LINK_ACCESSO_MASSIMI_ORA},
     },
     origine=SCELTA,
     ragione=(
