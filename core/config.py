@@ -490,6 +490,19 @@ CAMBIA_SCELTE_MASSIME = _registra(Costante(
     ),
 ))
 
+RICETTA_VISTE_MASSIME = _registra(Costante(
+    nome="RICETTA_VISTE_MASSIME",
+    valore=6,
+    origine=SCELTA,
+    ragione=(
+        "Su quante viste si rifa' una ricetta con un clic: ogni vista e' un "
+        "render, un invio e un credito. 6 come le miniature di Cambia: "
+        "abbastanza per i fotogrammi di un video o per le viste di una "
+        "tavola, pochi perche' un clic non costi una dozzina di render senza "
+        "che lo si veda. Giudizio del 2026-11-09, mai provato da un cliente."
+    ),
+))
+
 PASSI_AVVISO_DA_GENERAZIONE = _registra(Costante(
     nome="PASSI_AVVISO_DA_GENERAZIONE",
     valore=2,
@@ -1095,7 +1108,7 @@ LISTINO = _registra(Costante(
         "ricarica rende ~6%; i prezzi si decidono nel thread del posizionamento "
         "rispetto ai concorrenti e qui non cambiano. Annuale = 10 mensilita'. "
         "Il plugin Allplan e' in tutti i piani (AIRENDER nasce per Allplan); "
-        "Base e' Nano Banana 2 fino a 2K con Ritocca, Altra vista e tabella "
+        "Base e' Nano Banana 2 fino a 2K con Ritocca, Ricetta e tabella "
         "materiali; Pro aggiunge Pro, 4K, scene, Finale e video a 720p fino a "
         "10 s; Studio 3 postazioni, video 1080p e le funzioni a due invii. "
         "L'annuale accredita 12 mesi di render in un lotto solo; i render del "
