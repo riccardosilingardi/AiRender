@@ -1332,3 +1332,104 @@ REGOLA_ANTEPRIMA_LATO_PX = _registra(Costante(
     ),
     unita=" px",
 ))
+
+# --- punto di vista dalla pianta (bozza 16, flusso 7) ---------------------------
+
+PUNTO_DI_VISTA_ALTEZZA_OCCHI_M = _registra(Costante(
+    nome="PUNTO_DI_VISTA_ALTEZZA_OCCHI_M",
+    valore="1.6",
+    origine=SCELTA,
+    ragione=(
+        "L'altezza degli occhi della camera che il modello mette sulla pianta: "
+        "una persona in piedi. E' una stringa perche' entra cosi' nel prompt. "
+        "Scelta, come nel piano Flussi del 2026-11-08."
+    ),
+    unita=" m",
+))
+
+PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M = _registra(Costante(
+    nome="PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M",
+    valore="2.7",
+    origine=SCELTA,
+    ragione=(
+        "L'altezza del soffitto quando la pianta non la dice: un piano "
+        "abitativo. Senza Allplan il modello la immagina, e lo Studio scrive "
+        "sull'immagine «stanza immaginata dalla pianta». Scelta."
+    ),
+    unita=" m",
+))
+
+PUNTO_DI_VISTA_APERTURA_GRADI = _registra(Costante(
+    nome="PUNTO_DI_VISTA_APERTURA_GRADI",
+    valore=60,
+    origine=SCELTA,
+    ragione=(
+        "Quanto e' aperto il cono rosso disegnato sulla pianta: circa il campo "
+        "orizzontale di un 24 mm. Il modello lo legge come direzione, non come "
+        "ottica precisa: non e' misurato su un render."
+    ),
+    unita=" gradi",
+))
+
+PUNTO_DI_VISTA_CONO_LATO = _registra(Costante(
+    nome="PUNTO_DI_VISTA_CONO_LATO",
+    valore=0.18,
+    origine=SCELTA,
+    ragione=(
+        "Lunghezza del cono rosso, in frazione del lato lungo della pianta: "
+        "abbastanza per leggere la direzione, abbastanza corto da non coprire "
+        "la stanza che si guarda. Scelta."
+    ),
+))
+
+PUNTO_DI_VISTA_RAGGIO = _registra(Costante(
+    nome="PUNTO_DI_VISTA_RAGGIO",
+    valore=0.012,
+    origine=SCELTA,
+    ragione=(
+        "Raggio del punto rosso, in frazione del lato lungo della pianta: "
+        "visibile su una pianta di 2000 px senza coprire una porta. Scelta."
+    ),
+))
+
+PUNTO_DI_VISTA_ROSSO = _registra(Costante(
+    nome="PUNTO_DI_VISTA_ROSSO",
+    valore=(230, 30, 30),
+    origine=SCELTA,
+    ragione=(
+        "Il rosso del punto e del cono. Il prompt dice «red dot and red cone»: "
+        "un rosso pieno che una pianta non usa per muri o pavimenti. Scelto."
+    ),
+))
+
+PUNTO_DI_VISTA_CONO_OPACITA = _registra(Costante(
+    nome="PUNTO_DI_VISTA_CONO_OPACITA",
+    valore=110,
+    origine=SCELTA,
+    ragione=(
+        "Opacita' del cono, da 0 a 255: sotto il rosso si vedono ancora muri e "
+        "arredi che la camera guarda. Scelta."
+    ),
+))
+
+PUNTO_DI_VISTA_TRASCINA_MINIMO = _registra(Costante(
+    nome="PUNTO_DI_VISTA_TRASCINA_MINIMO",
+    valore=0.02,
+    origine=SCELTA,
+    ragione=(
+        "Sotto questa distanza (frazione della pianta) fra dove stai e verso "
+        "dove guardi, il trascinamento e' un clic: la direzione non si legge e "
+        "lo Studio la chiede di nuovo. Scelta."
+    ),
+))
+
+PUNTO_DI_VISTA_ALLPLAN = _registra(Costante(
+    nome="PUNTO_DI_VISTA_ALLPLAN",
+    valore=False,
+    origine=SCELTA,
+    ragione=(
+        "Spento: in Allplan la camera vera sul punto scelto aspetta la sonda di "
+        "PythonParts (si puo' impostare la camera della finestra da script?). "
+        "Finche' non risponde, lo Studio mostra «In Allplan» in grigio."
+    ),
+))

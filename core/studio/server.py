@@ -52,6 +52,8 @@ Rotte:
     POST /api/passi/pulito/invia           le richieste della strada in un invio dalla vista
     POST /api/ritocca/componi              il prompt di un ritocco (aree e note), prima di Applica
     POST /api/ritocca/invia                tutte le note in un invio sul render di un passo
+    POST /api/punto/componi                il prompt del punto di vista dalla pianta, prima di Rendi
+    POST /api/punto/invia                  il punto di vista: pianta + punto rosso, un passo nuovo
     POST /api/finale/componi               cosa fa «Finale» su un render: misura d'uscita, destinazione
     POST /api/finale/invia                 «Finale»: il render ingrandito, un passo nuovo
     POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
@@ -290,6 +292,10 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_ritocco(self._corpo_json()))
             case ["api", "ritocca", "invia"]:
                 self._json(studio.invia_ritocco(self._corpo_json()))
+            case ["api", "punto", "componi"]:
+                self._json(studio.componi_punto(self._corpo_json()))
+            case ["api", "punto", "invia"]:
+                self._json(studio.invia_punto(self._corpo_json()))
             case ["api", "finale", "componi"]:
                 self._json(studio.componi_finale(self._corpo_json()))
             case ["api", "finale", "invia"]:

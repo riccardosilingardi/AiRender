@@ -1060,6 +1060,50 @@ celle mostrano lo stato. **Errore**: messaggio del motore sopra Applica; scelte 
 tratti restano; miniature doppie, sconosciute o troppe non mandano niente.
 **Pieno**: i passi nuovi nell'albero e nella griglia.
 
+## Pianta, planimetria e planivolumetrico, costruiti il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 6; Design canvas, schermata
+C-Pianta; testi nella scheda «Preset nuovi» della pagina Flussi). Studio e web
+app, stessa pagina. Schermate in `docs/ui/studio-pianta/`.
+
+**Genera**: la scena **Pianta** si aggiunge a Esterno, Interno e Arredo. Nove
+preset (pianta resa materica, in assonometria, colorata da concorso, bianco e
+nero; planimetria illustrata, da drone, ad acquerello; planivolumetrico plastico
+bianco e materico). Nei dettagli: **1 · Che disegno è** (Pianta dell'edificio,
+Planimetria, Planivolumetrico), **2 · Stile della tavola**, **3 · Luce e
+ombre**. Il giudizio della vista per una pianta non chiede ombre né toni di
+grigio: «Pianta adatta · linee e colori piatti vanno bene». «Tieni la
+geometria» si chiama «Tieni la geometria · muri e aperture». Accanto a «Pianta
+adatta» c'è **Punto di vista**, per una pianta già fatta.
+
+**Barra sotto un render di pianta**: al posto di Popola ci sono **Arreda** e
+**Punto di vista**. Il resto (Cambia, Ritocca, Variante, Video, Altra vista,
+Finale) resta com'è.
+- **Arreda** apre il Ritocca in modo Arreda: solo Rettangolo e Selezione libera,
+  lo stile in alto (scelte di `STILI_ARREDA`) con **Esci da Arreda**, e per ogni
+  zona a destra «Stanza» (soggiorno, cucina, camera, bagno, studio, ingresso…).
+  Applica dice «Arreda · N zone». Fuori dalle zone resta la pianta di prima.
+- **Punto di vista**: la pianta grande; si clicca dove si sta e si trascina
+  verso dove si guarda, e compaiono il punto e il cono rossi, gli stessi che il
+  motore disegna sulla seconda immagine che parte. Sotto: Dove (Dentro la casa,
+  Fuori nel lotto), Luce (Giorno, Pomeriggio caldo, Sera), Camera (**Senza
+  Allplan** scelta; **In Allplan** spenta con «In arrivo»: aspetta la sonda di
+  PythonParts). Sempre, prima di Rendi: «Stanza immaginata dalla pianta. Altezze
+  (occhi a 1,6 m, soffitto a 2,7 m, scelte), arredi e finestre che la pianta non
+  disegna li ha immaginati il modello.» Il modello deve ricevere più immagini.
+
+**Prima/dopo (A/B)**: resta il confronto predefinito in Risultato, Passi e
+Ritocca, anche per Arreda e per il punto di vista. Sopra il render di un punto
+di vista il titolo è «La foto dal punto di vista» con lo stesso avviso «Stanza
+immaginata dalla pianta», anche in Passi.
+
+Quattro stati. **Vuoto**: in Punto di vista, «Clicca sulla pianta dove stai»
+accanto a Rendi grigio; trascinamento troppo corto, «Trascina un po' più in
+là»; in Arreda senza zone, «Disegna un rettangolo su ogni stanza da arredare».
+**In corso**: il lavoro si segue come gli altri passi. **Errore**: il messaggio
+del motore sopra Rendi o Applica; punto, zone e stanze restano. **Pieno**: un
+passo nuovo sotto la pianta, col prima/dopo.
+
 ## Studio · Licenza e saldo, costruita il 2026-11-05
 
 Bozza A scelta da Riccardo il 2026-11-05 fra due (A scheda intera, B cassetto
