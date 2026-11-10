@@ -42,11 +42,13 @@ test("l'email del link elenca una riga per licenza, con la durata", async () => 
   const { chiamate, chiama } = registra();
   const ambiente = { MAILJET_API_KEY: "k", MAILJET_SECRET_KEY: "s", EMAIL_MITTENTE: "a@b.it" };
   await creaEmail(ambiente, chiama).inviaLink("c@d.it", [
-    { nomePiano: "Pro", ultime_cifre: "3333", link: "https://x/studio/#accesso=abc" },
-    { nomePiano: "Prova", ultime_cifre: "7777", link: "https://x/studio/#accesso=def" },
+    { nomePiano: "Pro", ultime_cifre: "3333", render: 19, link: "https://x/studio/#accesso=abc" },
+    { nomePiano: "Prova", ultime_cifre: "7777", render: 1, link: "https://x/studio/#accesso=def" },
   ], 15);
   const m = chiamate[0].corpo.Messages[0];
   assert.equal(m.Subject, "Il tuo link per entrare in AIRENDER Studio");
-  assert.match(m.TextPart, /Licenza Pro \(finisce con 3333\):\n {4}https:\/\/x\/studio\/#accesso=abc/);
+  assert.match(m.TextPart, /hai 2 licenze, ognuna col suo saldo/);
+  assert.match(m.TextPart, /Licenza Pro, codice che finisce con 3333, 19 render disponibili:\n {4}https:\/\/x\/studio\/#accesso=abc/);
+  assert.match(m.TextPart, /Licenza Prova, codice che finisce con 7777, 1 render disponibile:/);
   assert.match(m.TextPart, /15 minuti e una volta sola/);
 });

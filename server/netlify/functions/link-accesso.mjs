@@ -47,7 +47,14 @@ export async function gestisci(req, { ambiente = process.env, db = creaDb(ambien
     if (l.link_recenti >= listino.accesso.link_massimi_ora) continue; // in silenzio: la risposta resta uguale
     const gettone = casuale(32).toString("base64url");
     await db.rpc("airender_crea_link", { p_hash_gettone: hashGettone(gettone), p_licenza: l.id, p_minuti: minuti });
-    voci.push({ nomePiano: piano(l.piano).nome, ultime_cifre: l.ultime_cifre, link: `${sito}/studio/#accesso=${gettone}` });
+    // Il saldo accanto a ogni link: con due licenze sulla stessa email e' il
+    // modo piu' semplice per capire quale si sta aprendo.
+    const saldo = await db.rpc("airender_saldo", { p_licenza: l.id });
+    voci.push({
+      nomePiano: piano(l.piano).nome, ultime_cifre: l.ultime_cifre,
+      render: Math.max(0, Number(saldo?.disponibile) || 0),
+      link: `${sito}/studio/#accesso=${gettone}`,
+    });
   }
   if (voci.length) await posta.inviaLink(email, voci, minuti);
   return MANDATA(email);

@@ -58,6 +58,7 @@ export function dbFinto() {
       }
       return { esito: "ok", ripetuto: false, saldo: saldo(r.licenza_id) };
     },
+    airender_saldo: ({ p_licenza }) => saldo(p_licenza),
     airender_evento_nuovo: () => true,
     airender_licenze_di: ({ p_email }) => stato.licenze
       .filter((l) => l.email.toLowerCase() === p_email.trim().toLowerCase() && l.stato === "attiva")
