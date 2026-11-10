@@ -189,6 +189,7 @@
     "render": 100,
     "validita_mesi": 12
   },
+  "rimborsi_senza_immagine_24h": 10,
   "rivendita": {
     "sconto_rivenditore": 30,
     "sconto_segnalazione": 20

@@ -1019,6 +1019,18 @@ LISTINO = _registra(Costante(
             "video_1080p_al_secondo": 8,
         },
         "benvenuto": {"render": 10, "validita_mesi": 12},
+        # Quanti render tornati SENZA immagine (Gemini rifiuta o risponde solo
+        # testo) si rimborsano per licenza nelle ultime 24 ore; oltre, il
+        # render vuoto si scala come uno riuscito (server, migrazione 005).
+        # SCELTA (2026-11-10), non misurata: un uso onesto ne vede pochi
+        # (anche 100 render in un giorno con il 5% di rifiuti fanno 5), quindi
+        # 10 non tocca mai chi lavora; chi provoca apposta risposte vuote
+        # costa ad AIRENDER al massimo 10 render al giorno per licenza invece
+        # che senza limite. Non conta gli invii che il Router rifiuta ne' i
+        # lavori fermati dal cliente: quelli si rimborsano sempre. Se Comfy non
+        # fa pagare i risultati vuoti (da leggere in x-comfy-credits-used) il
+        # tetto si puo' alzare.
+        "rimborsi_senza_immagine_24h": 10,
         # "prompt_completo": il cliente vede e riscrive il prompt in inglese
         # («Avanzate» dello Studio). Solo Pro e Studio: chi compra il risultato
         # non ha bisogno del testo, e un testo in vista si copia (Riccardo,

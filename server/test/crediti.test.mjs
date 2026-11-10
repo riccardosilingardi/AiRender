@@ -21,3 +21,10 @@ test("il link di accesso vale una volta, scade, e la chiave che crea apre la lic
   psql(`${qui}../supabase/migrations/004_accesso_link.sql`);
   psql(`${qui}link.sql`);
 });
+
+test("i render senza immagine si rimborsano fino al tetto delle 24 ore, poi si pagano", { skip: !db && "AIRENDER_PG non impostata" }, () => {
+  const psql = (file) => execFileSync("psql", ["-v", "ON_ERROR_STOP=1", "-q", "-d", db, "-f", file], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  psql(`${qui}../supabase/migrations/001_crediti.sql`);
+  psql(`${qui}../supabase/migrations/005_tetto_rimborsi.sql`);
+  psql(`${qui}rimborsi.sql`);
+});

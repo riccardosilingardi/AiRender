@@ -592,7 +592,10 @@ class ProviderComfy(Provider):
         corpo = schema.corpo(inviata)
         chiave_idempotenza = self._nuova_chiave_idempotenza()
         uscita, dettagli = self._esegui(richiesta.modello, corpo, chiave_idempotenza)
-        tipo, valore = schema.immagine(uscita)
+        try:
+            tipo, valore = schema.immagine(uscita)
+        except ErroreProvider as errore:
+            raise self._senza_immagine(errore, dettagli) from None
         dati = self._byte_immagine(tipo, valore)
         if cornice is not None:
             dati = modulo_immagine.togli_cornice(dati, cornice)
@@ -718,6 +721,10 @@ class ProviderComfy(Provider):
     def _intestazioni_chiave(self) -> dict:
         """Come si presenta il plugin al servizio: qui la chiave Comfy dell'utente."""
         return {INTESTAZIONE_CHIAVE: self.chiave}
+
+    def _senza_immagine(self, errore: ErroreProvider, dettagli: dict) -> ErroreProvider:
+        """L'errore da mostrare quando il risultato e' arrivato senza immagine."""
+        return errore
 
     def _dettagli_risultato(self, risposte: dict) -> dict:
         """Cosa salvare nella ricetta dalle intestazioni del risultato."""

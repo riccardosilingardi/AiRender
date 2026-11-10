@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hashCodice } from "../lib/codice.mjs";
-import { gestisci, RISPOSTA_MASSIMA_BYTE } from "../netlify/functions/router.mjs";
+import { gestisci, RISPOSTA_MASSIMA_BYTE, TETTO_RIMBORSI } from "../netlify/functions/router.mjs";
 import { dbFinto, fetchFinto } from "./finti.mjs";
 
 const CODICE = "AIR-0000-1111-2222-3333";
@@ -112,6 +112,28 @@ test("un risultato senza immagine non si paga", async () => {
   await gestisci(lettura(), { db, ambiente, chiama });
   assert.equal(db.stato.render[0].stato, "annullato");
   assert.equal(db.stato.lotti[0].residuo, 10);
+});
+
+test("i render senza immagine si rimborsano fino al tetto delle 24 ore, poi si pagano", async () => {
+  const db = conLicenza("pro", 30);
+  for (let i = 0; i <= TETTO_RIMBORSI; i++) {
+    db.stato.render.push({ id: `R${i}`, licenza_id: "L1", peso: 1, stato: "riservato", richiesta_comfy: `req-${i}` });
+  }
+  const vuoto = { corpo: { candidates: [{ content: { parts: [{ text: "rifiuto" }] } }] } };
+  const chiama = fetchFinto([[() => true, vuoto]]);
+  const leggi = (i) => gestisci(new Request(`${SERVER}/v2/models/${NB2}/requests/req-${i}`, { headers: { "x-airender-licenza": CODICE } }), { db, ambiente, chiama });
+  for (let i = 0; i < TETTO_RIMBORSI; i++) {
+    const r = await leggi(i);
+    assert.equal(r.headers.get("x-airender-render-scalati"), "0");
+  }
+  assert.equal(db.stato.lotti[0].residuo, 30);
+  const oltre = await leggi(TETTO_RIMBORSI);
+  assert.equal(oltre.headers.get("x-airender-render-scalati"), "1");
+  assert.equal(oltre.headers.get("x-airender-rimborsi-tetto"), String(TETTO_RIMBORSI));
+  assert.equal(db.stato.lotti[0].residuo, 29);
+  const di_nuovo = await leggi(TETTO_RIMBORSI);
+  assert.equal(di_nuovo.headers.get("x-airender-render-scalati"), "0", "la stessa lettura non paga due volte");
+  assert.equal(db.stato.lotti[0].residuo, 29);
 });
 
 test("nessuno legge la richiesta di un'altra licenza", async () => {

@@ -43,7 +43,9 @@ Il listino (prezzi, pesi, piani) vive in `core/config.py`, `LISTINO`.
    `supabase/migrations/002_pulizia_risultati.sql` e
    `supabase/migrations/003_funzioni_chiuse.sql` (le funzioni dei crediti le
    esegue solo `service_role`) e `supabase/migrations/004_accesso_link.sql`
-   (link di accesso via email e chiavi del browser). Il bucket privato `risultati` lo crea la 001. Copia l'URL e la chiave
+   (link di accesso via email e chiavi del browser) e
+   `supabase/migrations/005_tetto_rimborsi.sql` (tetto ai rimborsi dei render
+   senza immagine: va eseguita **prima** di pubblicare il router che la usa). Il bucket privato `risultati` lo crea la 001. Copia l'URL e la chiave
    segreta (`sb_secret_…`, in `SUPABASE_SECRET_KEY`).
 2. **Stripe.** Catalogo prodotti: un prodotto per piano con i prezzi del
    listino (Prova 15 € e Ricarica 10 € una tantum; Base 19/190, Pro 39/390,
