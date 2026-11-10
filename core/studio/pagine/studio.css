@@ -585,6 +585,9 @@ input.codice.sbagliato { border-color: var(--errore); }
 .geometria p { margin: 0; }
 .geometria.spento b { color: var(--spento); }
 .geometria.spento input { cursor: not-allowed; }
+.controlli-geometria { display: grid; gap: 6px; padding: 4px 0 0 24px; }
+.controlli-geometria .controllo { align-items: flex-start; }
+.controlli-geometria .controllo input { margin-top: 3px; }
 
 /* --- Regola: luce e colore prima di esportare ----------------------------------- */
 .regola { padding: 10px 0 12px; border-bottom: 1px solid var(--bordo); margin-bottom: 4px; }

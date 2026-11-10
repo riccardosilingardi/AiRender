@@ -30,6 +30,7 @@ const S = {
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
   geometria: false,       // «Tieni la geometria»: prima un workflow col ControlNet, poi il modello
+  controlliGeometria: ["spigoli"], // quali guide tiene il ControlNet: spigoli, profondita, linee
   esempi: [],             // «Stile da esempi»: render d'esempio oltre al riferimento, stessa forma
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
@@ -576,6 +577,7 @@ async function genera() {
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
       materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
       geometria: geometriaGenera(),
+      controlli_geometria: geometriaGenera() ? S.controlliGeometria : undefined,
       destinazione_geometria_mostrata: S.destinazione && S.destinazione.geometria && S.destinazione.geometria.destinazione,
     });
     S.ultimoEsito = null;
@@ -1387,17 +1389,46 @@ function perchéGeometriaSpenta() {
 }
 function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
+// I tre controlli di «Tieni la geometria», in parole semplici. Si possono
+// spuntare insieme; almeno uno resta acceso.
+const CONTROLLI_GEOMETRIA = [
+  ["spigoli", "Spigoli", "Il consigliato, basta da solo quasi sempre.",
+    "Spigoli (Canny): tiene contorni, finestre e porte esattamente dove sono nella vista. È il più preciso. Difetto: ricalca come righe anche retini, fughe e texture disegnate. Quando: viste esterne e interne con geometria pulita."],
+  ["profondita", "Profondità", "Per masse, volumi e interni.",
+    "Profondità (depth map): tiene cosa sta davanti e cosa dietro, i volumi e la prospettiva, non i dettagli. Lascia al render più libertà sulle superfici. Quando: interni, masterplan, studi di massa, o insieme agli Spigoli per tenere anche le distanze."],
+  ["linee", "Linee dritte", "Se gli Spigoli ricalcano troppo.",
+    "Linee dritte (M-LSD): tiene solo i segmenti dritti di muri, solai e serramenti; ignora texture, vegetazione e oggetti curvi. Quando: prospetti con molti retini o alberi, dove gli Spigoli copierebbero anche quelli."],
+];
+
 function pannelloGeometria() {
   const possibile = geometriaPossibile();
   const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
+  const controlli = S.geometria && possibile ? h("div", { classe: "controlli-geometria" },
+    ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
+      const acceso = S.controlliGeometria.includes(chiave);
+      const ultimo = acceso && S.controlliGeometria.length === 1;
+      const id = `geometria-${chiave}`;
+      return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
+        h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
+          onchange: (e) => {
+            const scelti = new Set(S.controlliGeometria);
+            if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
+            S.controlliGeometria = CONTROLLI_GEOMETRIA.map(([c]) => c).filter((c) => scelti.has(c));
+            S.secco = null; render();
+          } }),
+        h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
+    }),
+    nota("Più controlli insieme tengono di più ma lasciano meno libertà al render. Il costo non cambia.",
+      "Vale in Genera, sulla vista Allplan, anche con più varianti per invio. I passi dopo (Cambia, Ritocca, Variante) oggi non la usano: la tenuta di quei passi la dice la % di spigoli, sempre misurata contro la vista.")) : null;
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta,
       h("b", {}, S.scelte && S.scelte.scena === "pianta" ? "Tieni la geometria · muri e aperture" : "Tieni la geometria")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
-      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
-      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."));
+      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire la vista: spigoli, profondità o linee dritte, quelli che spunti); ",
+      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."),
+    controlli);
 }
 
 function esempiGenera() { return S.modo === "contesto" || !S.riferimento ? [] : S.esempi.map((r) => r.nome); }
@@ -1793,6 +1824,16 @@ function disegnaComposto() {
 
 function nomeRender(l) { return `${l.modello_nome} · ${l.preset_nome} · ${data(l.creato_il)}`; }
 
+// Nell'elenco dei render: con quali controlli ha tenuto la geometria e la
+// quota di spigoli ritrovati, per confrontare i render della stessa vista.
+function tenutaBreve(l) {
+  const parti = [];
+  if (l.controlli_geometria) parti.push(`Tieni: ${l.controlli_geometria}`);
+  const q = l.tenuta && l.tenuta.spigoli;
+  parti.push(typeof q === "number" ? `Spigoli ${percento(q)}` : "Spigoli: non misurati");
+  return parti.join(" · ");
+}
+
 // La linea del prima/dopo, uguale in Risultato e in Passi. `st` tiene la
 // posizione della linea (st.x, da 0 a 100) fra un disegno e l'altro.
 function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
@@ -1895,7 +1936,8 @@ function elencoRender() {
       onclick: async () => { r.scelto = l.identificativo; r.rifai = false; r.esportato = null; if (r.confronto === l.identificativo) r.confronto = "vista"; await caricaRicetta(); render(); },
     },
     l.render ? h("img", { src: `/file/render/${l.identificativo}`, alt: "" }) : h("span", { classe: "segnaposto", stile: "width:64px;height:40px" }),
-    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato))))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."));
+    h("span", {}, nomeRender(l), h("span", { classe: "stato-lavoro", stile: "display:block" }, l.stato),
+      l.render ? h("span", { classe: "tenue piccolo", stile: "display:block" }, tenutaBreve(l)) : null)))) : h("p", { classe: "tenue" }, "Nessun render da questa vista."));
 }
 
 // La misura degli spigoli: un numero solo se il motore l'ha fatta, altrimenti
@@ -1929,6 +1971,93 @@ async function misuraOra(identificativo) {
     await caricaRender();
   } catch (e) { S.errore = e; }
   render();
+}
+
+// --- Riaggancia alla vista (2026-11-10) --------------------------------------
+// Nano Banana non ha un ControlNet: a ogni passata le linee possono muoversi.
+// Questa spunta, quando la % di spigoli scende, ripassa il render leggero nel
+// ControlNet guidato dalla vista Allplan: le linee tornano al loro posto, luce
+// e materiali restano in gran parte. Costa solo quando si usa.
+
+function statoRiaggancia(l) {
+  if (!S.riaggancio || S.riaggancio.per !== l.identificativo) {
+    S.riaggancio = { per: l.identificativo, acceso: false, controlli: ["spigoli"], composto: null, errore: null };
+  }
+  return S.riaggancio;
+}
+
+async function componiRiaggancia(l) {
+  const q = statoRiaggancia(l);
+  try {
+    q.composto = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
+    q.errore = null;
+  } catch (e) { q.composto = null; q.errore = e; }
+  render();
+}
+
+async function applicaRiaggancia(l) {
+  const q = statoRiaggancia(l);
+  q.errore = null;
+  try {
+    const dest = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
+    const risposta = await post("/api/riaggancia/invia", {
+      vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli, destinazione_mostrata: dest.destinazione,
+    });
+    S.riaggancio = null;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+function pannelloRiaggancia(l) {
+  if (!l || !l.render || l.modello === "caricata") return null;
+  const q = statoRiaggancia(l);
+  const possibile = geometriaPossibile();
+  const t = l.tenuta;
+  const bassa = t && typeof t.spigoli === "number" && t.avvisa;
+  const spunta = h("input", { type: "checkbox", id: "riaggancia", checked: q.acceso && possibile, disabled: !possibile,
+    onchange: (e) => { q.acceso = e.target.checked; q.composto = null; if (q.acceso) componiRiaggancia(l); else render(); } });
+  const figli = [
+    h("label", { classe: "riga-spunta", for: "riaggancia" }, spunta, h("b", {}, "Riaggancia alla vista"), " ",
+      spiega("Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca, Variante) le linee possono spostarsi un po'. Riaggancia ripassa questo render, leggero, nel ControlNet guidato dalla vista Allplan: spigoli e aperture tornano al loro posto, luce e materiali restano in gran parte. Esce un passo nuovo; confrontalo col prima/dopo e con la % di spigoli.")),
+    h("p", { classe: "tenue piccolo" }, bassa
+      ? "La % di spigoli è bassa: questo render può essersi spostato dalla vista."
+      : "Da usare quando la % di spigoli scende o il prima/dopo mostra linee spostate."),
+  ];
+  if (!possibile) figli.push(h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()));
+  if (q.acceso && possibile) {
+    const c = q.composto;
+    figli.push(h("div", { classe: "controlli-geometria" },
+      ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
+        const acceso = q.controlli.includes(chiave);
+        const ultimo = acceso && q.controlli.length === 1;
+        const id = `riaggancia-${chiave}`;
+        return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
+          h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
+            onchange: (e) => {
+              const scelti = new Set(q.controlli);
+              if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
+              q.controlli = CONTROLLI_GEOMETRIA.map(([k]) => k).filter((k) => scelti.has(k));
+              componiRiaggancia(l);
+            } }),
+          h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
+      })));
+    if (c && c.destinazione) {
+      figli.push(h("p", { classe: "destinazione" }, "Vanno a ", h("b", {}, c.destinazione), `. Costo: ${c.costo}.`),
+        h("p", { classe: "tenue piccolo" }, c.cosa_parte));
+    }
+    if (c && c.errore) figli.push(avviso("errore", c.errore, c.cosa_fare));
+    if (q.errore) figli.push(avviso("errore", q.errore.fatto, q.errore.cosa_fare));
+    figli.push(h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => applicaRiaggancia(l),
+        disabled: !c || !c.destinazione || !!S.lavoroAttivo || null }, "Riaggancia"),
+      S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Riaggancia si accende quando finisce.") : null),
+      nota("Scelta, non provata.", `Rifà il ${c ? c.quanto_rifa : "–"}% del render (valore scelto, non misurato). Nessun riaggancio è ancora stato fatto col workflow vero: il primo è la prova.`));
+  }
+  return h("section", { classe: "pannello", "aria-label": "Riaggancia alla vista" }, ...figli);
 }
 
 function tenuta(l) {
@@ -2925,7 +3054,7 @@ function schermataRisultato() {
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
       palcoConAzioni(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l),
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), pannelloRiaggancia(l), ricettaPannello(l), adesso(l),
         altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }

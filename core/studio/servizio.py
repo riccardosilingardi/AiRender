@@ -940,7 +940,16 @@ class Studio:
             inserti=inserti,
             esempi=esempi,
             geometria_mostrata=dati.get("destinazione_geometria_mostrata") if geometria else None,
+            controlli_geometria=self._controlli_geometria(dati) if geometria else (),
         )
+
+    @staticmethod
+    def _controlli_geometria(dati: dict) -> tuple[str, ...]:
+        """Spigoli, Profondita', Linee dritte: quelli spuntati. Senza la voce, i soli Spigoli."""
+        try:
+            return modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
 
     def _esempi_scelti(self, dati: dict, contesto: bool = False, riferimento: object = True) -> tuple[Path, ...]:
         """Gli esempi di «Stile da esempi» oltre al riferimento: nomi della cartella dei riferimenti."""
@@ -1054,6 +1063,7 @@ class Studio:
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
                        esempi: tuple = (), geometria_mostrata: str | None = None,
+                       controlli_geometria: tuple = (),
                        punto_di_vista: modulo_punto.PuntoDiVista | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
@@ -1116,6 +1126,7 @@ class Studio:
                 finale=finale,
                 esempi=tuple(esempi),
                 destinazione_geometria=prima_passata["destinazione"] if prima_passata else None,
+                controlli_geometria=controlli_geometria if prima_passata else (),
                 punto_di_vista=punto_di_vista,
                 crea_provider=self._crea_provider,
             )
@@ -1450,6 +1461,9 @@ class Studio:
                                "pianta non dice li ha immaginati il modello.")
         elif finale:
             testo_riassunto = _riassunto_finale(finale)
+        elif dati.get("riaggancia"):
+            testo_riassunto = ("Riagganciato alla vista: il render di prima rifatto in parte col ControlNet, "
+                               "sulle linee della vista.")
         elif dati.get("partenza"):
             # Un passo su un render: lo stile non riparte, solo la richiesta.
             testo_riassunto = "Passo sul render di prima: " + "; ".join(richieste) + "."
@@ -1468,12 +1482,15 @@ class Studio:
             "vista": Path(dati.get("vista") or "").name,
             "destinazione": dati.get("destinazione"),
             "modello": dati.get("modello"),
-            "modello_nome": NOME_CARICATA if importata else modello.nome if modello else dati.get("modello"),
+            "modello_nome": (NOME_CARICATA if importata
+                             else modulo_geometria.NOME_WORKFLOW if dati.get("riaggancia")
+                             else modello.nome if modello else dati.get("modello")),
             "importata": importata,
             "preset": dati.get("preset"),
             "preset_nome": (
                 "nessun invio" if importata
                 else NOME_PUNTO if punto
+                else "Riaggancia alla vista" if dati.get("riaggancia")
                 else f"Finale ×{finale.get('ingrandimento')}" if finale
                 else "Ritocco: " + modulo_passi.nome_breve(str((dati.get("aree") or [{}])[0].get("nota") or ""))
                 if dati.get("aree") and isinstance((dati.get("aree") or [None])[0], dict)
@@ -1489,7 +1506,19 @@ class Studio:
             "tenuta": _TENUTA_IMPORTATA if importata else self._tenuta(render),
             # «stanza immaginata dalla pianta»: lo Studio lo scrive sull'immagine.
             "immaginata": bool(punto),
+            "controlli_geometria": self._nomi_controlli(dati),
         }
+
+    @staticmethod
+    def _nomi_controlli(dati: dict) -> str | None:
+        """«Spigoli + Profondità» per un lavoro con Tieni la geometria, None per gli altri."""
+        if not dati.get("destinazione_geometria"):
+            return None
+        try:
+            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender:
+            return None
+        return " + ".join(modulo_geometria.NOMI_CONTROLLI[c] for c in controlli)
 
     def _tenuta(self, render: Path | None) -> dict | None:
         """La misura degli spigoli di un render, come la mostra lo Studio. None senza render."""
@@ -1911,6 +1940,7 @@ class Studio:
             "scena": self._scena(albero, passo),
             "modello": passo.get("modello"),
             "modello_nome": NOME_CARICATA if passo.get("modello") == modulo_coda.MODELLO_CARICATA
+            else modulo_geometria.NOME_WORKFLOW if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA
             else modello.nome if modello else passo.get("modello"),
             "creato_il": passo.get("creato_il"),
             "stato": stato,
@@ -2318,6 +2348,58 @@ class Studio:
             finale=finale,
         )
 
+    # --- Riaggancia alla vista -------------------------------------------
+
+    def _riaggancia(self, dati: dict) -> tuple[Path, dict, Path, tuple[str, ...]]:
+        """Vista, passo di partenza, il suo render e i controlli spuntati."""
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        passo, render = self._passo_di_partenza(self._albero(vista), dati.get("da"))
+        return vista, passo, render, self._controlli_geometria(dati)
+
+    def componi_riaggancia(self, dati: dict) -> dict:
+        """Cosa fa «Riaggancia alla vista», prima del clic: dove va, cosa parte e cosa costa (regola 5)."""
+        _vista, passo, _render, controlli = self._riaggancia(dati)
+        geometria = _geometria_dict(1, self.provider)
+        return {
+            "da_numero": str(passo.get("numero")),
+            "controlli": modulo_geometria.descrivi_controlli(controlli),
+            "destinazione": geometria["destinazione"],
+            "errore": geometria["errore"],
+            "cosa_fare": geometria["cosa_fare"],
+            "cosa_parte": ("Partono due immagini, solo al workflow col ControlNet: la vista Allplan, da cui "
+                           "si prendono le linee, e il render, che si rifà in parte sopra quelle linee. "
+                           "Nano Banana non riceve niente."),
+            "costo": _costo_geometria(1, self.provider).replace("la prima passata", "il riaggancio"),
+            "quanto_rifa": round(config.GEOMETRIA_RIAGGANCIA_DENOISE * 100),  # numero-non-configurabile: in percento
+        }
+
+    def invia_riaggancia(self, dati: dict) -> dict:
+        """«Riaggancia alla vista» sul render di un passo: il risultato e' un passo figlio."""
+        vista, passo, render, controlli = self._riaggancia(dati)
+        try:
+            dove = modulo_geometria.destinazione(self.provider)
+        except ErroreAirender as problema:
+            raise RichiestaStudioNonValida(problema.fatto, problema.cosa_fare) from None
+        mostrata = dati.get("destinazione_mostrata")
+        if mostrata != dove:
+            raise RichiestaStudioNonValida(
+                f"La pagina ha mostrato come destinazione {mostrata!r}, ma il render "
+                f"partirebbe verso {dove}. Non ho inviato niente.",
+                "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
+            )
+        try:
+            lavoro = modulo_coda.metti_in_coda_riaggancia(
+                self.cartella, vista, blocchi.Scelte(scena=self._scena(self._albero(vista), passo)),
+                self.provider, passo["identificativo"], render, dove, controlli)
+        except ErroreAirender as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        return {
+            "identificativo": lavoro.identificativo,
+            "identificativi": [lavoro.identificativo],
+            "destinazione": lavoro.destinazione,
+            "coda_attiva": self._coda_attiva(),
+        }
+
     # --- cartella --------------------------------------------------------
 
     # --- video (Studio · Video) -------------------------------------------
@@ -2569,6 +2651,8 @@ def _nome_passo(passo: dict) -> str:
     """Il nome breve della riga: dalle scelte, o dalla richiesta."""
     if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
         return NOME_CARICATA
+    if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA:
+        return "Riaggancia alla vista"
     tipo = _tipo_passo(passo)
     if tipo == "punto":
         return NOME_PUNTO
@@ -2600,6 +2684,10 @@ def _riassunto_passo(passo: dict, padre: dict | None) -> str:
     """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
     if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
         return "L'immagine che hai caricato, così com'è: nessun invio."
+    if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA:
+        numero = padre.get("numero") if padre else "0, la vista"
+        return (f"Dal passo {numero}: rifatto in parte col ControlNet sulle linee della vista, "
+                "per rimettere la geometria al suo posto.")
     tipo = _tipo_passo(passo)
     richieste = passo.get("richieste") or []
     if tipo == "punto":
@@ -2723,7 +2811,7 @@ def _geometria_dict(varianti: int, provider: str = "") -> dict:
         "errore": errore,
         "cosa_fare": cosa_fare,
         "workflow": modulo_geometria.NOME_WORKFLOW,
-        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet sugli spigoli; "
+        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet (i controlli spuntati); "
                        "poi il suo render parte verso il modello al posto della vista."),
         "costo": _costo_geometria(varianti, provider),
     }

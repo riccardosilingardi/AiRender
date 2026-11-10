@@ -1183,6 +1183,42 @@ GEOMETRIA_FORZA = _registra(Costante(
     ),
 ))
 
+GEOMETRIA_FORZA_PROFONDITA = _registra(Costante(
+    nome="GEOMETRIA_FORZA_PROFONDITA",
+    valore=0.6,
+    origine=SCELTA,
+    ragione=(
+        "Quanto comanda il controllo «Profondita'» (mappa di profondita' stimata "
+        "con Depth Anything V2) nella prima passata. Tiene volumi, piani e "
+        "prospettiva, non i dettagli: sotto gli Spigoli perche' insieme non "
+        "irrigidiscano il render. Giudizio del 2026-11-09, nessun render fatto."
+    ),
+))
+
+GEOMETRIA_FORZA_LINEE = _registra(Costante(
+    nome="GEOMETRIA_FORZA_LINEE",
+    valore=0.7,
+    origine=SCELTA,
+    ragione=(
+        "Quanto comanda il controllo «Linee dritte» (M-LSD, solo segmenti "
+        "dritti) nella prima passata. Ignora retini e texture, quindi regge una "
+        "forza vicina agli Spigoli. Giudizio del 2026-11-09, nessun render fatto."
+    ),
+))
+
+GEOMETRIA_RIAGGANCIA_DENOISE = _registra(Costante(
+    nome="GEOMETRIA_RIAGGANCIA_DENOISE",
+    valore=0.35,
+    origine=SCELTA,
+    ragione=(
+        "«Riaggancia alla vista»: quanto del render si rifa' nella passata col "
+        "ControlNet guidata dalla vista (1 = tutto da capo, 0 = niente). Basso "
+        "perche' luce e materiali del render restino e si spostino solo le "
+        "linee. Fra 0.3 e 0.4 nelle guide di img2img per architettura; "
+        "giudizio del 2026-11-10, nessun render fatto."
+    ),
+))
+
 GEOMETRIA_PASSI = _registra(Costante(
     nome="GEOMETRIA_PASSI",
     valore=8,

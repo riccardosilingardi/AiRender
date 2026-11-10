@@ -449,10 +449,13 @@ def test_esempi_stile_massimo_ferma_un_quinto_esempio_ed_e_scelto(tmp_path):
 
 def test_le_costanti_di_tieni_la_geometria_sono_scelte_e_dentro_i_limiti_dei_nodi():
     """Caso: un valore fuori dai limiti di ComfyUI, e il workflow si ferma dopo il caricamento pagato."""
-    for nome in ("GEOMETRIA_FORZA", "GEOMETRIA_PASSI", "GEOMETRIA_LATO_MASSIMO",
-                 "GEOMETRIA_ATTESA_SECONDI", "GEOMETRIA_INTERVALLO_SECONDI"):
+    assert 0 < config.GEOMETRIA_RIAGGANCIA_DENOISE < 1  # numero-non-configurabile: 1 rifarebbe tutto da capo
+    for nome in ("GEOMETRIA_FORZA", "GEOMETRIA_FORZA_PROFONDITA", "GEOMETRIA_FORZA_LINEE", "GEOMETRIA_PASSI",
+                 "GEOMETRIA_RIAGGANCIA_DENOISE",
+                 "GEOMETRIA_LATO_MASSIMO", "GEOMETRIA_ATTESA_SECONDI", "GEOMETRIA_INTERVALLO_SECONDI"):
         assert config.costante(nome).origine == config.SCELTA
-    assert -10 <= config.GEOMETRIA_FORZA <= 10  # numero-non-configurabile: limiti di QwenImageDiffsynthControlnet
+    for forza in (config.GEOMETRIA_FORZA, config.GEOMETRIA_FORZA_PROFONDITA, config.GEOMETRIA_FORZA_LINEE):
+        assert -10 <= forza <= 10  # numero-non-configurabile: limiti di QwenImageDiffsynthControlnet
     assert 0 < config.GEOMETRIA_LATO_MASSIMO <= 16384  # numero-non-configurabile: limite di ImageScaleToMaxDimension
     assert config.GEOMETRIA_PASSI >= 1
     assert 0 < config.GEOMETRIA_INTERVALLO_SECONDI < config.GEOMETRIA_ATTESA_SECONDI

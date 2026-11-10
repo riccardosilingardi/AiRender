@@ -60,8 +60,8 @@ function caricamento(altro = {}) {
   return new Request(`${SERVER}/geometria/api/v2/assets`, { method: "POST", headers: intestazioni(altro), body: modulo });
 }
 
-function grafoDelMotore(asset, prompt = "a house", seme = 42) {
-  const g = structuredClone(modello.workflow);
+function grafoDelMotore(asset, prompt = "a house", seme = 42, controlli = "spigoli") {
+  const g = structuredClone(modello.grafi[controlli]);
   g[modello.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id: asset } };
   g[modello.nodi.prompt].inputs.text = prompt;
   g[modello.nodi.campionatore].inputs.seed = seme;
@@ -122,7 +122,7 @@ test("l'invio riserva il peso del listino, ricostruisce il grafo e manda solo as
   const chiama = deployFinto();
   const r = await caricaEInvia(db, chiama, (id) => {
     const g = grafoDelMotore(id, "a villa", 7);
-    g[modello.nodi.forza].inputs.strength = 0;   // il client prova a cambiare la forza
+    g["8"].inputs.strength = 0;   // il client prova a cambiare la forza
     g[modello.nodi.campionatore].inputs.steps = 200; // e i passi
     g["99"] = { class_type: "SaveImage", inputs: {} }; // e ad aggiungere un nodo
     return g;
@@ -134,8 +134,8 @@ test("l'invio riserva il peso del listino, ricostruisce il grafo e manda solo as
   assert.notEqual(c.headers["idempotency-key"], "k1");
   const mandato = JSON.parse(c.body).workflow;
   assert.equal(mandato["99"], undefined);
-  assert.equal(mandato[modello.nodi.forza].inputs.strength, modello.forza);
-  assert.equal(mandato[modello.nodi.campionatore].inputs.steps, modello.passi);
+  assert.deepEqual(mandato["8"].inputs, modello.grafi.spigoli["8"].inputs);
+  assert.equal(mandato[modello.nodi.campionatore].inputs.steps, modello.grafi.spigoli[modello.nodi.campionatore].inputs.steps);
   assert.equal(mandato[modello.nodi.campionatore].inputs.seed, 7);
   assert.equal(mandato[modello.nodi.prompt].inputs.text, "a villa");
   assert.deepEqual(mandato[modello.nodi.immagine].inputs.image, { __type: "core/ASSET", info: { id: "asset-7" } });
@@ -242,5 +242,63 @@ test("senza indirizzo del deployment il server lo dice e non riserva", async () 
   const db = conLicenza();
   const r = await gestisci(caricamento(), { db, ambiente: { COMFY_API_KEY: "k" }, chiama: deployFinto() }).catch((e) => e);
   assert.equal(r.name, "VariabileMancante");
+  assert.equal(db.stato.render.length, 0);
+});
+
+test("i controlli scelti dal client scelgono il grafo: Profondita' e Linee dritte senza Spigoli", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const r = await caricaEInvia(db, chiama, (id) => grafoDelMotore(id, "a house", 3, "profondita+linee"));
+  assert.equal(r.status, 201);
+  const mandato = JSON.parse(chiama.chiamate.find((x) => x.url === `${DEPLOY}/api/v2/jobs`).body).workflow;
+  assert.equal(mandato["8"], undefined, "niente Spigoli");
+  assert.equal(mandato["3"], undefined);
+  assert.ok(mandato["18"] && mandato["20"]);
+  assert.deepEqual(mandato["20"].inputs.model, ["18", 0]);
+});
+
+test("un grafo senza nessun controllo si rifiuta prima di riservare", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const r = await caricaEInvia(db, chiama, (id) => {
+    const g = grafoDelMotore(id);
+    delete g["8"];
+    return g;
+  });
+  assert.equal(r.status, 400);
+  assert.equal(db.stato.render.length, 0);
+});
+
+test("«Riaggancia alla vista»: il render firmato entra nel latente, i controlli restano dalla vista", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const a = await gestisci(caricamento(), { db, ambiente, chiama });
+  const { id } = await a.json();
+  const g = structuredClone(modello.grafi_riaggancia.spigoli);
+  g[modello.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id } };
+  g[modello.nodi.render].inputs.image = { __type: "core/ASSET", info: { id } };
+  g[modello.nodi.prompt].inputs.text = "a house";
+  g[modello.nodi.campionatore].inputs.seed = 7;
+  const r = await gestisci(invio(g), { db, ambiente, chiama });
+  assert.equal(r.status, 201);
+  const mandato = JSON.parse(chiama.chiamate.find((x) => x.url === `${DEPLOY}/api/v2/jobs`).body).workflow;
+  assert.equal(mandato["14"], undefined, "niente foglio vuoto");
+  assert.deepEqual(mandato["9"].inputs.latent_image, ["23", 0]);
+  assert.ok(mandato["9"].inputs.denoise < 1);
+  assert.equal(mandato[modello.nodi.render].inputs.image.info.id, id.split(".")[0]);
+});
+
+test("«Riaggancia alla vista» con un render non firmato si rifiuta prima di riservare", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const r = await caricaEInvia(db, chiama, (id) => {
+    const g = structuredClone(modello.grafi_riaggancia.spigoli);
+    g[modello.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id } };
+    g[modello.nodi.render].inputs.image = { __type: "core/ASSET", info: { id: "falso.0000" } };
+    g[modello.nodi.prompt].inputs.text = "a house";
+    g[modello.nodi.campionatore].inputs.seed = 7;
+    return g;
+  });
+  assert.equal(r.status, 403);
   assert.equal(db.stato.render.length, 0);
 });

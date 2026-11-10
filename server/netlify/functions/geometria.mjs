@@ -1,5 +1,6 @@
 // «Tieni la geometria» coi crediti AIRENDER: la prima passata col ControlNet
-// sugli spigoli, sul deployment della Comfy Developer Platform di Riccardo.
+// (Spigoli, Profondita', Linee dritte), sul deployment della Comfy Developer
+// Platform di Riccardo.
 //
 // Parla la stessa API v2 dei workflow del deployment (carica l'asset, manda
 // il lavoro, leggi lo stato, scarica l'uscita), sotto /geometria/api/v2, cosi'
@@ -84,29 +85,44 @@ export function assetDelCliente(licenzaId, idCliente, chiave) {
   return firmaAsset(licenzaId, asset, chiave) === idCliente.slice(punto + 1) ? asset : null;
 }
 
-// Il grafo da mandare: quello di geometria.json coi valori di config.py, e
-// dal client solo asset, prompt e seme.
-export function grafo(asset, prompt, seme, m = modello) {
-  const g = structuredClone(m.workflow);
+// Il grafo da mandare: quello di geometria.json per i controlli scelti (gia'
+// coi valori di config.py), e dal client solo asset, prompt e seme. Con
+// `render` (l'asset del render) e' «Riaggancia alla vista».
+export function grafo(asset, prompt, seme, controlli = "spigoli", m = modello, render = null) {
+  const g = structuredClone((render ? m.grafi_riaggancia : m.grafi)[controlli]);
   g[m.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id: asset } };
-  g[m.nodi.lato].inputs.largest_size = m.lato_massimo;
+  if (render) g[m.nodi.render].inputs.image = { __type: "core/ASSET", info: { id: render } };
   g[m.nodi.prompt].inputs.text = prompt;
-  g[m.nodi.forza].inputs.strength = m.forza;
   g[m.nodi.campionatore].inputs.seed = seme;
-  g[m.nodi.campionatore].inputs.steps = m.passi;
   return g;
 }
 
-// Cosa il client chiede, letto dal grafo che manda il motore.
+// Quali controlli (Spigoli, Profondita', Linee dritte) ha scelto il client:
+// i nodi ControlNet che ci sono nel suo grafo, nell'ordine di geometria.json.
+export function controlliDalGrafo(g, m = modello) {
+  const scelti = m.controlli.filter(([, nodo]) => g[nodo]).map(([nome]) => nome);
+  const chiave = scelti.join("+");
+  return m.grafi[chiave] ? chiave : null;
+}
+
+// Cosa il client chiede, letto dal grafo che manda il motore. `render` c'e'
+// solo per «Riaggancia alla vista» (il nodo del render nel grafo).
 export function richiestaDalGrafo(corpo, m = modello) {
   const g = corpo?.workflow;
   if (!g || typeof g !== "object") return null;
+  const controlli = controlliDalGrafo(g, m);
+  if (!controlli) return null;
   const asset = g[m.nodi.immagine]?.inputs?.image?.info?.id;
   const prompt = g[m.nodi.prompt]?.inputs?.text;
   const seme = g[m.nodi.campionatore]?.inputs?.seed;
   if (typeof prompt !== "string" || !prompt.trim() || prompt.length > PROMPT_MASSIMO) return null;
   if (!Number.isInteger(seme) || seme < 0 || seme > SEME_MASSIMO) return null;
-  return { asset, prompt, seme };
+  let render = null;
+  if (g[m.nodi.render]) {
+    render = g[m.nodi.render]?.inputs?.image?.info?.id;
+    if (typeof render !== "string" || !render) return null;
+  }
+  return { asset, prompt, seme, controlli, render };
 }
 
 export function pesoGeometria(l = listino) {
@@ -202,6 +218,11 @@ async function invia(req, { db, ambiente, chiama, cliente, licenza }) {
     return errore(403, "asset_sconosciuto", "La vista indicata non e' stata caricata da questa licenza.",
       "Rilancia il render: la vista si ricarica.");
   }
+  const render = chiesto.render ? assetDelCliente(licenza.id, chiesto.render, chiaveComfy) : null;
+  if (chiesto.render && !render) {
+    return errore(403, "asset_sconosciuto", "Il render da riagganciare non e' stato caricato da questa licenza.",
+      "Rilancia «Riaggancia alla vista»: il render si ricarica.");
+  }
   const quanto = pesoGeometria();
   if (!quanto) {
     return errore(503, "servizio_non_configurato", "«Tieni la geometria» non ha un prezzo nel listino del server.",
@@ -227,7 +248,7 @@ async function invia(req, { db, ambiente, chiama, cliente, licenza }) {
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify({ workflow: grafo(asset, chiesto.prompt, chiesto.seme) }),
+      body: JSON.stringify({ workflow: grafo(asset, chiesto.prompt, chiesto.seme, chiesto.controlli, modello, render) }),
       signal: AbortSignal.timeout(ATTESA_COMFY_MS),
     });
   } catch {

@@ -435,6 +435,39 @@ Storage), due giorni dopo il bucket `risultati` vuoto.
 - `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
   le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
 
+### Riaggancia alla vista (2026-11-10)
+
+Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca,
+Variante) le linee possono muoversi, e nessun concorrente lo vincola (Veras e
+Rendair usano Nano Banana senza ControlNet; nel test di Autodesk Nano Banana
+sposta scale e ringhiere). Riccardo ha scelto una spunta, da usare quando la %
+di spigoli scende: nel Risultato, «Riaggancia alla vista» manda vista e render
+al solo workflow col ControlNet. Il render entra nel latente (nodi 21-23) al
+posto del foglio vuoto e se ne rifà `GEOMETRIA_RIAGGANCIA_DENOISE` (0,35,
+**scelto**); i controlli si prendono dalla vista. Esce un passo figlio, misurato
+contro la vista come gli altri. Lavoro del formato 12, modello `riaggancia`.
+Costo come la prima passata (`pesi_azioni.tieni_geometria`), solo piano Studio
+o chiave propria. **Non verificato**: che `ImageScale` accetti misure collegate
+da `GetImageSize` sulla Developer Platform; che a 0,35 le linee tornino davvero
+senza spegnere luce e materiali di Nano Banana (Z-Image-Turbo è meno fine);
+mai provato in un browser né col workflow vero. Verifica: un render con la %
+bassa, Riaggancia, poi prima/dopo col render di partenza e le due %.
+
+### Tieni la geometria con tre controlli (2026-11-09)
+
+Sotto la spunta «Tieni la geometria» lo Studio mostra tre spunte combinabili:
+Spigoli (Canny, predefinito), Profondità (Depth Anything V2) e Linee dritte
+(M-LSD), come i concorrenti che lo dichiarano (LookX: depth, Canny,
+segmentazione; Veras: un cursore unico). Il lavoro scrive i controlli in
+`controlli_geometria`; il server sceglie il grafo fra i 7 di
+`server/geometria.json`. Costo uguale per ogni combinazione. **Non verificato**:
+nomi e ingressi dei nodi `DepthAnythingV2Preprocessor` e `M-LSDPreprocessor`
+(comfyui_controlnet_aux) sulla Developer Platform; che piu' nodi
+QwenImageDiffsynthControlnet in fila sullo stesso ControlNet Union funzionino;
+le forze `GEOMETRIA_FORZA_PROFONDITA` 0,6 e `GEOMETRIA_FORZA_LINEE` 0,7 sono
+scelte. Verifica: build del deployment col file nuovo, poi la stessa vista con
+Spigoli, con Profondità e con tutti e tre, bozze affiancate.
+
 ### Tieni la geometria coi crediti AIRENDER (2026-11-06)
 
 Plugin e web app (provider `airender`) mandano la prima passata al server
