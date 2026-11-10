@@ -453,6 +453,13 @@ select { min-height: 34px; padding: 0 10px; }
 .scelta-modo .modo[aria-pressed="true"] { border: 2px solid var(--accento); padding: 11px 15px; background: var(--pannello-2); }
 .scelta-modo .modo b { font-size: 15px; }
 
+/* Da un'immagine: che immagine e', cosa farne, poi il file. */
+.da-immagine { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.da-immagine h2 { margin: 0; font-size: 16px; }
+.da-immagine .scelta-modo { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.scelta-modo .modo:disabled { cursor: not-allowed; opacity: .6; }
+.tieni { flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+
 /* Inserisci in un luogo: tre passi numerati, la foto grande a sinistra. */
 .griglia-contesto { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
 .passi-destra { display: flex; flex-direction: column; gap: 20px; }
@@ -487,7 +494,7 @@ select { min-height: 34px; padding: 0 10px; }
 .lettore-video { width: 100%; border-radius: 6px; background: #000; }
 
 @media (max-width: 900px) {
-  .griglia-contesto, .scelta-modo { grid-template-columns: 1fr; }
+  .griglia-contesto, .scelta-modo, .da-immagine .scelta-modo { grid-template-columns: 1fr; }
 }
 
 /* --- spiegazioni al passaggio del mouse (proposta 5) ------------------------ */

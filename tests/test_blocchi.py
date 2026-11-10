@@ -34,7 +34,9 @@ def test_i_testi_dei_blocchi_sono_quelli_della_bozza():
                    blocchi.PERSONE, blocchi.QUALITA, blocchi.FEDELTA,
                    blocchi.RESA, blocchi.EVITARE_DA_RESA,
                    blocchi.FEDELTA_PRODOTTO, blocchi.LOOK_PRODOTTO, blocchi.LUCE_PRODOTTO,
-                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO, blocchi.INQUADRATURE):
+                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO, blocchi.INQUADRATURE,
+                   blocchi.TIPI_PIANTA, blocchi.FEDELTA_PIANTA, blocchi.LOOK_PIANTA, blocchi.LUCE_PIANTA,
+                   blocchi.QUALITA_PIANTA):
         for blocco in elenco.values():
             nel_codice.add((blocco.identificativo, blocco.testo))
     for blocco in (blocchi.CONTESTO_FUORI_INTATTO, blocchi.CONTESTO_PULISCI_MAPPA):
@@ -49,9 +51,12 @@ def test_nessun_blocco_si_presenta_come_provato():
                    blocchi.INTORNO, blocchi.VERDE, blocchi.PERSONE, blocchi.FUORI, blocchi.ARREDO,
                    blocchi.FEDELTA, blocchi.RESA, blocchi.EVITARE_DA_RESA,
                    blocchi.FEDELTA_PRODOTTO, blocchi.LOOK_PRODOTTO, blocchi.LUCE_PRODOTTO,
-                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO):
+                   blocchi.SFONDO, blocchi.QUALITA_PRODOTTO,
+                   blocchi.TIPI_PIANTA, blocchi.FEDELTA_PIANTA, blocchi.LOOK_PIANTA, blocchi.LUCE_PIANTA,
+                   blocchi.QUALITA_PIANTA):
         tutti += list(elenco.values())
-    tutti.append(blocchi.COSA_EVITARE_PRODOTTO)
+    tutti += [blocchi.COSA_EVITARE_PRODOTTO, blocchi.COSA_EVITARE_PIANTA,
+              blocchi.PUNTO_DI_VISTA, blocchi.PUNTO_DI_VISTA_SITO]
     assert {b.origine for b in tutti} == {config.SCELTA}
 
 
@@ -75,6 +80,8 @@ def test_le_lunghezze_dei_preset_sono_quelle_misurate_nella_bozza():
         "interno-sera": 835, "interno-notte": 804, "interno-vissuto": 925,
         "arredo-catalogo": 1037, "arredo-studio": 1059, "arredo-editoriale": 1023,
         "arredo-dettaglio": 1023, "arredo-controluce": 1010, "arredo-ambientato": 1064,
+        # Bozza 16, le piante: misurate dalla tabella «Preset pianta».
+        "pianta-materica": 1148, "pianta-assonometria": 1116, "pianta-concorso": 1062, "pianta-biancoenero": 1046, "planimetria-illustrata": 1071, "planimetria-drone": 1123, "planimetria-acquerello": 1028, "planivolumetrico-plastico": 1102, "planivolumetrico-materico": 1190,
     }
     misurate = {k: len(componi(p.scelte)) for k, p in blocchi.PRESET_STILE.items()}
     assert misurate == attese
@@ -300,7 +307,7 @@ def test_l_esempio_dell_arredo_della_bozza_esce_identico():
 def test_ogni_scena_ha_i_suoi_preset():
     """Caso: lo switch della scena mostra preset di un'altra scena, o una scena resta senza."""
     per_scena = {s: [p for p in blocchi.PRESET_STILE.values() if p.scelte.scena == s] for s in blocchi.SCENE}
-    assert {s: len(v) for s, v in per_scena.items()} == {"esterno": 8, "interno": 6, "prodotto": 6}
+    assert {s: len(v) for s, v in per_scena.items()} == {"esterno": 8, "interno": 6, "prodotto": 6, "pianta": 9}
 
 
 def test_un_arredo_tiene_il_pezzo_e_non_l_architettura():

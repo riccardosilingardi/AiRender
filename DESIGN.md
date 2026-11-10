@@ -1060,6 +1060,98 @@ celle mostrano lo stato. **Errore**: messaggio del motore sopra Applica; scelte 
 tratti restano; miniature doppie, sconosciute o troppe non mandano niente.
 **Pieno**: i passi nuovi nell'albero e nella griglia.
 
+## Studio · Da un'immagine, costruita il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 5, partenza «Un'immagine»;
+Design canvas, schermata B-Immagine). Studio e web app, stessa pagina.
+Schermate in `docs/ui/studio-immagine/`.
+
+**Ingresso** (Genera, riquadro della vista): accanto a «Usa un'altra vista…»
+c'è **Da un'immagine…**; a vista vuota è il bottone principale. Apre un
+pannello con tre scelte: **Un render già fatto**, **Una foto**, **Uno schizzo o
+un plastico**. Per la foto si sceglie anche cosa farne (**Cambia il look**,
+**Cambia arredi o materiali**, **Metti il progetto qui**) e, per le prime due,
+**Che cosa si vede?** (Un esterno / Un interno). Poi «Scegli l'immagine…».
+
+Dove porta:
+- **Render già fatto**: niente Genera. L'immagine diventa subito un risultato
+  («Caricata 1» nello storico) e da lì partono Cambia, Ritocca, Popola, Video e
+  Finale, con la stessa barra. Non parte niente e non costa niente: il riquadro
+  «Com'è stato fatto» dice «Nessun invio», la tenuta dice «Non misurata» col
+  perché. Variante e Altra vista non ci sono (serve una vista di Allplan).
+- **Foto, Cambia il look**: Genera, con **Cosa tenere** sotto la vista: «Muri e
+  finestre» (predefinito) o «Anche gli arredi». Preset, look, riferimento di
+  stile come per una vista. La foto è anche subito un risultato, come il render.
+- **Foto, Cambia arredi o materiali**: Ritocca sulla foto, coi riquadri e le
+  foto di riferimento che ci sono già.
+- **Foto, Metti il progetto qui**: Fotoinserimento, con la foto come luogo.
+- **Schizzo o plastico**: Genera come una vista, Cosa tenere = «Le linee dello
+  schizzo». Arredo (prodotto) è spento per tutte le immagini caricate.
+
+Su un'immagine caricata il controllo di idoneità guarda solo la misura (lato
+minimo): ombre, toni e sfondo uniforme valgono per le viste di Allplan. La riga
+sotto la vista dice il tipo («Foto», «Schizzo o plastico», «Render già fatto»).
+
+**Punti** (Materiali della vista, fuori da Allplan): «+ Punti» accanto a «+
+Contorno». Ogni clic sulla vista è un quadratino campione (`PUNTO_LATO`, 5% del
+lato, scelta) e una riga «Materiale N · dalla vista» con «diventa…» e «+
+Riferimento». «Fine selezione» chiude.
+
+**Prima / dopo**: resta il confronto predefinito in Risultato e in Passi. Per
+l'immagine caricata la partenza si chiama «Immagine caricata» (o «Foto di
+partenza», «Schizzo di partenza») e una riga sopra il cursore dice che prima e
+dopo sono uguali finché non parte il primo Cambia, Ritocca o Popola.
+
+Quattro stati. **Vuoto**: pannello chiuso; aperto senza tipo, «Scegli
+l'immagine…» grigio. **In corso**: «Carico…» sul bottone. **Errore**: messaggio
+del motore nel pannello (immagine troppo piccola, formato, tipo sconosciuto);
+niente viene salvato. **Pieno**: la vista caricata in Genera, o il risultato in
+Risultato, o il Ritocca aperto, secondo la scelta.
+
+## Pianta, planimetria e planivolumetrico, costruiti il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 6; Design canvas, schermata
+C-Pianta; testi nella scheda «Preset nuovi» della pagina Flussi). Studio e web
+app, stessa pagina. Schermate in `docs/ui/studio-pianta/`.
+
+**Genera**: la scena **Pianta** si aggiunge a Esterno, Interno e Arredo. Nove
+preset (pianta resa materica, in assonometria, colorata da concorso, bianco e
+nero; planimetria illustrata, da drone, ad acquerello; planivolumetrico plastico
+bianco e materico). Nei dettagli: **1 · Che disegno è** (Pianta dell'edificio,
+Planimetria, Planivolumetrico), **2 · Stile della tavola**, **3 · Luce e
+ombre**. Il giudizio della vista per una pianta non chiede ombre né toni di
+grigio: «Pianta adatta · linee e colori piatti vanno bene». «Tieni la
+geometria» si chiama «Tieni la geometria · muri e aperture». Accanto a «Pianta
+adatta» c'è **Punto di vista**, per una pianta già fatta.
+
+**Barra sotto un render di pianta**: al posto di Popola ci sono **Arreda** e
+**Punto di vista**. Il resto (Cambia, Ritocca, Variante, Video, Altra vista,
+Finale) resta com'è.
+- **Arreda** apre il Ritocca in modo Arreda: solo Rettangolo e Selezione libera,
+  lo stile in alto (scelte di `STILI_ARREDA`) con **Esci da Arreda**, e per ogni
+  zona a destra «Stanza» (soggiorno, cucina, camera, bagno, studio, ingresso…).
+  Applica dice «Arreda · N zone». Fuori dalle zone resta la pianta di prima.
+- **Punto di vista**: la pianta grande; si clicca dove si sta e si trascina
+  verso dove si guarda, e compaiono il punto e il cono rossi, gli stessi che il
+  motore disegna sulla seconda immagine che parte. Sotto: Dove (Dentro la casa,
+  Fuori nel lotto), Luce (Giorno, Pomeriggio caldo, Sera), Camera (**Senza
+  Allplan** scelta; **In Allplan** spenta con «In arrivo»: aspetta la sonda di
+  PythonParts). Sempre, prima di Rendi: «Stanza immaginata dalla pianta. Altezze
+  (occhi a 1,6 m, soffitto a 2,7 m, scelte), arredi e finestre che la pianta non
+  disegna li ha immaginati il modello.» Il modello deve ricevere più immagini.
+
+**Prima/dopo (A/B)**: resta il confronto predefinito in Risultato, Passi e
+Ritocca, anche per Arreda e per il punto di vista. Sopra il render di un punto
+di vista il titolo è «La foto dal punto di vista» con lo stesso avviso «Stanza
+immaginata dalla pianta», anche in Passi.
+
+Quattro stati. **Vuoto**: in Punto di vista, «Clicca sulla pianta dove stai»
+accanto a Rendi grigio; trascinamento troppo corto, «Trascina un po' più in
+là»; in Arreda senza zone, «Disegna un rettangolo su ogni stanza da arredare».
+**In corso**: il lavoro si segue come gli altri passi. **Errore**: il messaggio
+del motore sopra Rendi o Applica; punto, zone e stanze restano. **Pieno**: un
+passo nuovo sotto la pianta, col prima/dopo.
+
 ## Studio · Licenza e saldo, costruita il 2026-11-05
 
 Bozza A scelta da Riccardo il 2026-11-05 fra due (A scheda intera, B cassetto

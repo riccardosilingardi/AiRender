@@ -19,6 +19,9 @@ TROPPO_PICCOLA = "troppo_piccola"
 SEMBRA_WIREFRAME = "sembra_wireframe"
 TROPPO_PIATTA = "troppo_piatta"
 
+# La scena di blocchi.PIANTA, scritta qui per non legare l'idoneita' ai blocchi.
+SCENA_DISEGNO = "pianta"
+
 _COME_SI_SALVA = (
     "In Allplan: metti la vista in shaded con le ombre attive e lo sfondo "
     "neutro, poi \"Salva contenuto finestra come immagine\" con il lato lungo "
@@ -37,8 +40,12 @@ class Esito:
     statistiche: Statistiche
 
 
-def valuta(statistiche: Statistiche) -> Esito:
+def valuta(statistiche: Statistiche, scena: str | None = None) -> Esito:
     """Giudica la vista. Non solleva: chi chiama decide se fermarsi.
+
+    Una pianta (scena «pianta») e' fatta proprio di linee su fondo chiaro, o
+    di colori piatti: per lei contano solo i pixel. Il controllo del
+    wireframe e della vista piatta vale per una vista in prospettiva.
 
     L'ordine conta. Una vista a colori piatti ha poche tonalita' quanto un
     wireframe: le separa il contrasto. Il wireframe e' fatto di linee nere su
@@ -56,6 +63,18 @@ def valuta(statistiche: Statistiche) -> Esito:
                 "controllo della struttura ha troppo poco a cui aggrapparsi."
             ),
             cosa_fare=_COME_SI_SALVA,
+            statistiche=statistiche,
+        )
+
+    if scena == SCENA_DISEGNO:
+        return Esito(
+            idonea=True,
+            motivo=None,
+            fatto=(
+                f"Pianta {statistiche.larghezza}x{statistiche.altezza} px: per un "
+                "disegno dall'alto contano solo i pixel, linee e colori piatti vanno bene."
+            ),
+            cosa_fare="",
             statistiche=statistiche,
         )
 
@@ -101,9 +120,38 @@ def valuta(statistiche: Statistiche) -> Esito:
     )
 
 
-def assicura_idonea(statistiche: Statistiche) -> Esito:
+def valuta_immagine(statistiche: Statistiche) -> Esito:
+    """Un'immagine caricata con «Da un'immagine» (core/partenza.py): conta solo la misura.
+
+    Ombre, toni e sfondo uniforme dicono se una vista di Allplan e' stata
+    salvata bene; una foto o un render li hanno per forza, e uno schizzo a
+    matita sembrerebbe sempre un wireframe. Resta il lato minimo: sotto, il
+    modello ha troppo poco da cui partire.
+    """
+    if statistiche.lato_lungo < config.LATO_MINIMO_PX:
+        return Esito(
+            idonea=False,
+            motivo=TROPPO_PICCOLA,
+            fatto=(
+                f"Questa immagine e' {statistiche.larghezza}x{statistiche.altezza} px: "
+                f"troppo piccola. Sotto {config.LATO_MINIMO_PX} px di lato lungo il "
+                "modello ha troppo poco da cui partire."
+            ),
+            cosa_fare=f"Carica la stessa immagine piu' grande, con il lato lungo ad almeno {config.LATO_MINIMO_PX} px.",
+            statistiche=statistiche,
+        )
+    return Esito(
+        idonea=True,
+        motivo=None,
+        fatto=f"Immagine {statistiche.larghezza}x{statistiche.altezza} px.",
+        cosa_fare="",
+        statistiche=statistiche,
+    )
+
+
+def assicura_idonea(statistiche: Statistiche, scena: str | None = None) -> Esito:
     """Come `valuta`, ma si ferma se la vista non va bene."""
-    esito = valuta(statistiche)
+    esito = valuta(statistiche, scena)
     if not esito.idonea:
         raise ImmagineNonIdonea(esito.fatto, esito.cosa_fare, esito.motivo or "")
     return esito

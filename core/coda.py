@@ -48,10 +48,12 @@ from . import contesto as modulo_contesto
 from . import materiali as modulo_materiali
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
-from .idoneita import valuta
+from .idoneita import valuta, valuta_immagine
 from .preset import MODELLI_PREDEFINITI
+from . import punto as modulo_punto
 from .provider import geometria as modulo_geometria
 from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
+from .ricetta import Ricetta, impronta
 
 FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
 # Il formato 2 (2026-10-30) aggiunge il passo di partenza e le richieste a
@@ -96,7 +98,12 @@ FORMATO_GEOMETRIA = 10  # numero-non-configurabile: versione del formato di un l
 # Banana. Il file scrive anche il formato del lavoro avvolto (`formato_base`) e
 # la seconda destinazione. Un motore vecchio rifiuta il 10 invece di mandare
 # solo a Nano Banana quello che l'utente ha chiesto di mandare prima altrove.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_PUNTO = 11  # numero-non-configurabile: versione del formato di un lavoro «Punto di vista dalla pianta»
+# Il formato 11 (2026-11-09) e' il punto di vista dalla pianta: dalla pianta
+# (un render o la vista) il motore disegna il punto e il cono rossi e manda le
+# due immagini. Niente aree, richieste, riferimenti, materiali o geometria.
+# Un motore vecchio rifiuta l'11 invece di mandare la pianta da sola.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)  # numero-non-configurabile: i formati che questo motore sa leggere
 TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
@@ -318,6 +325,10 @@ class Lavoro:
     # Un file del formato 10 senza questa voce e' di prima del 2026-11-09:
     # parte coi soli Spigoli, come allora.
     controlli_geometria: tuple[str, ...] = ()
+    # Studio, «Punto di vista dalla pianta»: dove sta la camera e verso dove
+    # guarda. La seconda immagine (la pianta col punto rosso) la disegna il
+    # motore prima dell'invio.
+    punto_di_vista: modulo_punto.PuntoDiVista | None = None
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
@@ -327,6 +338,8 @@ class Lavoro:
 
     def formato_proprio(self) -> int:
         """Il formato del lavoro senza «Tieni la geometria»."""
+        if self.punto_di_vista:
+            return FORMATO_PUNTO
         if self.finale:
             return FORMATO_FINALE
         if self.esempi:
@@ -372,6 +385,8 @@ class Lavoro:
         return int(bool(self.riferimento)) + len(self.esempi)
 
     def _prompt_senza_inserti(self) -> str:
+        if self.punto_di_vista:
+            return self.punto_di_vista.prompt(self.scelte.materiali)
         if self.finale:
             # Il modello di «Finale» non ha prompt: questa riga e' solo per la ricetta.
             return f"Finale: upscale x{self.finale['ingrandimento']}, {self.finale['tipo']}."
@@ -416,6 +431,7 @@ class Lavoro:
             **({"inserti": list(self.inserti)} if self.inserti else {}),
             **({"finale": dict(self.finale)} if self.finale else {}),
             **({"esempi": list(self.esempi)} if self.esempi else {}),
+            **({"punto_di_vista": self.punto_di_vista.a_dizionario()} if self.punto_di_vista else {}),
             **({"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria,
                 "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
                if self.destinazione_geometria else {}),
@@ -522,6 +538,18 @@ class Lavoro:
                 "quale, o parte da un render invece che dalla vista.",
                 "Rimetti il lavoro in coda da Studio · Genera.",
             )
+        punto = None
+        if formato == FORMATO_PUNTO:
+            if richieste or any(dati.get(k) for k in ("aree", "riferimento", "contesto", "materiali",
+                                                      "inserti", "finale", "esempi")):
+                raise LavoroNonValido(
+                    "Il file del lavoro e' un «Punto di vista dalla pianta» ma porta anche altro.",
+                    "Rifai il punto di vista da sotto la pianta nello Studio.",
+                )
+            try:
+                punto = modulo_punto.da_dizionario(dati.get("punto_di_vista"))
+            except modulo_punto.PuntoNonValido as errore:
+                raise LavoroNonValido(f"Nel file del lavoro: {errore.fatto}", errore.cosa_fare) from None
         contesto = None
         if dati.get("formato") == FORMATO_CONTESTO:
             if partenza or riferimento or aree:
@@ -554,6 +582,7 @@ class Lavoro:
             inserti=inserti,
             finale=finale,
             esempi=esempi,
+            punto_di_vista=punto,
             creato_il=str(dati.get("creato_il") or _adesso()),
         )
 
@@ -561,7 +590,8 @@ class Lavoro:
     def _da_dizionario_geometria(cls, dati: dict) -> "Lavoro":
         """Un lavoro del formato 10: si legge quello avvolto, poi si rimette la prima passata."""
         base, destinazione = dati.get("formato_base"), dati.get("destinazione_geometria")
-        if (base not in FORMATI_LETTI or base in (FORMATO_GEOMETRIA, FORMATO_FINALE, FORMATO_RITOCCO, FORMATO_CONTESTO)
+        if (base not in FORMATI_LETTI or base in (FORMATO_GEOMETRIA, FORMATO_FINALE, FORMATO_RITOCCO, FORMATO_CONTESTO,
+                                                  FORMATO_PUNTO)
                 or not isinstance(destinazione, str) or not destinazione.strip()
                 or any(dati.get(k) for k in ("partenza", "parte_da", "aree", "contesto", "finale"))):
             raise LavoroNonValido(
@@ -652,6 +682,47 @@ def leggi_stato(radice: Path, identificativo: str) -> dict | None:
         return None
 
 
+# «Da un'immagine», un render gia' fatto (core/partenza.py): non parte niente,
+# l'immagine caricata diventa un lavoro gia' fatto, cosi' sotto ha la barra di
+# ogni render (Cambia, Ritocca, Popola, Finale, Regola, Esporta).
+PROVIDER_NESSUNO = "nessuno"
+MODELLO_CARICATA = "caricata"
+DESTINAZIONE_NESSUNA = "Nessun invio: è l'immagine che hai caricato"
+
+
+def importa_immagine(radice: Path, vista: Path, scena: str = blocchi.ESTERNO) -> Lavoro:
+    """Un lavoro gia' fatto il cui render e' la vista stessa. Nessun invio, nessun costo.
+
+    Il file del lavoro, il render, la ricetta e lo stato stanno dove la coda
+    mette quelli dei lavori fatti: lo Studio li legge come gli altri. Il
+    lavoro porta `importata`, cosi' nessuno lo rifa' o ne misura la tenuta
+    (confrontare l'immagine con se stessa darebbe un numero falso, regola 3).
+    """
+    vista = Path(vista)
+    dati = vista.read_bytes()
+    modulo_immagine.misura(dati)  # solleva se non e' un'immagine
+    # La scena dice quali voci hanno Cambia e Popola da qui: esterno o interno.
+    blocchi.partenza_valida(blocchi.PARTENZA_FOTO, scena)
+    percorsi = cartelle(radice)
+    lavoro = Lavoro(nuovo_identificativo(), str(vista), blocchi.Scelte(scena=scena),
+                    PROVIDER_NESSUNO, MODELLO_CARICATA, DESTINAZIONE_NESSUNA)
+    render = percorsi[FATTO_DIR] / f"{lavoro.identificativo}{vista.suffix.lower()}"
+    ricetta = render.with_name(render.name + ".ricetta.json")
+    scrivi_atomico(render, dati)
+    scrivi_atomico(ricetta, Ricetta(
+        provider=PROVIDER_NESSUNO, modello=MODELLO_CARICATA, preset=SCELTE_LIBERE,
+        preset_versione=blocchi.VERSIONE, prompt="", testo_utente="", grana="",
+        dettaglio_grana=None, forza_struttura=None, risoluzione="", aspetto="",
+        generazione_fissa=False, impronta_sorgente=impronta(dati),
+        parametri={"importata": True},
+    ).a_json())
+    finale = percorsi[FATTO_DIR] / f"{lavoro.identificativo}.json"
+    scrivi_json(finale, {**lavoro.a_dizionario(), "importata": True})
+    scrivi_stato(radice, lavoro.identificativo, FATTO, lavoro=str(finale), render=str(render),
+                 ricetta=str(ricetta), importata=True, avvisi=[])
+    return lavoro
+
+
 def metti_in_coda(
     radice: Path,
     vista: Path,
@@ -675,6 +746,7 @@ def metti_in_coda(
     esempi: tuple[Path, ...] | list[Path] = (),
     destinazione_geometria: str | None = None,
     controlli_geometria: tuple[str, ...] = (),
+    punto_di_vista: modulo_punto.PuntoDiVista | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
     """Scrive un lavoro in in-attesa/ e il suo stato "in coda".
@@ -756,6 +828,14 @@ def metti_in_coda(
                 "«Finale» parte da un render, da solo: niente richieste, aree, riferimenti o materiali.",
                 "Fai prima il passo che ti serve, poi il Finale sul suo render.",
             )
+    if punto_di_vista is not None and (richieste or aree or riferimento is not None or contesto is not None
+                                       or materiali or inserti or finale is not None or esempi
+                                       or destinazione_geometria):
+        raise LavoroNonValido(
+            "«Punto di vista dalla pianta» parte dalla pianta da sola: niente richieste, aree, "
+            "riferimenti, materiali o «Tieni la geometria».",
+            "Fai il punto di vista dalla pianta, poi lavora sull'immagine che esce.",
+        )
     if destinazione_geometria and (partenza or aree or contesto is not None or finale is not None):
         raise LavoroNonValido(
             "«Tieni la geometria» parte solo con un render dalla vista: ridisegna tutto dagli spigoli, "
@@ -794,7 +874,13 @@ def metti_in_coda(
         esempi=tuple(str(e) for e in esempi),
         destinazione_geometria=destinazione_geometria or None,
         controlli_geometria=(_controlli_del_lavoro(controlli_geometria) if destinazione_geometria else ()),
+        punto_di_vista=punto_di_vista,
     )
+    if punto_di_vista is not None and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: la pianta col punto rosso non partirebbe.",
+            "Scegli Nano Banana 2 o Nano Banana Pro.",
+        )
     if inserti and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
             f"{modello} riceve una sola immagine per invio: i riferimenti di oggetti e persone non partirebbero.",
@@ -1109,7 +1195,15 @@ class Coda:
             dati = self._leggi_partenza(Path(lavoro.partenza))
         else:
             dati = modulo_immagine.leggi(Path(lavoro.vista))
-            giudizio = valuta(modulo_immagine.misura(dati))
+            # Da un'immagine caricata (foto, schizzo) conta solo la misura:
+            # le regole delle viste di Allplan non valgono (core/partenza.py).
+            # Il punto di vista parte da una pianta: si giudica come una pianta,
+            # anche se le scelte dicono la scena dell'immagine che esce.
+            if lavoro.scelte.partenza != blocchi.VISTA_ALLPLAN:
+                giudizio = valuta_immagine(modulo_immagine.misura(dati))
+            else:
+                giudizio = valuta(modulo_immagine.misura(dati),
+                                  blocchi.PIANTA if lavoro.punto_di_vista else lavoro.scelte.scena)
             if not giudizio.idonea:
                 raise ImmagineNonIdonea(giudizio.fatto, giudizio.cosa_fare, giudizio.motivo or "")
         motore = self._crea_provider(lavoro.provider)
@@ -1134,6 +1228,9 @@ class Coda:
             # render segue la prima immagine, e il render e' il contesto.
             ingresso, in_piu = lavoro.contesto.prepara(luogo), (dati,)
             motore.controlla_prima_dell_invio(lavoro.modello, ingresso)
+        if lavoro.punto_di_vista:
+            # La seconda immagine: la stessa pianta col punto e il cono rossi.
+            in_piu = (modulo_punto.disegna(dati, lavoro.punto_di_vista),)
         if lavoro.riferimento:
             riferimento = controlla_riferimento(self.radice, Path(lavoro.riferimento)).read_bytes()
             modulo_immagine.misura(riferimento)  # solleva se non e' un'immagine
