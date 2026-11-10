@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-16"
+VERSIONE = "bozza-17"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -46,7 +46,12 @@ INTERNO = "interno"
 # per l'utente e' «Arredo»; l'identificativo e' «prodotto» perche' «arredo» e'
 # gia' l'asse degli oggetti negli interni.
 PRODOTTO = "prodotto"
-SCENE = (ESTERNO, INTERNO, PRODOTTO)
+# Una pianta, una planimetria o un planivolumetrico visti dall'alto (bozza 16,
+# flussi 5, 6 e 7 di Riccardo, 2026-11-09). Che disegno e' lo dice l'asse
+# «tipo»; il resto della tavola lo dice lo stile («look»).
+PIANTA = "pianta"
+SCENE = (ESTERNO, INTERNO, PRODOTTO, PIANTA)
+NOMI_SCENE = {ESTERNO: "esterno", INTERNO: "interno", PRODOTTO: "arredo", PIANTA: "pianta"}
 
 
 class SceltaNonValida(ErroreAirender):
@@ -137,7 +142,7 @@ FEDELTA_PRODOTTO = _blocchi(
      "background described below."),
 )
 
-# --- partenza da un'immagine (bozza 16, 2026-11-09) -------------------------
+# --- partenza da un'immagine (bozza 17, 2026-11-10) -------------------------
 
 # Da dove viene l'immagine che parte per prima. «vista» e' la vista di
 # Allplan di sempre: regola fissa secondo la fedelta'. Le altre sono
@@ -185,7 +190,7 @@ def partenza_valida(partenza: str | None, scena: str = ESTERNO) -> str:
         )
     if partenza != VISTA_ALLPLAN and scena not in SCENE_PARTENZA:
         raise SceltaNonValida(
-            "Da una foto o da uno schizzo si parte con un esterno o un interno, non con un pezzo d'arredo.",
+            "Da una foto o da uno schizzo si parte con un esterno o un interno, non con un pezzo d'arredo o una pianta.",
             "Scegli la scena Esterno o Interno.",
         )
     return partenza
@@ -269,6 +274,8 @@ def spenti(scelte: "Scelte") -> frozenset[str]:
 
 
 def _evitare(resa: str, scena: str = ESTERNO) -> Blocco:
+    if scena == PIANTA:
+        return COSA_EVITARE_PIANTA
     if resa == FOTO and scena == PRODOTTO:
         return COSA_EVITARE_PRODOTTO
     return EVITARE_DA_RESA.get(f"evitare-{resa}", COSA_EVITARE)
@@ -280,6 +287,8 @@ SCENA = _blocchi(
     (PRODOTTO, "Arredo",
      "The subject is a single piece of designer furniture, photographed as a "
      "product; the room around it is not part of the design."),
+    (PIANTA, "Pianta",
+     "The subject is an architectural drawing seen from straight above."),
 )
 
 LOOK = _blocchi(
@@ -541,6 +550,262 @@ COSA_EVITARE_PRODOTTO = Blocco(
     "blacks.",
 )
 
+# --- pianta, planimetria e planivolumetrico (bozza 16) ---------------------------
+
+# Flussi 5, 6 e 7 di Riccardo (2026-11-08): una cattura dall'alto di Allplan
+# (vista in pianta o zenitale), o un'immagine di pianta caricata, diventa una
+# tavola. Il punto fermo non e' l'edificio in prospettiva ma il disegno: muri,
+# aperture, impronte, strade e confini restano dove sono, alla stessa scala.
+# Scritti con lo schema del prompt architettonico (cosa e', cosa resta, il
+# materiale con la sua grana, la luce con la sua direzione), non presi da
+# Notion: la prompt library di Riccardo non ha piante. Nessuno provato.
+EDIFICIO = "edificio"
+SITO = "sito"
+VOLUMI = "volumi"
+TIPO_PREDEFINITO = EDIFICIO
+
+TIPI_PIANTA = _descritti(_blocchi(
+    (EDIFICIO, "Pianta dell'edificio",
+     "The subject is a floor plan of one storey seen from straight above: "
+     "walls, openings, door swings, stairs and the furniture drawn in it."),
+    (SITO, "Planimetria",
+     "The subject is a site plan seen from straight above: building "
+     "footprints and roofs, roads, paths, plot lines, lawns and trees."),
+    (VOLUMI, "Planivolumetrico",
+     "The subject is a massing site plan seen from straight above: the "
+     "buildings as solid volumes with their real heights, the ground, roads "
+     "and plot lines around them."),
+), {
+    EDIFICIO: "Un piano: stanze, muri, porte e finestre, gli arredi disegnati.",
+    SITO: "Il lotto: edifici dall'alto, strade, percorsi, verde, confini.",
+    VOLUMI: "I volumi dall'alto, con le ombre che seguono le altezze vere.",
+})
+
+# La regola fissa di un disegno dall'alto: da tenere e' il disegno, non la
+# prospettiva. Stessi tre gradi, stessi nomi delle altre scene.
+_REGOLA_PIANTA = (
+    "Edit this exact drawing. Keep the framing, the scale and every wall, "
+    "opening, building footprint, road, path and plot line exactly where it "
+    "is and at the same thickness; do not add, remove, move or reshape any of "
+    "them. Keep the view straight from above unless the style below asks for "
+    "an axonometric view. Change only the look described below."
+)
+FEDELTA_PIANTA = _blocchi(
+    ("rigida", "Rigida",
+     _REGOLA_PIANTA + " Match the drawing strictly: same number and position of "
+     "rooms, doors, windows, stairs and buildings; if in doubt, change less."),
+    ("bilanciata", "Bilanciata", _REGOLA_PIANTA),
+    ("libera", "Libera",
+     "Edit this drawing. Keep the framing, the scale and the position of every "
+     "wall, opening, footprint and road; you may simplify small drawn details "
+     "and add plausible floor finishes, planting and paving. Keep the view "
+     "straight from above unless the style below asks for an axonometric view. "
+     "Change the look described below."),
+)
+
+# Lo stile della tavola: prende il posto del look fotografico. Ogni voce dice
+# cosa diventano pavimenti, tetti, terreno e verde, in modo che valga per i
+# tre tipi (una pianta non ha tetti, una planimetria non ha pavimenti: il
+# modello prende quello che c'e').
+LOOK_PIANTA = _descritti(_blocchi(
+    ("materica", "Resa materica",
+     "Rendered presentation plan: walls cut in solid charcoal, floors in real "
+     "materials with visible grain (light oak in living rooms and bedrooms, "
+     "large-format stone tiles in kitchens and bathrooms), roofs in their real "
+     "materials, lawns with fine grass texture, trees as soft round canopies."),
+    ("concorso", "Colori da concorso",
+     "Competition-style coloured plan: flat muted colours with no texture, "
+     "walls and roofs in solid dark grey, floors and paving in warm light "
+     "neutrals, lawns in soft sage green, water in pale blue-grey, thin "
+     "crisp outlines."),
+    ("biancoenero", "Bianco e nero con ombre",
+     "Black and white architectural plan: white floors and ground, walls and "
+     "cut elements in solid black, fine grey hatching for paving and planting, "
+     "soft grey cast shadows as the only tone."),
+    ("assonometria", "Assonometria",
+     "Cut-away isometric view at 45 degrees from above: walls and buildings "
+     "extruded to their real height (2.7 m per storey), cut at 1.2 m with the "
+     "cut in solid charcoal, floors and ground in real materials, clean light "
+     "background, no roof over the cut storey."),
+    ("plastico", "Plastico bianco",
+     "Photograph of a white architectural scale model from straight above: "
+     "matte white card for buildings and walls, pale basswood for the ground "
+     "and paving, trees as small white spheres, crisp cut edges."),
+    ("drone", "Foto dall'alto",
+     "Photorealistic aerial orthophoto taken by a drone at about 120 m, "
+     "straight down: real roof materials with gentle weathering, mowed lawns, "
+     "tree canopies, paving and asphalt with true texture; inside a building "
+     "the roof is removed and the floors show their real materials."),
+    ("acquerello", "Acquerello",
+     "Architectural watercolour plan: fine ink lines on every wall and edge, "
+     "loose transparent washes for floors, lawns and trees, soft colour "
+     "bleeding, white paper showing through."),
+), {
+    "materica": "Pavimenti e tetti nei materiali veri, muri tagliati pieni.",
+    "concorso": "Colori piatti e tenui, linee nette, niente texture.",
+    "biancoenero": "Bianco e nero, retini grigi, solo le ombre fanno tono.",
+    "assonometria": "Muri alzati a 2,70 m e tagliati, vista a 45 gradi.",
+    "plastico": "Cartoncino bianco e legno chiaro, come un plastico.",
+    "drone": "Come una foto da drone dritta verso il basso.",
+    "acquerello": "Linee a china e velature trasparenti.",
+})
+
+# Luce e ombre di una tavola: la convenzione e' il sole da nord-ovest. Nel
+# planivolumetrico le ombre lunghe fanno leggere le altezze.
+LUCE_PIANTA = _descritti(_blocchi(
+    ("nordovest", "Ombre morbide da nord-ovest",
+     "Soft daylight from the top left (north-west), short soft shadows cast "
+     "by walls, buildings and trees towards the bottom right."),
+    ("radente", "Sole basso, ombre lunghe",
+     "Low late-afternoon sun from the left: long crisp shadows that show the "
+     "height of every wall, building and tree, warm light on the lit sides."),
+    ("diffusa", "Luce diffusa, senza ombre",
+     "Even diffuse light with no cast shadows, as on an overcast day: every "
+     "part of the drawing equally readable."),
+), {
+    "nordovest": "La convenzione delle tavole: ombre corte verso il basso a destra.",
+    "radente": "Ombre lunghe: si leggono le altezze, utile nel planivolumetrico.",
+    "diffusa": "Tutto leggibile, nessuna ombra.",
+})
+
+QUALITA_PIANTA = _blocchi(
+    ("base", "Base", "Professional architectural presentation drawing, clean and legible."),
+    ("32k", "Altissima definizione",
+     "Professional architectural presentation drawing, 32k, ultra-detailed, "
+     "competition board quality."),
+)
+
+COSA_EVITARE_PIANTA = Blocco(
+    "evitare-pianta",
+    "Cosa evitare · pianta",
+    "Avoid: perspective or tilted camera unless the style asks for it, text, "
+    "labels, room names, dimension lines, north arrows, scale bars, new walls "
+    "or rooms, bent or doubled lines, CGI look.",
+)
+
+
+# --- Arreda per zone (bozza 16, flusso 6) --------------------------------------
+
+# Una zona e' un'area del Ritocca su una pianta: un rettangolo o una selezione
+# libera, con il tipo di stanza. Lo stile vale per tutte le zone di un invio.
+# La nota di ogni zona dice cosa mettere e cosa non toccare: muri, aperture e
+# le altre zone. Testi scelti, mai provati: le misure degli arredi in pianta
+# sono il punto dove il modello sbaglia di piu'.
+STANZE_ARREDA = {
+    "soggiorno": ("Soggiorno", "a living room: a sofa, armchairs, a coffee table, a rug and a TV unit"),
+    "cucina": ("Cucina", "a kitchen: a run of base cabinets with sink and hob along the wall, a small island if there is room"),
+    "pranzo": ("Pranzo", "a dining area: a table for six with chairs and a sideboard"),
+    "camera": ("Camera", "a double bedroom: a double bed with two bedside tables, a wardrobe along a wall"),
+    "cameretta": ("Cameretta", "a single bedroom: a single bed, a desk with a chair and a wardrobe"),
+    "bagno": ("Bagno", "a bathroom: toilet, washbasin with vanity, a shower or a bath where there is room"),
+    "studio": ("Studio", "a home office: a desk with a chair, shelving along a wall and an armchair"),
+    "ingresso": ("Ingresso", "an entrance hall: a coat cabinet, a bench and a console"),
+}
+STILI_ARREDA = {
+    "nordico": ("Nordico", "Scandinavian style: light oak, white and pale grey fabrics"),
+    "contemporaneo": ("Contemporaneo caldo", "warm contemporary style: walnut, cream fabrics and brass details"),
+    "minimale": ("Minimale", "minimal style: few pieces, white lacquer, light grey stone"),
+    "industriale": ("Industriale", "industrial style: black steel, dark leather and reclaimed wood"),
+    "mediterraneo": ("Mediterraneo", "Mediterranean style: natural linen, rattan, terracotta and whitewashed wood"),
+}
+
+
+def _arreda(stanza: object, stile: object) -> tuple[str, str]:
+    if not isinstance(stanza, str) or stanza not in STANZE_ARREDA:
+        raise SceltaNonValida(
+            f"\"{stanza}\" non e' un tipo di stanza di Arreda.",
+            "Scegli il tipo di stanza per ogni zona: " + ", ".join(n.lower() for n, _ in STANZE_ARREDA.values()) + ".",
+        )
+    if not isinstance(stile, str) or stile not in STILI_ARREDA:
+        raise SceltaNonValida(
+            f"\"{stile}\" non e' uno stile di Arreda.",
+            "Scegli uno stile: " + ", ".join(n.lower() for n, _ in STILI_ARREDA.values()) + ".",
+        )
+    return stanza, stile
+
+
+def nota_arreda(stanza: object, stile: object) -> str:
+    """La nota di una zona di Arreda: cosa mettere, a che misura, cosa non toccare."""
+    stanza, stile = _arreda(stanza, stile)
+    return (f"furnish this area as {STANZE_ARREDA[stanza][1]}, in {STILI_ARREDA[stile][1]}; "
+            "furniture at real sizes for the room, at least 80 cm of walking space, nothing in "
+            "front of doors or windows, seen from straight above in the same rendering style and "
+            "light as the rest of the plan; keep walls, openings and every other area unchanged")
+
+
+def nome_arreda(stanza: str, stile: str) -> str:
+    """Come lo Studio chiama una zona: «Arreda · soggiorno, nordico»."""
+    return f"Arreda · {STANZE_ARREDA[stanza][0].lower()}, {STILI_ARREDA[stile][0].lower()}"
+
+
+# --- Punto di vista dalla pianta, senza Allplan (bozza 16, flusso 7) -------------
+
+# Dalla pianta resa a una foto ad altezza d'occhi. Partono due immagini: la
+# pianta, e la stessa pianta con un punto e un cono rossi dove sta la camera
+# e verso dove guarda (li disegna il motore, core/punto.py). Senza Allplan il
+# modello immagina la stanza: altezze e arredi non disegnati sono suoi, e lo
+# Studio lo scrive sull'immagine («stanza immaginata dalla pianta»). Con
+# Allplan la camera vera aspetta la sonda di PythonParts. Testi mai provati.
+ALTEZZA_OCCHI_M = config.PUNTO_DI_VISTA_ALTEZZA_OCCHI_M
+ALTEZZA_SOFFITTO_M = config.PUNTO_DI_VISTA_ALTEZZA_SOFFITTO_M
+
+PUNTO_DI_VISTA = Blocco(
+    "punto-di-vista",
+    "Punto di vista dalla pianta",
+    "Image 1 is a floor plan seen from straight above. Image 2 is the same plan "
+    "with a red dot and a red cone: the dot is a camera at eye height "
+    f"{ALTEZZA_OCCHI_M} m, the cone shows where it looks. Render the photograph "
+    "that camera would take, at eye level with straight verticals: walls, "
+    "doors, windows, stairs and furniture where the plan has them, ceiling "
+    f"height {ALTEZZA_SOFFITTO_M} m. Do not add rooms, walls or openings that "
+    "are not in the plan, and do not draw the dot, the cone or any plan "
+    "lines in the photograph.",
+)
+PUNTO_DI_VISTA_SITO = Blocco(
+    "punto-di-vista-sito",
+    "Punto di vista dalla planimetria",
+    "Image 1 is a site plan seen from straight above. Image 2 is the same plan "
+    "with a red dot and a red cone: the dot is a person standing on the ground "
+    f"with eyes at {ALTEZZA_OCCHI_M} m, the cone shows where they look. Render "
+    "the photograph that person would take, at eye level with straight "
+    "verticals: buildings, roads, paths and trees where the plan has them, "
+    "buildings at believable heights. Do not add buildings or roads that are "
+    "not in the plan, and do not draw the dot, the cone or any plan lines in "
+    "the photograph.",
+)
+STILI_PUNTO = {
+    "giorno": ("Giorno, luce naturale",
+               "Professional architectural photograph, natural daylight, soft shadows, "
+               "true-to-life materials and colours."),
+    "caldo": ("Pomeriggio caldo",
+              "Warm late-afternoon sunlight raking in through the windows, long soft shadows, "
+              "golden tones, editorial interior photograph."),
+    "sera": ("Sera, luci accese",
+             "Evening, warm 3000 K lamps switched on, dark blue sky outside, cosy contrast, "
+             "editorial photograph."),
+}
+
+
+def scena_punto(tipo: str | None) -> str:
+    """La scena dell'immagine che esce: un interno da una pianta, un esterno da una planimetria."""
+    return INTERNO if (tipo or TIPO_PREDEFINITO) == EDIFICIO else ESTERNO
+
+
+def componi_punto_di_vista(tipo: str | None, stile: object, materiali: str = "") -> str:
+    """Il prompt del punto di vista: le due immagini, la camera, lo stile, cosa evitare."""
+    if not isinstance(stile, str) or stile not in STILI_PUNTO:
+        raise SceltaNonValida(
+            f"\"{stile}\" non e' uno stile del punto di vista.",
+            "Scegli fra " + ", ".join(n.lower() for n, _ in STILI_PUNTO.values()) + ".",
+        )
+    regola = PUNTO_DI_VISTA if (tipo or TIPO_PREDEFINITO) == EDIFICIO else PUNTO_DI_VISTA_SITO
+    pezzi = [regola.testo, STILI_PUNTO[stile][1]]
+    if frase_materiali(materiali):
+        pezzi.append(frase_materiali(materiali))
+    pezzi.append(COSA_EVITARE.testo)
+    return " ".join(pezzi)
+
+
 PERSONE = {
     "nessuna": Blocco("nessuna", "Nessuna", "No people."),
     **dict((
@@ -562,6 +827,7 @@ QUALITA = _blocchi(
 # scena si rifiuta: il cielo di un interno non esiste. None vuol dire che i
 # blocchi dipendono dalla scena: vedi PER_SCENA.
 ASSI = {
+    "tipo": (TIPI_PIANTA, (PIANTA,)),
     "fedelta": (None, SCENE),
     "look": (None, SCENE),
     "luce": (None, SCENE),
@@ -576,10 +842,10 @@ ASSI = {
 }
 
 PER_SCENA = {
-    "fedelta": {ESTERNO: FEDELTA, INTERNO: FEDELTA, PRODOTTO: FEDELTA_PRODOTTO},
-    "look": {ESTERNO: LOOK, INTERNO: LOOK, PRODOTTO: LOOK_PRODOTTO},
-    "luce": {ESTERNO: LUCE_ESTERNI, INTERNO: LUCE_INTERNI, PRODOTTO: LUCE_PRODOTTO},
-    "qualita": {ESTERNO: QUALITA, INTERNO: QUALITA, PRODOTTO: QUALITA_PRODOTTO},
+    "fedelta": {ESTERNO: FEDELTA, INTERNO: FEDELTA, PRODOTTO: FEDELTA_PRODOTTO, PIANTA: FEDELTA_PIANTA},
+    "look": {ESTERNO: LOOK, INTERNO: LOOK, PRODOTTO: LOOK_PRODOTTO, PIANTA: LOOK_PIANTA},
+    "luce": {ESTERNO: LUCE_ESTERNI, INTERNO: LUCE_INTERNI, PRODOTTO: LUCE_PRODOTTO, PIANTA: LUCE_PIANTA},
+    "qualita": {ESTERNO: QUALITA, INTERNO: QUALITA, PRODOTTO: QUALITA_PRODOTTO, PIANTA: QUALITA_PIANTA},
 }
 
 QUALITA_PREDEFINITA = "base"
@@ -596,6 +862,8 @@ class Scelte:
 
     scena: str = ESTERNO
     materiali: str = ""
+    # Solo per una pianta: che disegno e' (pianta, planimetria, planivolumetrico).
+    tipo: str | None = None
     look: str | None = None
     luce: str | None = None
     cielo: str | None = None
@@ -673,6 +941,12 @@ def _prodotto(identificativo, nome, look, luce, sfondo) -> PresetStile:
     ))
 
 
+def _pianta(identificativo, nome, tipo, look, luce) -> PresetStile:
+    return PresetStile(identificativo, nome, Scelte(
+        scena=PIANTA, tipo=tipo, look=look, luce=luce,
+    ))
+
+
 # Le combinazioni della bozza 4. Intorno ("niente"), verde ("nessuno") e arredo
 # ("nessuno") non sono nelle colonne delle tabelle, ma ci sono nelle lunghezze
 # che la bozza ha misurato: solo con loro i conti tornano al carattere. Lo
@@ -700,6 +974,17 @@ PRESET_STILE = {
         _prodotto("arredo-dettaglio", "Dettaglio materiale", "macro", "radente", "grigio"),
         _prodotto("arredo-controluce", "Controluce, fondo scuro", "leica", "controluce", "scuro"),
         _prodotto("arredo-ambientato", "Ambientato, stanza sfocata", "gfx", "finestra", "ambiente"),
+        # Bozza 16: i nomi delle chip del Design canvas (artboard C) e delle
+        # schede «Preset nuovi» della pagina Flussi.
+        _pianta("pianta-materica", "Pianta, resa materica", EDIFICIO, "materica", "nordovest"),
+        _pianta("pianta-assonometria", "Pianta in assonometria", EDIFICIO, "assonometria", "nordovest"),
+        _pianta("pianta-concorso", "Pianta colorata da concorso", EDIFICIO, "concorso", "diffusa"),
+        _pianta("pianta-biancoenero", "Pianta bianco e nero con ombre", EDIFICIO, "biancoenero", "nordovest"),
+        _pianta("planimetria-illustrata", "Planimetria illustrata", SITO, "concorso", "nordovest"),
+        _pianta("planimetria-drone", "Planimetria, foto da drone", SITO, "drone", "nordovest"),
+        _pianta("planimetria-acquerello", "Planimetria ad acquerello", SITO, "acquerello", "nordovest"),
+        _pianta("planivolumetrico-plastico", "Planivolumetrico, plastico bianco", VOLUMI, "plastico", "radente"),
+        _pianta("planivolumetrico-materico", "Planivolumetrico materico", VOLUMI, "materica", "radente"),
     )
 }
 
@@ -752,7 +1037,14 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
     if scelte.scena not in SCENE:
         raise SceltaNonValida(
             f"La scena \"{scelte.scena}\" non esiste.",
-            "Scegli esterno, interno o arredo.",
+            "Scegli esterno, interno, arredo o pianta.",
+        )
+    if scelte.scena != PIANTA and scelte.tipo:
+        _blocco("tipo", scelte.tipo, scelte.scena)  # il tipo di disegno vale solo per una pianta
+    if scelte.scena == PIANTA and resa_valida(scelte.resa) != FOTO:
+        raise SceltaNonValida(
+            f"Una pianta non prende la resa «{NOMI_RESE[scelte.resa]}»: lo stile della tavola fa gia' da resa.",
+            "Scegli lo stile della tavola (resa materica, colori da concorso, acquerello...).",
         )
     ordine = [a for a in ORDINE_ASSI if scelte.scena in ASSI[a][1]]
     # Un asse di un'altra scena, se compilato, si rifiuta invece di sparire
@@ -762,10 +1054,13 @@ def blocchi_scelti(scelte: Scelte) -> list[Blocco]:
             _blocco(asse, getattr(scelte, asse), scelte.scena)
     resa = resa_valida(scelte.resa)
     via = SPENTI_DA_RESA[resa]
+    # Per una pianta la scena e' il tipo di disegno: dice gia' che e' visto dall'alto.
     partenza = partenza_valida(scelte.partenza, scelte.scena)
     regola = (_blocco("fedelta", scelte.fedelta or FEDELTA_PREDEFINITA, scelte.scena)
               if partenza == VISTA_ALLPLAN else PARTENZE[partenza])
-    blocchi = [regola, SCENA[scelte.scena]]
+    blocchi = [regola,
+               _blocco("tipo", scelte.tipo or TIPO_PREDEFINITO, PIANTA) if scelte.scena == PIANTA
+               else SCENA[scelte.scena]]
     if resa != FOTO:
         blocchi.append(RESA[resa])
     for asse in ordine:
@@ -840,7 +1135,7 @@ def componi_richieste(scena: str, richieste) -> str:
     materiali: qui non c'e' nessun modello linguistico che le traduca.
     """
     if scena not in SCENE:
-        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno o arredo.")
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno, arredo o pianta.")
     pulite = _pulisci_richieste(richieste)
     apertura = "Change:" if len(pulite) == 1 else "Changes:"
     return " ".join([REGOLA_PASSO.testo, SCENA[scena].testo,
@@ -863,7 +1158,7 @@ def aggiungi_richieste(base: str, richieste) -> str:
 def _prima_di_evitare(base: str, frase: str) -> str:
     """La frase subito prima di «cosa evitare» (quello di sempre o quello della resa), o in fondo."""
     base = base.strip()
-    for evitare in (COSA_EVITARE, COSA_EVITARE_PRODOTTO, *EVITARE_DA_RESA.values()):
+    for evitare in (COSA_EVITARE, COSA_EVITARE_PRODOTTO, COSA_EVITARE_PIANTA, *EVITARE_DA_RESA.values()):
         if base.endswith(evitare.testo):
             testa = base[: -len(evitare.testo)].rstrip()
             return f"{testa} {frase} {evitare.testo}"
@@ -878,7 +1173,7 @@ def componi_passo(scena: str, cambi: dict[str, str]) -> str:
     nuova, per esempio {"verde": "poco"}.
     """
     if scena not in SCENE:
-        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno o arredo.")
+        raise SceltaNonValida(f"La scena \"{scena}\" non esiste.", "Scegli esterno, interno, arredo o pianta.")
     if not cambi:
         raise SceltaNonValida(
             "Un passo senza richieste non cambia niente.",
@@ -1380,6 +1675,9 @@ def _nomi_richieste() -> dict[str, str]:
                     nome = nome_popola(voce.identificativo, quante, come)
                     nomi[nota_popola(voce.identificativo, quante, come, scena)] = nome
                     nomi[richiesta_popola(voce.identificativo, quante, come, scena)] = nome
+    for stanza in STANZE_ARREDA:
+        for stile in STILI_ARREDA:
+            nomi[nota_arreda(stanza, stile)] = nome_arreda(stanza, stile)
     return nomi
 
 

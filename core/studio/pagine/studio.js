@@ -12,6 +12,7 @@ const SUL_WEB = location.pathname.startsWith("/studio/");
 const S = {
   scheda: "genera",
   miei: { preset: [], problema: null, scelto: "", nota: null },  // I miei preset
+  ricette: { elenco: [], problema: null, scelta: "", dest: null, nota: null, errore: null },  // Le mie ricette
   studio: null,
   catalogo: null,
   vista: null,            // nome del file nella cartella
@@ -70,7 +71,10 @@ const S = {
   // aree con le loro note (coordinate da 0 a 1), il lavoro mandato e,
   // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
   ritocca: { da: null, strumento: "rettangolo", aree: [], testo: "", spessore: null, modello: null, composto: null, errore: null,
-             inviato: null, esito: null, x: 50, popola: null },
+             inviato: null, esito: null, x: 50, popola: null, arreda: null },
+  // Punto di vista dalla pianta: da quale immagine (un passo, o "0" la vista),
+  // dove sta la camera e verso dove guarda (da 0 a 1), tipo, stile, modello.
+  punto: null,
   // Studio · Video: il catalogo letto dal server, come partire, i posti
   // delle immagini ({ render } o { caricata }), il movimento e i video fatti.
   video: { catalogo: null, voci: [], caricato: false, modo: "primo", posti: [null], movimento: "avanza", testo: "",
@@ -234,7 +238,30 @@ function illustrazione(sc) {
   const finestra = buio ? "#F3C46A" : "#7FA4C8";
   const id = "g" + Math.random().toString(36).slice(2, 8);
   let corpo;
-  if (sc.scena === "prodotto") {
+  if (sc.scena === "pianta") {
+    // Un piano visto dall'alto: muri, una porta, gli arredi; o un lotto con edifici e verde.
+    const COLORI = { materica: ["#E9DCC4", "#C9A57A", "#2C2C2C"], concorso: ["#F2EEE6", "#D8CDB8", "#5A5A5A"],
+      biancoenero: ["#FFFFFF", "#E6E6E6", "#111111"], assonometria: ["#ECE7DE", "#C9B79C", "#3A3A3A"],
+      plastico: ["#F4F1EA", "#E2D6C0", "#CFCAC2"], drone: ["#8FA27A", "#A9A39A", "#6E6458"], acquerello: ["#F7F3EA", "#B9CFC0", "#4B5563"] };
+    const [fondo, pavimento, muro] = COLORI[sc.look] || COLORI.materica;
+    const ombra = sc.luce === "diffusa" ? 0 : (sc.luce === "radente" ? 6 : 2.5);
+    if (sc.tipo === "sito" || sc.tipo === "volumi") {
+      const tetto = sc.look === "plastico" ? "#FFFFFF" : (sc.look === "drone" ? "#9B5A43" : muro);
+      corpo = `<rect width="128" height="72" fill="${sc.look === "drone" ? "#7F9466" : "#DCE5D1"}"/>
+        <path d="M0 50 H128 V60 H0 Z" fill="${sc.look === "plastico" ? "#E2D6C0" : "#B8B3AA"}"/>
+        ${[[14, 14, 26, 22], [52, 10, 22, 30], [86, 18, 28, 18]].map(([x, y, w, hh]) =>
+          `<rect x="${x + ombra}" y="${y + ombra}" width="${w}" height="${hh}" fill="#000" opacity=".18"/><rect x="${x}" y="${y}" width="${w}" height="${hh}" fill="${tetto}"/>`).join("")}
+        ${[[44, 44], [80, 42], [118, 40], [8, 44]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="${sc.look === "plastico" ? "#FFFFFF" : "#5E7F4F"}" opacity=".9"/>`).join("")}`;
+    } else {
+      corpo = `<rect width="128" height="72" fill="${fondo}"/>
+        <rect x="14" y="8" width="100" height="56" fill="${pavimento}"/>
+        <path d="M14 8 H114 V64 H14 Z M64 8 V40 M64 48 V64 M14 36 H50" stroke="${muro}" stroke-width="3" fill="none"/>
+        <path d="M64 40 A8 8 0 0 1 72 48" stroke="${muro}" stroke-width=".8" fill="none"/>
+        <rect x="22" y="44" width="26" height="12" rx="2" fill="#FFFFFF" opacity=".75"/>
+        <rect x="78" y="16" width="26" height="18" rx="1" fill="#FFFFFF" opacity=".75"/>
+        ${ombra ? `<path d="M17 11 H111 V14 H17 Z" fill="#000" opacity=".12"/>` : ""}`;
+    }
+  } else if (sc.scena === "prodotto") {
     // Un pezzo solo su un fondo da studio: una sedia stilizzata.
     const FONDI = { bianco: "#F7F7F5", grigio: "#CFCAC2", calce: "#E8E2D6", scuro: "#2E3033", vista: "#D9D2C5", ambiente: "#BFB6A8" };
     const fondo = FONDI[sc.sfondo] || FONDI.grigio;
@@ -279,6 +306,16 @@ function illustrazione(sc) {
 // --- dati --------------------------------------------------------------------
 
 function presetDi(scena) { return S.catalogo.scene[scena].preset; }
+// Il giudizio sulla vista per la scena scelta: una pianta e' fatta di linee,
+// e il controllo del wireframe vale solo per una vista in prospettiva.
+function giudizioVista() {
+  const d = S.descrizione;
+  if (!d) return null;
+  if (S.scelte && S.scelte.scena === "pianta" && d.leggibile !== false) {
+    return { idonea: !!d.idonea_pianta, fatto: (d.pianta || {}).fatto || d.fatto, cosa_fare: (d.pianta || {}).cosa_fare || d.cosa_fare };
+  }
+  return { idonea: !!d.idonea, fatto: d.fatto, cosa_fare: d.cosa_fare };
+}
 function asse(id) { return S.catalogo.scene[S.scelte.scena].assi.find((a) => a.id === id); }
 function nomeVoce(idAsse, valore) {
   const a = asse(idAsse);
@@ -370,7 +407,8 @@ function scegliPreset(id) {
   const p = presetDi(S.scelte.scena).find((x) => x.id === id);
   if (!p) return;
   S.preset = id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined,
+               resa: p.scelte.scena === "pianta" ? "foto" : S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -378,7 +416,9 @@ function scegliScena(scena) {
   if (scena === S.scelte.scena) return;
   const p = presetDi(scena)[0];
   S.preset = p.id;
-  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined, resa: S.scelte.resa, risoluzione: S.scelte.risoluzione };
+  // Una pianta non prende le rese: lo stile della tavola fa già da resa.
+  S.scelte = { ...p.scelte, materiali: S.scelte.materiali, qualita: S.scelte.qualita, fedelta: undefined,
+               resa: scena === "pianta" ? "foto" : S.scelte.resa, risoluzione: S.scelte.risoluzione };
   aggiornaComposto();
   render();
 }
@@ -428,7 +468,7 @@ async function caricaVista(nome) {
   if (!nome) { render(); return; }
   try { S.descrizione = await get(`/api/viste/${enc(nome)}`); } catch (e) { S.errore = e; }
   // Da una foto o da uno schizzo non si parte con un pezzo d'arredo (blocchi.SCENE_PARTENZA).
-  if (tipoVista() && S.scelte && S.scelte.scena === "prodotto") scegliScena("interno");
+  if (tipoVista() && S.scelte && (S.scelte.scena === "prodotto" || S.scelte.scena === "pianta")) scegliScena(S.scelte.scena === "pianta" ? "esterno" : "interno");
   try { S.mat.dati = await get(`/api/viste/${enc(nome)}/materiali`); } catch (e) { S.mat.errore = e; }
   await caricaDestinazione();
   aggiornaComposto();
@@ -629,8 +669,12 @@ function sezioneVista() {
     figura.append(h("div", { classe: "vista-vuota" },
       h("h2", {}, "Nessuna vista ancora."),
       SUL_WEB
-        ? h("p", {}, "Parti da un'immagine: una foto, un render già fatto o uno schizzo. Resta in questo browser finché non la mandi al servizio.")
-        : h("p", {}, "Catturala dalla palette in Allplan, oppure parti da un'immagine: una foto, un render già fatto o uno schizzo."),
+        ? h("p", {}, S.scelte && S.scelte.scena === "pianta"
+          ? "Scegli un'immagine della pianta con Usa un'altra vista…: un export di Allplan, una pianta scansionata o una pianta già resa."
+          : "Parti da un'immagine: una foto, un render già fatto o uno schizzo. Resta in questo browser finché non la mandi al servizio.")
+        : h("p", {}, S.scelte && S.scelte.scena === "pianta"
+          ? "In Allplan metti la vista in pianta (dall'alto, per la planimetria anche le ombre) e catturala dalla palette, oppure scegli un'immagine di pianta con Usa un'altra vista…"
+          : "Catturala dalla palette in Allplan, oppure parti da un'immagine: una foto, un render già fatto o uno schizzo."),
       S.daImmagine.aperto ? null : h("div", { classe: "azioni" },
         h("button", { classe: "btn primario", onclick: () => apriDaImmagine() }, "Da un'immagine…")),
       SUL_WEB ? null : h("p", { classe: "tenue piccolo" }, "Cartella delle viste: ", h("span", { classe: "mono" }, S.studio.cartella))));
@@ -640,12 +684,19 @@ function sezioneVista() {
     if (S.lavoroAttivo) figura.append(striscia());
   }
   const sotto = h("div", { classe: "riga tra" });
+  const g = giudizioVista();
   if (d && d.tipo) {
     sotto.append(d.idonea
       ? h("span", {}, h("b", { stile: "color:var(--ok)" }, d.tipo_nome), h("span", { classe: "tenue" }, ` · ${d.larghezza}×${d.altezza} · ${d.nome}`))
       : h("span", {}, h("b", { stile: "color:var(--errore)" }, "Immagine troppo piccola"), h("span", { classe: "tenue" }, ` · ${d.nome}`)));
   } else if (d) {
-    if (d.idonea) {
+    if (g.idonea && S.scelte.scena === "pianta") {
+      sotto.append(h("span", {}, h("b", { stile: "color:var(--ok)" }, "Pianta adatta"),
+        h("span", { classe: "tenue" }, ` · linee e colori piatti vanno bene · ${d.larghezza}×${d.altezza} · ${d.nome}`)),
+        h("button", { classe: "btn", "aria-expanded": String(!!(S.punto && S.punto.da === "0")),
+          onclick: () => apriPunto("0", `/file/vista/${enc(S.vista)}`, S.scelte.tipo),
+          title: "Se la pianta è già fatta: clicca dove stai e trascina verso dove guardi, esce la foto di quella camera." }, "Punto di vista"));
+    } else if (g.idonea) {
       sotto.append(h("span", {}, h("b", { stile: "color:var(--ok)" }, "Vista adatta"),
         h("span", { classe: "tenue" }, ` · ${d.toni} toni di grigio, sfondo uniforme al ${Math.round(d.quota_sfondo * 100)}% · ${d.larghezza}×${d.altezza} · ${d.nome}`)));
     } else {
@@ -658,12 +709,13 @@ function sezioneVista() {
   const blocco = h("section", { classe: "pannello", "aria-label": "Vista di partenza" }, figura, sotto);
   if (S.daImmagine.aperto) blocco.append(pannelloDaImmagine());
   if (d && d.tipo && d.idonea) blocco.append(pannelloTieni(d));
-  if (d && !d.idonea) blocco.append(avviso("errore", d.fatto, d.cosa_fare));
+  if (d && !g.idonea) blocco.append(avviso("errore", g.fatto, g.cosa_fare));
   if (d && d.colori_come_materiali) {
     blocco.append(avviso("attenzione", "Il modello legge i colori della vista come materiali.",
       "Per colori veri, salva la vista con colori neutri."));
   }
   if (S.mostraViste) blocco.append(pannelloViste());
+  if (S.punto && S.punto.da === "0" && S.scelte.scena === "pianta") blocco.append(pannelloPunto());
   return blocco;
 }
 
@@ -891,6 +943,7 @@ function tessereAsse(idAsse) {
 
 function sintesi() {
   const s = S.scelte;
+  if (s.scena === "pianta") return [nomeVoce("tipo", s.tipo || "edificio"), nomeVoce("look", s.look), nomeVoce("luce", s.luce)].filter(Boolean).join(" · ");
   const pezzi = [resaScelta().nome, spento("look") ? null : (nomeVoce("look", s.look) || "").split(" · ")[0], spento("luce") ? null : nomeVoce("luce", s.luce)];
   if (s.scena === "esterno") pezzi.push(nomeVoce("cielo", s.cielo), `intorno: ${(nomeVoce("intorno", s.intorno) || "—").toLowerCase()}`,
     `verde: ${(nomeVoce("verde", s.verde) || "—").toLowerCase()}`);
@@ -900,7 +953,7 @@ function sintesi() {
   return pezzi.filter(Boolean).join(" · ");
 }
 
-const SCENE = [["esterno", "Esterno"], ["interno", "Interno"], ["prodotto", "Arredo"]];
+const SCENE = [["esterno", "Esterno"], ["interno", "Interno"], ["prodotto", "Arredo"], ["pianta", "Pianta"]];
 
 function colonnaStile() {
   const interno = S.scelte.scena === "interno";
@@ -909,9 +962,9 @@ function colonnaStile() {
     h("span", { classe: "etichetta" }, "Scena"),
     h("div", { classe: "switch", role: "group", "aria-label": "Scena" },
       SCENE.map(([id, nome]) => {
-        const no = id === "prodotto" && tipoVista();
+        const no = (id === "prodotto" || id === "pianta") && tipoVista();
         return h("button", { classe: "seg", "aria-pressed": String(S.scelte.scena === id), disabled: no || null,
-          title: no ? "Da una foto o da uno schizzo si parte con un esterno o un interno: un pezzo d'arredo ha la sua regola, per una vista di Allplan." : null,
+          title: no ? "Da una foto o da uno schizzo si parte con un esterno o un interno. Per un pezzo d'arredo o una pianta: una vista di Allplan, o la pianta con «Usa un'altra vista»." : null,
           onclick: () => scegliScena(id) }, nome);
       })));
   const preset = h("section", { classe: "pannello", "aria-label": "Parti da un preset" },
@@ -923,6 +976,21 @@ function colonnaStile() {
 
   const dettagli = h("details", { classe: "pannello dettagli", open: S.dettagliAperti });
   dettagli.addEventListener("toggle", () => { S.dettagliAperti = dettagli.open; });
+  if (S.scelte.scena === "pianta") {
+    dettagli.append(
+      h("summary", {}, h("h2", {}, "Dettagli del preset"),
+        h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
+        h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
+      h("div", { classe: "gruppo" }, h("h3", {}, "1 · Che disegno è",
+        spiega("Planimetria e planivolumetrico partono da una vista zenitale di Allplan. Nel planivolumetrico le ombre seguono le altezze dei volumi.")),
+        tessereAsse("tipo")),
+      h("div", { classe: "gruppo" }, h("h3", {}, "2 · Stile della tavola",
+        spiega("Prende il posto del look fotografico e della resa · muri, aperture e impronte restano dove li hai disegnati")),
+        chipAsse("look")),
+      h("div", { classe: "gruppo" }, h("h3", {}, "3 · Luce e ombre"), tessereAsse("luce")),
+      h("p", { classe: "tenue piccolo" }, "Verde, alberi, persone e auto si aggiungono dopo, sul render, con i pennelli del Ritocca. Le stanze si arredano con Arreda."));
+    return h("div", { classe: "colonna-stile" }, scena, preset, dettagli);
+  }
   dettagli.append(
     h("summary", {}, h("h2", {}, "Dettagli del preset"),
       h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
@@ -955,7 +1023,8 @@ function colonnaInvio() {
   const interno = S.scelte.scena === "interno";
   const materiali = h("textarea", {
     id: "materiali", rows: "3", "aria-label": "Materiali a parole",
-    placeholder: S.scelte.scena === "prodotto" ? "es. struttura in rovere naturale, seduta in cuoio cognac, piedini in ottone spazzolato"
+    placeholder: S.scelte.scena === "pianta" ? "es. pavimenti in rovere chiaro, bagni in gres grande formato, tetti in coppi"
+      : S.scelte.scena === "prodotto" ? "es. struttura in rovere naturale, seduta in cuoio cognac, piedini in ottone spazzolato"
       : interno ? "es. pavimento in rovere chiaro, pareti in calce bianca, cucina in acciaio"
       : "es. intonaco bianco, infissi in rovere scuro, zoccolo in pietra grigia",
   });
@@ -1006,6 +1075,7 @@ function colonnaInvio() {
 
   const scelteInvio = h("section", { classe: "pannello", "aria-label": "Modello e qualità" },
     ...pannelloMiei(),
+    ...(S.modo === "contesto" ? [] : pannelloRicette()),
     h("span", { classe: "etichetta" }, "Modello"), modelli,
     S.modo === "contesto" ? null : h("span", { classe: "etichetta" }, "Qualità"), S.modo === "contesto" ? null : qualita,
     h("span", { classe: "etichetta" }, "Risoluzione del render"), risoluzione,
@@ -1322,7 +1392,8 @@ function pannelloGeometria() {
   const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
-    h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
+    h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta,
+      h("b", {}, S.scelte && S.scelte.scena === "pianta" ? "Tieni la geometria · muri e aperture" : "Tieni la geometria")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
       "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire gli spigoli della vista); ",
@@ -1634,7 +1705,7 @@ function colonnaContesto() {
 
 function motivoGeneraSpento() {
   if (!S.vista) return "Serve una vista: catturala dalla palette o scegline una con Usa un'altra vista…";
-  if (S.descrizione && !S.descrizione.idonea) return "La vista non è adatta: guarda il motivo sopra.";
+  if (S.descrizione && !giudizioVista().idonea) return "La vista non è adatta: guarda il motivo sopra.";
   if (S.lavoroAttivo) return "Un lavoro è già in corso: aspetta che finisca o annullalo.";
   const m = modelloScelto();
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
@@ -1800,7 +1871,8 @@ function confronto(l) {
   }
   segnaRegolato(palco, srcB, l);
   return h("div", { classe: "palco" },
-    h("div", { classe: "riga tra" }, h("h1", { title: sottotitolo }, "È ancora il tuo edificio?"), modi),
+    h("div", { classe: "riga tra" }, h("h1", { title: sottotitolo }, l.immaginata ? "La foto dal punto di vista" : "È ancora il tuo edificio?"), modi),
+    l.immaginata ? avvisoImmaginata() : null,
     regolaAttiva(l) ? h("p", { classe: "piccolo", role: "status" },
       h("span", { classe: "regola-gratis" }, "Con le regolazioni"), " · le vedi qui, il file le prende quando esporti. Tieni premuto «Senza regolazioni» per vedere com'era.") : null,
     h("div", { classe: "riga" }, h("span", { classe: "etichetta" }, "Confronta con"), h("div", { stile: "min-width:260px" }, scegliA)),
@@ -2172,6 +2244,7 @@ function palcoConAzioni(l) {
 function barraAzioni(l) {
   if (S.azioni.per !== l.identificativo) S.azioni = { per: l.identificativo, video: false, movimento: null, testo: "", mandato: false, errore: null, porta: null, finale: null, popola: null };
   const az = S.azioni;
+  const pianta = scenaDi(l) === "pianta";
   const d = S.passi.dest[l.modello];
   const m = S.catalogo.modelli.find((x) => x.id === l.modello);
   const occupato = !!S.lavoroAttivo;
@@ -2180,14 +2253,20 @@ function barraAzioni(l) {
       title: "Cambia tutta l'immagine a parole: luce, ora, tempo, atmosfera. Spigoli e arredo restano." }, "Cambia"),
     h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }),
       title: "Disegna un'area e scrivi cosa cambiare. Fuori dall'area resta tutto com'è." }, "Ritocca"),
-    h("button", { classe: "btn", "aria-expanded": String(!!az.popola), onclick: () => apriPopola(l),
+    pianta ? [
+      h("button", { classe: "btn", onclick: () => ritoccaDa({ identificativo: l.identificativo }, null, { stile: S.catalogo.pianta.stili_arreda[0].id }),
+        title: "Disegna un rettangolo per stanza e di' che stanza è: il modello la arreda vista dall'alto. Muri e aperture restano." }, "Arreda"),
+      h("button", { classe: "btn", "aria-expanded": String(!!(S.punto && S.punto.da === l.identificativo)),
+        onclick: () => apriPunto(l.identificativo, `/file/render/${l.identificativo}`, (l.scelte || {}).tipo),
+        title: "Clicca sulla pianta dove stai e trascina verso dove guardi: esce la foto che farebbe quella camera." }, "Punto di vista"),
+    ] : h("button", { classe: "btn", "aria-expanded": String(!!az.popola), onclick: () => apriPopola(l),
       title: "Persone, alberi o auto: dove dipingi tu col pennello verde, o dove decide il modello." }, "Popola"),
     l.importata ? null : h("button", { classe: "btn", onclick: () => rifai(l), disabled: occupato || !d || (m && !m.verificato) || null,
       title: occupato ? "Un lavoro è in corso: Variante si accende quando finisce." : "Stessa ricetta, un'altra immagine. Arriva accanto a questa, già scelta." }, "Variante"),
     h("button", { classe: "btn", "aria-expanded": String(az.video), onclick: apriVideoVeloce,
       title: "Un video che parte da questa immagine." }, "Video"),
     l.importata ? null : h("button", { classe: "btn", "aria-expanded": String(!!az.porta), onclick: () => apriPorta(l),
-      title: "La stessa immagine su un'altra vista catturata in Allplan: stesso stile, stessi ritocchi. Per i fotogrammi di un video." }, "Altra vista"),
+      title: "Rifà i passi di questa immagine su altre viste catturate in Allplan: stesso stile, stessi ritocchi. Si salva per dopo." }, "Ricetta"),
     h("button", { classe: "btn", "aria-expanded": String(!!az.finale), onclick: () => apriFinale(l),
       title: "Ingrandisce questa immagine e aggiunge dettaglio, senza cambiare il disegno. Per la tavola o la stampa." }, "Finale"))];
   // Variante non dice niente da sola (test del 2026-11-04): si scrive da dove
@@ -2204,6 +2283,7 @@ function barraAzioni(l) {
   if (az.porta) righe.push(pannelloPorta(l));
   if (az.finale) righe.push(pannelloFinale(l));
   if (az.popola) righe.push(pannelloPopola(l));
+  if (S.punto && S.punto.da === l.identificativo) righe.push(pannelloPunto());
   if (az.errore) righe.push(avviso("errore", az.errore.fatto, az.errore.cosa_fare));
   return h("section", { classe: "barra-azioni", "aria-label": "Da questa immagine" }, ...righe);
 }
@@ -2241,7 +2321,7 @@ async function apriPopola(l) {
   const passo = passoDa(l.identificativo);
   if (!passo || !passo.si_parte) { az.errore = new ErroreStudio((passo && passo.motivo_non_si_parte) || "Questa immagine non è fra i passi della vista.", "Scegli un render riuscito."); render(); return; }
   const cose = S.catalogo.popola.cose.filter((c) => c.scene.includes(passo.scena || "esterno"));
-  if (!cose.length) { az.errore = new ErroreStudio("Popola non vale per un pezzo d'arredo fotografato da solo.", "Per un arredo usa Ritocca con un'area."); render(); return; }
+  if (!cose.length) { az.errore = new ErroreStudio(passo.scena === "pianta" ? "Popola non vale su una pianta vista dall'alto." : "Popola non vale per un pezzo d'arredo fotografato da solo.", passo.scena === "pianta" ? "Su una pianta usa Arreda, oppure Punto di vista." : "Per un arredo usa Ritocca con un'area."); render(); return; }
   az.errore = null;
   az.popola = { da: passo.identificativo, scena: passo.scena || "esterno", cosa: cose[0].id, quante: "alcune", come: "ferme",
                 dove: "dipingo", modello: modelloVerificato(passo.modello), composto: null, errore: null };
@@ -2328,6 +2408,169 @@ function pannelloPopola(l) {
       !dipingo && occupato ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Applica si accende quando finisce.") : null));
 }
 
+// --- Punto di vista dalla pianta (flusso 7, 2026-11-09) ------------------------
+// Si clicca dove si sta e si trascina verso dove si guarda. Partono due
+// immagini: la pianta, e la pianta col punto e il cono rossi (li disegna il
+// motore, uguali a questi). Senza Allplan la stanza e' immaginata dal modello:
+// lo si scrive prima di Rendi e sull'immagine che esce.
+
+function scenaDi(l) {
+  const passo = passoDa(l.identificativo);
+  return (passo && passo.scena) || (l.scelte || {}).scena || "esterno";
+}
+
+function metri(valore) { return `${String(valore).replace(".", ",")} m`; }
+
+function avvisoImmaginata() {
+  const p = S.catalogo.pianta;
+  return h("div", { classe: "avviso attenzione", role: "note" },
+    h("b", {}, "Stanza immaginata dalla pianta."),
+    h("span", {}, `Altezze (occhi a ${metri(p.altezza_occhi)}, soffitto a ${metri(p.altezza_soffitto)}, scelte), arredi e finestre che la pianta non disegna li ha immaginati il modello. Non è il tuo modello Allplan.`));
+}
+
+async function apriPunto(da, src, tipo) {
+  if (S.punto && S.punto.da === da) { S.punto = null; render(); return; }
+  const passo = da !== "0" ? passoDa(da) : null;
+  S.punto = { da, src, tipo: tipo === "edificio" ? "edificio" : tipo === "volumi" ? "volumi" : tipo === "sito" ? "sito" : "edificio",
+              stile: S.catalogo.pianta.stili_punto[0].id, x: null, y: null, verso_x: null, verso_y: null,
+              modello: modelloPiuImmagini(passo ? passo.modello : null), composto: null, errore: null };
+  await destinazioneDi(S.punto.modello);
+  render();
+}
+
+// Il punto parte con due immagini: serve un modello che ne riceve piu' d'una.
+function modelloPiuImmagini(id) {
+  const tutti = S.catalogo.modelli;
+  const m = tutti.find((x) => x.id === id);
+  if (m && m.verificato && m.piu_immagini) return m.id;
+  const predefinito = tutti.find((x) => x.id === S.studio.modello_predefinito);
+  if (predefinito && predefinito.piu_immagini) return predefinito.id;
+  const altro = tutti.find((x) => x.verificato && x.piu_immagini);
+  return altro ? altro.id : S.studio.modello_predefinito;
+}
+
+function corpoPunto(q) {
+  return { vista: S.vista, da: q.da, punto: { x: q.x, y: q.y, verso_x: q.verso_x, verso_y: q.verso_y, tipo: q.tipo, stile: q.stile } };
+}
+
+function puntoCompleto(q) {
+  return q.x !== null && q.verso_x !== null && Math.hypot(q.verso_x - q.x, q.verso_y - q.y) >= S.catalogo.pianta.trascina_minimo;
+}
+
+async function componiPunto() {
+  const q = S.punto;
+  if (!q) return;
+  if (!puntoCompleto(q)) { q.composto = null; render(); return; }
+  try { q.composto = await post("/api/punto/componi", { ...corpoPunto(q), modello: q.modello }); q.errore = null; }
+  catch (e) { q.composto = null; q.errore = e; }
+  render();
+}
+
+async function rendiPunto() {
+  const q = S.punto;
+  q.errore = null;
+  try {
+    const dest = await destinazioneDi(q.modello);
+    const risposta = await post("/api/punto/invia", { ...corpoPunto(q), modello: q.modello, destinazione_mostrata: dest && dest.destinazione });
+    S.punto = null;
+    S.passi.scelto = risposta.identificativo;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+// La pianta con il punto e il cono: le coordinate sono frazioni dell'immagine,
+// il cono si disegna in pixel dell'immagine perche' l'angolo resti vero.
+function telaPunto(q) {
+  const img = h("img", { src: q.src, alt: "La pianta: clicca dove stai, trascina verso dove guardi", draggable: "false",
+    stile: "display:block; max-width:100%; max-height:55vh; user-select:none" });
+  // L'SVG nasce da un pezzo di testo: la pagina non scrive indirizzi web.
+  const scatola = document.createElement("div");
+  scatola.innerHTML = '<svg class="segno-punto" aria-hidden="true"></svg>';
+  const svg = scatola.firstChild;
+  const tela = h("div", { classe: "tela-punto", stile: "position:relative; display:inline-block; max-width:100%; touch-action:none; cursor:crosshair" }, img, svg);
+  svg.style.cssText = "position:absolute; inset:0; width:100%; height:100%; pointer-events:none";
+  const disegna = () => {
+    const w = img.naturalWidth || 1000, a = img.naturalHeight || 1000;
+    svg.setAttribute("viewBox", `0 0 ${w} ${a}`);
+    svg.setAttribute("preserveAspectRatio", "none");
+    if (q.x === null) { svg.innerHTML = ""; return; }
+    const c = S.catalogo.pianta, rosso = `rgb(${c.rosso.join(",")})`;
+    const lato = Math.max(w, a), cx = q.x * w, cy = q.y * a;
+    const raggio = Math.max(4, lato * c.raggio);
+    let cono = "";
+    if (q.verso_x !== null && (q.verso_x !== q.x || q.verso_y !== q.y)) {
+      const angolo = Math.atan2(q.verso_y * a - cy, q.verso_x * w - cx);
+      const mezza = (c.apertura_gradi / 2) * Math.PI / 180, lungo = lato * c.cono_lato;
+      const v = [-mezza, mezza].map((d) => `${cx + lungo * Math.cos(angolo + d)},${cy + lungo * Math.sin(angolo + d)}`);
+      cono = `<polygon points="${cx},${cy} ${v.join(" ")}" fill="${rosso}" fill-opacity="${c.cono_opacita / 255}" stroke="${rosso}"/>`;
+    }
+    svg.innerHTML = `${cono}<circle cx="${cx}" cy="${cy}" r="${raggio}" fill="${rosso}" stroke="#fff" stroke-width="${Math.max(1, raggio / 3)}"/>`;
+  };
+  img.addEventListener("load", disegna);
+  const frazione = (ev) => {
+    const r = img.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height))];
+  };
+  let premuto = false;
+  tela.addEventListener("pointerdown", (ev) => {
+    premuto = true; tela.setPointerCapture(ev.pointerId);
+    [q.x, q.y] = frazione(ev); q.verso_x = null; q.verso_y = null; q.composto = null; disegna();
+  });
+  tela.addEventListener("pointermove", (ev) => { if (!premuto) return; [q.verso_x, q.verso_y] = frazione(ev); disegna(); });
+  const fine = () => { if (!premuto) return; premuto = false; componiPunto(); };
+  tela.addEventListener("pointerup", fine);
+  tela.addEventListener("pointercancel", fine);
+  disegna();
+  return tela;
+}
+
+function motivoRendiPunto(q) {
+  if (S.lavoroAttivo) return "Un lavoro è in corso: Rendi si accende quando finisce.";
+  if (q.x === null) return "Clicca sulla pianta dove stai.";
+  if (!puntoCompleto(q)) return "Trascina un po' più in là, verso dove guardi.";
+  if (q.errore) return q.errore.cosa_fare || q.errore.fatto;
+  if (!q.composto) return "Preparo il testo che parte…";
+  const d = S.passi.dest[q.modello];
+  if (d && d.cosa_manca) return d.cosa_manca;
+  return "";
+}
+
+function pannelloPunto() {
+  const q = S.punto;
+  const cat = S.catalogo.pianta;
+  const prompt = h("textarea", { classe: "prompt", readonly: true, "aria-label": "Prompt del punto di vista" });
+  prompt.value = q.composto ? q.composto.prompt : "";
+  const motivo = motivoRendiPunto(q);
+  const seg = (etichetta, voci, valore, cambia) => h("div", { classe: "riga-popola" }, h("span", { classe: "etichetta" }, etichetta),
+    h("div", { classe: "switch", role: "group", "aria-label": etichetta },
+      voci.map(([id, nome, spento, titolo]) => h("button", { classe: "seg", "aria-pressed": String(valore === id), disabled: spento || null, title: titolo || null,
+        onclick: () => { cambia(id); componiPunto(); } }, nome, spento ? presto() : null))));
+  return h("section", { classe: "pannello evidenziato", "aria-label": "Punto di vista" },
+    h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Punto di vista"),
+      h("button", { classe: "btn link", onclick: () => { S.punto = null; render(); } }, "Chiudi")),
+    h("p", { classe: "piccolo" }, "Clicca sulla pianta dove stai e trascina verso dove guardi. Esce la foto che farebbe quella camera, a altezza d'occhi."),
+    telaPunto(q),
+    seg("Dove", [["edificio", "Dentro la casa"], [q.tipo === "volumi" ? "volumi" : "sito", "Fuori, nel lotto"]], q.tipo, (id) => { q.tipo = id; }),
+    seg("Luce", cat.stili_punto.map((x) => [x.id, x.nome]), q.stile, (id) => { q.stile = id; }),
+    seg("Camera", [["senza", "Senza Allplan"], ["allplan", "In Allplan", true,
+      "Arriva quando la sonda di PythonParts legge la camera vera dal modello: altezze e arredi veri."]], cat.allplan ? "allplan" : "senza", () => {}),
+    avvisoImmaginata(),
+    vedePrompt() && q.composto ? h("details", { classe: "dettagli" }, h("summary", {}, h("span", { classe: "piccolo" }, "Il prompt che parte, in inglese"),
+      h("span", { classe: "tenue piccolo" }, `${q.composto.caratteri} caratteri`)), prompt) : null,
+    h("div", { classe: "gruppo-scelta-modello" }, h("span", { classe: "etichetta" }, "Modello"),
+      h("div", {}, sceltaModello(q, () => { componiPunto(); }, "punto", true))),
+    rigaDestinazione(q.modello, "La pianta, e la stessa pianta col punto e il cono rossi,"),
+    q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
+    h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: rendiPunto, disabled: !!motivo || null }, "Rendi il punto di vista"),
+      motivo ? h("span", { classe: "tenue piccolo" }, motivo) : null),
+    h("p", { classe: "tenue piccolo" }, "Esce un passo nuovo sotto la pianta, col prima/dopo come gli altri. Testi per il modello scelti, non ancora provati."));
+}
+
 // --- Finale: ingrandire con piu' dettaglio (2026-11-04) -----------------------
 // Magnific Precision V2 dal Router: nessun prompt, il render esce N volte piu'
 // grande. Il risultato e' un passo nuovo sotto questa immagine.
@@ -2394,53 +2637,94 @@ function pannelloFinale(l) {
     h("p", { classe: "tenue piccolo" }, "Esce un passo nuovo sotto questa immagine."));
 }
 
-// --- Altra vista: «Porta su un'altra vista» (2026-11-04) ----------------------
-// Per i fotogrammi di un video: la stessa ricetta (stile, modello, richieste e
-// note dei ritocchi) su un'altra cattura, con questa immagine come seconda
-// immagine perché il modello tenga uguali materiali e oggetti.
+// --- Ricetta: i passi di questa immagine su altre viste (2026-11-09) ----------
+// Era «Altra vista» (2026-11-04), per i fotogrammi di un video. Ora si
+// spuntano piu' viste e la ricetta si salva con un nome per rifarla dopo, da
+// Genera, sulle viste catturate piu' tardi. Ogni vista e' un render: stile e
+// modello del primo render, le richieste e le note di tutti i passi a parole,
+// e questa immagine come seconda immagine perche' materiali e oggetti restino
+// gli stessi.
 
 async function apriPorta(l) {
   const az = S.azioni;
   if (az.porta) { az.porta = null; render(); return; }
-  az.porta = { dati: null, dest: null, vista: null, mandato: null, errore: null };
+  az.porta = { dati: null, dest: null, viste: [], mandato: null, errore: null, nome: "", salvata: null };
   render();
   try {
     const dati = await get(`/api/lavori/${enc(l.identificativo)}/porta`);
     az.porta.dati = dati;
-    az.porta.vista = dati.viste[0] || null;
+    az.porta.viste = dati.viste.slice(0, 1);
+    az.porta.nome = nomeRicetta(dati.passi);
     az.porta.dest = await get(`/api/destinazione?modello=${enc(dati.modello)}&riferimento=1`);
   } catch (e) { if (az.porta) az.porta.errore = e; }
   render();
 }
 
+// Il nome proposto: gli ultimi due passi, solo la loro ultima parte
+// («Ora blu», non «Cambia · Ora blu»), tagliato a parola intera entro 60.
+function nomeRicetta(passi) {
+  const corti = (passi || []).map((p) => p.split(" · ").pop().replace(/…$/, ""));
+  let nome = (corti.length > 1 ? corti.slice(1) : corti).slice(-2).join(" + ");
+  if (nome.length > 60) nome = nome.slice(0, 60).replace(/\s+\S*$/, "");
+  return nome;
+}
+
+function elencoPassiRicetta(passi) {
+  return h("ol", { classe: "piccolo passi-ricetta" }, passi.map((x) => h("li", {}, x)));
+}
+
+function costoViste(costi, n) {
+  return n >= 1 && costi && costi[n - 1] ? costi[n - 1] : "";
+}
+
 function pannelloPorta(l) {
   const p = S.azioni.porta;
-  if (p.errore) return avviso("errore", p.errore.fatto, p.errore.cosa_fare);
-  if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo stile e ritocchi di questa immagine…");
+  if (p.errore && !p.dati) return avviso("errore", p.errore.fatto, p.errore.cosa_fare);
+  if (!p.dati || !p.dest) return h("p", { classe: "tenue piccolo" }, "Leggo i passi di questa immagine…");
   if (p.mandato) {
-    return h("div", { classe: "video-veloce", role: "status" }, h("b", {}, `In coda sulla vista ${p.mandato}.`),
-      h("span", { classe: "piccolo tenue" }, "La trovi nello storico a sinistra, sotto quella vista. Poi in Video la usi come fotogramma."));
+    const n = p.mandato.length;
+    return h("div", { classe: "video-veloce", role: "status" },
+      h("b", {}, n === 1 ? `In coda sulla vista ${p.mandato[0]}.` : `In coda su ${n} viste: ${p.mandato.join(", ")}.`),
+      h("span", { classe: "piccolo tenue" }, "Le trovi nello storico a sinistra, ognuna sotto la sua vista. Aprila: il prima/dopo la confronta con la sua vista Allplan."));
   }
   const d = p.dati;
+  const salva = h("div", { classe: "riga" },
+    h("input", { type: "text", "aria-label": "Nome della ricetta", maxlength: "60", value: p.nome,
+      placeholder: "Per esempio: Ora blu con persone",
+      oninput: (e) => { p.nome = e.target.value; } }),
+    h("button", { classe: "btn", onclick: () => salvaRicetta(l), disabled: !d.passi.length || null,
+      title: "La ritrovi in Genera › Le mie ricette, per rifarla sulle viste che catturi dopo." }, "Salva ricetta"));
+  const testa = [
+    h("span", { classe: "etichetta" }, "Ricetta di questa immagine"),
+    elencoPassiRicetta(d.passi),
+    h("p", { classe: "piccolo tenue" }, `Modello ${d.modello_nome}. I pennelli e le aree dei ritocchi non si portano: sono disegnati su questa inquadratura, passano a parole.`),
+    salva,
+    p.salvata ? h("p", { classe: "piccolo", role: "status" }, p.salvata) : null,
+    p.errore ? avviso("errore", p.errore.fatto, p.errore.cosa_fare) : null,
+  ];
   if (!d.viste.length) {
-    return h("div", { classe: "video-veloce" },
+    return h("div", { classe: "video-veloce" }, ...testa,
       h("b", {}, "Non c'è un'altra vista."),
-      h("span", { classe: "piccolo" }, "In Allplan inquadra il punto di vista del prossimo fotogramma e cattura dalla palette: comparirà qui."));
+      h("span", { classe: "piccolo" }, "In Allplan inquadra un altro punto di vista e cattura dalla palette: comparirà qui. Intanto puoi salvare la ricetta."));
   }
-  const scelta = h("select", { "aria-label": "Vista su cui portare", onchange: (e) => { p.vista = e.target.value; } },
-    d.viste.map((v) => h("option", { value: v, selected: v === p.vista || null }, v)));
+  const n = p.viste.length;
+  const troppe = n > d.massime;
+  const spunte = h("div", { classe: "spunte-viste", role: "group", "aria-label": "Viste su cui rifare la ricetta" },
+    d.viste.map((v) => h("label", { classe: "riga piccolo" },
+      h("input", { type: "checkbox", checked: p.viste.includes(v) || null,
+        onchange: (e) => { p.viste = e.target.checked ? [...p.viste, v] : p.viste.filter((x) => x !== v); render(); } }),
+      v)));
   const spento = S.lavoroAttivo ? "Un lavoro è in corso: si accende quando finisce."
-    : p.dest.cosa_manca || p.dest.riferimento_non_accettato || null;
-  return h("div", { classe: "video-veloce" },
-    h("span", { classe: "etichetta" }, "Su quale vista"),
-    scelta,
-    h("p", { classe: "piccolo" }, `Porta lo stile «${d.stile}», il modello ${d.modello_nome}`,
-      d.richieste.length ? ` e ${d.richieste.length === 1 ? "questa richiesta" : `queste ${d.richieste.length} richieste`}:` : "."),
-    d.richieste.length ? h("ul", { classe: "piccolo" }, d.richieste.map((r) => h("li", {}, r))) : null,
-    h("p", { classe: "piccolo tenue" }, "Questa immagine parte come seconda immagine, perché materiali e oggetti restino gli stessi. Le aree dei ritocchi non si portano: sono disegnate su un'altra inquadratura, passano a parole."),
-    h("p", { classe: "dove" }, "Va a ", h("b", {}, p.dest.destinazione), p.dest.costo ? ` · ${p.dest.costo}` : ""),
+    : p.dest.cosa_manca || p.dest.riferimento_non_accettato
+    || (!n ? "Spunta almeno una vista." : troppe ? `Al massimo ${d.massime} viste per clic.` : null);
+  return h("div", { classe: "video-veloce" }, ...testa,
+    h("span", { classe: "etichetta" }, "Rifalla su"),
+    spunte,
+    h("p", { classe: "dove" }, "Va a ", h("b", {}, p.dest.destinazione),
+      n ? ` · ${costoViste(d.costi, n)} · un render per vista` : ""),
     h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => porta(l), disabled: !!spento || null }, "Porta su questa vista"),
+      h("button", { classe: "btn primario", onclick: () => porta(l), disabled: !!spento || null },
+        n > 1 ? `Rifai su ${n} viste` : "Rifai su 1 vista"),
       spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
 }
 
@@ -2448,10 +2732,99 @@ async function porta(l) {
   const p = S.azioni.porta;
   p.errore = null;
   try {
-    await post(`/api/lavori/${enc(l.identificativo)}/porta`, { vista: p.vista, destinazione_mostrata: p.dest.destinazione });
-    p.mandato = p.vista;
+    const r = await post(`/api/lavori/${enc(l.identificativo)}/porta`, { viste: p.viste, destinazione_mostrata: p.dest.destinazione });
+    p.mandato = r.viste;
     await caricaStorico();
   } catch (e) { p.errore = e; }
+  render();
+}
+
+async function salvaRicetta(l) {
+  const p = S.azioni.porta;
+  const nome = (p.nome || "").trim();
+  p.errore = null; p.salvata = null;
+  const doppio = S.ricette.elenco.some((r) => r.nome.toLowerCase() === nome.toLowerCase());
+  if (doppio && !window.confirm(`Hai già una ricetta «${nome}». La sostituisco con i passi di questa immagine?`)) return;
+  try {
+    const r = await post("/api/mie-ricette", { lavoro: l.identificativo, nome, sovrascrivi: doppio });
+    S.ricette.elenco = r.ricette; S.ricette.problema = r.problema;
+    p.salvata = `Salvata «${nome}». La ritrovi in Genera › Le mie ricette.`;
+  } catch (e) { p.errore = e; }
+  render();
+}
+
+// --- Le mie ricette, in Genera ------------------------------------------------
+// Una ricetta salvata si rifa' sulla vista di Genera: la vista catturata dopo.
+
+async function caricaRicette() {
+  try {
+    const r = await get("/api/mie-ricette");
+    S.ricette.elenco = r.ricette; S.ricette.problema = r.problema;
+  } catch (e) { S.ricette.problema = e.fatto; }
+}
+
+async function scegliRicetta(nome) {
+  const q = S.ricette;
+  q.scelta = nome; q.dest = null; q.nota = null; q.errore = null;
+  const r = q.elenco.find((x) => x.nome === nome);
+  render();
+  if (r && r.usabile) {
+    try { q.dest = await get(`/api/destinazione?modello=${enc(r.modello)}&riferimento=1`); } catch (e) { q.errore = e; }
+  }
+  render();
+}
+
+function pannelloRicette() {
+  const q = S.ricette;
+  if (!q.elenco.length) {
+    return [h("span", { classe: "etichetta" }, "Le mie ricette"),
+      h("p", { classe: "tenue piccolo" }, "Nessuna ricetta salvata. Sotto un render riuscito apri Ricetta e premi Salva ricetta: qui la rifai sulle viste che catturi dopo."),
+      q.problema ? avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo.") : null];
+  }
+  const scelta = h("select", { "aria-label": "Le mie ricette" },
+    h("option", { value: "", selected: !q.scelta }, "Nessuna"),
+    q.elenco.map((r) => h("option", { value: r.nome, selected: r.nome === q.scelta }, r.usabile ? r.nome : `${r.nome} (non si usa più)`)));
+  scelta.addEventListener("change", () => scegliRicetta(scelta.value));
+  const r = q.elenco.find((x) => x.nome === q.scelta);
+  const righe = [h("span", { classe: "etichetta" }, "Le mie ricette"),
+    h("div", { classe: "riga" }, scelta,
+      r ? h("button", { classe: "btn", onclick: () => eliminaRicetta(r.nome) }, "Elimina") : null)];
+  if (q.problema) righe.push(avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo."));
+  if (q.nota) righe.push(h("p", { classe: "piccolo", role: "status" }, q.nota));
+  if (q.errore) righe.push(avviso("errore", q.errore.fatto, q.errore.cosa_fare));
+  if (!r) return righe;
+  righe.push(elencoPassiRicetta(r.passi || []));
+  if (!r.usabile) { righe.push(avviso("attenzione", "Questa ricetta non si usa più.", r.perche_no)); return righe; }
+  const stessa = r.vista === S.vista;
+  const spento = !S.vista ? "Serve una vista." : stessa ? "È la vista da cui viene la ricetta: qui serve Variante."
+    : S.lavoroAttivo ? "Un lavoro è in corso: si accende quando finisce."
+    : !q.dest ? "Leggo dove va…" : q.dest.cosa_manca || q.dest.riferimento_non_accettato || null;
+  righe.push(h("p", { classe: "piccolo tenue" }, `Viene da un render di ${r.vista}, che parte come seconda immagine. Stile e modello (${r.modello_nome}) sono i suoi: le scelte di questa pagina non contano.`));
+  if (q.dest) righe.push(h("p", { classe: "dove" }, "Va a ", h("b", {}, q.dest.destinazione), ` · ${costoViste(r.costi, 1)}`));
+  righe.push(h("div", { classe: "azioni" },
+    h("button", { classe: "btn", onclick: () => usaRicetta(r), disabled: !!spento || null }, "Rifalla su questa vista"),
+    spento ? h("span", { classe: "piccolo tenue" }, spento) : null));
+  return righe;
+}
+
+async function usaRicetta(r) {
+  const q = S.ricette;
+  q.errore = null; S.errore = null;
+  try {
+    const risposta = await post("/api/mie-ricette/usa", { nome: r.nome, viste: [S.vista], destinazione_mostrata: q.dest.destinazione });
+    q.nota = `«${r.nome}» in coda su ${S.vista}.`;
+    S.inFila = risposta.identificativi.slice(1);
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+async function eliminaRicetta(nome) {
+  if (!window.confirm(`Elimino la ricetta «${nome}»? Le immagini già fatte restano.`)) return;
+  try {
+    const r = await post("/api/mie-ricette/elimina", { nome });
+    S.ricette = { ...S.ricette, elenco: r.ricette, problema: r.problema, scelta: "", dest: null, nota: `Eliminata «${nome}».` };
+  } catch (e) { S.ricette.errore = e; }
   render();
 }
 
@@ -2623,6 +2996,7 @@ function areePerIlServer() {
     if (a.azione && a.azione !== "cambia") area.azione = a.azione;
     if (a.forma === "pennello") area.spessore = a.spessore;
     if (a.rif) area.inserto = ++numero;
+    if (S.ritocca.arreda) area.stanza = a.stanza || "soggiorno";
     return area;
   });
 }
@@ -2640,7 +3014,7 @@ async function immagineNota(i, file) {
 function togliImmagineNota(i) { S.ritocca.aree[i].rif = null; componiRitocco(); render(); }
 
 function bottoneImmagineNota(a, i, bloccato) {
-  if (S.ritocca.popola) return null;
+  if (S.ritocca.popola || S.ritocca.arreda) return null;
   const m = S.catalogo.modelli.find((x) => x.id === S.ritocca.modello);
   if (a.rif) {
     return h("div", { classe: "riga nota-rif" },
@@ -2660,13 +3034,14 @@ function bottoneImmagineNota(a, i, bloccato) {
 }
 
 // Il testo serve se c'e' un'area che non e' un «togli»: togliere si spiega da solo.
-function testoServe() { return !S.ritocca.popola && S.ritocca.aree.some((a) => a.azione !== "togli"); }
+function testoServe() { return !S.ritocca.popola && !S.ritocca.arreda && S.ritocca.aree.some((a) => a.azione !== "togli"); }
 
 // Cosa parte per il server: la frase con le @, oppure le scelte di Popola.
 function corpoRitocco() {
   const r = S.ritocca;
   const corpo = { vista: S.vista, da: r.da, aree: areePerIlServer(), inserti: insertiRitocco().map((x) => x.nome) };
-  if (r.popola) corpo.popola = { cosa: r.popola.cosa, quante: r.popola.quante, come: r.popola.come };
+  if (r.arreda) corpo.arreda = { stile: r.arreda.stile };
+  else if (r.popola) corpo.popola = { cosa: r.popola.cosa, quante: r.popola.quante, come: r.popola.come };
   else corpo.testo = r.testo;
   return corpo;
 }
@@ -2674,6 +3049,7 @@ function corpoRitocco() {
 function motivoApplicaRitoccoSpento() {
   const r = S.ritocca;
   if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
+  if (!r.aree.length && r.arreda) return "Disegna un rettangolo su ogni stanza da arredare, poi scegli che stanza è.";
   if (!r.aree.length) return r.popola ? "Passa il pennello verde dove le vuoi." : "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
   if (testoServe() && !r.testo.trim()) return "Scrivi cosa cambiare, e chiama le aree con @1, @2.";
   if (r.errore) return r.errore.cosa_fare || r.errore.fatto;
@@ -2701,6 +3077,7 @@ function componiRitocco() {
 
 function etichettaApplica() {
   const n = S.ritocca.aree.length;
+  if (S.ritocca.arreda) return n ? `Arreda · ${n === 1 ? "1 zona" : `${n} zone`}` : "Arreda";
   if (S.ritocca.popola) return n ? `Applica Popola · ${n === 1 ? "1 tratto" : `${n} tratti`}` : "Applica Popola";
   return n ? `Applica il ritocco · ${n === 1 ? "1 area" : `${n} aree`}` : "Applica il ritocco";
 }
@@ -2893,12 +3270,13 @@ function telaRitocco(base) {
     area.punti = area.punti.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
     if (area.forma === "pennello") area.contorno = contornoNormalizzato(area.punti, area.spessore, img);
     if (!area.azione) area.azione = "cambia";
+    if (r.arreda) area.stanza = "soggiorno";
     r.aree.push(area);
     r.composto = null;
     r.esito = null;
     render();
     // L'area nuova entra nel testo come @N, dove si scrive. In Popola non c'e' testo.
-    if (r.popola) componiRitocco(); else inserisciMenzione(r.aree.length);
+    if (r.popola || r.arreda) componiRitocco(); else inserisciMenzione(r.aree.length);
   };
   tela.addEventListener("pointerup", chiudi);
   tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); pennellata.setAttribute("points", ""); });
@@ -2909,6 +3287,17 @@ function telaRitocco(base) {
 // bottone per area che mette la sua @ dove sta il cursore.
 function compositoreRitocco(bloccato) {
   const r = S.ritocca;
+  if (r.arreda) {
+    const stili = S.catalogo.pianta.stili_arreda;
+    return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Arreda per zone" },
+      h("div", { classe: "riga tra" },
+        h("span", {}, h("b", {}, "Arreda per zone")),
+        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.arreda = null; r.aree = []; r.composto = null; r.strumento = "rettangolo"; render(); } }, "Esci da Arreda")),
+      h("div", { classe: "switch", role: "group", "aria-label": "Stile dell'arredo" },
+        stili.map((x) => h("button", { classe: "seg", "aria-pressed": String(r.arreda.stile === x.id), disabled: bloccato || null,
+          onclick: () => { r.arreda.stile = x.id; componiRitocco(); render(); } }, x.nome))),
+      h("span", { classe: "tenue piccolo" }, "Un rettangolo o una selezione libera per stanza, poi a destra dici che stanza è. Muri, porte e finestre restano come sono; fuori dalle zone la pianta resta quella di prima."));
+  }
   if (r.popola) {
     return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Popola" },
       h("div", { classe: "riga tra" },
@@ -2952,8 +3341,9 @@ function strumentiRitocco(spenti, ragione) {
   return h("div", { classe: "strumenti-ritocco" },
     h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
       voci.map(([id, nome]) => h("button", {
-        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || (r.popola && id !== "aggiungi") || null,
-        title: r.popola && id !== "aggiungi" ? "In Popola si dipinge solo col pennello verde." : null,
+        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || (r.popola && id !== "aggiungi") || (r.arreda && id !== "rettangolo" && id !== "libera") || null,
+        title: r.popola && id !== "aggiungi" ? "In Popola si dipinge solo col pennello verde."
+          : r.arreda && id !== "rettangolo" && id !== "libera" ? "In Arreda una zona è un rettangolo o una selezione libera." : null,
         onclick: () => { r.strumento = id; render(); },
       }, nome)),
       h("button", { classe: "seg", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto())),
@@ -2971,8 +3361,17 @@ function elencoAree(bloccato) {
     h("div", { classe: "riga tra" },
       h("span", { classe: "piccolo" }, h("b", { classe: `numero-elenco ${a.azione || "cambia"}` }, String(i + 1)), ` ${nomeArea(a)}`),
       bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
-    h("span", { classe: "piccolo tenue", id: `nota-area-${i}` }, note[i] ? `«${note[i]}»` : "La sua parte del testo compare qui."),
+    r.arreda ? sceltaStanza(a, bloccato) : null,
+    h("span", { classe: "piccolo tenue", id: `nota-area-${i}` }, note[i] ? `«${note[i]}»` : r.arreda ? "La frase della stanza compare qui." : "La sua parte del testo compare qui."),
     bottoneImmagineNota(a, i, bloccato))));
+}
+
+// In Arreda ogni zona dice che stanza e': la frase per il modello viene da li'.
+function sceltaStanza(a, bloccato) {
+  const scegli = h("select", { "aria-label": "Che stanza è", disabled: bloccato || null },
+    S.catalogo.pianta.stanze.map((x) => h("option", { value: x.id, selected: (a.stanza || "soggiorno") === x.id }, x.nome)));
+  scegli.addEventListener("change", () => { a.stanza = scegli.value; componiRitocco(); });
+  return h("label", { classe: "riga piccolo" }, "Stanza", scegli);
 }
 
 function daVerificare() {
@@ -3030,7 +3429,7 @@ async function fineRitocco(ora) {
     // Il prossimo ritocco parte da qui, dall'ultima immagine: non da quella
     // di prima, che non ha ancora quello che questo ritocco ha messo.
     r.da = ora.identificativo;
-    r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.popola = null;
+    r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.popola = null; r.arreda = null;
   } else {
     r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
       cosa_fare: ora.stato === "annullato" ? "Aree e testo sono rimasti: puoi applicarli di nuovo." : `${ora.cosa_fare || ""} Aree e testo sono rimasti come erano: Applica li rimanda.`.trim() };
@@ -3081,12 +3480,15 @@ function pannelloFuoriAree(passo) {
 }
 
 // Con `popola` (da Popola · Dipingo io) si dipinge solo col verde, senza testo:
-// ogni tratto prende la frase di Popola.
-function ritoccaDa(passo, popola) {
+// ogni tratto prende la frase di Popola. Con `arreda` (da una pianta) ogni zona
+// e' un rettangolo o una selezione libera con la sua stanza.
+function ritoccaDa(passo, popola, arreda) {
   const r = S.ritocca;
-  if (r.da !== passo.identificativo || popola || r.popola) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
+  if (r.da !== passo.identificativo || popola || r.popola || arreda || r.arreda) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
   r.popola = popola || null;
+  r.arreda = arreda || null;
   if (popola) r.strumento = "aggiungi";
+  if (arreda) r.strumento = "rettangolo";
   r.da = passo.identificativo; r.esito = null;
   location.hash = "#ritocca";
 }
@@ -3347,7 +3749,7 @@ function palcoPassi(passo) {
       h("p", { classe: "tenue" }, "Il punto di partenza di tutti i passi. Da qui si parte da Genera."),
       h("figure", { classe: "riquadro-vista" }, h("img", { src: `/file/vista/${enc(S.vista)}`, alt: nomePrima(), stile: "max-height:none" })));
   }
-  const titolo = h("h1", {}, `Passo ${passo.numero} · ${passo.nome}`);
+  const titolo = h("div", {}, h("h1", {}, `Passo ${passo.numero} · ${passo.nome}`), passo.immaginata ? avvisoImmaginata() : null);
   const confronto = modiConfronto(passo);
   if (confronto.modo === "griglia") return palcoGriglia(passo, confronto.fratelli, titolo, confronto.modi);
   if (!passo.render) {
@@ -3417,14 +3819,16 @@ function palcoGriglia(passo, fratelli, titolo, modi) {
   const cella = (x) => {
     const attivo = S.lavoroAttivo && S.lavoroAttivo.identificativo === x.identificativo;
     return h("button", { classe: "cella-griglia", "aria-current": String(x.identificativo === passo.identificativo),
-      onclick: () => { p.scelto = x.identificativo; render(); } },
+      // Il clic apre subito il prima/dopo di quella scelta: la griglia serve a
+      // scegliere, il confronto A/B col render di partenza resta quello di sempre.
+      onclick: () => { p.scelto = x.identificativo; p.confronto = "prima"; p.modo = "scorri"; render(); } },
       x.render ? h("img", { src: `/file/render/${x.identificativo}`, alt: x.nome })
         : h("span", { classe: "posto-griglia" }, attivo || x.attivo ? `${x.stato}…` : x.stato === "errore" ? "non riuscito" : x.stato || "—"),
       h("span", { classe: "piccolo" }, h("b", { classe: "numero" }, x.numero), " ", x.nome));
   };
   return h("div", { classe: "palco" },
     h("div", { classe: "riga tra" }, titolo, modi),
-    h("p", { classe: "tenue piccolo" }, `Partono tutti da ${padre ? `passo ${padre.numero}` : nomePrima()}. Clic su uno per sceglierlo e andare avanti da lì: gli altri restano nell'albero.`),
+    h("p", { classe: "tenue piccolo" }, `Partono tutti da ${padre ? `passo ${padre.numero}` : nomePrima()}. Clic su uno per vederlo in prima/dopo col render di partenza e andare avanti da lì: gli altri restano nell'albero.`),
     h("div", { classe: "griglia-confronto" },
       h("figure", { classe: "cella-griglia partenza" }, h("img", { src: partenza, alt: "Partenza" }),
         h("figcaption", { classe: "piccolo tenue" }, padre ? `Partenza · passo ${padre.numero}` : `Partenza · ${nomePrima()}`)),
@@ -3666,7 +4070,7 @@ function latoPassi(passo) {
   if (passo.aree && passo.aree.length && passo.render) blocchi.push(pannelloFuoriAree(passo));
   if (p.pulito && p.pulito.passo === passo.identificativo) blocchi.push(pannelloPulito(passo));
   // La stessa barra di Risultato (2026-11-04): Cambia · Ritocca · Variante ·
-  // Altra vista · Video. «Rifai tutto dalla vista» solo quando serve.
+  // Ricetta · Video. «Rifai tutto dalla vista» solo quando serve.
   const serve = passo.avviso || passo.partenza_mancante;
   blocchi.push(h("section", { classe: "pannello", "aria-label": "Da questa immagine" },
     passo.render ? barraAzioni(comeLavoro(passo)) : null,
@@ -4393,7 +4797,7 @@ async function avvia() {
   leggiScheda();
   try {
     [S.studio, S.catalogo] = await Promise.all([get("/api/studio"), get("/api/catalogo")]);
-    await Promise.all([caricaMiei(), caricaLicenza()]);
+    await Promise.all([caricaMiei(), caricaRicette(), caricaLicenza()]);
     // Senza codice e senza una chiave Comfy propria non parte niente: lo
     // Studio si apre sulla scheda Licenza (bozza A, 2026-11-05).
     if (S.licenza && !S.licenza.presente && !S.licenza.chiave_comfy && S.scheda !== "licenza") {
@@ -4428,6 +4832,7 @@ async function avvia() {
 genera = unInvioAllaVolta(genera);
 rifai = unInvioAllaVolta(rifai);
 porta = unInvioAllaVolta(porta);
+usaRicetta = unInvioAllaVolta(usaRicetta);
 applicaRitocco = unInvioAllaVolta(applicaRitocco);
 applicaPasso = unInvioAllaVolta(applicaPasso);
 inviaPulito = unInvioAllaVolta(inviaPulito);

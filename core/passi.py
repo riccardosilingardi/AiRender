@@ -210,6 +210,8 @@ def _passo_da_lavoro(lavoro: dict, numero: int) -> dict:
         # Un ritocco (Studio · Ritocca): le aree con le note, e come sono partite.
         "aree": lavoro.get("aree") or None,
         "modo_aree": lavoro.get("modo_aree"),
+        # Un punto di vista dalla pianta: dove sta la camera e verso dove guarda.
+        "punto_di_vista": lavoro.get("punto_di_vista") or None,
         "partenza": {"passo": lavoro.get("parte_da") or VISTA, "file": partenza or lavoro.get("vista")},
         "prompt": _prompt(lavoro),
         "versione_blocchi": blocchi.VERSIONE,

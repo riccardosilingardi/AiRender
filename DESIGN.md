@@ -918,7 +918,9 @@ interno notturno... Se devo passare da ritocca non ha senso xche devo
 selezionare il tutto. Rifai pulito, ritocca da qui, non si capisce.» Scelta
 sua: una barra sola, uguale in Risultato e in Passi.
 
-**La barra:** **Cambia · Ritocca · Variante · Video · Altra vista**.
+**La barra:** **Cambia · Ritocca · Variante · Video · Altra vista**
+(dal 2026-11-09 **Altra vista** si chiama **Ricetta**, vedi «Ricetta su altre
+viste»).
 - **Cambia** (nuovo, primo): cambia tutta l'immagine a parole, senza
   disegnare aree. Apre un riquadro sotto la barra: «Cambia tutta l'immagine, a
   parole», il campo per la richiesta e le scorciatoie **Notte · Tramonto ·
@@ -954,6 +956,62 @@ partenza non c'è più. Resta **Apri cartella**.
 - Tolte le frasi che ripetevano quello che si vede già (sotto «Parti da un
   preset», sotto Applica in Ritocca, il secondo «il primo video è la prova»).
 
+
+## Ricetta su altre viste, costruita il 2026-11-09
+
+PR 4 del piano dei flussi (pagina «Ricette e confronto», prototipo «Ricetta»).
+Il pulsante **Altra vista** della barra diventa **Ricetta**: stesso posto,
+stessa barra in Risultato e in Passi. Assorbe «Altra vista su più viste».
+
+**Il riquadro Ricetta** (si apre sotto la barra, come Video):
+- «Ricetta di questa immagine»: i passi numerati in italiano, quelli che
+  portano qualcosa a parole: «Genera · Rivista d'architettura», «Cambia · Ora
+  blu», «Popola · persone, poche, in movimento», «Ritocco · 2 note · …». Finale
+  e i passi senza richiesta non si elencano: sull'altra vista non cambiano
+  niente.
+- Sotto: «Modello …. I pennelli e le aree dei ritocchi non si portano: sono
+  disegnati su questa inquadratura, passano a parole.»
+- Nome (proposto dagli ultimi due passi) e **Salva ricetta**: «Salvata «…».
+  La ritrovi in Genera › Le mie ricette.» Un nome già usato chiede se
+  sostituire.
+- «Rifalla su»: una spunta per ogni altra vista della cartella, la prima già
+  spuntata. Dove va e costo per il numero di viste spuntate («circa 34 crediti
+  per 2 immagini (2 × 17,17) · … · un render per vista»). **Rifai su 1 vista** /
+  **Rifai su N viste**. Spento con la ragione accanto: nessuna vista spuntata,
+  oltre `RICETTA_VISTE_MASSIME` (6, scelta), un lavoro in corso, modello che
+  non accetta la seconda immagine.
+
+**Quattro stati del riquadro**
+- *Vuoto* (nessun'altra vista): i passi e Salva ricetta restano; al posto
+  delle spunte «Non c'è un'altra vista. In Allplan inquadra un altro punto di
+  vista e cattura dalla palette: comparirà qui. Intanto puoi salvare la
+  ricetta.»
+- *In corso*: «Leggo i passi di questa immagine…»; dopo l'invio «In coda su
+  N viste: …. Le trovi nello storico a sinistra, ognuna sotto la sua vista.
+  Aprila: il prima/dopo la confronta con la sua vista Allplan.»
+- *Errore*: il rifiuto del motore, che si spiega da solo. Se una vista non va
+  (stessa vista → «qui serve Variante», vista sparita, vista non adatta,
+  destinazione cambiata) **non parte niente**, nemmeno sulle altre.
+- *Pieno*: il riquadro descritto sopra.
+
+**Genera · Le mie ricette** (pannello «Modello e qualità», sotto I miei
+preset, non in Fotoinserimento):
+- Vuoto: «Nessuna ricetta salvata. Sotto un render riuscito apri Ricetta e
+  premi Salva ricetta: qui la rifai sulle viste che catturi dopo.»
+- Pieno: menu delle ricette, **Elimina**, i passi, «Viene da un render di
+  <vista>, che parte come seconda immagine. Stile e modello (…) sono i suoi: le
+  scelte di questa pagina non contano.», dove va e costo, **Rifalla su questa
+  vista**. Spento sulla vista da cui viene («qui serve Variante») o con un
+  lavoro in corso.
+- Errore: una ricetta il cui render è stato tolto resta nel menu come «(non si
+  usa più)» con i passi salvati e il perché; il file che non si legge si mette
+  da parte come per I miei preset.
+
+**Il prima/dopo resta.** Il risultato di una ricetta è un passo 1 della vista
+nuova: si apre in Risultato e in Passi con il confronto di sempre (Prima /
+dopo predefinito, Affiancati, Solo render) contro la sua vista Allplan.
+Screenshot (provider finto) in `docs/ui/studio-ricetta/`.
+
 ## Cambia con le miniature e Popola, costruiti il 2026-11-09
 
 Dal piano dei flussi approvato da Riccardo (PR 3; Design canvas, schermate A3 e
@@ -975,8 +1033,9 @@ Costo: …» e il bottone è **Applica N**.
 **Griglia** (Passi): quando un passo ha fratelli (passi nati dallo stesso
 render) il confronto ha una terza voce, **Griglia (N)**: la partenza
 tratteggiata e tutti i fratelli affiancati; quelli non ancora finiti mostrano
-lo stato su sfondo a righe. Un clic sceglie il passo da cui andare avanti; gli
-altri restano nell'albero. Dopo Applica con più scelte lo Studio va in Passi
+lo stato su sfondo a righe. Un clic sceglie il passo e apre subito il suo
+**Prima / dopo** contro il render di partenza (il confronto A/B resta sempre, è
+una regola di Riccardo del 2026-11-09); gli altri restano nell'albero. Dopo Applica con più scelte lo Studio va in Passi
 con la griglia aperta. I nomi nell'albero sono «Cambia · Ora blu» (più il testo
 libero, se c'è).
 
@@ -1048,6 +1107,50 @@ l'immagine…» grigio. **In corso**: «Carico…» sul bottone. **Errore**: mes
 del motore nel pannello (immagine troppo piccola, formato, tipo sconosciuto);
 niente viene salvato. **Pieno**: la vista caricata in Genera, o il risultato in
 Risultato, o il Ritocca aperto, secondo la scelta.
+
+## Pianta, planimetria e planivolumetrico, costruiti il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 6; Design canvas, schermata
+C-Pianta; testi nella scheda «Preset nuovi» della pagina Flussi). Studio e web
+app, stessa pagina. Schermate in `docs/ui/studio-pianta/`.
+
+**Genera**: la scena **Pianta** si aggiunge a Esterno, Interno e Arredo. Nove
+preset (pianta resa materica, in assonometria, colorata da concorso, bianco e
+nero; planimetria illustrata, da drone, ad acquerello; planivolumetrico plastico
+bianco e materico). Nei dettagli: **1 · Che disegno è** (Pianta dell'edificio,
+Planimetria, Planivolumetrico), **2 · Stile della tavola**, **3 · Luce e
+ombre**. Il giudizio della vista per una pianta non chiede ombre né toni di
+grigio: «Pianta adatta · linee e colori piatti vanno bene». «Tieni la
+geometria» si chiama «Tieni la geometria · muri e aperture». Accanto a «Pianta
+adatta» c'è **Punto di vista**, per una pianta già fatta.
+
+**Barra sotto un render di pianta**: al posto di Popola ci sono **Arreda** e
+**Punto di vista**. Il resto (Cambia, Ritocca, Variante, Video, Altra vista,
+Finale) resta com'è.
+- **Arreda** apre il Ritocca in modo Arreda: solo Rettangolo e Selezione libera,
+  lo stile in alto (scelte di `STILI_ARREDA`) con **Esci da Arreda**, e per ogni
+  zona a destra «Stanza» (soggiorno, cucina, camera, bagno, studio, ingresso…).
+  Applica dice «Arreda · N zone». Fuori dalle zone resta la pianta di prima.
+- **Punto di vista**: la pianta grande; si clicca dove si sta e si trascina
+  verso dove si guarda, e compaiono il punto e il cono rossi, gli stessi che il
+  motore disegna sulla seconda immagine che parte. Sotto: Dove (Dentro la casa,
+  Fuori nel lotto), Luce (Giorno, Pomeriggio caldo, Sera), Camera (**Senza
+  Allplan** scelta; **In Allplan** spenta con «In arrivo»: aspetta la sonda di
+  PythonParts). Sempre, prima di Rendi: «Stanza immaginata dalla pianta. Altezze
+  (occhi a 1,6 m, soffitto a 2,7 m, scelte), arredi e finestre che la pianta non
+  disegna li ha immaginati il modello.» Il modello deve ricevere più immagini.
+
+**Prima/dopo (A/B)**: resta il confronto predefinito in Risultato, Passi e
+Ritocca, anche per Arreda e per il punto di vista. Sopra il render di un punto
+di vista il titolo è «La foto dal punto di vista» con lo stesso avviso «Stanza
+immaginata dalla pianta», anche in Passi.
+
+Quattro stati. **Vuoto**: in Punto di vista, «Clicca sulla pianta dove stai»
+accanto a Rendi grigio; trascinamento troppo corto, «Trascina un po' più in
+là»; in Arreda senza zone, «Disegna un rettangolo su ogni stanza da arredare».
+**In corso**: il lavoro si segue come gli altri passi. **Errore**: il messaggio
+del motore sopra Rendi o Applica; punto, zone e stanze restano. **Pieno**: un
+passo nuovo sotto la pianta, col prima/dopo.
 
 ## Studio · Licenza e saldo, costruita il 2026-11-05
 

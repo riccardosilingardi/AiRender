@@ -273,7 +273,7 @@ la verifica si nomina qui.
 ### Partenza da un'immagine (2026-11-09)
 
 Foto, render già fatto e schizzo caricati nello Studio, con tre regole nuove
-per il modello in `core/blocchi.py` (bozza 16) e i Punti per i materiali.
+per il modello in `core/blocchi.py` (bozza 17) e i Punti per i materiali.
 Provato con i test (tipi, misura minima, import senza invio, passi e storico,
 rifiuti, Cambia e Ritocca da una foto, schizzo da Genera, Cosa tenere) e in
 Chromium sullo Studio del PC con un provider finto: pannello, i quattro
@@ -283,6 +283,22 @@ non si sa se Nano Banana tiene inquadratura e muri di una foto, gli arredi con
 giudizio, non misurato. Mai provato nella web app con Pyodide vero né sul PC di
 Riccardo. Si esce con tre render veri (una foto d'interno col look cambiato, uno
 schizzo, un render già fatto con un Cambia) giudicati a occhio da Riccardo.
+
+### Pianta, planimetria, Arreda e punto di vista (2026-11-09)
+
+Nove preset di pianta, Arreda per zone e il punto di vista dalla pianta, con i
+testi in `core/blocchi.py` (bozza 16) e il segno rosso in `core/punto.py`.
+Provato con i test (blocchi, rifiuti, idoneità di una pianta, zone con la loro
+stanza, due immagini in partenza, segno disegnato dove si è cliccato, formato 11
+della coda) e in Chromium sullo Studio del PC senza coda: scena Pianta, preset,
+pannello Punto di vista col cono. **Nessun testo provato con un render vero**:
+non si sa se Nano Banana tiene muri e aperture della pianta, se arreda solo le
+zone, né se dal punto rosso esce la stanza giusta guardando dalla parte giusta.
+Il modo Arreda del Ritocca non è stato guardato a video (serve un render di
+pianta finito). Altezze 1,6 m e 2,7 m, apertura 60°, misure del segno sono
+giudizi. «In Allplan» aspetta la sonda di PythonParts. Mai provato nella web app
+con Pyodide vero. Si esce con un giro di banco su una pianta vera di Riccardo:
+un preset, Arreda su tre stanze, due punti di vista, giudicati a occhio.
 
 ### Cambia con le miniature e Popola (2026-11-09)
 
@@ -510,15 +526,27 @@ provider finto e in Chromium senza modello. Mai visto se Nano Banana fa un
 interno notturno tenendo arredo e architettura. Verifica: un render di giorno,
 Cambia → Notte → Applica, e i due affiancati.
 
-### Altra vista: fotogrammi coerenti da più viste (2026-11-04)
+### Ricetta su altre viste (2026-11-09, era «Altra vista» del 2026-11-04)
 
-«Altra vista» sotto l'immagine porta stile, modello, richieste e note dei
-ritocchi su un'altra cattura, con l'immagine scelta come seconda immagine e la
-frase RIFERIMENTO_COERENZA (bozza 11). Provato solo con il provider finto: mai
-con Nano Banana vero, quindi non si sa quanto arredo e materiali restino
-uguali. Le aree dei ritocchi passano solo a parole; i materiali cambiati da
-Genera non si portano. Verifica: due viste dello stesso progetto, «Altra
-vista» da un render ritoccato, confronto a occhio degli oggetti aggiunti.
+«Ricetta» sotto l'immagine (era «Altra vista») elenca i passi dell'immagine
+(Genera · stile, Cambia, Popola, Ritocco), li rifà su una o più viste
+spuntate, al massimo `RICETTA_VISTE_MASSIME` (6, scelta) per clic, e li salva
+con un nome in `ricette-utente.json` nella cartella delle viste; in Genera,
+**Le mie ricette** la rifà sulla vista catturata dopo. Ogni vista è un invio
+solo, non un invio per passo: stile e modello del primo render, le richieste e
+le note di tutta la strada a parole, l'immagine come seconda immagine con
+RIFERIMENTO_COERENZA (bozza 11). Il prototipo dei flussi mostrava un invio per
+passo («3 invii per vista»): non l'ho fatto, perché la coda non sa ancora far
+partire un lavoro dal render di un altro lavoro non finito, e un passo per
+volta su ogni vista sposta gli spigoli a ogni giro.
+Provato solo col provider finto e in Chromium (screenshot in
+`docs/ui/studio-ricetta/`), mai in Edge, mai nella web app in Pyodide, mai con
+Nano Banana vero su più viste nello stesso clic. Le aree dei ritocchi e i
+tratti di Popola passano solo a parole; i materiali cambiati da Genera non si
+portano. Non si sa se una ricetta lunga (5-6 passi in un invio) regge come i
+passi fatti uno per volta. Verifica: un render con Cambia e un ritocco,
+Ricetta → due viste spuntate → Rifai su 2 viste, poi i tre render affiancati;
+se una vista perde i ritocchi, rimandare i tre render e la ricetta mostrata.
 
 ### Studio che si ricollega dopo un riavvio (2026-11-04)
 

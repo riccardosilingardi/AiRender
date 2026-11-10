@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 16 (2026-11-09)
+# Blocchi di stile — bozza 17 (2026-11-10)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -8,7 +8,7 @@ Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campa
 
 > Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below.
 
-## Partenza da un'immagine (bozza 16, 2026-11-09)
+## Partenza da un'immagine (bozza 17, 2026-11-10)
 
 Solo per un'immagine caricata nello Studio con «Da un'immagine» (`core/partenza.py`): una foto, un render fatto altrove, uno schizzo o la foto di un plastico. La regola prende il posto della regola fissa e della fedeltà al disegno, che parlano di una vista di Allplan. Una foto è vera: si tengono la prospettiva della fotocamera, pareti, serramenti e la luce che c'è. Valgono per esterni e interni, non per un pezzo d'arredo. Nessuna è provata col modello.
 
@@ -128,6 +128,7 @@ Esempio di materiali scritti dall'utente e tradotti:
 | `esterno` | Esterno (dallo switch) | The subject is a building exterior. | 35 |
 | `interno` | Interno (dallo switch) | The subject is an interior space. | 33 |
 | `prodotto` | Arredo (dallo switch, bozza 8) | The subject is a single piece of designer furniture, photographed as a product; the room around it is not part of the design. | 125 |
+| `pianta` | Pianta (dallo switch, bozza 16) | The subject is an architectural drawing seen from straight above. | 65 |
 
 ## Look fotografico
 
@@ -416,3 +417,109 @@ Esempio, Decide il modello, auto alcune in movimento:
 - **Persone**: poche = «two or three people»; alcune = «five to eight people»; molte = «about fifteen people». Poi: «ordinary adults in contemporary everyday clothes, scaled to the doors and floor heights, lit from the same direction as the scene, each casting a soft shadow on the ground». Come: ferme = «standing or sitting still»; movimento = «walking naturally, with a very slight motion blur». Dove, se decide il modello: esterno «on the paths, terraces and near the entrances, never in front of the main facade»; interno «in the free floor areas and at the tables, never blocking the main view of the room».
 - **Alberi**: poche = «one or two trees»; alcune = «three to five trees»; molte = «a row of eight to ten trees». Poi: «native deciduous species of believable size for a planting about ten years old, trunks rooted in the ground, foliage lit like the rest of the scene, shadows following the sun direction, not covering windows or the main entrance». Dove, se decide il modello: esterno «along the edges of the plot, the paths and the street, never in front of windows or the main entrance».
 - **Auto**: poche = «one or two cars»; alcune = «three or four cars»; molte = «six to eight cars». Poi: «recent unbranded European models in muted colours, correct perspective and size for the street, reflections and shadows consistent with the sky». Come: ferme = «parked»; movimento = «moving slowly along the road, with a slight motion blur». Dove, se decide il modello: esterno «only on roads, driveways and parking spaces, never on lawns or paths».
+
+## Pianta, planimetria e planivolumetrico (bozza 16, 2026-11-09)
+
+Flussi 5, 6 e 7 di Riccardo: una quarta scena, **Pianta**, per una cattura dall'alto di Allplan (vista in pianta o zenitale) o un'immagine di pianta caricata. Che disegno è lo dice l'asse **Che disegno è** (pianta dell'edificio, planimetria, planivolumetrico), che per questa scena prende il posto della riga «Scena». Lo **stile della tavola** prende il posto del look fotografico; le rese non valgono (lo stile fa già da resa). Niente cielo, intorno, verde, persone: si aggiungono dopo con i pennelli del Ritocca. Scritti con lo schema del prompt architettonico, non presi da Notion (la prompt library non ha piante). **Nessuno provato con il modello.**
+
+La regola fissa tiene il disegno, non la prospettiva: muri, aperture, impronte, strade e confini restano dove sono e dello stesso spessore. L'assonometria è l'unico stile che alza la vista a 45 gradi: la regola lo dice («unless the style below asks for an axonometric view»).
+
+### Che disegno è
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `edificio` | Pianta dell'edificio | The subject is a floor plan of one storey seen from straight above: walls, openings, door swings, stairs and the furniture drawn in it. | 135 |
+| `sito` | Planimetria | The subject is a site plan seen from straight above: building footprints and roofs, roads, paths, plot lines, lawns and trees. | 126 |
+| `volumi` | Planivolumetrico | The subject is a massing site plan seen from straight above: the buildings as solid volumes with their real heights, the ground, roads and plot lines around them. | 162 |
+
+### Fedeltà al disegno · pianta
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `rigida` | Rigida | Edit this exact drawing. Keep the framing, the scale and every wall, opening, building footprint, road, path and plot line exactly where it is and at the same thickness; do not add, remove, move or reshape any of them. Keep the view straight from above unless the style below asks for an axonometric view. Change only the look described below. Match the drawing strictly: same number and position of rooms, doors, windows, stairs and buildings; if in doubt, change less. | 470 |
+| `bilanciata` | Bilanciata | Edit this exact drawing. Keep the framing, the scale and every wall, opening, building footprint, road, path and plot line exactly where it is and at the same thickness; do not add, remove, move or reshape any of them. Keep the view straight from above unless the style below asks for an axonometric view. Change only the look described below. | 343 |
+| `libera` | Libera | Edit this drawing. Keep the framing, the scale and the position of every wall, opening, footprint and road; you may simplify small drawn details and add plausible floor finishes, planting and paving. Keep the view straight from above unless the style below asks for an axonometric view. Change the look described below. | 319 |
+
+### Stile della tavola
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `materica` | Resa materica | Rendered presentation plan: walls cut in solid charcoal, floors in real materials with visible grain (light oak in living rooms and bedrooms, large-format stone tiles in kitchens and bathrooms), roofs in their real materials, lawns with fine grass texture, trees as soft round canopies. | 286 |
+| `concorso` | Colori da concorso | Competition-style coloured plan: flat muted colours with no texture, walls and roofs in solid dark grey, floors and paving in warm light neutrals, lawns in soft sage green, water in pale blue-grey, thin crisp outlines. | 218 |
+| `biancoenero` | Bianco e nero con ombre | Black and white architectural plan: white floors and ground, walls and cut elements in solid black, fine grey hatching for paving and planting, soft grey cast shadows as the only tone. | 184 |
+| `assonometria` | Assonometria | Cut-away isometric view at 45 degrees from above: walls and buildings extruded to their real height (2.7 m per storey), cut at 1.2 m with the cut in solid charcoal, floors and ground in real materials, clean light background, no roof over the cut storey. | 254 |
+| `plastico` | Plastico bianco | Photograph of a white architectural scale model from straight above: matte white card for buildings and walls, pale basswood for the ground and paving, trees as small white spheres, crisp cut edges. | 198 |
+| `drone` | Foto dall'alto | Photorealistic aerial orthophoto taken by a drone at about 120 m, straight down: real roof materials with gentle weathering, mowed lawns, tree canopies, paving and asphalt with true texture; inside a building the roof is removed and the floors show their real materials. | 270 |
+| `acquerello` | Acquerello | Architectural watercolour plan: fine ink lines on every wall and edge, loose transparent washes for floors, lawns and trees, soft colour bleeding, white paper showing through. | 175 |
+
+### Luce e ombre · pianta
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `nordovest` | Ombre morbide da nord-ovest | Soft daylight from the top left (north-west), short soft shadows cast by walls, buildings and trees towards the bottom right. | 125 |
+| `radente` | Sole basso, ombre lunghe | Low late-afternoon sun from the left: long crisp shadows that show the height of every wall, building and tree, warm light on the lit sides. | 140 |
+| `diffusa` | Luce diffusa, senza ombre | Even diffuse light with no cast shadows, as on an overcast day: every part of the drawing equally readable. | 107 |
+
+### Qualità · pianta
+
+| id | Nome in UI | Testo per il modello | Caratteri |
+|---|---|---|---|
+| `base` | Base | Professional architectural presentation drawing, clean and legible. | 67 |
+| `32k` | Altissima definizione | Professional architectural presentation drawing, 32k, ultra-detailed, competition board quality. | 96 |
+
+### Cosa evitare · pianta
+
+> Avoid: perspective or tilted camera unless the style asks for it, text, labels, room names, dimension lines, north arrows, scale bars, new walls or rooms, bent or doubled lines, CGI look.
+
+### Preset pianta
+
+| Preset | Che disegno è | Stile della tavola | Luce e ombre | Caratteri |
+|---|---|---|---|---|
+| Pianta, resa materica | Pianta dell'edificio | Resa materica | Ombre morbide da nord-ovest | 1148 |
+| Pianta in assonometria | Pianta dell'edificio | Assonometria | Ombre morbide da nord-ovest | 1116 |
+| Pianta colorata da concorso | Pianta dell'edificio | Colori da concorso | Luce diffusa, senza ombre | 1062 |
+| Pianta bianco e nero con ombre | Pianta dell'edificio | Bianco e nero con ombre | Ombre morbide da nord-ovest | 1046 |
+| Planimetria illustrata | Planimetria | Colori da concorso | Ombre morbide da nord-ovest | 1071 |
+| Planimetria, foto da drone | Planimetria | Foto dall'alto | Ombre morbide da nord-ovest | 1123 |
+| Planimetria ad acquerello | Planimetria | Acquerello | Ombre morbide da nord-ovest | 1028 |
+| Planivolumetrico, plastico bianco | Planivolumetrico | Plastico bianco | Sole basso, ombre lunghe | 1102 |
+| Planivolumetrico materico | Planivolumetrico | Resa materica | Sole basso, ombre lunghe | 1190 |
+
+### Arreda per zone
+
+Nel Ritocca, su una pianta: un rettangolo o una selezione libera per stanza, il tipo di stanza per ogni zona, uno stile per tutte. Ogni zona diventa la nota della sua area:
+
+> furnish this area as a living room: a sofa, armchairs, a coffee table, a rug and a TV unit, in Scandinavian style: light oak, white and pale grey fabrics; furniture at real sizes for the room, at least 80 cm of walking space, nothing in front of doors or windows, seen from straight above in the same rendering style and light as the rest of the plan; keep walls, openings and every other area unchanged
+
+Tipi di stanza:
+
+- `soggiorno` Soggiorno: «a living room: a sofa, armchairs, a coffee table, a rug and a TV unit»
+- `cucina` Cucina: «a kitchen: a run of base cabinets with sink and hob along the wall, a small island if there is room»
+- `pranzo` Pranzo: «a dining area: a table for six with chairs and a sideboard»
+- `camera` Camera: «a double bedroom: a double bed with two bedside tables, a wardrobe along a wall»
+- `cameretta` Cameretta: «a single bedroom: a single bed, a desk with a chair and a wardrobe»
+- `bagno` Bagno: «a bathroom: toilet, washbasin with vanity, a shower or a bath where there is room»
+- `studio` Studio: «a home office: a desk with a chair, shelving along a wall and an armchair»
+- `ingresso` Ingresso: «an entrance hall: a coat cabinet, a bench and a console»
+
+Stili:
+
+- `nordico` Nordico: «Scandinavian style: light oak, white and pale grey fabrics»
+- `contemporaneo` Contemporaneo caldo: «warm contemporary style: walnut, cream fabrics and brass details»
+- `minimale` Minimale: «minimal style: few pieces, white lacquer, light grey stone»
+- `industriale` Industriale: «industrial style: black steel, dark leather and reclaimed wood»
+- `mediterraneo` Mediterraneo: «Mediterranean style: natural linen, rattan, terracotta and whitewashed wood»
+
+### Punto di vista dalla pianta, senza Allplan
+
+Partono due immagini: la pianta e la stessa pianta con un punto e un cono rossi (li disegna il motore). Altezza degli occhi 1.6 m e soffitto 2.7 m sono scelte, non misure. Da una planimetria o da un planivolumetrico la regola è quella del sito, e l'immagine che esce è un esterno.
+
+> Image 1 is a floor plan seen from straight above. Image 2 is the same plan with a red dot and a red cone: the dot is a camera at eye height 1.6 m, the cone shows where it looks. Render the photograph that camera would take, at eye level with straight verticals: walls, doors, windows, stairs and furniture where the plan has them, ceiling height 2.7 m. Do not add rooms, walls or openings that are not in the plan, and do not draw the dot, the cone or any plan lines in the photograph.
+
+> Image 1 is a site plan seen from straight above. Image 2 is the same plan with a red dot and a red cone: the dot is a person standing on the ground with eyes at 1.6 m, the cone shows where they look. Render the photograph that person would take, at eye level with straight verticals: buildings, roads, paths and trees where the plan has them, buildings at believable heights. Do not add buildings or roads that are not in the plan, and do not draw the dot, the cone or any plan lines in the photograph.
+
+Stili:
+
+- `giorno` Giorno, luce naturale: «Professional architectural photograph, natural daylight, soft shadows, true-to-life materials and colours.»
+- `caldo` Pomeriggio caldo: «Warm late-afternoon sunlight raking in through the windows, long soft shadows, golden tones, editorial interior photograph.»
+- `sera` Sera, luci accese: «Evening, warm 3000 K lamps switched on, dark blue sky outside, cosy contrast, editorial photograph.»
