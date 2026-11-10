@@ -21,6 +21,12 @@ dritte vengono dal custom node **comfyui_controlnet_aux** (e dal modello
 `depth_anything_v2_vitl.pth`): la build deve installarlo. Va rifatta la build
 col file nuovo, anche se il deployment c'era già.
 
+Dal 2026-11-10 ci sono anche i nodi 21 (`LoadImage` del render), 22
+(`ImageScale` alla misura della vista) e 23 (`VAEEncode`), usati solo da
+«Riaggancia alla vista»: il campionatore parte dal render invece che dal
+latente vuoto (nodo 14) e ne rifà una parte. Per gli altri invii il motore li
+toglie. Anche questi vanno nella build.
+
 Il motore riempie a ogni invio i nodi 1 (la vista caricata come asset), 2 (lato
 massimo), 6 (prompt), 8 (forza del ControlNet) e 9 (seme e passi), coi valori
 di `core/config.py`. I valori scritti nel file servono solo alla build.

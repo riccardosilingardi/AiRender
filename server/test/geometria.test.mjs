@@ -268,3 +268,37 @@ test("un grafo senza nessun controllo si rifiuta prima di riservare", async () =
   assert.equal(r.status, 400);
   assert.equal(db.stato.render.length, 0);
 });
+
+test("«Riaggancia alla vista»: il render firmato entra nel latente, i controlli restano dalla vista", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const a = await gestisci(caricamento(), { db, ambiente, chiama });
+  const { id } = await a.json();
+  const g = structuredClone(modello.grafi_riaggancia.spigoli);
+  g[modello.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id } };
+  g[modello.nodi.render].inputs.image = { __type: "core/ASSET", info: { id } };
+  g[modello.nodi.prompt].inputs.text = "a house";
+  g[modello.nodi.campionatore].inputs.seed = 7;
+  const r = await gestisci(invio(g), { db, ambiente, chiama });
+  assert.equal(r.status, 201);
+  const mandato = JSON.parse(chiama.chiamate.find((x) => x.url === `${DEPLOY}/api/v2/jobs`).body).workflow;
+  assert.equal(mandato["14"], undefined, "niente foglio vuoto");
+  assert.deepEqual(mandato["9"].inputs.latent_image, ["23", 0]);
+  assert.ok(mandato["9"].inputs.denoise < 1);
+  assert.equal(mandato[modello.nodi.render].inputs.image.info.id, id.split(".")[0]);
+});
+
+test("«Riaggancia alla vista» con un render non firmato si rifiuta prima di riservare", async () => {
+  const db = conLicenza();
+  const chiama = deployFinto();
+  const r = await caricaEInvia(db, chiama, (id) => {
+    const g = structuredClone(modello.grafi_riaggancia.spigoli);
+    g[modello.nodi.immagine].inputs.image = { __type: "core/ASSET", info: { id } };
+    g[modello.nodi.render].inputs.image = { __type: "core/ASSET", info: { id: "falso.0000" } };
+    g[modello.nodi.prompt].inputs.text = "a house";
+    g[modello.nodi.campionatore].inputs.seed = 7;
+    return g;
+  });
+  assert.equal(r.status, 403);
+  assert.equal(db.stato.render.length, 0);
+});

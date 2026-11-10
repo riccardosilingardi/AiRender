@@ -34,14 +34,17 @@ def testo_geometria() -> str:
     # Un grafo per ogni insieme di controlli (Spigoli, Profondita', Linee
     # dritte), gia' coi valori di config.py: il server sceglie quello giusto
     # e riempie solo vista, prompt e seme.
-    grafi = {}
+    grafi, riagganci = {}, {}
     for quanti in range(1, len(geometria.CONTROLLI) + 1):
         for scelta in combinations(geometria.CONTROLLI, quanti):
             grafi["+".join(scelta)] = geometria.grafo_per(scelta)
+            riagganci["+".join(scelta)] = geometria.grafo_per(scelta, riaggancia=True)
     dati = {
         "grafi": grafi,
+        # «Riaggancia alla vista»: gli stessi controlli, col render nel latente.
+        "grafi_riaggancia": riagganci,
         "nodi": {"immagine": geometria.NODO_IMMAGINE, "prompt": geometria.NODO_PROMPT,
-                 "campionatore": geometria.NODO_CAMPIONATORE},
+                 "campionatore": geometria.NODO_CAMPIONATORE, "render": geometria.NODO_RENDER},
         # Da quale nodo ControlNet si riconosce un controllo nel grafo del
         # client, nell'ordine dei nomi dei grafi (una lista: le chiavi si ordinano).
         "controlli": [[c, geometria.NODI_CONTROLLO[c][1]] for c in geometria.CONTROLLI],

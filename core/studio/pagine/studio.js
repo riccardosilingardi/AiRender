@@ -1973,6 +1973,93 @@ async function misuraOra(identificativo) {
   render();
 }
 
+// --- Riaggancia alla vista (2026-11-10) --------------------------------------
+// Nano Banana non ha un ControlNet: a ogni passata le linee possono muoversi.
+// Questa spunta, quando la % di spigoli scende, ripassa il render leggero nel
+// ControlNet guidato dalla vista Allplan: le linee tornano al loro posto, luce
+// e materiali restano in gran parte. Costa solo quando si usa.
+
+function statoRiaggancia(l) {
+  if (!S.riaggancio || S.riaggancio.per !== l.identificativo) {
+    S.riaggancio = { per: l.identificativo, acceso: false, controlli: ["spigoli"], composto: null, errore: null };
+  }
+  return S.riaggancio;
+}
+
+async function componiRiaggancia(l) {
+  const q = statoRiaggancia(l);
+  try {
+    q.composto = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
+    q.errore = null;
+  } catch (e) { q.composto = null; q.errore = e; }
+  render();
+}
+
+async function applicaRiaggancia(l) {
+  const q = statoRiaggancia(l);
+  q.errore = null;
+  try {
+    const dest = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
+    const risposta = await post("/api/riaggancia/invia", {
+      vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli, destinazione_mostrata: dest.destinazione,
+    });
+    S.riaggancio = null;
+    S.inFila = [];
+    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
+    await caricaPassi();
+    if (S.scheda === "risultato") await caricaRender();
+  } catch (e) { q.errore = e; }
+  render();
+}
+
+function pannelloRiaggancia(l) {
+  if (!l || !l.render || l.modello === "caricata") return null;
+  const q = statoRiaggancia(l);
+  const possibile = geometriaPossibile();
+  const t = l.tenuta;
+  const bassa = t && typeof t.spigoli === "number" && t.avvisa;
+  const spunta = h("input", { type: "checkbox", id: "riaggancia", checked: q.acceso && possibile, disabled: !possibile,
+    onchange: (e) => { q.acceso = e.target.checked; q.composto = null; if (q.acceso) componiRiaggancia(l); else render(); } });
+  const figli = [
+    h("label", { classe: "riga-spunta", for: "riaggancia" }, spunta, h("b", {}, "Riaggancia alla vista"), " ",
+      spiega("Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca, Variante) le linee possono spostarsi un po'. Riaggancia ripassa questo render, leggero, nel ControlNet guidato dalla vista Allplan: spigoli e aperture tornano al loro posto, luce e materiali restano in gran parte. Esce un passo nuovo; confrontalo col prima/dopo e con la % di spigoli.")),
+    h("p", { classe: "tenue piccolo" }, bassa
+      ? "La % di spigoli è bassa: questo render può essersi spostato dalla vista."
+      : "Da usare quando la % di spigoli scende o il prima/dopo mostra linee spostate."),
+  ];
+  if (!possibile) figli.push(h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()));
+  if (q.acceso && possibile) {
+    const c = q.composto;
+    figli.push(h("div", { classe: "controlli-geometria" },
+      ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
+        const acceso = q.controlli.includes(chiave);
+        const ultimo = acceso && q.controlli.length === 1;
+        const id = `riaggancia-${chiave}`;
+        return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
+          h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
+            onchange: (e) => {
+              const scelti = new Set(q.controlli);
+              if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
+              q.controlli = CONTROLLI_GEOMETRIA.map(([k]) => k).filter((k) => scelti.has(k));
+              componiRiaggancia(l);
+            } }),
+          h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
+      })));
+    if (c && c.destinazione) {
+      figli.push(h("p", { classe: "destinazione" }, "Vanno a ", h("b", {}, c.destinazione), `. Costo: ${c.costo}.`),
+        h("p", { classe: "tenue piccolo" }, c.cosa_parte));
+    }
+    if (c && c.errore) figli.push(avviso("errore", c.errore, c.cosa_fare));
+    if (q.errore) figli.push(avviso("errore", q.errore.fatto, q.errore.cosa_fare));
+    figli.push(h("div", { classe: "azioni" },
+      h("button", { classe: "btn primario", onclick: () => applicaRiaggancia(l),
+        disabled: !c || !c.destinazione || !!S.lavoroAttivo || null }, "Riaggancia"),
+      S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Riaggancia si accende quando finisce.") : null),
+      nota("Scelta, non provata.", `Rifà il ${c ? c.quanto_rifa : "–"}% del render (valore scelto, non misurato). Nessun riaggancio è ancora stato fatto col workflow vero: il primo è la prova.`));
+  }
+  return h("section", { classe: "pannello", "aria-label": "Riaggancia alla vista" }, ...figli);
+}
+
 function tenuta(l) {
   return corpoTenuta(l ? l.tenuta : null, l ? l.identificativo : null);
 }
@@ -2967,7 +3054,7 @@ function schermataRisultato() {
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
       palcoConAzioni(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l),
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), pannelloRiaggancia(l), ricettaPannello(l), adesso(l),
         altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }

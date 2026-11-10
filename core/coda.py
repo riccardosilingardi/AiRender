@@ -52,7 +52,8 @@ from .idoneita import valuta, valuta_immagine
 from .preset import MODELLI_PREDEFINITI
 from . import punto as modulo_punto
 from .provider import geometria as modulo_geometria
-from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
+from .provider.comfy import tipo_mime as comfy_tipo_mime
+from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione, Risultato
 from .ricetta import Ricetta, impronta
 
 FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
@@ -103,7 +104,13 @@ FORMATO_PUNTO = 11  # numero-non-configurabile: versione del formato di un lavor
 # (un render o la vista) il motore disegna il punto e il cono rossi e manda le
 # due immagini. Niente aree, richieste, riferimenti, materiali o geometria.
 # Un motore vecchio rifiuta l'11 invece di mandare la pianta da sola.
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_RIAGGANCIA = 12  # numero-non-configurabile: versione del formato di un lavoro «Riaggancia alla vista»
+# Il formato 12 (2026-11-10) e' «Riaggancia alla vista»: un render gia' fatto
+# ripassa leggero nel workflow col ControlNet, guidato dalla vista, e torna
+# sulle sue linee. Non va a Nano Banana: la destinazione e' solo il workflow.
+# Un motore vecchio rifiuta il 12 invece di mandare il render a Nano Banana.
+MODELLO_RIAGGANCIA = "riaggancia"  # il "modello" scritto nel lavoro: il workflow col ControlNet, niente Router
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)  # numero-non-configurabile: i formati che questo motore sa leggere
 TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
@@ -329,12 +336,16 @@ class Lavoro:
     # guarda. La seconda immagine (la pianta col punto rosso) la disegna il
     # motore prima dell'invio.
     punto_di_vista: modulo_punto.PuntoDiVista | None = None
+    # «Riaggancia alla vista»: il render di partenza ripassa nel ControlNet
+    # guidato dalla vista, con `controlli_geometria`, verso `destinazione_geometria`.
+    riaggancia: bool = False
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "formato",
-                           FORMATO_GEOMETRIA if self.destinazione_geometria else self.formato_proprio())
+                           FORMATO_RIAGGANCIA if self.riaggancia
+                           else FORMATO_GEOMETRIA if self.destinazione_geometria else self.formato_proprio())
 
     def formato_proprio(self) -> int:
         """Il formato del lavoro senza «Tieni la geometria»."""
@@ -364,6 +375,8 @@ class Lavoro:
         gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti i
         blocchi, piu' le richieste se ce ne sono.
         """
+        if self.riaggancia:
+            return modulo_geometria.PROMPT_RIAGGANCIA
         testo = self._prompt_senza_inserti()
         if self.destinazione_geometria:
             testo = f"{testo}\n\n{modulo_geometria.REGOLA_PROMPT}"
@@ -432,7 +445,10 @@ class Lavoro:
             **({"finale": dict(self.finale)} if self.finale else {}),
             **({"esempi": list(self.esempi)} if self.esempi else {}),
             **({"punto_di_vista": self.punto_di_vista.a_dizionario()} if self.punto_di_vista else {}),
-            **({"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria,
+            **({"riaggancia": True, "destinazione_geometria": self.destinazione_geometria,
+                "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
+               if self.riaggancia else
+               {"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria,
                 "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
                if self.destinazione_geometria else {}),
         }
@@ -453,6 +469,8 @@ class Lavoro:
             )
         if dati.get("formato") == FORMATO_GEOMETRIA:
             return cls._da_dizionario_geometria(dati)
+        if dati.get("formato") == FORMATO_RIAGGANCIA:
+            return cls._da_dizionario_riaggancia(dati)
         mancanti = [
             k for k in ("identificativo", "vista", "provider", "modello", "destinazione")
             if not dati.get(k)
@@ -605,6 +623,28 @@ class Lavoro:
             raise LavoroNonValido(errore.fatto, "Rimetti il lavoro in coda da Studio · Genera.") from None
         avvolto = cls.da_dizionario({**dati, "formato": base})
         return dataclasses.replace(avvolto, destinazione_geometria=destinazione, controlli_geometria=controlli)
+
+
+    @classmethod
+    def _da_dizionario_riaggancia(cls, dati: dict) -> "Lavoro":
+        """Un lavoro del formato 12: un passo da un render, che va solo al workflow col ControlNet."""
+        destinazione = dati.get("destinazione_geometria")
+        if (not dati.get("riaggancia") or not dati.get("partenza") or not isinstance(destinazione, str)
+                or not destinazione.strip() or dati.get("modello") != MODELLO_RIAGGANCIA
+                or any(dati.get(k) for k in ("aree", "contesto", "finale", "richieste", "riferimento",
+                                             "materiali", "inserti", "esempi", "punto_di_vista"))):
+            raise LavoroNonValido(
+                "Il file del lavoro chiede «Riaggancia alla vista» ma non dice da quale render parte "
+                "o dove va, o porta altro insieme.",
+                "Rimetti il lavoro in coda dal Risultato dello Studio.",
+            )
+        try:
+            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
+        except ErroreAirender as errore:
+            raise LavoroNonValido(errore.fatto, "Rimetti il lavoro in coda dal Risultato dello Studio.") from None
+        avvolto = cls.da_dizionario({**dati, "formato": FORMATO})
+        return dataclasses.replace(avvolto, destinazione_geometria=destinazione, controlli_geometria=controlli,
+                                   riaggancia=True)
 
 
 def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
@@ -910,6 +950,50 @@ def metti_in_coda(
     return lavoro
 
 
+def metti_in_coda_riaggancia(
+    radice: Path,
+    vista: Path,
+    scelte: blocchi.Scelte,
+    provider: str,
+    parte_da: str,
+    partenza: Path,
+    destinazione_geometria: str,
+    controlli_geometria: tuple[str, ...] = (),
+) -> Lavoro:
+    """«Riaggancia alla vista»: il render di un passo ripassa nel ControlNet guidato dalla vista.
+
+    Non va a Nano Banana: la sola destinazione e' il workflow, mostrata prima
+    dell'invio come le altre (regola 5).
+    """
+    if not parte_da or not partenza:
+        raise LavoroNonValido(
+            "«Riaggancia alla vista» parte da un render fatto.",
+            "Scegli un render nell'elenco dei render della vista.",
+        )
+    if not destinazione_geometria or not destinazione_geometria.strip():
+        raise LavoroNonValido(
+            "«Riaggancia alla vista» non sa dove va: la destinazione del workflow manca.",
+            "Ricarica lo Studio: la destinazione si mostra prima dell'invio.",
+        )
+    lavoro = Lavoro(
+        identificativo=nuovo_identificativo(),
+        vista=str(Path(vista).resolve()),
+        scelte=scelte,
+        provider=provider,
+        modello=MODELLO_RIAGGANCIA,
+        destinazione=destinazione_geometria,
+        parte_da=parte_da,
+        partenza=str(Path(partenza).resolve()),
+        destinazione_geometria=destinazione_geometria,
+        controlli_geometria=_controlli_del_lavoro(controlli_geometria),
+        riaggancia=True,
+    )
+    percorsi = cartelle(radice)
+    scrivi_stato(radice, lavoro.identificativo, IN_CODA, destinazione=destinazione_geometria)
+    scrivi_json(percorsi[IN_ATTESA_DIR] / f"{lavoro.identificativo}.json", lavoro.a_dizionario())
+    return lavoro
+
+
 def _cambio_controllato(radice: Path, cambio: modulo_materiali.Cambio) -> modulo_materiali.Cambio:
     """Il cambio con i file controllati: anteprima dalla cartella delle anteprime, foto dai riferimenti.
 
@@ -1062,8 +1146,6 @@ class Coda:
         try:
             lavoro = self._leggi(preso)
             self._controlla_annullamento(identificativo, stato_attuale["valore"])
-            richiesta, motore = self._prepara(lavoro)
-            self._controlla_annullamento(identificativo, stato_attuale["valore"])
 
             def avanzamento(stato: str) -> None:
                 if stato != stato_attuale["valore"]:
@@ -1073,17 +1155,22 @@ class Coda:
                     )
                 self._controlla_annullamento(identificativo, stato)
 
-            motore.avanzamento = avanzamento
-            if lavoro.destinazione_geometria:
-                richiesta, altro_geometria = self._prima_passata(lavoro, richiesta, motore, avanzamento)
-            self._dire(
-                f"Lavoro {identificativo}: destinazione dell'invio "
-                f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
-                "questa macchina."
-            )
-            # Da qui l'immagine parte: lo stato lo dice prima, non dopo.
-            avanzamento(INVIATO)
-            risultato = motore.genera(richiesta)
+            if lavoro.riaggancia:
+                risultato, altro_geometria = self._riaggancia(lavoro, avanzamento)
+            else:
+                richiesta, motore = self._prepara(lavoro)
+                self._controlla_annullamento(identificativo, stato_attuale["valore"])
+                motore.avanzamento = avanzamento
+                if lavoro.destinazione_geometria:
+                    richiesta, altro_geometria = self._prima_passata(lavoro, richiesta, motore, avanzamento)
+                self._dire(
+                    f"Lavoro {identificativo}: destinazione dell'invio "
+                    f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
+                    "questa macchina."
+                )
+                # Da qui l'immagine parte: lo stato lo dice prima, non dopo.
+                avanzamento(INVIATO)
+                risultato = motore.genera(richiesta)
         except LavoroAnnullato as annullato:
             self._chiudi(preso, ANNULLATO_DIR, ANNULLATO,
                          fatto=annullato.fatto, cosa_fare=annullato.cosa_fare)
@@ -1172,6 +1259,43 @@ class Coda:
         return dataclasses.replace(richiesta, immagine=bozza), {"geometria": {
             "bozza": str(percorso), "destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
             "workflow": modulo_geometria.NOME_WORKFLOW, "controlli": list(controlli)}}
+
+    def _riaggancia(self, lavoro: Lavoro, avanzamento: Callable[[str], None]):
+        """«Riaggancia alla vista»: vista e render al workflow col ControlNet, il suo render e' il risultato."""
+        geometria = self._crea_geometria(lambda: avanzamento(INVIATO), lavoro.provider)
+        annunciata = geometria.destinazione()
+        if annunciata != lavoro.destinazione_geometria:
+            raise LavoroNonValido(
+                f"Il lavoro dice che «Riaggancia alla vista» va a {lavoro.destinazione_geometria}, ma "
+                f"partirebbe verso {annunciata}. Non ho inviato niente.",
+                "Rimetti il lavoro in coda: le destinazioni si rileggono e si mostrano di nuovo.",
+            )
+        vista = modulo_immagine.leggi(Path(lavoro.vista))
+        render = self._leggi_partenza(Path(lavoro.partenza))
+        self._dire(f"Lavoro {lavoro.identificativo}: «Riaggancia alla vista» verso {annunciata}. "
+                   "Partono due immagini da questa macchina: la vista e il render.")
+        avanzamento(INVIATO)
+        seme = secrets.randbits(31)  # numero-non-configurabile: il seme del campionatore sta in un intero con segno
+        controlli = lavoro.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI
+        immagine, lavoro_comfy = geometria.esegui(vista, modulo_geometria.PROMPT_RIAGGANCIA, seme, controlli,
+                                                  render=render)
+        modulo_immagine.misura(immagine)  # solleva se non e' un'immagine
+        immagine = modulo_immagine.marca_generata(immagine)  # AI Act, art. 50.2, come gli altri render
+        ricetta = Ricetta(
+            provider=lavoro.provider, modello=modulo_geometria.NOME_WORKFLOW, preset="", preset_versione="",
+            prompt=modulo_geometria.PROMPT_RIAGGANCIA, testo_utente="", grana="", dettaglio_grana=None,
+            forza_struttura=None, risoluzione=f"{config.GEOMETRIA_LATO_MASSIMO}px", aspetto="",
+            generazione_fissa=False, impronta_sorgente=impronta(render), seme=seme,
+            parametri={"riaggancia": True, "impronta_vista": impronta(vista), "controlli": list(controlli),
+                       "denoise": config.GEOMETRIA_RIAGGANCIA_DENOISE, "lavoro_comfy": lavoro_comfy},
+        )
+        formato = comfy_tipo_mime(immagine).split("/")[-1].replace("jpeg", "jpg")
+        risultato = Risultato(immagine=immagine, formato=formato, ricetta=ricetta, avvisi=[
+            "Riagganciato alla vista col ControlNet: guarda il prima/dopo col render di partenza, "
+            "luce e materiali possono essersi un po' spenti."])
+        return risultato, {"geometria": {"destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
+                                         "workflow": modulo_geometria.NOME_WORKFLOW, "controlli": list(controlli),
+                                         "riaggancia": True}}
 
     def _leggi(self, preso: Path) -> Lavoro:
         try:

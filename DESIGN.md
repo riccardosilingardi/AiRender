@@ -1263,6 +1263,20 @@ descrizione»): con la spunta accesa, sotto compaiono **Spigoli** (acceso),
 resta acceso (l'ultimo non si toglie). Sotto: «Più controlli insieme tengono di
 più ma lasciano meno libertà al render. Il costo non cambia.»
 
+Dal 2026-11-10 ogni controllo ha la spiegazione nel «?» (cosa tiene, quando
+usarlo) e accanto una riga breve; il «?» della nota dice che vale solo in Genera
+dalla vista.
+
+**Riaggancia alla vista** (2026-11-10, scelta di Riccardo: «solo come spunta»).
+Nel Risultato, sotto «Tenuta della geometria», un pannello con la spunta
+«Riaggancia alla vista» e il suo «?». Spenta: una riga dice quando serve («Da
+usare quando la % di spigoli scende…», oppure «La % di spigoli è bassa…» sotto
+la soglia). Accesa: le stesse tre spunte dei controlli, dove va e cosa costa,
+cosa parte (vista e render, Nano Banana niente), il bottone **Riaggancia** e la
+nota «Scelta, non provata.». Fuori piano: spunta grigia con la frase del piano.
+Non c'è sull'immagine caricata. Esce un passo nuovo «Riaggancia alla vista»,
+col prima/dopo e la sua %.
+
 ## Finale, costruito il 2026-11-04
 
 Richiesta di Riccardo del 2026-11-04: «upscale e dettagli». Nella barra sotto

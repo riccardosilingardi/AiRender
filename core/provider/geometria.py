@@ -48,6 +48,14 @@ REGOLA_PROMPT = (
 # I nodi del workflow che il motore riempie (vedi il file JSON).
 NODO_IMMAGINE, NODO_LATO, NODO_PROMPT, NODO_FORZA, NODO_CAMPIONATORE = "1", "2", "6", "8", "9"
 NODO_MODELLO, NODO_CAMPIONAMENTO = "4", "11"
+# «Riaggancia alla vista»: il render rientra nel latente al posto del foglio
+# vuoto, e il ControlNet lo riporta sulle linee della vista.
+NODO_RENDER, NODI_RIAGGANCIA, NODO_LATENTE_VUOTO = "21", ("21", "22", "23"), "14"
+NODO_LATENTE_RENDER = "23"
+PROMPT_RIAGGANCIA = (
+    "architectural photograph of the building, same materials, same light and same colours "
+    "as the input image, every edge and opening exactly on the lines of the view"
+)
 
 # I tre controlli che l'utente puo' spuntare, nell'ordine in cui si
 # incatenano sul modello. Ognuno e' un preprocessore che estrae una guida
@@ -85,11 +93,16 @@ def descrivi_controlli(controlli: tuple[str, ...]) -> str:
     return nomi[0] if len(nomi) == 1 else ", ".join(nomi[:-1]) + " e " + nomi[-1]
 
 
-def grafo_per(controlli: tuple[str, ...]) -> dict:
+def grafo_per(controlli: tuple[str, ...], riaggancia: bool = False) -> dict:
     """Il grafo coi soli controlli scelti, incatenati sul modello, e i valori di config.py.
 
-    Restano da riempire solo vista, prompt e seme (workflow()). Lo usa anche
-    scripts/scrivi_listino.py per il server, che non riceve il grafo dal client.
+    Restano da riempire solo vista, prompt e seme (workflow()), e il render
+    con `riaggancia`. Lo usa anche scripts/scrivi_listino.py per il server,
+    che non riceve il grafo dal client.
+
+    Con `riaggancia` il campionatore non parte da un foglio vuoto ma dal
+    render, e ne rifa' solo GEOMETRIA_RIAGGANCIA_DENOISE: i controlli restano
+    presi dalla vista, cosi' le linee tornano al loro posto.
     """
     controlli = controlli_validi(controlli)
     grafo = copy.deepcopy(json.loads(WORKFLOW.read_text(encoding="utf-8")))
@@ -105,7 +118,16 @@ def grafo_per(controlli: tuple[str, ...]) -> dict:
     grafo[NODO_CAMPIONAMENTO]["inputs"]["model"] = precedente
     grafo[NODO_LATO]["inputs"]["largest_size"] = config.GEOMETRIA_LATO_MASSIMO
     grafo[NODO_CAMPIONATORE]["inputs"]["steps"] = config.GEOMETRIA_PASSI
+    if riaggancia:
+        del grafo[NODO_LATENTE_VUOTO]
+        grafo[NODO_CAMPIONATORE]["inputs"]["latent_image"] = [NODO_LATENTE_RENDER, 0]
+        grafo[NODO_CAMPIONATORE]["inputs"]["denoise"] = config.GEOMETRIA_RIAGGANCIA_DENOISE
+    else:
+        for nodo in NODI_RIAGGANCIA:
+            del grafo[nodo]
     return grafo
+
+
 STATI_FINITI = ("succeeded", "failed", "expired", "canceled")
 
 
@@ -162,10 +184,16 @@ def crea(provider: str, trasporto: "TrasportoWorkflow", controlla: Callable[[], 
     return Geometria(trasporto, controlla=controlla)
 
 
-def workflow(asset: str, prompt: str, seme: int, controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI) -> dict:
-    """Il grafo in formato API, coi controlli scelti e i valori del lavoro."""
-    grafo = grafo_per(controlli)
+def workflow(asset: str, prompt: str, seme: int, controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI,
+             render: str | None = None) -> dict:
+    """Il grafo in formato API, coi controlli scelti e i valori del lavoro.
+
+    Con `render` (l'asset del render da riagganciare) e' «Riaggancia alla vista».
+    """
+    grafo = grafo_per(controlli, riaggancia=render is not None)
     grafo[NODO_IMMAGINE]["inputs"]["image"] = {"__type": "core/ASSET", "info": {"id": asset}}
+    if render is not None:
+        grafo[NODO_RENDER]["inputs"]["image"] = {"__type": "core/ASSET", "info": {"id": render}}
     grafo[NODO_PROMPT]["inputs"]["text"] = prompt
     grafo[NODO_CAMPIONATORE]["inputs"]["seed"] = seme
     return grafo
@@ -216,25 +244,31 @@ class Geometria:
             f"Togli la spunta «Tieni la geometria» per mandare solo a Nano Banana.{aggiunta}",
         )
 
-    def carica(self, immagine: bytes) -> str:
+    def carica(self, immagine: bytes, nome: str = "vista") -> str:
         immagine = modulo_immagine.senza_metadati(immagine)  # partono solo i pixel, senza EXIF ne' XMP
         tipo = comfy.tipo_mime(immagine)
-        corpo, contenuto = _multipart(immagine, "vista." + tipo.rsplit("/", 1)[-1], tipo)
+        corpo, contenuto = _multipart(immagine, nome + "." + tipo.rsplit("/", 1)[-1], tipo)
         stato, _int, risposta = self.trasporto.manda_byte(
             f"{self.base}/api/v2/assets", {**self._intestazioni(), "Content-Type": contenuto}, corpo)
         if stato not in (200, 201) or not isinstance(risposta, dict) or not risposta.get("id"):  # numero-non-configurabile: HTTP OK e Created
-            raise self._errore("il caricamento della vista", stato, risposta)
+            raise self._errore(f"il caricamento del{'la vista' if nome == 'vista' else ' render'}", stato, risposta)
         return str(risposta["id"])
 
     def esegui(self, immagine: bytes, prompt: str, seme: int,
-               controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI) -> tuple[bytes, str]:
-        """Carica la vista, manda il workflow, aspetta e scarica. Torna l'immagine e l'id del lavoro Comfy."""
+               controlli: tuple[str, ...] = CONTROLLI_PREDEFINITI,
+               render: bytes | None = None) -> tuple[bytes, str]:
+        """Carica la vista, manda il workflow, aspetta e scarica. Torna l'immagine e l'id del lavoro Comfy.
+
+        Con `render` e' «Riaggancia alla vista»: carica anche il render, che il
+        workflow riporta sulle linee della vista.
+        """
         asset = self.carica(immagine)
+        asset_render = self.carica(render, "render") if render is not None else None
         self.controlla()
         stato, _int, lavoro = self.trasporto.chiama(
             "POST", f"{self.base}/api/v2/jobs",
             {**self._intestazioni(), "Idempotency-Key": str(uuid.uuid4())},
-            {"workflow": workflow(asset, prompt, seme, controlli)})
+            {"workflow": workflow(asset, prompt, seme, controlli, asset_render)})
         if stato not in (200, 201) or not isinstance(lavoro, dict) or not lavoro.get("id"):  # numero-non-configurabile: HTTP OK e Created
             raise self._errore("l'invio del workflow", stato, lavoro)
         identificativo = str(lavoro["id"])
