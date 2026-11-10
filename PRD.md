@@ -467,6 +467,26 @@ Nano Banana dopo. Prima passata in 10–34 s a caldo.
 - NON VERIFICATO: altre viste, altri semi, la passata Nano Banana dopo,
   Riaggancia sul deployment, il percorso coi crediti (server Netlify).
 
+### Nano Banana 2 con le mappe accanto alla vista (2026-11-10, sera)
+
+Idea di Riccardo: dare a Nano Banana 2 la vista e le tre mappe del
+ControlNet come immagini in piu', con un prompt che dice cosa e' ogni
+immagine. Script `scripts/prova_mappe_nano.py`. Dettagli, tabella e immagini in
+`docs/prova-nano-mappe-2026-11-10.md`.
+
+- Su una vista prospettica ambigua (casa a colori di layer) la vista con le tre
+  mappe ha ritrovato il 92% degli spigoli, contro l'85% della vista da sola, e
+  a occhio tiene partizioni e tetto. Su un edificio gia' chiaro e su una pianta
+  2D non cambia niente: Nano Banana da solo arriva al 91-98%.
+- Conta la **profondita'**: spigoli + linee senza profondita' 85%, spigoli da
+  soli peggiorano sempre (portano dentro tratteggi e grana della vista).
+- Depth Anything V2 **Small** (Apache-2.0) da' quasi lo stesso risultato della
+  Large (90% contro 92%). La Large, che usa il deployment, e' **CC-BY-NC**:
+  non si puo' usare per render venduti.
+- Il solo ControlNet di Z-Image su una pianta 2D: 85%, resa da illustrazione.
+- NON VERIFICATO: una sola esecuzione per variante, Gemini senza seme;
+  profondita' calcolata nel browser; profondita' presa dal modello Allplan.
+
 ### Riaggancia alla vista (2026-11-10)
 
 Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca,
