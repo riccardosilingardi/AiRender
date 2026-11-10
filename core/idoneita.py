@@ -120,6 +120,35 @@ def valuta(statistiche: Statistiche, scena: str | None = None) -> Esito:
     )
 
 
+def valuta_immagine(statistiche: Statistiche) -> Esito:
+    """Un'immagine caricata con «Da un'immagine» (core/partenza.py): conta solo la misura.
+
+    Ombre, toni e sfondo uniforme dicono se una vista di Allplan e' stata
+    salvata bene; una foto o un render li hanno per forza, e uno schizzo a
+    matita sembrerebbe sempre un wireframe. Resta il lato minimo: sotto, il
+    modello ha troppo poco da cui partire.
+    """
+    if statistiche.lato_lungo < config.LATO_MINIMO_PX:
+        return Esito(
+            idonea=False,
+            motivo=TROPPO_PICCOLA,
+            fatto=(
+                f"Questa immagine e' {statistiche.larghezza}x{statistiche.altezza} px: "
+                f"troppo piccola. Sotto {config.LATO_MINIMO_PX} px di lato lungo il "
+                "modello ha troppo poco da cui partire."
+            ),
+            cosa_fare=f"Carica la stessa immagine piu' grande, con il lato lungo ad almeno {config.LATO_MINIMO_PX} px.",
+            statistiche=statistiche,
+        )
+    return Esito(
+        idonea=True,
+        motivo=None,
+        fatto=f"Immagine {statistiche.larghezza}x{statistiche.altezza} px.",
+        cosa_fare="",
+        statistiche=statistiche,
+    )
+
+
 def assicura_idonea(statistiche: Statistiche, scena: str | None = None) -> Esito:
     """Come `valuta`, ma si ferma se la vista non va bene."""
     esito = valuta(statistiche, scena)

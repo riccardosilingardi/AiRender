@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 16 (2026-11-09)
+# Blocchi di stile — bozza 17 (2026-11-10)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -7,6 +7,18 @@ Cosa cambia dalla bozza 3 (2026-10-29): **Intorno** ha città, periferia e campa
 ## Regola fissa (sempre per prima)
 
 > Edit this exact image. Keep the camera, framing, proportions and every building element exactly as they are; do not add, remove or reshape any architecture. Change only the look described below.
+
+## Partenza da un'immagine (bozza 17, 2026-11-10)
+
+Solo per un'immagine caricata nello Studio con «Da un'immagine» (`core/partenza.py`): una foto, un render fatto altrove, uno schizzo o la foto di un plastico. La regola prende il posto della regola fissa e della fedeltà al disegno, che parlano di una vista di Allplan. Una foto è vera: si tengono la prospettiva della fotocamera, pareti, serramenti e la luce che c'è. Valgono per esterni e interni, non per un pezzo d'arredo. Nessuna è provata col modello.
+
+| id | Nome in UI | Testo per il modello |
+|---|---|---|
+| `foto` | Muri e finestre | This is a real photograph or a finished render, not a 3D model view. Edit this exact image. Keep the camera position, lens and perspective, every wall, floor, ceiling, window and door exactly as they are and, unless the light is described below, the daylight already in the image; do not add, remove or reshape any architecture. You may replace furniture, finishes and materials to match the look described below. |
+| `foto-arredi` | Anche gli arredi | This is a real photograph or a finished render, not a 3D model view. Edit this exact image. Keep the camera position, lens and perspective, every wall, floor, ceiling, window and door, and every piece of furniture and every object exactly where and as it is; do not add, remove or reshape anything. Change only the light, the colours and the materials as described below. |
+| `schizzo` | Le linee dello schizzo | This is a hand sketch or a photograph of a physical model, not a finished image. Keep every line of it: the same camera, framing, proportions, volumes and openings; do not add, remove or reshape any architecture. Turn it into a finished image with real materials and light as described below. |
+
+Una foto parte con «Muri e finestre», un render già fatto con «Anche gli arredi» (SCELTA). Cambia, Ritocca e Popola su una foto usano la regola dei passi di sempre.
 
 ## Fedeltà al disegno (bozza 6, 2026-10-31)
 

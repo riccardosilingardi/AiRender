@@ -48,11 +48,12 @@ from . import contesto as modulo_contesto
 from . import materiali as modulo_materiali
 from . import provider as registro
 from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
-from .idoneita import valuta
+from .idoneita import valuta, valuta_immagine
 from .preset import MODELLI_PREDEFINITI
 from . import punto as modulo_punto
 from .provider import geometria as modulo_geometria
 from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
+from .ricetta import Ricetta, impronta
 
 FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
 # Il formato 2 (2026-10-30) aggiunge il passo di partenza e le richieste a
@@ -671,6 +672,47 @@ def leggi_stato(radice: Path, identificativo: str) -> dict | None:
         return None
 
 
+# «Da un'immagine», un render gia' fatto (core/partenza.py): non parte niente,
+# l'immagine caricata diventa un lavoro gia' fatto, cosi' sotto ha la barra di
+# ogni render (Cambia, Ritocca, Popola, Finale, Regola, Esporta).
+PROVIDER_NESSUNO = "nessuno"
+MODELLO_CARICATA = "caricata"
+DESTINAZIONE_NESSUNA = "Nessun invio: è l'immagine che hai caricato"
+
+
+def importa_immagine(radice: Path, vista: Path, scena: str = blocchi.ESTERNO) -> Lavoro:
+    """Un lavoro gia' fatto il cui render e' la vista stessa. Nessun invio, nessun costo.
+
+    Il file del lavoro, il render, la ricetta e lo stato stanno dove la coda
+    mette quelli dei lavori fatti: lo Studio li legge come gli altri. Il
+    lavoro porta `importata`, cosi' nessuno lo rifa' o ne misura la tenuta
+    (confrontare l'immagine con se stessa darebbe un numero falso, regola 3).
+    """
+    vista = Path(vista)
+    dati = vista.read_bytes()
+    modulo_immagine.misura(dati)  # solleva se non e' un'immagine
+    # La scena dice quali voci hanno Cambia e Popola da qui: esterno o interno.
+    blocchi.partenza_valida(blocchi.PARTENZA_FOTO, scena)
+    percorsi = cartelle(radice)
+    lavoro = Lavoro(nuovo_identificativo(), str(vista), blocchi.Scelte(scena=scena),
+                    PROVIDER_NESSUNO, MODELLO_CARICATA, DESTINAZIONE_NESSUNA)
+    render = percorsi[FATTO_DIR] / f"{lavoro.identificativo}{vista.suffix.lower()}"
+    ricetta = render.with_name(render.name + ".ricetta.json")
+    scrivi_atomico(render, dati)
+    scrivi_atomico(ricetta, Ricetta(
+        provider=PROVIDER_NESSUNO, modello=MODELLO_CARICATA, preset=SCELTE_LIBERE,
+        preset_versione=blocchi.VERSIONE, prompt="", testo_utente="", grana="",
+        dettaglio_grana=None, forza_struttura=None, risoluzione="", aspetto="",
+        generazione_fissa=False, impronta_sorgente=impronta(dati),
+        parametri={"importata": True},
+    ).a_json())
+    finale = percorsi[FATTO_DIR] / f"{lavoro.identificativo}.json"
+    scrivi_json(finale, {**lavoro.a_dizionario(), "importata": True})
+    scrivi_stato(radice, lavoro.identificativo, FATTO, lavoro=str(finale), render=str(render),
+                 ricetta=str(ricetta), importata=True, avvisi=[])
+    return lavoro
+
+
 def metti_in_coda(
     radice: Path,
     vista: Path,
@@ -1133,10 +1175,15 @@ class Coda:
             dati = self._leggi_partenza(Path(lavoro.partenza))
         else:
             dati = modulo_immagine.leggi(Path(lavoro.vista))
+            # Da un'immagine caricata (foto, schizzo) conta solo la misura:
+            # le regole delle viste di Allplan non valgono (core/partenza.py).
             # Il punto di vista parte da una pianta: si giudica come una pianta,
             # anche se le scelte dicono la scena dell'immagine che esce.
-            giudizio = valuta(modulo_immagine.misura(dati),
-                              blocchi.PIANTA if lavoro.punto_di_vista else lavoro.scelte.scena)
+            if lavoro.scelte.partenza != blocchi.VISTA_ALLPLAN:
+                giudizio = valuta_immagine(modulo_immagine.misura(dati))
+            else:
+                giudizio = valuta(modulo_immagine.misura(dati),
+                                  blocchi.PIANTA if lavoro.punto_di_vista else lavoro.scelte.scena)
             if not giudizio.idonea:
                 raise ImmagineNonIdonea(giudizio.fatto, giudizio.cosa_fare, giudizio.motivo or "")
         motore = self._crea_provider(lavoro.provider)

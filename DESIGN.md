@@ -1060,6 +1060,54 @@ celle mostrano lo stato. **Errore**: messaggio del motore sopra Applica; scelte 
 tratti restano; miniature doppie, sconosciute o troppe non mandano niente.
 **Pieno**: i passi nuovi nell'albero e nella griglia.
 
+## Studio · Da un'immagine, costruita il 2026-11-09
+
+Dal piano dei flussi approvato da Riccardo (PR 5, partenza «Un'immagine»;
+Design canvas, schermata B-Immagine). Studio e web app, stessa pagina.
+Schermate in `docs/ui/studio-immagine/`.
+
+**Ingresso** (Genera, riquadro della vista): accanto a «Usa un'altra vista…»
+c'è **Da un'immagine…**; a vista vuota è il bottone principale. Apre un
+pannello con tre scelte: **Un render già fatto**, **Una foto**, **Uno schizzo o
+un plastico**. Per la foto si sceglie anche cosa farne (**Cambia il look**,
+**Cambia arredi o materiali**, **Metti il progetto qui**) e, per le prime due,
+**Che cosa si vede?** (Un esterno / Un interno). Poi «Scegli l'immagine…».
+
+Dove porta:
+- **Render già fatto**: niente Genera. L'immagine diventa subito un risultato
+  («Caricata 1» nello storico) e da lì partono Cambia, Ritocca, Popola, Video e
+  Finale, con la stessa barra. Non parte niente e non costa niente: il riquadro
+  «Com'è stato fatto» dice «Nessun invio», la tenuta dice «Non misurata» col
+  perché. Variante e Altra vista non ci sono (serve una vista di Allplan).
+- **Foto, Cambia il look**: Genera, con **Cosa tenere** sotto la vista: «Muri e
+  finestre» (predefinito) o «Anche gli arredi». Preset, look, riferimento di
+  stile come per una vista. La foto è anche subito un risultato, come il render.
+- **Foto, Cambia arredi o materiali**: Ritocca sulla foto, coi riquadri e le
+  foto di riferimento che ci sono già.
+- **Foto, Metti il progetto qui**: Fotoinserimento, con la foto come luogo.
+- **Schizzo o plastico**: Genera come una vista, Cosa tenere = «Le linee dello
+  schizzo». Arredo (prodotto) è spento per tutte le immagini caricate.
+
+Su un'immagine caricata il controllo di idoneità guarda solo la misura (lato
+minimo): ombre, toni e sfondo uniforme valgono per le viste di Allplan. La riga
+sotto la vista dice il tipo («Foto», «Schizzo o plastico», «Render già fatto»).
+
+**Punti** (Materiali della vista, fuori da Allplan): «+ Punti» accanto a «+
+Contorno». Ogni clic sulla vista è un quadratino campione (`PUNTO_LATO`, 5% del
+lato, scelta) e una riga «Materiale N · dalla vista» con «diventa…» e «+
+Riferimento». «Fine selezione» chiude.
+
+**Prima / dopo**: resta il confronto predefinito in Risultato e in Passi. Per
+l'immagine caricata la partenza si chiama «Immagine caricata» (o «Foto di
+partenza», «Schizzo di partenza») e una riga sopra il cursore dice che prima e
+dopo sono uguali finché non parte il primo Cambia, Ritocca o Popola.
+
+Quattro stati. **Vuoto**: pannello chiuso; aperto senza tipo, «Scegli
+l'immagine…» grigio. **In corso**: «Carico…» sul bottone. **Errore**: messaggio
+del motore nel pannello (immagine troppo piccola, formato, tipo sconosciuto);
+niente viene salvato. **Pieno**: la vista caricata in Genera, o il risultato in
+Risultato, o il Ritocca aperto, secondo la scelta.
+
 ## Pianta, planimetria e planivolumetrico, costruiti il 2026-11-09
 
 Dal piano dei flussi approvato da Riccardo (PR 6; Design canvas, schermata
