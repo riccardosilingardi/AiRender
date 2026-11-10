@@ -352,6 +352,19 @@ bene tutte le superfici simili al ritaglio, né se il grigio attorno al
 campione lo confonde. Mai provato nella web app con Pyodide vero (il ritaglio
 usa una canvas sull'immagine servita dal service worker).
 
+### Server: tetto ai rimborsi dei render senza immagine (2026-11-10)
+
+Un render che torna senza immagine si rimborsa fino a 10 per licenza nelle
+ultime 24 ore (`LISTINO["rimborsi_senza_immagine_24h"]`, SCELTA, ragione in
+`core/config.py`); oltre si scala come uno riuscito, e il plugin lo dice con
+il numero. Gli invii rifiutati dal Router e i lavori fermati dal cliente si
+rimborsano sempre e non contano. Provato: test del server con database finto,
+SQL della migrazione 005 su Postgres 16 locale, `pytest` sulle frasi del
+plugin. **Non provato**: la migrazione 005 sul Supabase vero; se Comfy fa
+pagare davvero i risultati vuoti (da leggere in `x-comfy-credits-used` alla
+prima risposta vuota vera, ora salvato in `render.crediti_comfy`); la frase
+nello Studio e nella web app, mai vista a video.
+
 ### Web app: accesso con link via email (2026-11-06)
 
 Si entra scrivendo l'email: `/api/link-accesso` manda con Mailjet un link per

@@ -47,6 +47,18 @@ export function dbFinto() {
     },
     airender_avvia: ({ p_render, p_richiesta }) => { stato.render.find((r) => r.id === p_render).richiesta_comfy = p_richiesta; return null; },
     airender_annulla: ({ p_render }) => { const r = stato.render.find((x) => x.id === p_render); if (r.stato === "riservato") r.stato = "annullato"; return null; },
+    airender_chiudi_senza_immagine: ({ p_render, p_tetto }) => {
+      const r = stato.render.find((x) => x.id === p_render);
+      if (r.stato === "annullato") return { esito: "ok", rimborsato: true, ripetuto: true, saldo: saldo(r.licenza_id) };
+      if (r.stato === "addebitato") return { rimborsato: false, ...rpc.airender_addebita({ p_render }) };
+      const rimborsati = stato.render.filter((x) => x.licenza_id === r.licenza_id && x.senza_immagine && x.stato === "annullato").length;
+      r.senza_immagine = true;
+      if (rimborsati < p_tetto) {
+        r.stato = "annullato";
+        return { esito: "ok", rimborsato: true, ripetuto: false, rimborsati_24h: rimborsati + 1, saldo: saldo(r.licenza_id) };
+      }
+      return { rimborsato: false, rimborsati_24h: rimborsati, ...rpc.airender_addebita({ p_render }) };
+    },
     airender_render_di: ({ p_licenza, p_richiesta }) => stato.render.find((r) => r.licenza_id === p_licenza && r.richiesta_comfy === p_richiesta) || null,
     airender_addebita: ({ p_render }) => {
       const r = stato.render.find((x) => x.id === p_render);

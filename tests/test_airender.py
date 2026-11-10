@@ -86,6 +86,26 @@ def test_il_render_va_al_server_airender_col_codice_e_non_con_la_chiave_comfy(mo
     assert risultato.ricetta.parametri["saldo_dopo"] == "41"
 
 
+def _risultato_vuoto(scalati):
+    corpo = {"candidates": [{"content": {"parts": [{"text": "non posso"}]}}]}
+    return 200, {"x-airender-render-scalati": scalati}, corpo
+
+
+def test_render_vuoto_rimborsato_lo_dice():
+    trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), _risultato_vuoto("0")])
+    with pytest.raises(ErroreProvider) as errore:
+        _provider(trasporto).genera(_richiesta())
+    assert "non e' stato scalato" in errore.value.fatto
+
+
+def test_render_vuoto_oltre_il_tetto_dice_che_e_stato_scalato_e_perche():
+    trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), _risultato_vuoto("1")])
+    with pytest.raises(ErroreProvider) as errore:
+        _provider(trasporto).genera(_richiesta())
+    assert "e' stato scalato (1)" in errore.value.fatto
+    assert str(config.LISTINO["rimborsi_senza_immagine_24h"]) in errore.value.fatto
+
+
 def test_saldo_finito_dice_ricarica_con_la_frase_del_server():
     corpo = {"error": {"type": "insufficient_credits",
                        "message": "Il saldo AIRENDER non basta: questo render costa 2 e ne restano 1."},

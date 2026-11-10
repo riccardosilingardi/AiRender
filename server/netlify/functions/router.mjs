@@ -10,7 +10,8 @@
 //   nell'ambiente di Netlify) e fallback_provider=false sempre, qualunque
 //   cosa chieda il client: la destinazione annunciata deve essere vera;
 // - ADDEBITA solo quando il risultato torna con un'immagine; se il Router
-//   rifiuta l'invio o chiude senza immagine, ANNULLA la riserva.
+//   rifiuta l'invio ANNULLA la riserva; se chiude senza immagine la annulla
+//   fino al tetto delle 24 ore (TETTO_RIMBORSI), oltre la addebita.
 //
 // Prima di inoltrare toglie dalle immagini EXIF, XMP e testi (lib/pulisci.mjs):
 // al Router partono solo i pixel e il prompt.
@@ -22,7 +23,7 @@ import { createHash } from "node:crypto";
 import { serve } from "../../lib/ambiente.mjs";
 import { creaDb } from "../../lib/db.mjs";
 import { intestazioniCliente, licenzaDi } from "../../lib/licenza.mjs";
-import { dimensioneDaCorpo, fuoriDalPiano, peso } from "../../lib/listino.mjs";
+import { dimensioneDaCorpo, fuoriDalPiano, listino, peso } from "../../lib/listino.mjs";
 import { corpoPulito } from "../../lib/pulisci.mjs";
 import { rifiutoDellaRiserva } from "../../lib/riserva.mjs";
 import { errore, json, protetto } from "../../lib/risposte.mjs";
@@ -42,6 +43,9 @@ export const LINK_RISULTATO_SECONDI = 24 * 3600;
 // e' sul suo PC (GDPR art. 5.1.e, limitazione della conservazione).
 export const RISULTATI_CONSERVATI_ORE = 48;
 const ATTESA_COMFY_MS = 20_000;
+// Quanti render senza immagine si rimborsano per licenza in 24 ore. Il valore
+// e la ragione stanno in core/config.py (LISTINO).
+export const TETTO_RIMBORSI = listino.rimborsi_senza_immagine_24h;
 
 export function analizzaPercorso(pathname) {
   const m = pathname.match(/^\/v2\/models\/([^/]+)\/([^/]+)\/requests(?:\/([^/]+)(\/status)?)?\/?$/);
@@ -182,11 +186,20 @@ async function leggi({ modello, richiesta, stato }, licenza, { db, ambiente, chi
   if (stato || r.status === 202) return json(r.status, uscita, inoltra(r, ["retry-after"]));
   if (!r.ok) return rifiutoDelRouter(r.status, uscita);
 
-  if (!haImmagine(uscita)) {
-    await db.rpc("airender_annulla", { p_render: render.id });
-    return json(200, uscita, { "x-airender-render-scalati": "0" });
-  }
   const crediti = Number(r.headers.get("x-comfy-credits-used")) || null;
+  if (!haImmagine(uscita)) {
+    // Rimborsato fino al tetto delle 24 ore (listino.json,
+    // rimborsi_senza_immagine_24h), poi si paga: vedi migrazione 005.
+    const chiuso = await db.rpc("airender_chiudi_senza_immagine", {
+      p_render: render.id, p_tetto: TETTO_RIMBORSI, p_crediti_comfy: crediti,
+    });
+    const scalati = chiuso.rimborsato || chiuso.ripetuto ? 0 : render.peso;
+    return json(200, uscita, {
+      "x-airender-render-scalati": String(scalati),
+      "x-airender-rimborsi-tetto": String(TETTO_RIMBORSI),
+      ...(chiuso.saldo ? { "x-airender-saldo": String(Math.max(0, chiuso.saldo.disponibile ?? 0)) } : {}),
+    });
+  }
   const addebito = await db.rpc("airender_addebita", { p_render: render.id, p_crediti_comfy: crediti });
   const corpo = await alleggerisci(uscita, render, db);
   return json(200, corpo, {

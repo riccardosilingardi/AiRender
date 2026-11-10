@@ -50,6 +50,26 @@ class ProviderAirender(ProviderComfy):
             dettagli["saldo_dopo"] = risposte["x-airender-saldo"]
         return dettagli
 
+    def _senza_immagine(self, errore: ErroreProvider, dettagli: dict) -> ErroreProvider:
+        # Il server rimborsa i render vuoti fino a un tetto nelle 24 ore
+        # (LISTINO["rimborsi_senza_immagine_24h"]); oltre li scala. Si dice
+        # quale dei due e' successo, mai un "forse".
+        scalati = str(dettagli.get("render_scalati", "0"))
+        tetto = config.LISTINO["rimborsi_senza_immagine_24h"]
+        if scalati in ("", "0"):
+            return ErroreProvider(
+                "Nano Banana ha chiuso il lavoro senza un'immagine. Il credito non e' stato scalato.",
+                "Riprova, magari cambiando il testo del prompt: un rifiuto di solito "
+                "dipende da cosa chiede il testo o da cosa c'e' nella vista.",
+            )
+        return ErroreProvider(
+            f"Nano Banana ha chiuso il lavoro senza un'immagine e questa volta il render "
+            f"e' stato scalato ({scalati}): nelle ultime 24 ore questa licenza ha gia' avuto "
+            f"{tetto} render vuoti rimborsati, il massimo.",
+            "Cambia il testo del prompt o la vista prima di riprovare; se pensi che sia un "
+            "errore di AIRENDER, scrivici e controlliamo.",
+        )
+
     def _assicura_chiave(self) -> None:
         if not self.chiave:
             raise ChiaveMancante(
