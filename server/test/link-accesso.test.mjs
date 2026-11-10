@@ -34,6 +34,7 @@ test("un'email con due licenze riceve un link per ciascuna, verso il sito AIREND
   assert.equal(inviate[0].a, "studio@esempio.it");
   assert.equal(inviate[0].minuti, listino.accesso.link_minuti);
   assert.deepEqual(inviate[0].voci.map((v) => v.ultime_cifre), ["3333", "7777"]);
+  assert.deepEqual(inviate[0].voci.map((v) => v.render), [19, 0]);
   assert.ok(inviate[0].voci.every((v) => v.link.startsWith("https://airender.prova/studio/#accesso=")));
 });
 

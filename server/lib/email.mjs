@@ -31,12 +31,17 @@ export function testoEmail(codice, nomePiano, sito) {
 // L'email col link di accesso alla web app: una riga per licenza attiva
 // di quell'email (un cliente puo' averne piu' d'una, ognuna col suo saldo).
 export function testoLink(voci, minuti) {
-  const righe = [
-    "Hai chiesto di entrare in AIRENDER Studio online.",
-    "",
-  ];
+  const renderDi = (v) => (v.render === undefined ? "" : `, ${v.render} ${v.render === 1 ? "render disponibile" : "render disponibili"}`);
+  const righe = ["Hai chiesto di entrare in AIRENDER Studio online.", ""];
+  if (voci.length > 1) {
+    righe.push(
+      `Con questa email hai ${voci.length} licenze, ognuna col suo saldo. Apri il link`,
+      "della licenza che vuoi usare in questo browser.",
+      "",
+    );
+  }
   for (const v of voci) {
-    righe.push(`Licenza ${v.nomePiano} (finisce con ${v.ultime_cifre}):`, `    ${v.link}`, "");
+    righe.push(`Licenza ${v.nomePiano}, codice che finisce con ${v.ultime_cifre}${renderDi(v)}:`, `    ${v.link}`, "");
   }
   righe.push(
     `Ogni link vale ${minuti} minuti e una volta sola. Aprilo nel browser dove`,
