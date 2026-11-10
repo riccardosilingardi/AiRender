@@ -477,6 +477,12 @@ def test_cambia_scelte_massime_sta_dentro_una_riga_di_miniature():
     assert config.costante("CAMBIA_SCELTE_MASSIME").origine == config.SCELTA
 
 
+def test_ricetta_viste_massime_e_una_scelta_fra_uno_e_una_dozzina():
+    """Caso: RICETTA_VISTE_MASSIME a 0 spegne Ricetta, a 50 un clic costa cinquanta render senza vederlo."""
+    assert 1 <= config.RICETTA_VISTE_MASSIME <= 12  # numero-non-configurabile: limite del test, non del prodotto
+    assert config.costante("RICETTA_VISTE_MASSIME").origine == config.SCELTA
+
+
 def test_lo_spessore_iniziale_del_pennello_sta_dentro_i_suoi_limiti():
     """Caso: PENNELLO_SPESSORE fuori da PENNELLO_SPESSORI, e il primo tratto si rifiuta."""
     sottile, grosso = config.PENNELLO_SPESSORI
