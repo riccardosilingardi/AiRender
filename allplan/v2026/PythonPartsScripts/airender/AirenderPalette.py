@@ -36,6 +36,14 @@ _CARTELLA = Path(__file__).resolve().parent
 if str(_CARTELLA) not in sys.path:
     sys.path.insert(0, str(_CARTELLA))
 
+# Pillow: quello di Allplan se si carica, se no quello che porta il pacchetto
+# (pillow_incluso.py). Cosi' il cliente non lo installa a mano.
+try:
+    import pillow_incluso  # noqa: E402  pylint: disable=wrong-import-position
+    _PILLOW = pillow_incluso.assicura(_CARTELLA)
+except ImportError:  # installazione vecchia senza il file: resta il Pillow di Allplan
+    _PILLOW = "Pillow installato in Allplan (pillow_incluso.py assente)"
+
 # Se un import fallisce (Pillow mancante, file non copiato, Python diverso)
 # Allplan non apre la palette e spesso non dice niente. L'errore si tiene qui,
 # si scrive in Usr\AIRENDER\avvio.txt e si mostra al primo clic.
@@ -81,6 +89,7 @@ def _scrivi_avvio(errore: str) -> str:
             f"cartella dello script {_CARTELLA}",
             f"file accanto: {sorted(p.name for p in _CARTELLA.iterdir())}",
             f"Pillow {pillow}",
+            f"Pillow scelto: {_PILLOW}",
             "sys.path:", *[f"  {voce}" for voce in sys.path],
             "", "ERRORE:" if errore else "Nessun errore.", errore,
         ]

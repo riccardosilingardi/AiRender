@@ -21,6 +21,7 @@ Nessun import di Allplan: gira con un Python qualunque e si prova con pytest.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -41,12 +42,68 @@ CARTELLA_SCRIPT = Path("PythonPartsScripts") / SVILUPPATORE / PLUGIN
 
 # I file che la palette importa e che vivono fuori dalla cartella della
 # versione: si copiano accanto all'adattatore, come faceva installa.ps1.
-FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "materiali_allplan.py")
+FILE_COMUNI = ("ponte.py", "telecomando.py", "sonda_palette.py", "materiali_allplan.py",
+               "pillow_incluso.py")
 # Le voci in cima all'.allep, nell'ordine del workflow del PythonParts SDK.
 VOCI_ALLEP = ("Library", "PythonPartsScripts", "PythonPartsActionbar",
               "install-config.yml", "requirements.in")
 # Solo nel pacchetto: nella Usr non servono, li legge l'installazione di Allplan.
 SOLO_NEL_PACCHETTO = ("install-config.yml", "requirements.in")
+
+# Pillow dentro il pacchetto (allplan/comune/pillow_incluso.py): una cartella
+# per ogni Python che Allplan puo' avere, cosi' il cliente non installa niente
+# a mano. Versione fissata e impronte SHA-256 copiate da PyPI il 2026-11-10
+# (https://pypi.org/pypi/pillow/11.3.0/json): una ruota diversa non entra.
+PILLOW_VERSIONE = "11.3.0"
+PILLOW_RUOTE = {
+    "cp310": "19d2ff547c75b8e3ff46f4d9ef969a06c30ab2d4263a9e287733aa8b2429ce8f",
+    "cp311": "1a992e86b0dd7aeb1f053cd506508c0999d710a8f07b4c791c63843fc6a807ac",
+    "cp312": "a6444696fce635783440b7f7a9fc24b3ad10a9ea3f0ab66c5905be1c19ccf17d",
+    "cp313": "0bce5c4fd0921f99d2e858dc4d4d64193407e1b99478bc5cacecba2311abde51",
+    "cp314": "a418486160228f64dd9e9efcd132679b7a02a5f22c982c78b6fc7dab3fefb635",
+}
+CARTELLA_PILLOW = "_pillow"
+
+
+def nome_ruota(etichetta: str) -> str:
+    return f"pillow-{PILLOW_VERSIONE}-{etichetta}-{etichetta}-win_amd64.whl"
+
+
+def _impronta(percorso: Path) -> str:
+    return hashlib.sha256(percorso.read_bytes()).hexdigest()
+
+
+def scarica_ruote(cache: Path, lancia=subprocess.run) -> None:
+    """Scarica da PyPI le ruote di Pillow che mancano nella cache (serve la rete una volta)."""
+    cache.mkdir(parents=True, exist_ok=True)
+    for etichetta in PILLOW_RUOTE:
+        if (cache / nome_ruota(etichetta)).is_file():
+            continue
+        versione = f"{etichetta[2]}.{etichetta[3:]}"
+        lancia([sys.executable, "-m", "pip", "download", "--quiet", "--no-deps",
+                "--only-binary=:all:", "--platform", "win_amd64", "--implementation", "cp",
+                "--python-version", versione, f"pillow=={PILLOW_VERSIONE}", "-d", str(cache)],
+               check=True)
+
+
+def includi_pillow(script: Path, cache: Path) -> list[str]:
+    """Estrae PIL/ e la licenza di ogni ruota in script/_pillow/cpXX. Controlla le impronte."""
+    incluse = []
+    for etichetta, attesa in PILLOW_RUOTE.items():
+        ruota = cache / nome_ruota(etichetta)
+        if not ruota.is_file():
+            raise SystemExit(f"Manca {ruota}: rilancia senza --senza-rete, serve la rete una volta.")
+        if _impronta(ruota) != attesa:
+            raise SystemExit(f"L'impronta di {ruota.name} non e' quella di PyPI: non la includo. "
+                             "Cancellala e rilancia.")
+        destinazione = script / CARTELLA_PILLOW / etichetta
+        with zipfile.ZipFile(ruota) as archivio:
+            for voce in archivio.namelist():
+                if voce.startswith("PIL/") or (".dist-info/" in voce and "LICENSE" in voce.upper()):
+                    archivio.extract(voce, destinazione)
+        incluse.append(etichetta)
+    return incluse
+
 
 # Quello che le installazioni della 2026 (allplan/v2026/installa.ps1) hanno
 # lasciato e che nella 2027 confonde: la cartella script vecchia e le palette
@@ -85,8 +142,11 @@ def _ignora(_cartella: str, nomi: list[str]) -> list[str]:
     return [n for n in nomi if n == "__pycache__" or n.endswith((".pyc", ".pyo"))]
 
 
-def costruisci(uscita: Path) -> Path:
-    """Scrive in `uscita/AIRENDER-2027/` l'albero completo del plugin e lo restituisce."""
+def costruisci(uscita: Path, cache_pillow: Path | None = None) -> Path:
+    """Scrive in `uscita/AIRENDER-2027/` l'albero completo del plugin e lo restituisce.
+
+    Con `cache_pillow` ci mette anche Pillow per ogni Python (includi_pillow).
+    """
     albero = uscita / NOME
     if albero.exists():
         shutil.rmtree(albero)
@@ -95,6 +155,8 @@ def costruisci(uscita: Path) -> Path:
     for nome in FILE_COMUNI:
         shutil.copy2(RADICE / "allplan" / "comune" / nome, script / nome)
     shutil.copytree(RADICE / "core", script / "core", ignore=_ignora)
+    if cache_pillow is not None:
+        includi_pillow(script, cache_pillow)
     return albero
 
 
@@ -168,7 +230,8 @@ def installa(albero: Path, usr: Path, ferma=ferma_coda_e_studio) -> Esito:
         shutil.copytree(albero / voce, usr / voce, dirs_exist_ok=True)
         esito.copiati.append(str(usr / voce))
 
-    if not (usr / "PythonParts-site-packages" / "PIL").is_dir():
+    incluso = (usr / CARTELLA_SCRIPT / CARTELLA_PILLOW).is_dir()
+    if not incluso and not (usr / "PythonParts-site-packages" / "PIL").is_dir():
         esito.avvisi.append(
             "Non vedo Pillow per la 2027 (manca PythonParts-site-packages\\PIL nella Usr). "
             "In Allplan 2027: PythonParts SDK › Install Python Package › pillow, destinazione USR, "
@@ -191,11 +254,20 @@ def main(argomenti: list[str] | None = None) -> int:
                         help="dove scrivere il pacchetto (predefinita: dist/ nel repository)")
     parser.add_argument("--installa", action="store_true",
                         help="copia AIRENDER nella cartella Usr di Allplan 2027")
+    parser.add_argument("--senza-pillow", action="store_true",
+                        help="non mettere Pillow nel pacchetto (lo installa il cliente dall'SDK)")
+    parser.add_argument("--senza-rete", action="store_true",
+                        help="non scaricare le ruote di Pillow: usa solo quelle gia' in dist/_ruote")
     parser.add_argument("--usr", type=Path,
                         help="la cartella Usr\\Local di Allplan 2027, se non e' trovata da sola")
     scelte = parser.parse_args(argomenti)
 
-    albero = costruisci(scelte.uscita)
+    cache = None
+    if not scelte.senza_pillow:
+        cache = scelte.uscita / "_ruote"
+        if not scelte.senza_rete:
+            scarica_ruote(cache)
+    albero = costruisci(scelte.uscita, cache)
     allep = comprimi(albero, scelte.uscita / f"{NOME}.allep")
     print(f"Pacchetto plugin: {allep}")
     if not scelte.installa:
