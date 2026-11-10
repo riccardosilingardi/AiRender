@@ -76,6 +76,18 @@ def forza(controllo: str) -> float:
             "linee": config.GEOMETRIA_FORZA_LINEE}[controllo]
 
 
+def forze(controlli: tuple[str, ...]) -> dict[str, float]:
+    """Le forze dei controlli scelti: se la somma supera GEOMETRIA_FORZA_TOTALE, scendono tutte in proporzione.
+
+    Prova vera del 2026-11-10: tre ControlNet incatenati a piena forza
+    sommano i vincoli e il render diventa una nebbia.
+    """
+    grezze = {c: forza(c) for c in controlli}
+    somma = sum(grezze.values())
+    riduzione = min(1.0, config.GEOMETRIA_FORZA_TOTALE / somma) if somma else 1.0
+    return {c: round(v * riduzione, 3) for c, v in grezze.items()}  # numero-non-configurabile: tre cifre bastano a una strength
+
+
 def controlli_validi(valore: object) -> tuple[str, ...]:
     """I controlli scelti, in ordine e senza doppioni. Vuoto o sconosciuto: si rifiuta."""
     if valore is None:
@@ -107,13 +119,14 @@ def grafo_per(controlli: tuple[str, ...], riaggancia: bool = False) -> dict:
     controlli = controlli_validi(controlli)
     grafo = copy.deepcopy(json.loads(WORKFLOW.read_text(encoding="utf-8")))
     precedente = [NODO_MODELLO, 0]
+    valori = forze(controlli)
     for controllo in CONTROLLI:
         preprocessore, controlnet = NODI_CONTROLLO[controllo]
         if controllo not in controlli:
             del grafo[preprocessore], grafo[controlnet]
             continue
         grafo[controlnet]["inputs"]["model"] = precedente
-        grafo[controlnet]["inputs"]["strength"] = forza(controllo)
+        grafo[controlnet]["inputs"]["strength"] = valori[controllo]
         precedente = [controlnet, 0]
     grafo[NODO_CAMPIONAMENTO]["inputs"]["model"] = precedente
     grafo[NODO_LATO]["inputs"]["largest_size"] = config.GEOMETRIA_LATO_MASSIMO
@@ -296,7 +309,22 @@ class Geometria:
         indirizzi = [u.get("url") for u in lavoro.get("outputs") or [] if isinstance(u, dict) and u.get("url")]
         if not indirizzi:
             raise self._errore("il workflow (nessuna immagine in uscita)", stato, lavoro)
-        return self.trasporto.scarica_con(self._risolvi(indirizzi[0]), self._intestazioni()), identificativo
+        return self._scarica_uscita(indirizzi[0]), identificativo
+
+    def _scarica_uscita(self, collegamento: str) -> bytes:
+        """L'immagine in uscita. La chiave va solo al deployment: un link firmato altrove si scarica senza.
+
+        Visto il 2026-11-10 sul deployment vero: le uscite stanno su
+        storage.googleapis.com con un link firmato, non sul deployment.
+        """
+        if collegamento.startswith("/") or urlparse(collegamento).hostname == urlparse(self.base).hostname:
+            return self.trasporto.scarica_con(self._risolvi(collegamento), self._intestazioni())
+        if urlparse(collegamento).scheme != "https":
+            raise ErroreProvider(
+                f"«Tieni la geometria»: Comfy ha indicato un link non https ({collegamento[:120]}).",  # numero-non-configurabile: taglio del link nel messaggio
+                "Togli la spunta e segnala il caso.",
+            )
+        return self.trasporto.scarica_con(collegamento, {})
 
     def _risolvi(self, collegamento: str) -> str:
         """Un link dell'API: assoluto si usa com'e', con la / iniziale si attacca all'origine."""

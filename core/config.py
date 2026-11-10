@@ -1184,14 +1184,16 @@ SERVER_INVIO_MASSIMO_MB = _registra(Costante(
 
 GEOMETRIA_FORZA = _registra(Costante(
     nome="GEOMETRIA_FORZA",
-    valore=0.8,
+    valore=1.0,
     origine=SCELTA,
     ragione=(
         "Quanto il ControlNet sugli spigoli comanda Z-Image-Turbo nella prima "
         "passata di «Tieni la geometria» (strength di QwenImageDiffsynthControlnet, "
-        "il modello comfy.org usa 1). Un po' sotto 1 perche' gli spigoli di una "
-        "vista Allplan sono anche quelli dei retini e dei giunti, e a 1 il "
-        "render li ricalca come righe. Giudizio del 2026-11-04, nessun render fatto."
+        "il modello comfy.org usa 1). Prima prova vera sul deployment, "
+        "2026-11-10, una vista sola e un seme: a 0,8 i tramezzi tengono ma il "
+        "modello inventa una torre sotto la pianta; a 1 la pianta resta com'e'. "
+        "Da solo vale questo; insieme agli altri controlli si riduce con "
+        "GEOMETRIA_FORZA_TOTALE."
     ),
 ))
 
@@ -1202,19 +1204,35 @@ GEOMETRIA_FORZA_PROFONDITA = _registra(Costante(
     ragione=(
         "Quanto comanda il controllo «Profondita'» (mappa di profondita' stimata "
         "con Depth Anything V2) nella prima passata. Tiene volumi, piani e "
-        "prospettiva, non i dettagli: sotto gli Spigoli perche' insieme non "
-        "irrigidiscano il render. Giudizio del 2026-11-09, nessun render fatto."
+        "prospettiva, non i dettagli. Prova vera 2026-11-10 (una vista): da "
+        "sola a 0,6 perde le partizioni (56% di spigoli), con gli Spigoli e' la "
+        "coppia migliore. Si riduce con GEOMETRIA_FORZA_TOTALE."
     ),
 ))
 
 GEOMETRIA_FORZA_LINEE = _registra(Costante(
     nome="GEOMETRIA_FORZA_LINEE",
-    valore=0.7,
+    valore=0.6,
     origine=SCELTA,
     ragione=(
         "Quanto comanda il controllo «Linee dritte» (M-LSD, solo segmenti "
-        "dritti) nella prima passata. Ignora retini e texture, quindi regge una "
-        "forza vicina agli Spigoli. Giudizio del 2026-11-09, nessun render fatto."
+        "dritti) nella prima passata. Ignora retini e texture. Prova vera "
+        "2026-11-10 (una vista): da sola a 0,6 tiene le partizioni ma inventa "
+        "volumi sotto (82%). Si riduce con GEOMETRIA_FORZA_TOTALE."
+    ),
+))
+
+GEOMETRIA_FORZA_TOTALE = _registra(Costante(
+    nome="GEOMETRIA_FORZA_TOTALE",
+    valore=1.1,
+    origine=SCELTA,
+    ragione=(
+        "Il massimo della somma delle forze quando si spuntano piu' controlli: "
+        "sopra, le forze si riducono tutte nella stessa proporzione. Prova vera "
+        "2026-11-10, una vista e un seme: tutti e tre a 0,8+0,6+0,7 (somma 2,1) "
+        "danno un'immagine nebbiosa inutilizzabile; a 0,5+0,3+0,3 (1,1) il "
+        "render e' pulito e tiene la pianta; Spigoli+Profondita' a 0,6+0,4 e' "
+        "stato il migliore. Con una vista sola e' una scelta, non una misura."
     ),
 ))
 

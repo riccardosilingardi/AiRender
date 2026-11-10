@@ -1394,7 +1394,7 @@ function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geom
 const CONTROLLI_GEOMETRIA = [
   ["spigoli", "Spigoli", "Il consigliato, basta da solo quasi sempre.",
     "Spigoli (Canny): tiene contorni, finestre e porte esattamente dove sono nella vista. È il più preciso. Difetto: ricalca come righe anche retini, fughe e texture disegnate. Quando: viste esterne e interne con geometria pulita."],
-  ["profondita", "Profondità", "Per masse, volumi e interni.",
+  ["profondita", "Profondità", "Insieme agli Spigoli: da sola perde i tramezzi.",
     "Profondità (depth map): tiene cosa sta davanti e cosa dietro, i volumi e la prospettiva, non i dettagli. Lascia al render più libertà sulle superfici. Quando: interni, masterplan, studi di massa, o insieme agli Spigoli per tenere anche le distanze."],
   ["linee", "Linee dritte", "Se gli Spigoli ricalcano troppo.",
     "Linee dritte (M-LSD): tiene solo i segmenti dritti di muri, solai e serramenti; ignora texture, vegetazione e oggetti curvi. Quando: prospetti con molti retini o alberi, dove gli Spigoli copierebbero anche quelli."],
@@ -1419,7 +1419,7 @@ function pannelloGeometria() {
           } }),
         h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
     }),
-    nota("Più controlli insieme tengono di più ma lasciano meno libertà al render. Il costo non cambia.",
+    nota("Più controlli insieme si dividono la stessa forza: non irrigidiscono il render, lo guidano in più modi. Il costo non cambia.",
       "Vale in Genera, sulla vista Allplan, anche con più varianti per invio. I passi dopo (Cambia, Ritocca, Variante) oggi non la usano: la tenuta di quei passi la dice la % di spigoli, sempre misurata contro la vista.")) : null;
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta,

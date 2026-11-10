@@ -152,6 +152,36 @@ def test_un_link_su_un_altro_indirizzo_non_riceve_la_chiave():
     assert not any("ladro" in c[1] for c in finto.chiamate)
 
 
+def test_un_uscita_su_un_link_firmato_altrove_si_scarica_senza_chiave():
+    """Il deployment vero (2026-11-10) mette le uscite su storage.googleapis.com con un link firmato."""
+    firmato = "https://storage.googleapis.com/comfy-cloud-assets/abc.png?X-Goog-Signature=1"
+
+    class Firmato(ComfyFinto):
+        def chiama(self, metodo, url, intestazioni, corpo=None):
+            stato, intest, dati = super().chiama(metodo, url, intestazioni, corpo)
+            if isinstance(dati, dict) and dati.get("outputs"):
+                dati["outputs"] = [{"node_id": "16", "url": firmato}]
+            return stato, intest, dati
+    finto = Firmato()
+    immagine, _lavoro = _client(finto).esegui(_png(), "x", 1)
+    assert immagine == _png()
+    scaricata = [c for c in finto.chiamate if c[0] == "SCARICA"]
+    assert scaricata == [("SCARICA", firmato, {}, None)]
+
+
+def test_un_uscita_su_un_link_non_https_non_si_scarica():
+    class Chiaro(ComfyFinto):
+        def chiama(self, metodo, url, intestazioni, corpo=None):
+            stato, intest, dati = super().chiama(metodo, url, intestazioni, corpo)
+            if isinstance(dati, dict) and dati.get("outputs"):
+                dati["outputs"] = [{"node_id": "16", "url": "http://altrove.example/a.png"}]
+            return stato, intest, dati
+    finto = Chiaro()
+    with pytest.raises(ErroreProvider, match="non https"):
+        _client(finto).esegui(_png(), "x", 1)
+    assert not any(c[0] == "SCARICA" for c in finto.chiamate)
+
+
 def test_il_file_del_workflow_e_json_api_puro_da_caricare_sulla_developer_platform():
     grezzo = json.loads(modulo_geometria.WORKFLOW.read_text(encoding="utf-8"))
     assert all(k.isdigit() and "class_type" in v for k, v in grezzo.items())
@@ -368,7 +398,7 @@ def test_ogni_insieme_di_controlli_da_un_grafo_incatenato_senza_nodi_orfani():
             for controllo in scelta:
                 nodo = grafo[modulo_geometria.NODI_CONTROLLO[controllo][1]]
                 assert nodo["inputs"]["model"] == precedente
-                assert nodo["inputs"]["strength"] == modulo_geometria.forza(controllo)
+                assert nodo["inputs"]["strength"] == modulo_geometria.forze(scelta)[controllo]
                 precedente = [modulo_geometria.NODI_CONTROLLO[controllo][1], 0]
             assert grafo["11"]["inputs"]["model"] == precedente
             for nodo in grafo.values():
@@ -423,3 +453,13 @@ def test_l_elenco_dei_render_dice_con_quali_controlli_ha_tenuto_la_geometria():
     assert nomi({"destinazione_geometria": "x"}) == "Spigoli"
     assert nomi({"destinazione_geometria": "x", "controlli_geometria": ["linee", "profondita"]}) == "Profondità + Linee dritte"
     assert nomi({"destinazione_geometria": "x", "controlli_geometria": []}) is None
+
+
+def test_piu_controlli_si_dividono_la_forza_totale():
+    """Prova vera 2026-11-10: tre ControlNet a piena forza danno una nebbia."""
+    da_solo = modulo_geometria.grafo_per(("spigoli",))
+    assert da_solo["8"]["inputs"]["strength"] == config.GEOMETRIA_FORZA
+    tutti = modulo_geometria.grafo_per(modulo_geometria.CONTROLLI)
+    somma = sum(tutti[cn]["inputs"]["strength"] for _p, cn in modulo_geometria.NODI_CONTROLLO.values())
+    assert somma == pytest.approx(config.GEOMETRIA_FORZA_TOTALE, abs=0.01)
+    assert tutti["8"]["inputs"]["strength"] > tutti["18"]["inputs"]["strength"]

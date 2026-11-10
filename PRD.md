@@ -445,8 +445,27 @@ Storage), due giorni dopo il bucket `risultati` vuoto.
   affiancati alla vista.
 - Il costo è a secondi di GPU del deployment: lo Studio non scrive un numero
   finché una prima passata vera non lo dà.
-- `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
-  le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
+- `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e le soglie di Canny
+  (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
+
+### Prima prova vera sul deployment (2026-11-10)
+
+Deployment `tieni-geometria/production` v1 (RTX PRO 6000 MIG 48 GB, 0 sempre
+accesi), una vista sola (la pianta in assonometria del 2026-10-27, bianca),
+preset Rivista, seme 42, lanciata da Claude con `Geometria.esegui`, senza
+Nano Banana dopo. Prima passata in 10–34 s a caldo.
+
+- **Bug trovato e corretto**: le uscite stanno su `storage.googleapis.com`
+  con un link firmato; il client le rifiutava («link su un altro indirizzo»).
+  Ora le scarica senza chiave, solo https, come gia' faceva il server.
+- **Forze**: Spigoli a 0,8 inventa una torre sotto la pianta, a 1 no; tutti e
+  tre a 0,8+0,6+0,7 danno una nebbia inutilizzabile. Nuova
+  `GEOMETRIA_FORZA_TOTALE` 1,1: oltre, le forze scendono in proporzione.
+  Spigoli 1, Profondita' 0,6, Linee 0,6. Profondita' da sola perde i tramezzi.
+- **La % di spigoli non basta**: la nebbia misurava 77%, il render buono 75%.
+  Il numero va letto col prima/dopo, mai da solo.
+- NON VERIFICATO: altre viste, altri semi, la passata Nano Banana dopo,
+  Riaggancia sul deployment, il percorso coi crediti (server Netlify).
 
 ### Riaggancia alla vista (2026-11-10)
 
