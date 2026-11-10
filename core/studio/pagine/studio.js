@@ -1122,9 +1122,12 @@ function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geom
 // I tre controlli di «Tieni la geometria», in parole semplici. Si possono
 // spuntare insieme; almeno uno resta acceso.
 const CONTROLLI_GEOMETRIA = [
-  ["spigoli", "Spigoli", "Tiene contorni, finestre e porte dove sono. Il più preciso; può ricalcare anche retini e fughe come righe."],
-  ["profondita", "Profondità", "Tiene volumi, piani e prospettiva (cosa sta davanti e cosa dietro), non i dettagli. Utile per masse e interni."],
-  ["linee", "Linee dritte", "Tiene solo le linee dritte di muri, solai e serramenti, ignora texture e vegetazione. Utile se gli Spigoli ricalcano troppo."],
+  ["spigoli", "Spigoli", "Il consigliato, basta da solo quasi sempre.",
+    "Spigoli (Canny): tiene contorni, finestre e porte esattamente dove sono nella vista. È il più preciso. Difetto: ricalca come righe anche retini, fughe e texture disegnate. Quando: viste esterne e interne con geometria pulita."],
+  ["profondita", "Profondità", "Per masse, volumi e interni.",
+    "Profondità (depth map): tiene cosa sta davanti e cosa dietro, i volumi e la prospettiva, non i dettagli. Lascia al render più libertà sulle superfici. Quando: interni, masterplan, studi di massa, o insieme agli Spigoli per tenere anche le distanze."],
+  ["linee", "Linee dritte", "Se gli Spigoli ricalcano troppo.",
+    "Linee dritte (M-LSD): tiene solo i segmenti dritti di muri, solai e serramenti; ignora texture, vegetazione e oggetti curvi. Quando: prospetti con molti retini o alberi, dove gli Spigoli copierebbero anche quelli."],
 ];
 
 function pannelloGeometria() {
@@ -1132,7 +1135,7 @@ function pannelloGeometria() {
   const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
     onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
   const controlli = S.geometria && possibile ? h("div", { classe: "controlli-geometria" },
-    ...CONTROLLI_GEOMETRIA.map(([chiave, nome, testo]) => {
+    ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
       const acceso = S.controlliGeometria.includes(chiave);
       const ultimo = acceso && S.controlliGeometria.length === 1;
       const id = `geometria-${chiave}`;
@@ -1144,9 +1147,10 @@ function pannelloGeometria() {
             S.controlliGeometria = CONTROLLI_GEOMETRIA.map(([c]) => c).filter((c) => scelti.has(c));
             S.secco = null; render();
           } }),
-        h("span", {}, h("b", {}, nome), " — ", h("span", { classe: "tenue" }, testo)));
+        h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
     }),
-    h("p", { classe: "tenue piccolo" }, "Più controlli insieme tengono di più ma lasciano meno libertà al render. Il costo non cambia.")) : null;
+    nota("Più controlli insieme tengono di più ma lasciano meno libertà al render. Il costo non cambia.",
+      "Vale in Genera, sulla vista Allplan, anche con più varianti per invio. I passi dopo (Cambia, Ritocca, Variante) oggi non la usano: la tenuta di quei passi la dice la % di spigoli, sempre misurata contro la vista.")) : null;
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta, h("b", {}, "Tieni la geometria")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
