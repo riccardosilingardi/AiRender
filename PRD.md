@@ -485,7 +485,12 @@ immagine. Script `scripts/prova_mappe_nano.py`. Dettagli, tabella e immagini in
   non si puo' usare per render venduti.
 - Il solo ControlNet di Z-Image su una pianta 2D: 85%, resa da illustrazione.
 - NON VERIFICATO: una sola esecuzione per variante, Gemini senza seme;
-  profondita' calcolata nel browser; profondita' presa dal modello Allplan.
+  profondita' calcolata nel browser (provata solo su CPU Linux); profondita' presa dal modello Allplan.
+- Tre Depth Anything calcolati in locale su CPU, senza deployment (tutti
+  Apache-2.0): DA2 Small e DA3 Small (circa 100 MB, sotto il secondo per
+  vista), DA3 Base (394 MB, 0,7-1,4 s). Nessun vincitore netto con un render
+  per casella; DA3 Base la piu' fedele sulla casa, le due Small candidate per
+  il browser.
 
 ### Riaggancia alla vista (2026-11-10)
 
