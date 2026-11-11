@@ -585,9 +585,6 @@ input.codice.sbagliato { border-color: var(--errore); }
 .geometria p { margin: 0; }
 .geometria.spento b { color: var(--spento); }
 .geometria.spento input { cursor: not-allowed; }
-.controlli-geometria { display: grid; gap: 6px; padding: 4px 0 0 24px; }
-.controlli-geometria .controllo { align-items: flex-start; }
-.controlli-geometria .controllo input { margin-top: 3px; }
 
 /* --- Regola: luce e colore prima di esportare ----------------------------------- */
 .regola { padding: 10px 0 12px; border-bottom: 1px solid var(--bordo); margin-bottom: 4px; }
@@ -633,3 +630,8 @@ input.codice.sbagliato { border-color: var(--errore); }
 
 /* Popola: una riga per scelta. */
 .riga-popola { display: flex; flex-direction: column; gap: 4px; }
+.etichetta-inclusa { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); font-weight: 600; }
+.mappe-geometria { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding-left: 24px; }
+.mappe-geometria figure { margin: 0; display: grid; gap: 2px; }
+.mappe-geometria img { max-width: 120px; max-height: 80px; border-radius: 4px; border: 1px solid var(--bordo); }
+.mappe-geometria figcaption { font-size: 12px; color: var(--tenue, #666); }

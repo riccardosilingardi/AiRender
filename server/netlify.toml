@@ -11,4 +11,4 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["listino.json", "geometria.json"]
+  included_files = ["listino.json"]

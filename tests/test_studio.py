@@ -608,9 +608,18 @@ def test_si_carica_una_vista_dal_server(server, cartella):
 
 
 def test_le_pagine_non_chiedono_niente_a_internet():
-    """Caso: lo Studio offline mostra una pagina vuota perche' aspetta un CDN o un font."""
+    """Caso: lo Studio offline mostra una pagina vuota perche' aspetta un CDN o un font.
+
+    L'unica eccezione e' la libreria della profondita' di «Tieni la geometria»
+    (transformers.js, versione fissa): si carica con import() solo quando si
+    spunta, e senza rete la spunta dice l'errore mentre il resto funziona.
+    """
+    permessa = 'const TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";'
     for file in CARTELLA_PAGINE.iterdir():
         testo = file.read_text(encoding="utf-8")
+        if file.name == "studio.js":
+            assert testo.count(permessa) == 1 and testo.count("import(TRANSFORMERS)") == 1
+            testo = testo.replace(permessa, "")
         assert not re.search(r"https?://", testo), f"{file.name} chiede qualcosa a internet"
 
 

@@ -1,6 +1,5 @@
 // La risposta al cliente quando la riserva dei crediti non va a buon fine.
-// Un posto solo: router dei render e «Tieni la geometria» dicono la stessa
-// cosa con le stesse parole.
+// Un posto solo: chi riserva crediti dice la stessa cosa con le stesse parole.
 
 import { errore } from "./risposte.mjs";
 

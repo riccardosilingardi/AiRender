@@ -124,3 +124,13 @@ finché non si cancella.
 Le cartelle sono `./` (edificio circolare), `casa/` e `pianta/`. In ognuna ci
 sono vista, mappe, prompt, render e confronti. In `casa/` ci sono anche
 `senza-profondita.png` e `profondita-small.png`.
+
+## Dopo: le mappe dal browser (2026-11-11)
+
+Le stesse mappe calcolate nella pagina dello Studio (Canny in JavaScript,
+Depth Anything V2 Small con transformers.js), senza linee dritte. Nano Banana 2
+con vista + spigoli + profondità del browser: casa colorata 77%, edificio
+circolare 94% (un render ciascuno, preset rivista). A occhio la casa tiene tetto,
+partizioni e lamelle; il 77% viene soprattutto dal mirino della vista e dal
+terreno. Dallo Studio vero: 17,49 crediti Comfy con le mappe contro 17,19 senza.
+Da qui «Tieni la geometria» usa queste mappe e il deployment si cancella.

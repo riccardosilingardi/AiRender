@@ -137,5 +137,5 @@ def test_la_web_app_costruita_non_chiede_niente_fuori_da_studio(tmp_path):
     assert 'id="principale"' in pagina and "studio.js" not in pagina.split('<template id="corpo-studio">')[1].split("</template>")[0]
     with zipfile.ZipFile(tmp_path / "motore.zip") as archivio:
         nomi = set(archivio.namelist())
-    assert {"core/studio/servizio.py", "core/coda.py", "web/ponte.py", "core/provider/workflow/tieni-geometria.json"} <= nomi
+    assert {"core/studio/servizio.py", "core/coda.py", "web/ponte.py", "core/mappe.py"} <= nomi
     assert not any("__pycache__" in n or n.startswith("core/studio/pagine/") for n in nomi)

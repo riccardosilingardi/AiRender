@@ -70,15 +70,7 @@ def test_listino_funzioni_per_piano():
     assert config.LISTINO["pesi_azioni"]["video_1080p_al_secondo"] == 8
 
 
-def test_il_workflow_di_tieni_la_geometria_del_server_e_quello_del_motore():
-    """Caso: si cambia il workflow o la forza in config.py e il server continua a mandare il vecchio."""
-    assert (RADICE / "server" / "geometria.json").read_text(encoding="utf-8") == _scrittore().testo_geometria(), (
-        "server/geometria.json non e' allineato: lancia python scripts/scrivi_listino.py"
-    )
-
-
-def test_tieni_la_geometria_ha_un_peso_e_sta_solo_nello_studio():
-    """Caso: la prima passata parte gratis coi crediti AIRENDER, o finisce in un piano che non la vende."""
-    assert config.LISTINO["pesi_azioni"]["tieni_geometria"] >= 1
-    aperta = {n for n, p in config.LISTINO["piani"].items() if p["funzioni"]["tieni_geometria"]}
-    assert aperta == {"studio"}
+def test_tieni_la_geometria_non_ha_un_peso_in_crediti():
+    """Caso: le mappe si calcolano sul computer di chi lavora e il listino fa pagare lo stesso un credito in piu'."""
+    assert "tieni_geometria" not in config.LISTINO["pesi_azioni"]
+    assert not (RADICE / "server" / "geometria.json").exists()

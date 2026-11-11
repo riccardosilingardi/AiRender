@@ -1225,57 +1225,42 @@ l'esempio 1 fa diventare riferimento il 2. Il conteggio «Partono N immagini: la
 vista, M esempi di stile…» compare prima dell'invio. Gli esempi entrano nella
 ricetta per impronta, come il riferimento. Salvarli come preset è il passo dopo.
 
-## Tieni la geometria, costruito il 2026-11-04
+## Tieni la geometria, rifatto il 2026-11-11 (mappe sul computer)
 
-Richiesta di Riccardo del 2026-11-04: «ControlNet va fatto, spuntato insieme e
-messo in fila a Nano Banana». In Genera, dopo il riferimento per lo stile e
-prima dei Rif.: la spunta **Tieni la geometria**, con la frase che spiega il
-ControlNet nella stessa riga («un pezzo che obbliga un modello aperto a seguire
-gli spigoli della vista») e «Due invii, due costi». Nel riquadro Invio, sopra la destinazione di sempre: «Prima passata: la vista
-va a **Comfy Developer Platform, workflow Z-Image-Turbo + ControlNet sugli
-spigoli su <nome>.run.comfy.app**», «Costo della prima passata: **a secondi di
-GPU del deployment**», poi «Poi il
-suo render va a …» e il conteggio delle immagini con «il render della prima
-passata» al posto della vista. Non c'è nel Fotoinserimento, in Cambia e in
-Ritocca: il ControlNet ridisegna tutto dagli spigoli e da un passo perderebbe
-quello che il passo aveva fatto (in Ritocca fuori dalle aree il render resta
-già com'era).
+Decisione di Riccardo del 2026-11-11, dopo le prove del 2026-11-10
+(`docs/prova-nano-mappe-2026-11-10.md`): niente più ControlNet su un deployment
+Comfy. In Genera, dopo il riferimento per lo stile e prima dei Rif., la spunta
+**Tieni la geometria** con accanto l'etichetta verde **Incluso · nessun
+credito in più** (il valore aggiunto, detto in una riga). Sotto, una frase:
+«AIRENDER calcola sul tuo computer spigoli e profondità della vista e li dà al
+modello come guida: muri, aperture e volumi restano dove li hai disegnati.» col
+suo «?» (cosa sono le due mappe, che partono con la vista verso lo stesso
+modello, quando aiutano, che vale solo in Genera dalla vista). Nel riquadro
+Invio la destinazione resta una: il conteggio dice «Partono 3 immagini: la
+vista, più le 2 mappe della vista (spigoli e profondità), calcolate sul tuo
+computer.» e una riga «Tieni la geometria: le mappe sono calcolate su questo
+computer, partono con la vista verso lo stesso modello: nessun servizio in
+più. Costo: **incluso: nessun credito in più**» (con la chiave Comfy propria:
+«circa 0,3 crediti Comfy in più per render (misurato una volta, a 1K)»).
+Non c'è nel Fotoinserimento, in Cambia e in Ritocca.
 - **Vuoto:** la spunta tolta, nessuna riga in più.
-- **In corso:** come Genera. **Errore:** senza l'indirizzo del deployment, o con
-  uno sbagliato, Genera si spegne e dice il comando `setx` da dare; un workflow fallito si legge come ogni errore, con
-  «Togli la spunta per mandare solo a Nano Banana».
-- **Pieno:** `docs/ui/studio-rif/76-tieni-la-geometria.png`,
-  `77-invio-due-destinazioni.png`. La bozza della prima passata resta accanto al
-  render (`<id>.geometria.png`), non ancora mostrata nello Studio.
+- **In corso:** con la spunta accesa, «Sto calcolando spigoli e profondità sul
+  tuo computer. La prima volta scarico anche il modello della profondità
+  (circa 50 MB, una volta sola).»; Genera resta spento con «Sto calcolando le
+  mappe della vista sul tuo computer: Genera si accende appena sono pronte.»
+- **Errore:** «Le mappe non si sono calcolate: <motivo>» col gesto (connessione
+  per il primo scaricamento, oppure togliere la spunta) e **Riprova**.
+- **Pieno:** le due miniature **Spigoli** e **Profondità** e «Pronte in 9,6 s, su
+  questo computer.» (`docs/ui/studio-rif/78-tieni-la-geometria-mappe.png`).
 
-Coi crediti AIRENDER (2026-11-06, plugin e web app) la stessa spunta: la prima
-passata va a «**server AIRENDER (airender-server.netlify.app) → Comfy
-Developer Platform, workflow Z-Image-Turbo + ControlNet sugli spigoli**», costo
-«**1 render AIRENDER in più per la prima passata (prezzo provvisorio), scalati
-solo se il workflow riesce**». Se il piano non la comprende la spunta è grigia
-con «Il piano <nome> non comprende «Tieni la geometria»: è nel piano Studio,
-oppure con una chiave Comfy tua.»; senza saldo letto, si rimanda alla scheda
-Licenza. Il server rifiuta comunque con la stessa idea prima di riservare.
+Fuori piano (resta solo nel piano Studio, Riccardo 2026-11-11) la spunta è
+grigia con «Il piano <nome> non comprende «Tieni la geometria»: è nel piano
+Studio.»; senza saldo letto, si rimanda alla scheda Licenza.
 
-Tre controlli (2026-11-09, richiesta di Riccardo: «tutte 3 con spunte e easy
-descrizione»): con la spunta accesa, sotto compaiono **Spigoli** (acceso),
-**Profondità** e **Linee dritte**, ognuno con una frase su cosa tiene. Almeno uno
-resta acceso (l'ultimo non si toglie). Sotto: «Più controlli insieme tengono di
-più ma lasciano meno libertà al render. Il costo non cambia.»
-
-Dal 2026-11-10 ogni controllo ha la spiegazione nel «?» (cosa tiene, quando
-usarlo) e accanto una riga breve; il «?» della nota dice che vale solo in Genera
-dalla vista.
-
-**Riaggancia alla vista** (2026-11-10, scelta di Riccardo: «solo come spunta»).
-Nel Risultato, sotto «Tenuta della geometria», un pannello con la spunta
-«Riaggancia alla vista» e il suo «?». Spenta: una riga dice quando serve («Da
-usare quando la % di spigoli scende…», oppure «La % di spigoli è bassa…» sotto
-la soglia). Accesa: le stesse tre spunte dei controlli, dove va e cosa costa,
-cosa parte (vista e render, Nano Banana niente), il bottone **Riaggancia** e la
-nota «Scelta, non provata.». Fuori piano: spunta grigia con la frase del piano.
-Non c'è sull'immagine caricata. Esce un passo nuovo «Riaggancia alla vista»,
-col prima/dopo e la sua %.
+Tolti il 2026-11-11 insieme al deployment: i tre controlli (Spigoli,
+Profondità, Linee dritte) e **Riaggancia alla vista**. Nello storico i render
+fatti prima restano con il loro nome («Riaggancia alla vista», «Tieni: Spigoli
+(ControlNet)»).
 
 ## Finale, costruito il 2026-11-04
 

@@ -56,8 +56,6 @@ Rotte:
     POST /api/punto/invia                  il punto di vista: pianta + punto rosso, un passo nuovo
     POST /api/finale/componi               cosa fa «Finale» su un render: misura d'uscita, destinazione
     POST /api/finale/invia                 «Finale»: il render ingrandito, un passo nuovo
-    POST /api/riaggancia/componi           cosa fa «Riaggancia alla vista»: destinazione, immagini, costo
-    POST /api/riaggancia/invia             «Riaggancia alla vista»: il render rimesso sulle linee, un passo nuovo
     POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
     GET  /api/video/catalogo               modello, modi, movimenti, durate e dove va il video
     GET  /api/video                        i video della cartella
@@ -304,10 +302,6 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.componi_finale(self._corpo_json()))
             case ["api", "finale", "invia"]:
                 self._json(studio.invia_finale(self._corpo_json()))
-            case ["api", "riaggancia", "componi"]:
-                self._json(studio.componi_riaggancia(self._corpo_json()))
-            case ["api", "riaggancia", "invia"]:
-                self._json(studio.invia_riaggancia(self._corpo_json()))
             case ["api", "video", "immagini"]:
                 self._json(studio.carica_immagine_video(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "video", "prova-a-secco"]:

@@ -998,23 +998,18 @@ LISTINO = _registra(Costante(
         },
         # Pesi delle azioni che non sono un invio a Nano Banana. Finale e video
         # il server non li inoltra ancora coi crediti AIRENDER (il router
-        # legge solo corpi Gemini); «Tieni la geometria» si' (geometria.mjs).
+        # legge solo corpi Gemini).
         # Stanno qui perche' il prezzo si decide in un posto solo.
         # Regola: ogni credito costa ad AIRENDER al massimo 0,09 EUR.
         # Finale x2 ~36 crediti Comfy (~0,15 EUR); x4 non misurato.
         # Video Seedance 2.5 1080p 5 s ~865 crediti Comfy (~3,60 EUR, stima
         # del listino Comfy) = ~0,72 EUR/s -> 8 crediti al secondo; 720p
         # stimato a meta' -> 4 al secondo. Nessuno dei due e' misurato.
-        # «Tieni la geometria»: la prima passata col ControlNet sulla Comfy
-        # Developer Platform, in piu' del render di Nano Banana che segue.
-        # PROVVISORIO (2026-11-06): il costo a secondi di GPU del deployment
-        # non e' ancora letto; Z-Image-Turbo a 8 passi e 1536 px e' qualche
-        # secondo di GPU, una macchina fredda di piu'. Si rivede alla prima
-        # fattura del deployment.
+        # «Tieni la geometria» non ha un peso: dal 2026-11-11 le mappe si
+        # calcolano sul computer di chi lavora e partono nello stesso render.
         "pesi_azioni": {
             "finale_x2": 2,
             "finale_x4": 4,
-            "tieni_geometria": 1,
             "video_720p_al_secondo": 4,
             "video_1080p_al_secondo": 8,
         },
@@ -1180,118 +1175,41 @@ SERVER_INVIO_MASSIMO_MB = _registra(Costante(
     unita=" MB",
 ))
 
-# --- «Tieni la geometria»: ControlNet prima di Nano Banana --------------------
+# --- «Tieni la geometria»: le mappe della vista accanto alla vista ------------
+# La pagina dello Studio le calcola sul computer di chi lavora (core/mappe.py)
+# e le legge da /api/studio: i valori stanno qui, la pagina non ne ha di suoi.
 
-GEOMETRIA_FORZA = _registra(Costante(
-    nome="GEOMETRIA_FORZA",
-    valore=1.0,
+MAPPE_SPIGOLI_SOGLIA_BASSA = _registra(Costante(
+    nome="MAPPE_SPIGOLI_SOGLIA_BASSA",
+    valore=0.1,
     origine=SCELTA,
     ragione=(
-        "Quanto il ControlNet sugli spigoli comanda Z-Image-Turbo nella prima "
-        "passata di «Tieni la geometria» (strength di QwenImageDiffsynthControlnet, "
-        "il modello comfy.org usa 1). Prima prova vera sul deployment, "
-        "2026-11-10, una vista sola e un seme: a 0,8 i tramezzi tengono ma il "
-        "modello inventa una torre sotto la pianta; a 1 la pianta resta com'e'. "
-        "Da solo vale questo; insieme agli altri controlli si riduce con "
-        "GEOMETRIA_FORZA_TOTALE."
+        "Canny della mappa degli spigoli: un bordo debole resta solo se tocca un "
+        "bordo forte sopra questa soglia (gradiente di Sobel non normalizzato, "
+        "grigi da 0 a 1). E' quella del nodo Canny di ComfyUI usato nelle prove "
+        "del 2026-11-10; la mappa del browser e' risultata uguale a occhio il 2026-11-11."
     ),
 ))
 
-GEOMETRIA_FORZA_PROFONDITA = _registra(Costante(
-    nome="GEOMETRIA_FORZA_PROFONDITA",
-    valore=0.6,
+MAPPE_SPIGOLI_SOGLIA_ALTA = _registra(Costante(
+    nome="MAPPE_SPIGOLI_SOGLIA_ALTA",
+    valore=0.32,
     origine=SCELTA,
     ragione=(
-        "Quanto comanda il controllo «Profondita'» (mappa di profondita' stimata "
-        "con Depth Anything V2) nella prima passata. Tiene volumi, piani e "
-        "prospettiva, non i dettagli. Prova vera 2026-11-10 (una vista): da "
-        "sola a 0,6 perde le partizioni (56% di spigoli), con gli Spigoli e' la "
-        "coppia migliore. Si riduce con GEOMETRIA_FORZA_TOTALE."
+        "Canny della mappa degli spigoli: sopra questa soglia un bordo e' sempre "
+        "uno spigolo. Come sopra, quella delle prove del 2026-11-10."
     ),
 ))
 
-GEOMETRIA_FORZA_LINEE = _registra(Costante(
-    nome="GEOMETRIA_FORZA_LINEE",
-    valore=0.6,
+MAPPE_LATO_PROFONDITA = _registra(Costante(
+    nome="MAPPE_LATO_PROFONDITA",
+    valore=518,
     origine=SCELTA,
     ragione=(
-        "Quanto comanda il controllo «Linee dritte» (M-LSD, solo segmenti "
-        "dritti) nella prima passata. Ignora retini e texture. Prova vera "
-        "2026-11-10 (una vista): da sola a 0,6 tiene le partizioni ma inventa "
-        "volumi sotto (82%). Si riduce con GEOMETRIA_FORZA_TOTALE."
-    ),
-))
-
-GEOMETRIA_FORZA_TOTALE = _registra(Costante(
-    nome="GEOMETRIA_FORZA_TOTALE",
-    valore=1.1,
-    origine=SCELTA,
-    ragione=(
-        "Il massimo della somma delle forze quando si spuntano piu' controlli: "
-        "sopra, le forze si riducono tutte nella stessa proporzione. Prova vera "
-        "2026-11-10, una vista e un seme: tutti e tre a 0,8+0,6+0,7 (somma 2,1) "
-        "danno un'immagine nebbiosa inutilizzabile; a 0,5+0,3+0,3 (1,1) il "
-        "render e' pulito e tiene la pianta; Spigoli+Profondita' a 0,6+0,4 e' "
-        "stato il migliore. Con una vista sola e' una scelta, non una misura."
-    ),
-))
-
-GEOMETRIA_RIAGGANCIA_DENOISE = _registra(Costante(
-    nome="GEOMETRIA_RIAGGANCIA_DENOISE",
-    valore=0.35,
-    origine=SCELTA,
-    ragione=(
-        "«Riaggancia alla vista»: quanto del render si rifa' nella passata col "
-        "ControlNet guidata dalla vista (1 = tutto da capo, 0 = niente). Basso "
-        "perche' luce e materiali del render restino e si spostino solo le "
-        "linee. Fra 0.3 e 0.4 nelle guide di img2img per architettura; "
-        "giudizio del 2026-11-10, nessun render fatto."
-    ),
-))
-
-GEOMETRIA_PASSI = _registra(Costante(
-    nome="GEOMETRIA_PASSI",
-    valore=8,
-    origine=SCELTA,
-    ragione=(
-        "I passi del campionatore nella prima passata: 8 e' quello del modello "
-        "comfy.org per Z-Image-Turbo, che e' fatto per pochi passi. Il costo su "
-        "Comfy Cloud va a secondi di GPU, e piu' passi costano di piu'. Non misurato."
-    ),
-))
-
-GEOMETRIA_LATO_MASSIMO = _registra(Costante(
-    nome="GEOMETRIA_LATO_MASSIMO",
-    valore=1536,
-    origine=SCELTA,
-    ragione=(
-        "Il lato lungo, in pixel, a cui si porta la vista prima di estrarne gli "
-        "spigoli. Il modello comfy.org avverte sopra i 2500; 1536 tiene i "
-        "dettagli di una facciata e resta veloce. Nano Banana poi rifa' la "
-        "misura del render. Giudizio, non misurato."
-    ),
-))
-
-GEOMETRIA_ATTESA_SECONDI = _registra(Costante(
-    nome="GEOMETRIA_ATTESA_SECONDI",
-    valore=600,
-    origine=SCELTA,
-    ragione=(
-        "Quanto si aspetta al massimo la prima passata su Comfy Cloud prima di "
-        "fermare il lavoro. Una macchina fredda carica circa 20 GB di modelli "
-        "(Z-Image-Turbo, il codificatore Qwen e il ControlNet) prima di partire. "
-        "Dieci minuti e' un margine scelto, non misurato."
-    ),
-))
-
-GEOMETRIA_INTERVALLO_SECONDI = _registra(Costante(
-    nome="GEOMETRIA_INTERVALLO_SECONDI",
-    valore=3,
-    origine=SCELTA,
-    ragione=(
-        "Ogni quanto si chiede a Comfy Cloud se la prima passata e' finita. "
-        "Compromesso fra quanto presto si vede il risultato e quante richieste "
-        "partono; l'API v2 non ha un webhook per i lavori. Scelto."
+        "Il lato lungo, in pixel, a cui si porta la vista prima di Depth Anything "
+        "(che lavora a 518 e a multipli di 14). Piu' grande non aggiunge dettaglio "
+        "alla mappa e nel browser senza scheda video passa da 3 a 15-20 secondi "
+        "(misurato nel container il 2026-11-11). La mappa torna poi alla misura della vista."
     ),
 ))
 

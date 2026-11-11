@@ -51,9 +51,8 @@ from .errori import ErroreAirender, FileNonTrovato, ImmagineNonIdonea
 from .idoneita import valuta, valuta_immagine
 from .preset import MODELLI_PREDEFINITI
 from . import punto as modulo_punto
-from .provider import geometria as modulo_geometria
-from .provider.comfy import tipo_mime as comfy_tipo_mime
-from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione, Risultato
+from . import mappe as modulo_mappe
+from .provider.base import IN_LAVORAZIONE, INVIATO, Provider, RichiestaGenerazione
 from .ricetta import Ricetta, impronta
 
 FORMATO = 2  # numero-non-configurabile: versione del formato del file di lavoro
@@ -92,25 +91,25 @@ FORMATO_ESEMPI = 9  # numero-non-configurabile: versione del formato di un lavor
 # Il formato 9 (2026-11-04) aggiunge gli esempi di stile: render d'esempio
 # dopo il riferimento per lo stile, solo dalla vista. Legge anche materiali e
 # Rif. se ci sono.
-FORMATO_GEOMETRIA = 10  # numero-non-configurabile: versione del formato di un lavoro con «Tieni la geometria»
-# Il formato 10 (2026-11-04) avvolge un lavoro di Genera dalla vista: prima
-# parte un workflow col ControlNet (spigoli, profondita', linee dritte: il
-# file scrive quali in `controlli_geometria`), poi il suo render va a Nano
-# Banana. Il file scrive anche il formato del lavoro avvolto (`formato_base`) e
-# la seconda destinazione. Un motore vecchio rifiuta il 10 invece di mandare
-# solo a Nano Banana quello che l'utente ha chiesto di mandare prima altrove.
+FORMATO_GEOMETRIA = 10  # numero-non-configurabile: il vecchio «Tieni la geometria» col ControlNet sul deployment
+# Il formato 10 (2026-11-04 / 2026-11-10) mandava prima la vista a un
+# workflow col ControlNet su un deployment Comfy, che non c'e' piu': un file
+# del 10 si rifiuta e si spiega (LAVORO_VECCHIA_GEOMETRIA).
 FORMATO_PUNTO = 11  # numero-non-configurabile: versione del formato di un lavoro «Punto di vista dalla pianta»
 # Il formato 11 (2026-11-09) e' il punto di vista dalla pianta: dalla pianta
 # (un render o la vista) il motore disegna il punto e il cono rossi e manda le
 # due immagini. Niente aree, richieste, riferimenti, materiali o geometria.
 # Un motore vecchio rifiuta l'11 invece di mandare la pianta da sola.
-FORMATO_RIAGGANCIA = 12  # numero-non-configurabile: versione del formato di un lavoro «Riaggancia alla vista»
-# Il formato 12 (2026-11-10) e' «Riaggancia alla vista»: un render gia' fatto
-# ripassa leggero nel workflow col ControlNet, guidato dalla vista, e torna
-# sulle sue linee. Non va a Nano Banana: la destinazione e' solo il workflow.
-# Un motore vecchio rifiuta il 12 invece di mandare il render a Nano Banana.
-MODELLO_RIAGGANCIA = "riaggancia"  # il "modello" scritto nel lavoro: il workflow col ControlNet, niente Router
-FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATO_RIAGGANCIA = 12  # numero-non-configurabile: il vecchio «Riaggancia alla vista», sullo stesso deployment
+FORMATO_MAPPE = 13  # numero-non-configurabile: versione del formato di un lavoro con «Tieni la geometria» a mappe
+# Il formato 13 (2026-11-11) avvolge un lavoro di Genera dalla vista: le mappe
+# della vista (spigoli e profondita', core/mappe.py), calcolate dalla pagina
+# sul computer di chi lavora, partono per ultime insieme alla vista, verso lo
+# stesso modello. Il file scrive il formato del lavoro avvolto
+# (`formato_base`) e i file delle mappe. Un motore vecchio rifiuta il 13
+# invece di mandare la vista senza le mappe che l'utente ha chiesto.
+FORMATI_LETTI = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)  # numero-non-configurabile: i formati che questo motore sa leggere
+FORMATI_VECCHIA_GEOMETRIA = (FORMATO_GEOMETRIA, FORMATO_RIAGGANCIA)
 TIPI_FINALE = ("foto", "illustrazione")
 
 # Le immagini di riferimento caricate nello Studio, nella cartella delle viste.
@@ -185,7 +184,6 @@ def _adesso() -> str:
 
 SUFFISSO_MISURA = ".misura.json"
 SUFFISSO_MODELLO = ".modello"  # il risultato intero del modello in un ritocco, accanto al render incollato
-SUFFISSO_GEOMETRIA = ".geometria"  # la bozza della prima passata col ControlNet, accanto al render
 
 
 def percorso_misura(render: Path) -> Path:
@@ -324,31 +322,22 @@ class Lavoro:
     # Studio · Genera, «Stile da esempi»: render d'esempio dopo il
     # riferimento per lo stile (che e' il primo esempio). Solo dalla vista.
     esempi: tuple[str, ...] = ()
-    # Studio · Genera, «Tieni la geometria»: la destinazione della prima
-    # passata col ControlNet, mostrata prima dell'invio come l'altra (regola
-    # 5). Vuota, il lavoro va solo al modello. Solo dalla vista.
-    destinazione_geometria: str | None = None
-    # I controlli della prima passata (Spigoli, Profondita', Linee dritte).
-    # Un file del formato 10 senza questa voce e' di prima del 2026-11-09:
-    # parte coi soli Spigoli, come allora.
-    controlli_geometria: tuple[str, ...] = ()
+    # Studio · Genera, «Tieni la geometria»: i file delle mappe della vista
+    # (spigoli, profondita'), fra i riferimenti, che partono per ultime verso
+    # lo stesso modello. Vuoto, niente mappe. Solo dalla vista.
+    mappe: tuple[str, ...] = ()
     # Studio, «Punto di vista dalla pianta»: dove sta la camera e verso dove
     # guarda. La seconda immagine (la pianta col punto rosso) la disegna il
     # motore prima dell'invio.
     punto_di_vista: modulo_punto.PuntoDiVista | None = None
-    # «Riaggancia alla vista»: il render di partenza ripassa nel ControlNet
-    # guidato dalla vista, con `controlli_geometria`, verso `destinazione_geometria`.
-    riaggancia: bool = False
     creato_il: str = field(default_factory=_adesso)
     formato: int = FORMATO
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "formato",
-                           FORMATO_RIAGGANCIA if self.riaggancia
-                           else FORMATO_GEOMETRIA if self.destinazione_geometria else self.formato_proprio())
+        object.__setattr__(self, "formato", FORMATO_MAPPE if self.mappe else self.formato_proprio())
 
     def formato_proprio(self) -> int:
-        """Il formato del lavoro senza «Tieni la geometria»."""
+        """Il formato del lavoro senza le mappe di «Tieni la geometria»."""
         if self.punto_di_vista:
             return FORMATO_PUNTO
         if self.finale:
@@ -365,7 +354,7 @@ class Lavoro:
             return FORMATO_RIFERIMENTO
         if self.contesto:
             return FORMATO_CONTESTO
-        return FORMATO if self.formato == FORMATO_GEOMETRIA else self.formato
+        return FORMATO if self.formato == FORMATO_MAPPE else self.formato
 
     def prompt(self) -> str:
         """Il testo che parte.
@@ -375,18 +364,14 @@ class Lavoro:
         gia'). Dalla vista: il testo scritto a mano se c'e', altrimenti i
         blocchi, piu' le richieste se ce ne sono.
         """
-        if self.riaggancia:
-            return modulo_geometria.PROMPT_RIAGGANCIA
-        testo = self._prompt_senza_inserti()
-        if self.destinazione_geometria:
-            testo = f"{testo}\n\n{modulo_geometria.REGOLA_PROMPT}"
-        return blocchi.aggiungi_inserti(testo, self.prima_immagine_inserti(), len(self.inserti))
+        testo = blocchi.aggiungi_inserti(self._prompt_senza_inserti(), self.prima_immagine_inserti(), len(self.inserti))
+        if self.mappe:
+            testo = f"{testo}\n\n{modulo_mappe.regola(self.prima_immagine_mappe())}"
+        return testo
 
-    def prompt_geometria(self) -> str:
-        """Il testo della prima passata: lo stile senza le regole delle immagini in piu'."""
-        if self.prompt_a_mano and self.prompt_a_mano.strip():
-            return blocchi.aggiungi_richieste(self.prompt_a_mano.strip(), self.richieste)
-        return blocchi.aggiungi_richieste(blocchi.componi(self.scelte), self.richieste)
+    def prima_immagine_mappe(self) -> int:
+        """Il numero della prima mappa: dopo tutte le altre immagini, Rif. compresi."""
+        return self.prima_immagine_inserti() + len(self.inserti)
 
     def prima_immagine_inserti(self) -> int:
         """Il numero della prima immagine dei Rif.: dopo partenza, maschera, riferimento e materiali."""
@@ -445,12 +430,7 @@ class Lavoro:
             **({"finale": dict(self.finale)} if self.finale else {}),
             **({"esempi": list(self.esempi)} if self.esempi else {}),
             **({"punto_di_vista": self.punto_di_vista.a_dizionario()} if self.punto_di_vista else {}),
-            **({"riaggancia": True, "destinazione_geometria": self.destinazione_geometria,
-                "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
-               if self.riaggancia else
-               {"formato_base": self.formato_proprio(), "destinazione_geometria": self.destinazione_geometria,
-                "controlli_geometria": list(self.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI)}
-               if self.destinazione_geometria else {}),
+            **({"formato_base": self.formato_proprio(), "mappe": list(self.mappe)} if self.mappe else {}),
         }
 
     @classmethod
@@ -467,10 +447,10 @@ class Lavoro:
                 "Aggiorna il motore e la palette alla stessa versione, poi "
                 "rimetti il lavoro in coda.",
             )
-        if dati.get("formato") == FORMATO_GEOMETRIA:
-            return cls._da_dizionario_geometria(dati)
-        if dati.get("formato") == FORMATO_RIAGGANCIA:
-            return cls._da_dizionario_riaggancia(dati)
+        if dati.get("formato") in FORMATI_VECCHIA_GEOMETRIA:
+            raise LavoroNonValido(*LAVORO_VECCHIA_GEOMETRIA)
+        if dati.get("formato") == FORMATO_MAPPE:
+            return cls._da_dizionario_mappe(dati)
         mancanti = [
             k for k in ("identificativo", "vista", "provider", "modello", "destinazione")
             if not dati.get(k)
@@ -605,46 +585,29 @@ class Lavoro:
         )
 
     @classmethod
-    def _da_dizionario_geometria(cls, dati: dict) -> "Lavoro":
-        """Un lavoro del formato 10: si legge quello avvolto, poi si rimette la prima passata."""
-        base, destinazione = dati.get("formato_base"), dati.get("destinazione_geometria")
-        if (base not in FORMATI_LETTI or base in (FORMATO_GEOMETRIA, FORMATO_FINALE, FORMATO_RITOCCO, FORMATO_CONTESTO,
-                                                  FORMATO_PUNTO)
-                or not isinstance(destinazione, str) or not destinazione.strip()
+    def _da_dizionario_mappe(cls, dati: dict) -> "Lavoro":
+        """Un lavoro del formato 13: si legge quello avvolto, poi si rimettono le mappe."""
+        base, mappe = dati.get("formato_base"), dati.get("mappe")
+        if (base not in FORMATI_LETTI or base in (*FORMATI_VECCHIA_GEOMETRIA, FORMATO_MAPPE, FORMATO_FINALE,
+                                                  FORMATO_RITOCCO, FORMATO_CONTESTO, FORMATO_PUNTO)
+                or not isinstance(mappe, list) or len(mappe) != len(modulo_mappe.MAPPE)
+                or not all(isinstance(m, str) and m for m in mappe)
                 or any(dati.get(k) for k in ("partenza", "parte_da", "aree", "contesto", "finale"))):
             raise LavoroNonValido(
-                "Il file del lavoro chiede «Tieni la geometria» ma non dice dove va la prima passata, "
+                "Il file del lavoro chiede «Tieni la geometria» ma le mappe non tornano, "
                 "o non parte dalla vista.",
                 "Rimetti il lavoro in coda da Studio · Genera.",
             )
-        try:
-            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
-        except ErroreAirender as errore:
-            raise LavoroNonValido(errore.fatto, "Rimetti il lavoro in coda da Studio · Genera.") from None
         avvolto = cls.da_dizionario({**dati, "formato": base})
-        return dataclasses.replace(avvolto, destinazione_geometria=destinazione, controlli_geometria=controlli)
+        return dataclasses.replace(avvolto, mappe=tuple(mappe))
 
 
-    @classmethod
-    def _da_dizionario_riaggancia(cls, dati: dict) -> "Lavoro":
-        """Un lavoro del formato 12: un passo da un render, che va solo al workflow col ControlNet."""
-        destinazione = dati.get("destinazione_geometria")
-        if (not dati.get("riaggancia") or not dati.get("partenza") or not isinstance(destinazione, str)
-                or not destinazione.strip() or dati.get("modello") != MODELLO_RIAGGANCIA
-                or any(dati.get(k) for k in ("aree", "contesto", "finale", "richieste", "riferimento",
-                                             "materiali", "inserti", "esempi", "punto_di_vista"))):
-            raise LavoroNonValido(
-                "Il file del lavoro chiede «Riaggancia alla vista» ma non dice da quale render parte "
-                "o dove va, o porta altro insieme.",
-                "Rimetti il lavoro in coda dal Risultato dello Studio.",
-            )
-        try:
-            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
-        except ErroreAirender as errore:
-            raise LavoroNonValido(errore.fatto, "Rimetti il lavoro in coda dal Risultato dello Studio.") from None
-        avvolto = cls.da_dizionario({**dati, "formato": FORMATO})
-        return dataclasses.replace(avvolto, destinazione_geometria=destinazione, controlli_geometria=controlli,
-                                   riaggancia=True)
+LAVORO_VECCHIA_GEOMETRIA = (
+    "Questo lavoro usa il vecchio «Tieni la geometria» (o «Riaggancia alla vista»), che passava da un "
+    "workflow col ControlNet su un deployment Comfy: il deployment non c'e' piu' e il lavoro non parte.",
+    "Rimettilo in coda da Studio · Genera con «Tieni la geometria»: ora le mappe della vista si "
+    "calcolano sul tuo computer e partono insieme alla vista, senza costi in piu'.",
+)
 
 
 def _aree_del_lavoro(dati: dict, partenza: object) -> tuple[tuple[modulo_aree.Area, ...], str | None]:
@@ -784,8 +747,7 @@ def metti_in_coda(
     inserti: tuple[Path, ...] | list[Path] = (),
     finale: dict | None = None,
     esempi: tuple[Path, ...] | list[Path] = (),
-    destinazione_geometria: str | None = None,
-    controlli_geometria: tuple[str, ...] = (),
+    mappe: tuple[Path, ...] | list[Path] = (),
     punto_di_vista: modulo_punto.PuntoDiVista | None = None,
     crea_provider: Callable[[str], Provider] = registro.crea,
 ) -> Lavoro:
@@ -870,18 +832,26 @@ def metti_in_coda(
             )
     if punto_di_vista is not None and (richieste or aree or riferimento is not None or contesto is not None
                                        or materiali or inserti or finale is not None or esempi
-                                       or destinazione_geometria):
+                                       or mappe):
         raise LavoroNonValido(
             "«Punto di vista dalla pianta» parte dalla pianta da sola: niente richieste, aree, "
             "riferimenti, materiali o «Tieni la geometria».",
             "Fai il punto di vista dalla pianta, poi lavora sull'immagine che esce.",
         )
-    if destinazione_geometria and (partenza or aree or contesto is not None or finale is not None):
-        raise LavoroNonValido(
-            "«Tieni la geometria» parte solo con un render dalla vista: ridisegna tutto dagli spigoli, "
-            "e da un passo perderebbe quello che il passo aveva gia' fatto.",
-            "Togli la spunta, oppure usala in Genera.",
-        )
+    if mappe:
+        if partenza or aree or contesto is not None or finale is not None:
+            raise LavoroNonValido(
+                "«Tieni la geometria» parte solo con un render dalla vista: le mappe sono della vista, "
+                "e da un passo il modello ridisegnerebbe quello che il passo aveva gia' fatto.",
+                "Togli la spunta, oppure usala in Genera.",
+            )
+        if len(mappe) != len(modulo_mappe.MAPPE):
+            raise LavoroNonValido(
+                f"«Tieni la geometria» manda {len(modulo_mappe.MAPPE)} mappe della vista "
+                f"({', '.join(modulo_mappe.MAPPE)}): ne sono arrivate {len(mappe)}.",
+                "Ricarica lo Studio: le mappe si calcolano di nuovo.",
+            )
+        mappe = tuple(controlla_riferimento(radice, Path(m)) for m in mappe)
     if modello is None:
         try:
             modello = MODELLI_PREDEFINITI[provider]
@@ -912,8 +882,7 @@ def metti_in_coda(
         inserti=tuple(str(i) for i in inserti),
         finale=finale,
         esempi=tuple(str(e) for e in esempi),
-        destinazione_geometria=destinazione_geometria or None,
-        controlli_geometria=(_controlli_del_lavoro(controlli_geometria) if destinazione_geometria else ()),
+        mappe=tuple(str(m) for m in mappe),
         punto_di_vista=punto_di_vista,
     )
     if punto_di_vista is not None and not crea_provider(provider).accetta_piu_immagini(modello):
@@ -937,6 +906,11 @@ def metti_in_coda(
             f"{modello} riceve una sola immagine per invio: «Fotoinserimento» ne manda due.",
             "Scegli Nano Banana 2.",
         )
+    if mappe and not crea_provider(provider).accetta_piu_immagini(modello):
+        raise LavoroNonValido(
+            f"{modello} riceve una sola immagine per invio: le mappe di «Tieni la geometria» non partirebbero.",
+            "Scegli Nano Banana 2, oppure togli la spunta.",
+        )
     if riferimento is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
             f"{modello} riceve una sola immagine per invio: il riferimento per lo stile non partirebbe.",
@@ -946,50 +920,6 @@ def metti_in_coda(
     percorsi = cartelle(radice)
     # Prima lo stato, poi il lavoro: chi trova il lavoro trova anche lo stato.
     scrivi_stato(radice, lavoro.identificativo, IN_CODA, destinazione=destinazione)
-    scrivi_json(percorsi[IN_ATTESA_DIR] / f"{lavoro.identificativo}.json", lavoro.a_dizionario())
-    return lavoro
-
-
-def metti_in_coda_riaggancia(
-    radice: Path,
-    vista: Path,
-    scelte: blocchi.Scelte,
-    provider: str,
-    parte_da: str,
-    partenza: Path,
-    destinazione_geometria: str,
-    controlli_geometria: tuple[str, ...] = (),
-) -> Lavoro:
-    """«Riaggancia alla vista»: il render di un passo ripassa nel ControlNet guidato dalla vista.
-
-    Non va a Nano Banana: la sola destinazione e' il workflow, mostrata prima
-    dell'invio come le altre (regola 5).
-    """
-    if not parte_da or not partenza:
-        raise LavoroNonValido(
-            "«Riaggancia alla vista» parte da un render fatto.",
-            "Scegli un render nell'elenco dei render della vista.",
-        )
-    if not destinazione_geometria or not destinazione_geometria.strip():
-        raise LavoroNonValido(
-            "«Riaggancia alla vista» non sa dove va: la destinazione del workflow manca.",
-            "Ricarica lo Studio: la destinazione si mostra prima dell'invio.",
-        )
-    lavoro = Lavoro(
-        identificativo=nuovo_identificativo(),
-        vista=str(Path(vista).resolve()),
-        scelte=scelte,
-        provider=provider,
-        modello=MODELLO_RIAGGANCIA,
-        destinazione=destinazione_geometria,
-        parte_da=parte_da,
-        partenza=str(Path(partenza).resolve()),
-        destinazione_geometria=destinazione_geometria,
-        controlli_geometria=_controlli_del_lavoro(controlli_geometria),
-        riaggancia=True,
-    )
-    percorsi = cartelle(radice)
-    scrivi_stato(radice, lavoro.identificativo, IN_CODA, destinazione=destinazione_geometria)
     scrivi_json(percorsi[IN_ATTESA_DIR] / f"{lavoro.identificativo}.json", lavoro.a_dizionario())
     return lavoro
 
@@ -1046,18 +976,6 @@ def dire_sicuro(testo: str) -> None:
         pass  # uscita chiusa: il messaggio e' solo informativo
 
 
-def _controlli_del_lavoro(controlli: tuple[str, ...]) -> tuple[str, ...]:
-    try:
-        return modulo_geometria.controlli_validi(list(controlli) or None)
-    except ErroreAirender as errore:
-        raise LavoroNonValido(errore.fatto, errore.cosa_fare) from None
-
-
-def _geometria_reale(controlla: Callable[[], None], provider: str = "") -> "modulo_geometria.Geometria":
-    from .provider.trasporto import TrasportoHTTP  # pylint: disable=import-outside-toplevel
-    return modulo_geometria.crea(provider, TrasportoHTTP(), controlla=controlla)
-
-
 class Coda:
     """Prende un lavoro alla volta da in-attesa/ e lo porta fino in fondo."""
 
@@ -1067,12 +985,10 @@ class Coda:
         crea_provider: Callable[[str], Provider] = registro.crea,
         dire: Callable[[str], None] = dire_sicuro,
         attesa: Callable[[float], None] = time.sleep,
-        crea_geometria: Callable[[Callable[[], None], str], "modulo_geometria.Geometria"] | None = None,
     ) -> None:
         self.radice = Path(radice)
         self.percorsi = cartelle(self.radice)
         self._crea_provider = crea_provider
-        self._crea_geometria = crea_geometria or _geometria_reale
         self._dire = dire
         self._attesa = attesa
 
@@ -1142,7 +1058,6 @@ class Coda:
 
     def _lavora(self, identificativo: str, preso: Path) -> None:
         stato_attuale = {"valore": IN_CODA}
-        altro_geometria: dict = {}
         try:
             lavoro = self._leggi(preso)
             self._controlla_annullamento(identificativo, stato_attuale["valore"])
@@ -1155,22 +1070,17 @@ class Coda:
                     )
                 self._controlla_annullamento(identificativo, stato)
 
-            if lavoro.riaggancia:
-                risultato, altro_geometria = self._riaggancia(lavoro, avanzamento)
-            else:
-                richiesta, motore = self._prepara(lavoro)
-                self._controlla_annullamento(identificativo, stato_attuale["valore"])
-                motore.avanzamento = avanzamento
-                if lavoro.destinazione_geometria:
-                    richiesta, altro_geometria = self._prima_passata(lavoro, richiesta, motore, avanzamento)
-                self._dire(
-                    f"Lavoro {identificativo}: destinazione dell'invio "
-                    f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
-                    "questa macchina."
-                )
-                # Da qui l'immagine parte: lo stato lo dice prima, non dopo.
-                avanzamento(INVIATO)
-                risultato = motore.genera(richiesta)
+            richiesta, motore = self._prepara(lavoro)
+            self._controlla_annullamento(identificativo, stato_attuale["valore"])
+            motore.avanzamento = avanzamento
+            self._dire(
+                f"Lavoro {identificativo}: destinazione dell'invio "
+                f"{lavoro.destinazione}. {_quante_immagini(1 + len(richiesta.immagini_in_piu))} "
+                "questa macchina."
+            )
+            # Da qui l'immagine parte: lo stato lo dice prima, non dopo.
+            avanzamento(INVIATO)
+            risultato = motore.genera(richiesta)
         except LavoroAnnullato as annullato:
             self._chiudi(preso, ANNULLATO_DIR, ANNULLATO,
                          fatto=annullato.fatto, cosa_fare=annullato.cosa_fare)
@@ -1195,7 +1105,7 @@ class Coda:
             return
 
         immagine, formato = risultato.immagine, risultato.formato
-        altro = dict(altro_geometria)
+        altro: dict = {"mappe": list(lavoro.mappe)} if lavoro.mappe else {}
         if lavoro.aree and not lavoro.contesto:
             # Un ritocco: il modello ridisegna tutta l'immagine, e fuori dalle
             # aree puo' togliere quello che un ritocco di prima aveva messo.
@@ -1234,68 +1144,6 @@ class Coda:
             **altro,
         )
         self._dire(f"Lavoro {identificativo}: render salvato in {render}")
-
-    def _prima_passata(self, lavoro: Lavoro, richiesta: RichiestaGenerazione, motore: Provider,
-                       avanzamento: Callable[[str], None]) -> tuple[RichiestaGenerazione, dict]:
-        """«Tieni la geometria»: il workflow col ControlNet, poi il suo render parte al posto della vista."""
-        # Coi crediti AIRENDER passa dal server; con la chiave propria va al deployment.
-        geometria = self._crea_geometria(lambda: avanzamento(INVIATO), lavoro.provider)
-        annunciata = geometria.destinazione()
-        if annunciata != lavoro.destinazione_geometria:
-            raise LavoroNonValido(
-                f"Il lavoro dice che la prima passata va a {lavoro.destinazione_geometria}, ma "
-                f"partirebbe verso {annunciata}. Non ho inviato niente.",
-                "Rimetti il lavoro in coda: le destinazioni si rileggono e si mostrano di nuovo.",
-            )
-        self._dire(f"Lavoro {lavoro.identificativo}: prima passata «Tieni la geometria» verso {annunciata}.")
-        avanzamento(INVIATO)
-        seme = secrets.randbits(31)  # numero-non-configurabile: il seme del campionatore sta in un intero con segno
-        controlli = lavoro.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI
-        bozza, lavoro_comfy = geometria.esegui(richiesta.immagine, lavoro.prompt_geometria(), seme, controlli)
-        modulo_immagine.misura(bozza)  # solleva se non e' un'immagine
-        motore.controlla_prima_dell_invio(lavoro.modello, bozza)
-        percorso = self.percorsi[FATTO_DIR] / f"{lavoro.identificativo}{SUFFISSO_GEOMETRIA}.png"
-        scrivi_atomico(percorso, bozza)
-        return dataclasses.replace(richiesta, immagine=bozza), {"geometria": {
-            "bozza": str(percorso), "destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
-            "workflow": modulo_geometria.NOME_WORKFLOW, "controlli": list(controlli)}}
-
-    def _riaggancia(self, lavoro: Lavoro, avanzamento: Callable[[str], None]):
-        """«Riaggancia alla vista»: vista e render al workflow col ControlNet, il suo render e' il risultato."""
-        geometria = self._crea_geometria(lambda: avanzamento(INVIATO), lavoro.provider)
-        annunciata = geometria.destinazione()
-        if annunciata != lavoro.destinazione_geometria:
-            raise LavoroNonValido(
-                f"Il lavoro dice che «Riaggancia alla vista» va a {lavoro.destinazione_geometria}, ma "
-                f"partirebbe verso {annunciata}. Non ho inviato niente.",
-                "Rimetti il lavoro in coda: le destinazioni si rileggono e si mostrano di nuovo.",
-            )
-        vista = modulo_immagine.leggi(Path(lavoro.vista))
-        render = self._leggi_partenza(Path(lavoro.partenza))
-        self._dire(f"Lavoro {lavoro.identificativo}: «Riaggancia alla vista» verso {annunciata}. "
-                   "Partono due immagini da questa macchina: la vista e il render.")
-        avanzamento(INVIATO)
-        seme = secrets.randbits(31)  # numero-non-configurabile: il seme del campionatore sta in un intero con segno
-        controlli = lavoro.controlli_geometria or modulo_geometria.CONTROLLI_PREDEFINITI
-        immagine, lavoro_comfy = geometria.esegui(vista, modulo_geometria.PROMPT_RIAGGANCIA, seme, controlli,
-                                                  render=render)
-        modulo_immagine.misura(immagine)  # solleva se non e' un'immagine
-        immagine = modulo_immagine.marca_generata(immagine)  # AI Act, art. 50.2, come gli altri render
-        ricetta = Ricetta(
-            provider=lavoro.provider, modello=modulo_geometria.NOME_WORKFLOW, preset="", preset_versione="",
-            prompt=modulo_geometria.PROMPT_RIAGGANCIA, testo_utente="", grana="", dettaglio_grana=None,
-            forza_struttura=None, risoluzione=f"{config.GEOMETRIA_LATO_MASSIMO}px", aspetto="",
-            generazione_fissa=False, impronta_sorgente=impronta(render), seme=seme,
-            parametri={"riaggancia": True, "impronta_vista": impronta(vista), "controlli": list(controlli),
-                       "denoise": config.GEOMETRIA_RIAGGANCIA_DENOISE, "lavoro_comfy": lavoro_comfy},
-        )
-        formato = comfy_tipo_mime(immagine).split("/")[-1].replace("jpeg", "jpg")
-        risultato = Risultato(immagine=immagine, formato=formato, ricetta=ricetta, avvisi=[
-            "Riagganciato alla vista col ControlNet: guarda il prima/dopo col render di partenza, "
-            "luce e materiali possono essersi un po' spenti."])
-        return risultato, {"geometria": {"destinazione": annunciata, "lavoro_comfy": lavoro_comfy, "seme": seme,
-                                         "workflow": modulo_geometria.NOME_WORKFLOW, "controlli": list(controlli),
-                                         "riaggancia": True}}
 
     def _leggi(self, preso: Path) -> Lavoro:
         try:
@@ -1375,6 +1223,11 @@ class Coda:
             inserto = controlla_riferimento(self.radice, Path(percorso)).read_bytes()
             modulo_immagine.misura(inserto)  # solleva se non e' un'immagine
             in_piu = (*in_piu, inserto)
+        for percorso in lavoro.mappe:
+            # Le mappe di «Tieni la geometria» per ultime: il prompt le conta da prima_immagine_mappe.
+            mappa = controlla_riferimento(self.radice, Path(percorso)).read_bytes()
+            modulo_immagine.misura(mappa)  # solleva se non e' un'immagine
+            in_piu = (*in_piu, mappa)
         # La grana non entra nei blocchi: i modelli del Router non hanno un
         # dettaglio della grana, e la ricetta lo scrive come assente.
         livello = modulo_grana.MEDIA

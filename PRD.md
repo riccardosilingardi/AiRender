@@ -270,6 +270,18 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### «Tieni la geometria» a mappe (2026-11-11)
+
+Provato con i test (`tests/test_mappe.py`), con una prova vera dallo Studio del
+PC in Chromium nel container (mappe calcolate, lavoro partito, render tornato)
+e con due render per misurare il costo. **Mai provato sul PC di Riccardo** (Edge
+o Chrome su Windows, con scheda video: tempi da misurare), **mai nella web app
+con Pyodide vero**, mai coi crediti AIRENDER. La tenuta e' giudicata su un
+render per vista: servono piu' render per dire che le mappe aiutano sempre. Si
+esce con: Riccardo apre lo Studio, spunta «Tieni la geometria» su una vista
+prospettica coi colori dei layer, guarda le due miniature e dice i secondi; poi
+un render con e uno senza, affiancati.
+
 ### Partenza da un'immagine (2026-11-09)
 
 Foto, render già fatto e schizzo caricati nello Studio, con tre regole nuove
@@ -492,7 +504,36 @@ immagine. Script `scripts/prova_mappe_nano.py`. Dettagli, tabella e immagini in
   per casella; DA3 Base la piu' fedele sulla casa, le due Small candidate per
   il browser.
 
-### Riaggancia alla vista (2026-11-10)
+### «Tieni la geometria» a mappe, sul computer (2026-11-11)
+
+Decisione di Riccardo del 2026-11-11: il deployment Comfy col ControlNet si
+cancella (licenza CC-BY-NC della Depth Large, 4,68 $/mese fissi). «Tieni la
+geometria» diventa: la pagina dello Studio (PC e web app) calcola gli spigoli
+(Canny in JavaScript, soglie di `config.py`) e la profondita' (Depth Anything
+V2 Small, Apache-2.0, transformers.js 4.3.2, modello scaricato una volta da
+Hugging Face e tenuto in cache), le carica fra i riferimenti, e partono per
+ultime insieme alla vista verso lo stesso modello, con la regola di
+`core/mappe.py` nel prompt. Lavoro nel formato 13 della coda; i formati 10 e 12
+(vecchio ControlNet, Riaggancia) si rifiutano e dicono come rifarli. Resta solo
+nel piano Studio (Riccardo). Tolti: `geometria.mjs` e `geometria.json` dal
+server, il peso `tieni_geometria` dal listino, le costanti `GEOMETRIA_*`, i tre
+controlli e «Riaggancia alla vista». Le linee dritte (M-LSD) non ci sono piu'.
+
+- Mappe del browser contro quelle del deployment: spigoli uguali a occhio,
+  profondita' uguale a quella di onnxruntime in Python.
+- Tempo nel container (Chromium senza scheda video, WASM): 3-4 s per la
+  profondita' dopo il primo caricamento, 0,2-0,5 s gli spigoli; il primo giro
+  dello Studio, compreso lo scaricamento, 9,6 s.
+- Costo con la chiave Comfy: 17,49 crediti con le mappe contro 17,19 senza
+  (Nano Banana 2, 1K, la stessa vista, un render ciascuno). Coi crediti
+  AIRENDER nessun credito in piu'.
+- Prova vera dallo Studio del PC (Chromium nel container, coda vera, Router):
+  il lavoro e' partito con 3 immagini e la regola giusta. A occhio la casa
+  colorata tiene volumi e tetto meglio che senza mappe (senza, la casa
+  galleggia), ma inventa una gradinata in primo piano: un render ciascuno.
+
+### Riaggancia alla vista (2026-11-10) — tolto il 2026-11-11
+
 
 Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca,
 Variante) le linee possono muoversi, e nessun concorrente lo vincola (Veras e

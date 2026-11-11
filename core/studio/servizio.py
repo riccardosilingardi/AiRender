@@ -38,7 +38,8 @@ from .. import provider as registro
 from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta, valuta_immagine
 from ..preset import MODELLI_PREDEFINITI
-from ..provider import comfy, geometria as modulo_geometria
+from .. import mappe as modulo_mappe
+from ..provider import comfy
 from ..provider.base import Provider
 from ..ricetta import Ricetta, impronta
 from . import miniature as modulo_miniature
@@ -232,6 +233,13 @@ class Studio:
                 "origine": config.costante("RITOCCO_MODO_AREE").origine,
                 "pennello": config.PENNELLO_SPESSORE,
                 "pennelli": list(config.PENNELLO_SPESSORI),
+            },
+            # «Tieni la geometria»: come la pagina calcola le mappe, coi valori di config.py.
+            "mappe": {
+                "soglia_bassa": config.MAPPE_SPIGOLI_SOGLIA_BASSA,
+                "soglia_alta": config.MAPPE_SPIGOLI_SOGLIA_ALTA,
+                "lato_profondita": config.MAPPE_LATO_PROFONDITA,
+                "modello_profondita": modulo_mappe.MODELLO_PROFONDITA,
             },
         }
 
@@ -812,13 +820,12 @@ class Studio:
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
             # Regola 5: quante immagini partono, detto prima del clic.
-            "immagini": (2 if (riferimento or contesto) else 1) + degli_esempi + dei_materiali + dei_rif,
+            "immagini": ((2 if (riferimento or contesto) else 1) + degli_esempi + dei_materiali + dei_rif
+                         + (len(modulo_mappe.MAPPE) if geometria and not contesto else 0)),
             "inserti": dei_rif,
             "esempi": degli_esempi,
-            "cosa_parte": (_cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi)
-                           .replace("la vista", "il render della prima passata", 1)
-                           if geometria and not contesto else
-                           _cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi)),
+            "cosa_parte": _con_le_mappe(_cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi),
+                                        geometria and not contesto),
             "contesto_non_accettato": (
                 f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
                 "Scegli Nano Banana 2."
@@ -837,7 +844,12 @@ class Studio:
                 if dei_rif and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
                                    if (riferimento or contesto or dei_materiali or dei_rif) else None),
-            "geometria": _geometria_dict(quante, self.provider) if geometria and not contesto else None,
+            "geometria": ({**_GEOMETRIA, "costo": _GEOMETRIA["costo_airender" if self.provider == "airender" else "costo"]}
+                          if geometria and not contesto else None),
+            "mappe_non_accettate": (
+                f"{modello.nome} riceve una sola immagine per invio: le mappe di «Tieni la geometria» "
+                "non partirebbero. Scegli Nano Banana 2."
+                if geometria and not contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -881,9 +893,9 @@ class Studio:
         if destinazione["inserti_non_accettati"]:
             problemi.append({"fatto": destinazione["inserti_non_accettati"],
                              "cosa_fare": "Scegli Nano Banana 2, oppure togli i Rif."})
-        if destinazione["geometria"] and destinazione["geometria"]["errore"]:
-            problemi.append({"fatto": destinazione["geometria"]["errore"],
-                             "cosa_fare": destinazione["geometria"]["cosa_fare"]})
+        if destinazione["mappe_non_accettate"]:
+            problemi.append({"fatto": destinazione["mappe_non_accettate"],
+                             "cosa_fare": "Scegli Nano Banana 2, oppure togli la spunta «Tieni la geometria»."})
         if not self._coda_attiva():
             problemi.append(_CODA_FERMA)
         return {
@@ -939,17 +951,18 @@ class Studio:
             materiali=cambi,
             inserti=inserti,
             esempi=esempi,
-            geometria_mostrata=dati.get("destinazione_geometria_mostrata") if geometria else None,
-            controlli_geometria=self._controlli_geometria(dati) if geometria else (),
+            mappe=self._mappe_scelte(dati) if geometria else (),
         )
 
-    @staticmethod
-    def _controlli_geometria(dati: dict) -> tuple[str, ...]:
-        """Spigoli, Profondita', Linee dritte: quelli spuntati. Senza la voce, i soli Spigoli."""
-        try:
-            return modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
-        except ErroreAirender as errore:
-            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+    def _mappe_scelte(self, dati: dict) -> tuple[Path, ...]:
+        """Le mappe della vista calcolate dalla pagina e caricate fra i riferimenti, nell'ordine di core/mappe.py."""
+        mappe = dati.get("mappe")
+        if not isinstance(mappe, dict) or any(not isinstance(mappe.get(m), str) for m in modulo_mappe.MAPPE):
+            raise RichiestaStudioNonValida(
+                "«Tieni la geometria» è spuntato ma le mappe della vista non sono arrivate.",
+                "Aspetta che lo Studio finisca di calcolarle (spigoli e profondità), poi premi di nuovo Genera.",
+            )
+        return tuple(self.percorso_riferimento(mappe[m]) for m in modulo_mappe.MAPPE)
 
     def _esempi_scelti(self, dati: dict, contesto: bool = False, riferimento: object = True) -> tuple[Path, ...]:
         """Gli esempi di «Stile da esempi» oltre al riferimento: nomi della cartella dei riferimenti."""
@@ -1062,8 +1075,7 @@ class Studio:
                        portato_da: str | None = None,
                        contesto: modulo_contesto.Contesto | None = None,
                        materiali: tuple = (), inserti: tuple = (), finale: dict | None = None,
-                       esempi: tuple = (), geometria_mostrata: str | None = None,
-                       controlli_geometria: tuple = (),
+                       esempi: tuple = (), mappe: tuple = (),
                        punto_di_vista: modulo_punto.PuntoDiVista | None = None) -> dict:
         if mostrata != destinazione["destinazione"]:
             raise RichiestaStudioNonValida(
@@ -1071,17 +1083,9 @@ class Studio:
                 f"partirebbe verso {destinazione['destinazione']}. Non ho inviato niente.",
                 "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
             )
-        prima_passata = destinazione.get("geometria")
-        if prima_passata:
-            if prima_passata["errore"]:
-                raise RichiestaStudioNonValida(f"Non mando: {prima_passata['errore']}",
-                                               f"{prima_passata['cosa_fare']} Oppure togli la spunta «Tieni la geometria».")
-            if geometria_mostrata != prima_passata["destinazione"]:
-                raise RichiestaStudioNonValida(
-                    f"La pagina ha mostrato come prima passata {geometria_mostrata!r}, ma la vista "
-                    f"partirebbe verso {prima_passata['destinazione']}. Non ho inviato niente.",
-                    "Ricarica lo Studio: le destinazioni si rileggono e si mostrano di nuovo.",
-                )
+        if destinazione.get("mappe_non_accettate"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['mappe_non_accettate']}",
+                                           "Scegli Nano Banana 2, oppure togli la spunta «Tieni la geometria».")
         if destinazione["cosa_manca"]:
             raise RichiestaStudioNonValida(
                 f"Non mando: {destinazione['cosa_manca']}",
@@ -1125,8 +1129,7 @@ class Studio:
                 inserti=tuple(inserti),
                 finale=finale,
                 esempi=tuple(esempi),
-                destinazione_geometria=prima_passata["destinazione"] if prima_passata else None,
-                controlli_geometria=controlli_geometria if prima_passata else (),
+                mappe=tuple(mappe),
                 punto_di_vista=punto_di_vista,
                 crea_provider=self._crea_provider,
             )
@@ -1461,7 +1464,7 @@ class Studio:
                                "pianta non dice li ha immaginati il modello.")
         elif finale:
             testo_riassunto = _riassunto_finale(finale)
-        elif dati.get("riaggancia"):
+        elif dati.get("riaggancia"):  # lavori di prima del 2026-11-11
             testo_riassunto = ("Riagganciato alla vista: il render di prima rifatto in parte col ControlNet, "
                                "sulle linee della vista.")
         elif dati.get("partenza"):
@@ -1483,7 +1486,7 @@ class Studio:
             "destinazione": dati.get("destinazione"),
             "modello": dati.get("modello"),
             "modello_nome": (NOME_CARICATA if importata
-                             else modulo_geometria.NOME_WORKFLOW if dati.get("riaggancia")
+                             else _NOME_WORKFLOW_VECCHIO if dati.get("riaggancia")
                              else modello.nome if modello else dati.get("modello")),
             "importata": importata,
             "preset": dati.get("preset"),
@@ -1512,13 +1515,12 @@ class Studio:
     @staticmethod
     def _nomi_controlli(dati: dict) -> str | None:
         """«Spigoli + Profondità» per un lavoro con Tieni la geometria, None per gli altri."""
-        if not dati.get("destinazione_geometria"):
+        if dati.get("mappe"):
+            return " + ".join(modulo_mappe.NOMI[m] for m in modulo_mappe.MAPPE)
+        if not dati.get("destinazione_geometria"):  # lavori col ControlNet, di prima del 2026-11-11
             return None
-        try:
-            controlli = modulo_geometria.controlli_validi(dati.get("controlli_geometria"))
-        except ErroreAirender:
-            return None
-        return " + ".join(modulo_geometria.NOMI_CONTROLLI[c] for c in controlli)
+        controlli = dati.get("controlli_geometria") or ["spigoli"]
+        return " + ".join(_NOMI_CONTROLLI_VECCHI.get(c, str(c)) for c in controlli) + " (ControlNet)"
 
     def _tenuta(self, render: Path | None) -> dict | None:
         """La misura degli spigoli di un render, come la mostra lo Studio. None senza render."""
@@ -1940,7 +1942,7 @@ class Studio:
             "scena": self._scena(albero, passo),
             "modello": passo.get("modello"),
             "modello_nome": NOME_CARICATA if passo.get("modello") == modulo_coda.MODELLO_CARICATA
-            else modulo_geometria.NOME_WORKFLOW if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA
+            else _NOME_WORKFLOW_VECCHIO if passo.get("modello") == _MODELLO_RIAGGANCIA_VECCHIO
             else modello.nome if modello else passo.get("modello"),
             "creato_il": passo.get("creato_il"),
             "stato": stato,
@@ -2348,58 +2350,6 @@ class Studio:
             finale=finale,
         )
 
-    # --- Riaggancia alla vista -------------------------------------------
-
-    def _riaggancia(self, dati: dict) -> tuple[Path, dict, Path, tuple[str, ...]]:
-        """Vista, passo di partenza, il suo render e i controlli spuntati."""
-        vista = self.percorso_vista(str(dati.get("vista") or ""))
-        passo, render = self._passo_di_partenza(self._albero(vista), dati.get("da"))
-        return vista, passo, render, self._controlli_geometria(dati)
-
-    def componi_riaggancia(self, dati: dict) -> dict:
-        """Cosa fa «Riaggancia alla vista», prima del clic: dove va, cosa parte e cosa costa (regola 5)."""
-        _vista, passo, _render, controlli = self._riaggancia(dati)
-        geometria = _geometria_dict(1, self.provider)
-        return {
-            "da_numero": str(passo.get("numero")),
-            "controlli": modulo_geometria.descrivi_controlli(controlli),
-            "destinazione": geometria["destinazione"],
-            "errore": geometria["errore"],
-            "cosa_fare": geometria["cosa_fare"],
-            "cosa_parte": ("Partono due immagini, solo al workflow col ControlNet: la vista Allplan, da cui "
-                           "si prendono le linee, e il render, che si rifà in parte sopra quelle linee. "
-                           "Nano Banana non riceve niente."),
-            "costo": _costo_geometria(1, self.provider).replace("la prima passata", "il riaggancio"),
-            "quanto_rifa": round(config.GEOMETRIA_RIAGGANCIA_DENOISE * 100),  # numero-non-configurabile: in percento
-        }
-
-    def invia_riaggancia(self, dati: dict) -> dict:
-        """«Riaggancia alla vista» sul render di un passo: il risultato e' un passo figlio."""
-        vista, passo, render, controlli = self._riaggancia(dati)
-        try:
-            dove = modulo_geometria.destinazione(self.provider)
-        except ErroreAirender as problema:
-            raise RichiestaStudioNonValida(problema.fatto, problema.cosa_fare) from None
-        mostrata = dati.get("destinazione_mostrata")
-        if mostrata != dove:
-            raise RichiestaStudioNonValida(
-                f"La pagina ha mostrato come destinazione {mostrata!r}, ma il render "
-                f"partirebbe verso {dove}. Non ho inviato niente.",
-                "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
-            )
-        try:
-            lavoro = modulo_coda.metti_in_coda_riaggancia(
-                self.cartella, vista, blocchi.Scelte(scena=self._scena(self._albero(vista), passo)),
-                self.provider, passo["identificativo"], render, dove, controlli)
-        except ErroreAirender as errore:
-            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
-        return {
-            "identificativo": lavoro.identificativo,
-            "identificativi": [lavoro.identificativo],
-            "destinazione": lavoro.destinazione,
-            "coda_attiva": self._coda_attiva(),
-        }
-
     # --- cartella --------------------------------------------------------
 
     # --- video (Studio · Video) -------------------------------------------
@@ -2651,7 +2601,7 @@ def _nome_passo(passo: dict) -> str:
     """Il nome breve della riga: dalle scelte, o dalla richiesta."""
     if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
         return NOME_CARICATA
-    if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA:
+    if passo.get("modello") == _MODELLO_RIAGGANCIA_VECCHIO:
         return "Riaggancia alla vista"
     tipo = _tipo_passo(passo)
     if tipo == "punto":
@@ -2684,7 +2634,7 @@ def _riassunto_passo(passo: dict, padre: dict | None) -> str:
     """La richiesta del passo, in italiano, come la legge l'utente nella ricetta."""
     if passo.get("modello") == modulo_coda.MODELLO_CARICATA:
         return "L'immagine che hai caricato, così com'è: nessun invio."
-    if passo.get("modello") == modulo_coda.MODELLO_RIAGGANCIA:
+    if passo.get("modello") == _MODELLO_RIAGGANCIA_VECCHIO:
         numero = padre.get("numero") if padre else "0, la vista"
         return (f"Dal passo {numero}: rifatto in parte col ControlNet sulle linee della vista, "
                 "per rimettere la geometria al suo posto.")
@@ -2794,39 +2744,44 @@ def _prompt_genera(a_mano: str | None, scelte, contesto, stile: int, esempi: int
         prompt = blocchi.aggiungi_riferimento(prompt, esempi=esempi)
     if not a_mano:
         prompt = modulo_materiali.prompt(prompt, cambi, prima_immagine=modulo_materiali.prima_immagine(stile))
+    prima_inserti = modulo_coda.prima_immagine_inserti(False, stile, modulo_materiali.quante_immagini(cambi))
+    prompt = blocchi.aggiungi_inserti(prompt, prima_inserti, inserti)
     if geometria and not contesto:
-        prompt = f"{prompt}\n\n{modulo_geometria.REGOLA_PROMPT}"
-    return blocchi.aggiungi_inserti(prompt, modulo_coda.prima_immagine_inserti(
-        False, stile, modulo_materiali.quante_immagini(cambi)), inserti)
+        prompt = f"{prompt}\n\n{modulo_mappe.regola(prima_inserti + inserti)}"
+    return prompt
 
 
-def _geometria_dict(varianti: int, provider: str = "") -> dict:
-    """La prima passata di «Tieni la geometria»: dove va e cosa costa, prima del clic (regola 5)."""
-    try:
-        dove, errore, cosa_fare = modulo_geometria.destinazione(provider), None, None
-    except ErroreAirender as problema:
-        dove, errore, cosa_fare = None, problema.fatto, problema.cosa_fare
-    return {
-        "destinazione": dove,
-        "errore": errore,
-        "cosa_fare": cosa_fare,
-        "workflow": modulo_geometria.NOME_WORKFLOW,
-        "cosa_parte": ("Prima la vista va da sola al workflow col ControlNet (i controlli spuntati); "
-                       "poi il suo render parte verso il modello al posto della vista."),
-        "costo": _costo_geometria(varianti, provider),
-    }
+# «Tieni la geometria»: le mappe le calcola la pagina sul computer di chi
+# lavora e partono con la vista verso lo stesso modello. Nessun servizio in
+# piu', nessun costo in piu' (regola 5: si dice prima del clic).
+_GEOMETRIA = {
+    "destinazione": f"le mappe sono {modulo_mappe.DOVE}",
+    "mappe": [modulo_mappe.NOMI[m] for m in modulo_mappe.MAPPE],
+    "modello_profondita": modulo_mappe.MODELLO_PROFONDITA,
+    # Coi crediti AIRENDER il render costa gli stessi crediti; con la chiave
+    # Comfy propria le due immagini in ingresso si pagano a token: misurato
+    # una volta il 2026-11-11, Nano Banana 2 a 1K, 17,49 crediti con le mappe
+    # contro 17,19 senza (la stessa vista, lo stesso preset).
+    "costo_airender": "incluso: nessun credito in più",
+    "costo": "circa 0,3 crediti Comfy in più per render (misurato una volta, a 1K)",
+}
 
 
-def _costo_geometria(varianti: int, provider: str) -> str:
-    """Coi crediti AIRENDER il listino dice quanto; con la chiave propria nessun numero (regola 3)."""
-    if provider == modulo_geometria.PROVIDER_AIRENDER:
-        peso = modulo_geometria.peso_airender() * varianti
-        prime = "la prima passata" if varianti == 1 else f"{varianti} prime passate"
-        return (f"{peso} render AIRENDER in più per {prime} (prezzo provvisorio), "
-                "scalati solo se il workflow riesce")
-    # Un workflow con la chiave propria si paga a secondi di GPU del deployment, non a immagine.
-    return ("a secondi di GPU del deployment" if varianti == 1
-            else f"{varianti} prime passate, a secondi di GPU del deployment")
+def _con_le_mappe(cosa_parte: str, geometria: bool) -> str:
+    """«Partono N immagini: ..., più le 2 mappe della vista»: il conto giusto, nelle stesse parole (regola 5)."""
+    if not geometria:
+        return cosa_parte
+    gia = 1 if cosa_parte.startswith("Parte una immagine") else 2 if cosa_parte.startswith("Partono due") \
+        else int(re.match(r"Partono (\d+)", cosa_parte).group(1))
+    elenco = cosa_parte.split(": ", 1)[1].rstrip(".")
+    quante = len(modulo_mappe.MAPPE)
+    return (f"Partono {gia + quante} immagini: {elenco}, più le {quante} mappe della vista "
+            "(spigoli e profondità), calcolate sul tuo computer.")
+# I lavori di prima del 2026-11-11 passavano da un workflow col ControlNet su
+# un deployment Comfy che non c'e' piu': lo Studio li mostra ancora nello storico.
+_NOME_WORKFLOW_VECCHIO = "Z-Image-Turbo + ControlNet"
+_MODELLO_RIAGGANCIA_VECCHIO = "riaggancia"
+_NOMI_CONTROLLI_VECCHI = {"spigoli": "Spigoli", "profondita": "Profondità", "linee": "Linee dritte"}
 
 
 def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0, esempi: int = 0) -> str:

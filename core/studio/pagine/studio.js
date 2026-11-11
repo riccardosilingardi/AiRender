@@ -29,8 +29,8 @@ const S = {
   lavoroAttivo: null,
   varianti: 1,            // quanti lavori con le stesse scelte per un Genera
   riferimento: null,      // immagine di riferimento per lo stile: { nome, da, larghezza, altezza }
-  geometria: false,       // «Tieni la geometria»: prima un workflow col ControlNet, poi il modello
-  controlliGeometria: ["spigoli"], // quali guide tiene il ControlNet: spigoli, profondita, linee
+  geometria: false,       // «Tieni la geometria»: spigoli e profondità della vista partono con la vista
+  mappe: {},              // le mappe calcolate qui, per vista: { stato, spigoli, profondita, secondi, errore }
   esempi: [],             // «Stile da esempi»: render d'esempio oltre al riferimento, stessa forma
   inserti: [],            // Rif. 1-4 di oggetti e persone da mettere nella vista, stessa forma del riferimento
   // Materiali di questo progetto: l'elenco letto dalla palette con la vista,
@@ -473,6 +473,7 @@ async function caricaVista(nome) {
   try { S.mat.dati = await get(`/api/viste/${enc(nome)}/materiali`); } catch (e) { S.mat.errore = e; }
   await caricaDestinazione();
   aggiornaComposto();
+  if (geometriaGenera()) calcolaMappe();
   await caricaRender();
   if (S.scheda === "passi") await caricaPassi();
   render();
@@ -577,8 +578,7 @@ async function genera() {
       riferimento: S.modo !== "contesto" && S.riferimento && S.riferimento.nome, contesto: contestoPerServer(),
       materiali: materialiPerServer(), inserti: insertiGenera(), esempi: esempiGenera(),
       geometria: geometriaGenera(),
-      controlli_geometria: geometriaGenera() ? S.controlliGeometria : undefined,
-      destinazione_geometria_mostrata: S.destinazione && S.destinazione.geometria && S.destinazione.geometria.destinazione,
+      mappe: geometriaGenera() ? mappePerServer() : undefined,
     });
     S.ultimoEsito = null;
     S.inFila = risposta.identificativi.slice(1);
@@ -1373,10 +1373,9 @@ async function scegliRiferimento(file) {
   render();
 }
 // «Stile da esempi»: gli esempi oltre al riferimento, che e' il primo.
-// La prima passata gira su un workflow della Comfy Developer Platform: con la
-// chiave Comfy propria sempre; coi crediti AIRENDER (PC e web) se il piano la
-// comprende (funzioni.tieni_geometria, oggi solo Studio). Il server lo
-// ricontrolla comunque prima di riservare.
+// «Tieni la geometria» e' del piano Studio (funzioni.tieni_geometria), o di
+// chi usa una chiave Comfy sua. Le mappe le calcola questa pagina, sul
+// computer di chi lavora: nessun servizio in piu' le riceve e non costano.
 function geometriaCoiCrediti() {
   const s = S.licenza && S.licenza.presente && S.licenza.saldo;
   return !!(s && s.funzioni && s.funzioni.tieni_geometria);
@@ -1384,51 +1383,140 @@ function geometriaCoiCrediti() {
 function geometriaPossibile() { return usaComfy() || geometriaCoiCrediti(); }
 function perchéGeometriaSpenta() {
   const s = S.licenza && S.licenza.presente && S.licenza.saldo;
-  if (s) return `Il piano ${nomePiano(s)} non comprende «Tieni la geometria»: è nel piano Studio, oppure con una chiave Comfy tua.`;
+  if (s) return `Il piano ${nomePiano(s)} non comprende «Tieni la geometria»: è nel piano Studio.`;
   return "Per sapere se il tuo piano comprende «Tieni la geometria» serve il saldo dal server AIRENDER: apri la scheda Licenza.";
 }
 function geometriaGenera() { return S.modo !== "contesto" && S.geometria && geometriaPossibile(); }
 
-// I tre controlli di «Tieni la geometria», in parole semplici. Si possono
-// spuntare insieme; almeno uno resta acceso.
-const CONTROLLI_GEOMETRIA = [
-  ["spigoli", "Spigoli", "Il consigliato, basta da solo quasi sempre.",
-    "Spigoli (Canny): tiene contorni, finestre e porte esattamente dove sono nella vista. È il più preciso. Difetto: ricalca come righe anche retini, fughe e texture disegnate. Quando: viste esterne e interne con geometria pulita."],
-  ["profondita", "Profondità", "Insieme agli Spigoli: da sola perde i tramezzi.",
-    "Profondità (depth map): tiene cosa sta davanti e cosa dietro, i volumi e la prospettiva, non i dettagli. Lascia al render più libertà sulle superfici. Quando: interni, masterplan, studi di massa, o insieme agli Spigoli per tenere anche le distanze."],
-  ["linee", "Linee dritte", "Se gli Spigoli ricalcano troppo.",
-    "Linee dritte (M-LSD): tiene solo i segmenti dritti di muri, solai e serramenti; ignora texture, vegetazione e oggetti curvi. Quando: prospetti con molti retini o alberi, dove gli Spigoli copierebbero anche quelli."],
-];
+// --- le mappe della vista, calcolate qui ---------------------------------------
+// Spigoli: Canny come quello di kornia/ComfyUI (Gauss 5x5 sigma 1, Sobel non
+// normalizzato, soppressione dei non massimi, isteresi). Profondità: Depth
+// Anything V2 Small (Apache-2.0) con transformers.js, scaricato una volta da
+// Hugging Face e poi tenuto nella cache del browser. Le soglie e il lato
+// vengono da core/config.py attraverso /api/studio.
+const TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
+const MODELLO_PROFONDITA = "onnx-community/depth-anything-v2-small";
+let stimatoreProfondita = null;
+
+function mappePronte() { const m = S.mappe[S.vista]; return !!(m && m.stato === "pronte"); }
+function mappePerServer() { const m = S.mappe[S.vista]; return m && m.stato === "pronte" ? { spigoli: m.spigoli.nome, profondita: m.profondita.nome } : undefined; }
+
+function mappaSpigoli(img, basso, alto) {
+  const W = img.naturalWidth, H = img.naturalHeight, N = W * H;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+  const px = x.getImageData(0, 0, W, H).data;
+  const g = new Float32Array(N);
+  for (let i = 0; i < N; i++) g[i] = (0.299 * px[4 * i] + 0.587 * px[4 * i + 1] + 0.114 * px[4 * i + 2]) / 255;
+  const k = [-2, -1, 0, 1, 2].map((d) => Math.exp(-d * d / 2));
+  const somma = k.reduce((a, b) => a + b); for (let i = 0; i < k.length; i++) k[i] /= somma;
+  const at = (a, i, j) => a[Math.min(H - 1, Math.max(0, j)) * W + Math.min(W - 1, Math.max(0, i))];
+  const t = new Float32Array(N), b = new Float32Array(N);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { let v = 0; for (let d = -2; d <= 2; d++) v += k[d + 2] * at(g, i + d, j); t[j * W + i] = v; }
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { let v = 0; for (let d = -2; d <= 2; d++) v += k[d + 2] * at(t, i, j + d); b[j * W + i] = v; }
+  const mag = new Float32Array(N), dir = new Uint8Array(N);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const gx = at(b, i + 1, j - 1) + 2 * at(b, i + 1, j) + at(b, i + 1, j + 1) - at(b, i - 1, j - 1) - 2 * at(b, i - 1, j) - at(b, i - 1, j + 1);
+    const gy = at(b, i - 1, j + 1) + 2 * at(b, i, j + 1) + at(b, i + 1, j + 1) - at(b, i - 1, j - 1) - 2 * at(b, i, j - 1) - at(b, i + 1, j - 1);
+    mag[j * W + i] = Math.hypot(gx, gy);
+    const a = (Math.atan2(gy, gx) * 180 / Math.PI + 180) % 180;
+    dir[j * W + i] = a < 22.5 || a >= 157.5 ? 0 : a < 67.5 ? 1 : a < 112.5 ? 2 : 3;
+  }
+  const passo = [[1, 0], [1, 1], [0, 1], [-1, 1]];
+  const nms = new Float32Array(N);
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    const m = mag[j * W + i], [dx, dy] = passo[dir[j * W + i]];
+    if (m >= mag[(j + dy) * W + i + dx] && m >= mag[(j - dy) * W + i - dx]) nms[j * W + i] = m;
+  }
+  const esito = new Uint8Array(N), pila = [];
+  for (let q = 0; q < N; q++) if (nms[q] >= alto) { esito[q] = 255; pila.push(q); }
+  while (pila.length) {
+    const q = pila.pop(), i = q % W, j = (q - i) / W;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const r = (j + dj) * W + i + di;
+      if (r >= 0 && r < N && !esito[r] && nms[r] >= basso) { esito[r] = 255; pila.push(r); }
+    }
+  }
+  const out = x.createImageData(W, H);
+  for (let q = 0; q < N; q++) { out.data[4 * q] = out.data[4 * q + 1] = out.data[4 * q + 2] = esito[q]; out.data[4 * q + 3] = 255; }
+  x.putImageData(out, 0, 0);
+  return c;
+}
+
+async function mappaProfondita(img, lato) {
+  const { pipeline, RawImage } = await import(TRANSFORMERS);
+  if (!stimatoreProfondita) stimatoreProfondita = await pipeline("depth-estimation", MODELLO_PROFONDITA, { dtype: "fp16" });
+  const W = img.naturalWidth, H = img.naturalHeight, s = Math.min(1, lato / Math.max(W, H));
+  const piccola = document.createElement("canvas");
+  piccola.width = Math.round(W * s); piccola.height = Math.round(H * s);
+  piccola.getContext("2d").drawImage(img, 0, 0, piccola.width, piccola.height);
+  const { depth } = await stimatoreProfondita(RawImage.fromCanvas(piccola));
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d"); x.imageSmoothingQuality = "high";
+  x.drawImage(depth.toCanvas(), 0, 0, W, H);
+  return c;
+}
+
+function blobDa(canvas) { return new Promise((ok) => canvas.toBlob(ok, "image/png")); }
+
+async function caricaMappa(canvas, nome) {
+  return post("/api/riferimenti", await blobDa(canvas), { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(nome) });
+}
+
+async function calcolaMappe() {
+  const vista = S.vista;
+  if (!vista || (S.mappe[vista] && S.mappe[vista].stato !== "errore")) return;
+  const valori = S.studio.mappe;
+  S.mappe[vista] = { stato: "calcolo" };
+  render();
+  const inizio = performance.now();
+  try {
+    const img = new Image();
+    img.src = `/file/vista/${enc(vista)}`;
+    await img.decode();
+    const spigoli = mappaSpigoli(img, valori.soglia_bassa, valori.soglia_alta);
+    const profondita = await mappaProfondita(img, valori.lato_profondita);
+    const [rs, rp] = await Promise.all([caricaMappa(spigoli, "mappa-spigoli.png"), caricaMappa(profondita, "mappa-profondita.png")]);
+    S.mappe[vista] = { stato: "pronte", spigoli: rs, profondita: rp, secondi: (performance.now() - inizio) / 1000 };
+  } catch (e) {
+    S.mappe[vista] = { stato: "errore", errore: String(e && e.message || e) };
+  }
+  render();
+}
+
+function statoMappe() {
+  const m = S.mappe[S.vista];
+  if (!m || m.stato === "calcolo") {
+    return h("p", { classe: "tenue piccolo" }, "Sto calcolando spigoli e profondità sul tuo computer. La prima volta scarico anche il modello della profondità (circa 50 MB, una volta sola).");
+  }
+  if (m.stato === "errore") {
+    return h("div", {}, avviso("errore", `Le mappe non si sono calcolate: ${m.errore}`,
+      "Controlla la connessione (la prima volta il modello si scarica da Hugging Face), poi riprova. Oppure togli la spunta."),
+      h("button", { classe: "btn", onclick: () => calcolaMappe() }, "Riprova"));
+  }
+  return h("div", { classe: "mappe-geometria" },
+    h("figure", {}, h("img", { src: `/file/riferimento/${enc(m.spigoli.nome)}`, alt: "Mappa degli spigoli della vista" }), h("figcaption", {}, "Spigoli")),
+    h("figure", {}, h("img", { src: `/file/riferimento/${enc(m.profondita.nome)}`, alt: "Mappa di profondità della vista" }), h("figcaption", {}, "Profondità")),
+    h("p", { classe: "tenue piccolo" }, `Pronte in ${m.secondi.toFixed(1).replace(".", ",")} s, su questo computer.`));
+}
 
 function pannelloGeometria() {
   const possibile = geometriaPossibile();
   const spunta = h("input", { type: "checkbox", id: "tieni-geometria", checked: S.geometria && possibile, disabled: !possibile,
-    onchange: async (e) => { S.geometria = e.target.checked; S.secco = null; await caricaDestinazione(); aggiornaComposto(true); render(); } });
-  const controlli = S.geometria && possibile ? h("div", { classe: "controlli-geometria" },
-    ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
-      const acceso = S.controlliGeometria.includes(chiave);
-      const ultimo = acceso && S.controlliGeometria.length === 1;
-      const id = `geometria-${chiave}`;
-      return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
-        h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
-          onchange: (e) => {
-            const scelti = new Set(S.controlliGeometria);
-            if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
-            S.controlliGeometria = CONTROLLI_GEOMETRIA.map(([c]) => c).filter((c) => scelti.has(c));
-            S.secco = null; render();
-          } }),
-        h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
-    }),
-    nota("Più controlli insieme si dividono la stessa forza: non irrigidiscono il render, lo guidano in più modi. Il costo non cambia.",
-      "Vale in Genera, sulla vista Allplan, anche con più varianti per invio. I passi dopo (Cambia, Ritocca, Variante) oggi non la usano: la tenuta di quei passi la dice la % di spigoli, sempre misurata contro la vista.")) : null;
+    onchange: async (e) => {
+      S.geometria = e.target.checked; S.secco = null;
+      if (geometriaGenera()) calcolaMappe();
+      await caricaDestinazione(); aggiornaComposto(true); render();
+    } });
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta,
-      h("b", {}, S.scelte && S.scelte.scena === "pianta" ? "Tieni la geometria · muri e aperture" : "Tieni la geometria")),
+      h("b", {}, S.scelte && S.scelte.scena === "pianta" ? "Tieni la geometria · muri e aperture" : "Tieni la geometria"),
+      " ", h("span", { classe: "etichetta-inclusa" }, "Incluso · nessun credito in più")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
-      "Prima la vista va a un modello aperto con un ControlNet (un pezzo che lo obbliga a seguire la vista: spigoli, profondità o linee dritte, quelli che spunti); ",
-      "poi il suo render va al modello scelto, che cura luce e materiali senza spostare le linee. Due invii, due costi."),
-    controlli);
+      "AIRENDER calcola sul tuo computer spigoli e profondità della vista e li dà al modello come guida: muri, aperture e volumi restano dove li hai disegnati. ",
+      spiega("Spigoli: dove sono contorni, finestre e porte. Profondità: cosa sta davanti e cosa dietro (chiaro vicino, scuro lontano), per i volumi e le distanze. Le due mappe partono insieme alla vista nello stesso invio, verso lo stesso modello: nessun servizio in più e, coi crediti AIRENDER, nessun credito in più. Aiutano soprattutto nelle viste prospettiche coi colori dei layer; su una pianta o su una vista già chiara il modello tiene bene anche da solo. Vale in Genera, sulla vista: i passi dopo (Cambia, Ritocca, Variante) non la usano, e la loro tenuta la dice la % di spigoli.")),
+    geometriaGenera() ? statoMappe() : null);
 }
 
 function esempiGenera() { return S.modo === "contesto" || !S.riferimento ? [] : S.esempi.map((r) => r.nome); }
@@ -1745,7 +1833,12 @@ function motivoGeneraSpento() {
   if (S.contesto && !S.contesto.area) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio.";
   if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
   if (S.modo !== "contesto" && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
-  if (S.destinazione.geometria && S.destinazione.geometria.errore) return S.destinazione.geometria.errore;
+  if (geometriaGenera() && S.destinazione.mappe_non_accettate) return S.destinazione.mappe_non_accettate;
+  if (geometriaGenera() && !mappePronte()) {
+    const m = S.mappe[S.vista];
+    return m && m.stato === "errore" ? "Le mappe di «Tieni la geometria» non si sono calcolate: riprova o togli la spunta."
+      : "Sto calcolando le mappe della vista sul tuo computer: Genera si accende appena sono pronte.";
+  }
   return null;
 }
 
@@ -1753,21 +1846,14 @@ function pannelloInvio() {
   const d = S.destinazione;
   const spento = motivoGeneraSpento();
   const blocco = h("section", { classe: "pannello", "aria-label": "Invio" });
-  if (d && d.geometria) {
-    const g = d.geometria;
-    blocco.append(
-      h("p", { classe: "destinazione" }, "Prima passata: la vista va a ",
-        g.destinazione ? h("b", {}, g.destinazione) : "—", "."),
-      h("p", { classe: "destinazione" }, "Costo della prima passata: ", h("b", {}, g.costo)));
-    if (g.errore) blocco.append(avviso("errore", g.errore, `${g.cosa_fare} Oppure togli la spunta «Tieni la geometria».`));
-  }
   if (d) {
     blocco.append(
-      h("p", { classe: "destinazione" }, d.geometria ? "Poi il suo render va a " : "La vista va a ", h("b", {}, d.destinazione),
+      h("p", { classe: "destinazione" }, "La vista va a ", h("b", {}, d.destinazione),
         ` (${d.fornitore}, ${d.modello_nome})`, d.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
       h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
+    if (d.geometria) blocco.append(h("p", { classe: "destinazione" }, "«Tieni la geometria»: ", d.geometria.destinazione, ". Costo: ", h("b", {}, d.geometria.costo), "."));
   }
   if (!S.studio.coda_attiva) {
     blocco.append(avviso("attenzione", "La coda dei lavori non sta girando: un lavoro resterebbe in attesa.",
@@ -1971,93 +2057,6 @@ async function misuraOra(identificativo) {
     await caricaRender();
   } catch (e) { S.errore = e; }
   render();
-}
-
-// --- Riaggancia alla vista (2026-11-10) --------------------------------------
-// Nano Banana non ha un ControlNet: a ogni passata le linee possono muoversi.
-// Questa spunta, quando la % di spigoli scende, ripassa il render leggero nel
-// ControlNet guidato dalla vista Allplan: le linee tornano al loro posto, luce
-// e materiali restano in gran parte. Costa solo quando si usa.
-
-function statoRiaggancia(l) {
-  if (!S.riaggancio || S.riaggancio.per !== l.identificativo) {
-    S.riaggancio = { per: l.identificativo, acceso: false, controlli: ["spigoli"], composto: null, errore: null };
-  }
-  return S.riaggancio;
-}
-
-async function componiRiaggancia(l) {
-  const q = statoRiaggancia(l);
-  try {
-    q.composto = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
-    q.errore = null;
-  } catch (e) { q.composto = null; q.errore = e; }
-  render();
-}
-
-async function applicaRiaggancia(l) {
-  const q = statoRiaggancia(l);
-  q.errore = null;
-  try {
-    const dest = await post("/api/riaggancia/componi", { vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli });
-    const risposta = await post("/api/riaggancia/invia", {
-      vista: S.vista, da: l.identificativo, controlli_geometria: q.controlli, destinazione_mostrata: dest.destinazione,
-    });
-    S.riaggancio = null;
-    S.inFila = [];
-    seguiLavoro(await get(`/api/lavori/${risposta.identificativo}`));
-    await caricaPassi();
-    if (S.scheda === "risultato") await caricaRender();
-  } catch (e) { q.errore = e; }
-  render();
-}
-
-function pannelloRiaggancia(l) {
-  if (!l || !l.render || l.modello === "caricata") return null;
-  const q = statoRiaggancia(l);
-  const possibile = geometriaPossibile();
-  const t = l.tenuta;
-  const bassa = t && typeof t.spigoli === "number" && t.avvisa;
-  const spunta = h("input", { type: "checkbox", id: "riaggancia", checked: q.acceso && possibile, disabled: !possibile,
-    onchange: (e) => { q.acceso = e.target.checked; q.composto = null; if (q.acceso) componiRiaggancia(l); else render(); } });
-  const figli = [
-    h("label", { classe: "riga-spunta", for: "riaggancia" }, spunta, h("b", {}, "Riaggancia alla vista"), " ",
-      spiega("Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca, Variante) le linee possono spostarsi un po'. Riaggancia ripassa questo render, leggero, nel ControlNet guidato dalla vista Allplan: spigoli e aperture tornano al loro posto, luce e materiali restano in gran parte. Esce un passo nuovo; confrontalo col prima/dopo e con la % di spigoli.")),
-    h("p", { classe: "tenue piccolo" }, bassa
-      ? "La % di spigoli è bassa: questo render può essersi spostato dalla vista."
-      : "Da usare quando la % di spigoli scende o il prima/dopo mostra linee spostate."),
-  ];
-  if (!possibile) figli.push(h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()));
-  if (q.acceso && possibile) {
-    const c = q.composto;
-    figli.push(h("div", { classe: "controlli-geometria" },
-      ...CONTROLLI_GEOMETRIA.map(([chiave, nome, breve, testo]) => {
-        const acceso = q.controlli.includes(chiave);
-        const ultimo = acceso && q.controlli.length === 1;
-        const id = `riaggancia-${chiave}`;
-        return h("label", { classe: "riga-spunta controllo", for: id, title: ultimo ? "Ne serve almeno uno." : "" },
-          h("input", { type: "checkbox", id, checked: acceso, disabled: ultimo,
-            onchange: (e) => {
-              const scelti = new Set(q.controlli);
-              if (e.target.checked) scelti.add(chiave); else scelti.delete(chiave);
-              q.controlli = CONTROLLI_GEOMETRIA.map(([k]) => k).filter((k) => scelti.has(k));
-              componiRiaggancia(l);
-            } }),
-          h("span", {}, h("b", {}, nome), " ", spiega(testo), " ", h("span", { classe: "tenue" }, breve)));
-      })));
-    if (c && c.destinazione) {
-      figli.push(h("p", { classe: "destinazione" }, "Vanno a ", h("b", {}, c.destinazione), `. Costo: ${c.costo}.`),
-        h("p", { classe: "tenue piccolo" }, c.cosa_parte));
-    }
-    if (c && c.errore) figli.push(avviso("errore", c.errore, c.cosa_fare));
-    if (q.errore) figli.push(avviso("errore", q.errore.fatto, q.errore.cosa_fare));
-    figli.push(h("div", { classe: "azioni" },
-      h("button", { classe: "btn primario", onclick: () => applicaRiaggancia(l),
-        disabled: !c || !c.destinazione || !!S.lavoroAttivo || null }, "Riaggancia"),
-      S.lavoroAttivo ? h("span", { classe: "tenue piccolo" }, "Un lavoro è in corso: Riaggancia si accende quando finisce.") : null),
-      nota("Scelta, non provata.", `Rifà il ${c ? c.quanto_rifa : "–"}% del render (valore scelto, non misurato). Nessun riaggancio è ancora stato fatto col workflow vero: il primo è la prova.`));
-  }
-  return h("section", { classe: "pannello", "aria-label": "Riaggancia alla vista" }, ...figli);
 }
 
 function tenuta(l) {
@@ -3054,7 +3053,7 @@ function schermataRisultato() {
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
       palcoConAzioni(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(l), pannelloRiaggancia(l), ricettaPannello(l), adesso(l),
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l),
         altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
           altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
 }
