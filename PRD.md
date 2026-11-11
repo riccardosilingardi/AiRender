@@ -270,6 +270,18 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### «Tieni la geometria» a mappe (2026-11-11)
+
+Provato con i test (`tests/test_mappe.py`), con una prova vera dallo Studio del
+PC in Chromium nel container (mappe calcolate, lavoro partito, render tornato)
+e con due render per misurare il costo. **Mai provato sul PC di Riccardo** (Edge
+o Chrome su Windows, con scheda video: tempi da misurare), **mai nella web app
+con Pyodide vero**, mai coi crediti AIRENDER. La tenuta e' giudicata su un
+render per vista: servono piu' render per dire che le mappe aiutano sempre. Si
+esce con: Riccardo apre lo Studio, spunta «Tieni la geometria» su una vista
+prospettica coi colori dei layer, guarda le due miniature e dice i secondi; poi
+un render con e uno senza, affiancati.
+
 ### Partenza da un'immagine (2026-11-09)
 
 Foto, render già fatto e schizzo caricati nello Studio, con tre regole nuove
@@ -445,10 +457,83 @@ Storage), due giorni dopo il bucket `risultati` vuoto.
   affiancati alla vista.
 - Il costo è a secondi di GPU del deployment: lo Studio non scrive un numero
   finché una prima passata vera non lo dà.
-- `GEOMETRIA_FORZA` 0,8, `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e
-  le soglie di Canny (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
+- `GEOMETRIA_PASSI` 8, `GEOMETRIA_LATO_MASSIMO` 1536 e le soglie di Canny
+  (0,1 / 0,32) sono scelti, da tarare sulle prime viste.
 
-### Riaggancia alla vista (2026-11-10)
+### Prima prova vera sul deployment (2026-11-10)
+
+Deployment `tieni-geometria/production` v1 (RTX PRO 6000 MIG 48 GB, 0 sempre
+accesi), una vista sola (la pianta in assonometria del 2026-10-27, bianca),
+preset Rivista, seme 42, lanciata da Claude con `Geometria.esegui`, senza
+Nano Banana dopo. Prima passata in 10–34 s a caldo.
+
+- **Bug trovato e corretto**: le uscite stanno su `storage.googleapis.com`
+  con un link firmato; il client le rifiutava («link su un altro indirizzo»).
+  Ora le scarica senza chiave, solo https, come gia' faceva il server.
+- **Forze**: Spigoli a 0,8 inventa una torre sotto la pianta, a 1 no; tutti e
+  tre a 0,8+0,6+0,7 danno una nebbia inutilizzabile. Nuova
+  `GEOMETRIA_FORZA_TOTALE` 1,1: oltre, le forze scendono in proporzione.
+  Spigoli 1, Profondita' 0,6, Linee 0,6. Profondita' da sola perde i tramezzi.
+- **La % di spigoli non basta**: la nebbia misurava 77%, il render buono 75%.
+  Il numero va letto col prima/dopo, mai da solo.
+- NON VERIFICATO: altre viste, altri semi, la passata Nano Banana dopo,
+  Riaggancia sul deployment, il percorso coi crediti (server Netlify).
+
+### Nano Banana 2 con le mappe accanto alla vista (2026-11-10, sera)
+
+Idea di Riccardo: dare a Nano Banana 2 la vista e le tre mappe del
+ControlNet come immagini in piu', con un prompt che dice cosa e' ogni
+immagine. Script `scripts/prova_mappe_nano.py`. Dettagli, tabella e immagini in
+`docs/prova-nano-mappe-2026-11-10.md`.
+
+- Su una vista prospettica ambigua (casa a colori di layer) la vista con le tre
+  mappe ha ritrovato il 92% degli spigoli, contro l'85% della vista da sola, e
+  a occhio tiene partizioni e tetto. Su un edificio gia' chiaro e su una pianta
+  2D non cambia niente: Nano Banana da solo arriva al 91-98%.
+- Conta la **profondita'**: spigoli + linee senza profondita' 85%, spigoli da
+  soli peggiorano sempre (portano dentro tratteggi e grana della vista).
+- Depth Anything V2 **Small** (Apache-2.0) da' quasi lo stesso risultato della
+  Large (90% contro 92%). La Large, che usa il deployment, e' **CC-BY-NC**:
+  non si puo' usare per render venduti.
+- Il solo ControlNet di Z-Image su una pianta 2D: 85%, resa da illustrazione.
+- NON VERIFICATO: una sola esecuzione per variante, Gemini senza seme;
+  profondita' calcolata nel browser (provata solo su CPU Linux); profondita' presa dal modello Allplan.
+- Tre Depth Anything calcolati in locale su CPU, senza deployment (tutti
+  Apache-2.0): DA2 Small e DA3 Small (circa 100 MB, sotto il secondo per
+  vista), DA3 Base (394 MB, 0,7-1,4 s). Nessun vincitore netto con un render
+  per casella; DA3 Base la piu' fedele sulla casa, le due Small candidate per
+  il browser.
+
+### «Tieni la geometria» a mappe, sul computer (2026-11-11)
+
+Decisione di Riccardo del 2026-11-11: il deployment Comfy col ControlNet si
+cancella (licenza CC-BY-NC della Depth Large, 4,68 $/mese fissi). «Tieni la
+geometria» diventa: la pagina dello Studio (PC e web app) calcola gli spigoli
+(Canny in JavaScript, soglie di `config.py`) e la profondita' (Depth Anything
+V2 Small, Apache-2.0, transformers.js 4.3.2, modello scaricato una volta da
+Hugging Face e tenuto in cache), le carica fra i riferimenti, e partono per
+ultime insieme alla vista verso lo stesso modello, con la regola di
+`core/mappe.py` nel prompt. Lavoro nel formato 13 della coda; i formati 10 e 12
+(vecchio ControlNet, Riaggancia) si rifiutano e dicono come rifarli. Resta solo
+nel piano Studio (Riccardo). Tolti: `geometria.mjs` e `geometria.json` dal
+server, il peso `tieni_geometria` dal listino, le costanti `GEOMETRIA_*`, i tre
+controlli e «Riaggancia alla vista». Le linee dritte (M-LSD) non ci sono piu'.
+
+- Mappe del browser contro quelle del deployment: spigoli uguali a occhio,
+  profondita' uguale a quella di onnxruntime in Python.
+- Tempo nel container (Chromium senza scheda video, WASM): 3-4 s per la
+  profondita' dopo il primo caricamento, 0,2-0,5 s gli spigoli; il primo giro
+  dello Studio, compreso lo scaricamento, 9,6 s.
+- Costo con la chiave Comfy: 17,49 crediti con le mappe contro 17,19 senza
+  (Nano Banana 2, 1K, la stessa vista, un render ciascuno). Coi crediti
+  AIRENDER nessun credito in piu'.
+- Prova vera dallo Studio del PC (Chromium nel container, coda vera, Router):
+  il lavoro e' partito con 3 immagini e la regola giusta. A occhio la casa
+  colorata tiene volumi e tetto meglio che senza mappe (senza, la casa
+  galleggia), ma inventa una gradinata in primo piano: un render ciascuno.
+
+### Riaggancia alla vista (2026-11-10) — tolto il 2026-11-11
+
 
 Nano Banana non ha un ControlNet: a ogni passata (Genera, Cambia, Ritocca,
 Variante) le linee possono muoversi, e nessun concorrente lo vincola (Veras e
