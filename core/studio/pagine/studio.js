@@ -210,12 +210,61 @@ function avviso(tipo, fatto, cosaFare) {
 }
 // Una spiegazione che non occupa la pagina: un «?» accanto all'etichetta,
 // il testo al passaggio del mouse o con il tasto Tab (proposta 5, 2026-11-02).
+// Il «?» apre un pop-up col testo: al passaggio del mouse, col tasto Tab o
+// con un clic (sul touch). Uno solo per pagina, attaccato al body perché i
+// pannelli con overflow non lo taglino.
 function spiega(testo) {
-  return h("span", { classe: "spiega", tabindex: "0", role: "note", title: testo, "aria-label": testo }, "?");
+  return h("span", { classe: "spiega", tabindex: "0", role: "button", "aria-label": `Spiegazione: ${testo}`, "data-spiega": testo }, "?");
 }
+const bolla = { el: null, di: null };
+function mostraBolla(punto) {
+  if (!bolla.el) {
+    bolla.el = h("div", { classe: "bolla", role: "tooltip", id: "bolla" });
+    document.body.append(bolla.el);
+  }
+  bolla.di = punto;
+  bolla.el.textContent = punto.dataset.spiega;
+  bolla.el.classList.add("aperta");
+  const r = punto.getBoundingClientRect();
+  const b = bolla.el.getBoundingClientRect();
+  const sinistra = Math.max(8, Math.min(r.left + r.width / 2 - b.width / 2, innerWidth - b.width - 8));
+  const sopra = r.bottom + 8 + b.height > innerHeight ? r.top - b.height - 8 : r.bottom + 8;
+  bolla.el.style.left = `${sinistra + scrollX}px`;
+  bolla.el.style.top = `${sopra + scrollY}px`;
+  punto.setAttribute("aria-describedby", "bolla");
+}
+function chiudiBolla() {
+  if (!bolla.el) return;
+  bolla.el.classList.remove("aperta");
+  if (bolla.di) bolla.di.removeAttribute("aria-describedby");
+  bolla.di = null;
+}
+document.addEventListener("mouseover", (e) => { const p = e.target.closest && e.target.closest(".spiega"); if (p) mostraBolla(p); });
+document.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest(".spiega") && bolla.di && !bolla.di.contains(e.relatedTarget)) chiudiBolla(); });
+document.addEventListener("focusin", (e) => { if (e.target.classList && e.target.classList.contains("spiega")) mostraBolla(e.target); });
+document.addEventListener("focusout", (e) => { if (e.target === bolla.di) chiudiBolla(); });
+document.addEventListener("click", (e) => {
+  const p = e.target.closest && e.target.closest(".spiega");
+  if (p) { e.preventDefault(); e.stopPropagation(); if (bolla.di === p && bolla.el.classList.contains("aperta")) chiudiBolla(); else mostraBolla(p); }
+  else chiudiBolla();
+}, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") chiudiBolla(); });
+addEventListener("scroll", chiudiBolla, true);
 // Una riga breve con la spiegazione intera dietro il «?».
 function nota(breve, testo) {
   return h("p", { classe: "tenue piccolo" }, breve, " ", spiega(testo));
+}
+// Dove va un invio, detto sempre allo stesso modo (CLAUDE.md, regola 5): il
+// servizio si legge prima dell'invio, l'indirizzo esatto e il dettaglio del
+// costo stanno nel «?».
+function destinazioneBreve(chi, d) {
+  const [costo, ...dettagli] = String(d.costo || "").split(" · ");
+  const servizio = String(d.destinazione || "").split(" (")[0];
+  return h("p", { classe: "destinazione" }, `${chi} va a `,
+    h("b", {}, d.fornitore ? `${servizio} → ${d.fornitore}` : servizio),
+    d.modello_nome ? ` · ${d.modello_nome}` : "",
+    spiega(`Destinazione esatta: ${d.destinazione}${d.senza_ripiego ? ", senza ripiego su altri servizi" : ""}.`),
+    costo ? [" · ", h("b", {}, costo), dettagli.length ? spiega(dettagli.join(" · ")) : null] : null);
 }
 function presto(testo) { return h("span", { classe: "presto" }, testo || "In arrivo"); }
 
@@ -632,10 +681,8 @@ function disegnaTestata() {
   const attiva = S.studio.coda_attiva;
   c.append(...[
     h("span", { classe: attiva ? "punto" : "punto fermo", "aria-hidden": "true" }),
-    h("span", {}, attiva ? "Coda dei lavori attiva" : "Coda dei lavori ferma"),
-    SUL_WEB ? null : h("span", { classe: "tenue" }, "·"),
-    SUL_WEB ? null : h("span", { classe: "tenue" }, "Cartella delle viste: "),
-    SUL_WEB ? null : h("span", { classe: "mono", title: S.studio.cartella }, S.studio.cartella),
+    h("span", {}, attiva ? "Coda attiva" : "Coda ferma"),
+    SUL_WEB ? null : spiega(`${attiva ? "La coda manda i lavori uno alla volta, anche con lo Studio chiuso." : "La coda è ferma: i lavori aspettano che riparta."} Cartella delle viste: ${S.studio.cartella}`),
     S.descrizione && S.descrizione.camera ? h("span", { classe: "tenue" }, `· ${S.descrizione.camera}`) : null,
   ].filter(Boolean));
   const posto = document.getElementById("licenza-testata");
@@ -700,7 +747,8 @@ function sezioneVista() {
           title: "Se la pianta è già fatta: clicca dove stai e trascina verso dove guardi, esce la foto di quella camera." }, "Punto di vista"));
     } else if (g.idonea) {
       sotto.append(h("span", {}, h("b", { stile: "color:var(--ok)" }, "Vista adatta"),
-        h("span", { classe: "tenue" }, ` · ${d.toni} toni di grigio, sfondo uniforme al ${Math.round(d.quota_sfondo * 100)}% · ${d.larghezza}×${d.altezza} · ${d.nome}`)));
+        h("span", { classe: "tenue" }, ` · ${d.nome}`),
+        spiega(`Vista shaded con ${d.toni} toni di grigio, sfondo uniforme al ${Math.round(d.quota_sfondo * 100)}%, ${d.larghezza}×${d.altezza} pixel.`)));
     } else {
       sotto.append(h("span", {}, h("b", { stile: "color:var(--errore)" }, "Vista non adatta"), h("span", { classe: "tenue" }, ` · ${d.nome}`)));
     }
@@ -894,7 +942,7 @@ function miniatura(p) {
 }
 function rigaMiniature(elenco) {
   const vere = elenco.filter((p) => p.miniatura).length;
-  if (!vere) return "Miniature illustrative: rendono l'idea, non sono render del modello";
+  if (!vere) return "Le miniature sono disegni: rendono l'idea, non sono render del modello.";
   if (vere === elenco.length) return "Miniature: render veri del banco di prova, con la data sotto";
   return `${vere} miniature sono render veri (data sotto), le altre ${elenco.length - vere} illustrazioni: rendono l'idea, non sono render del modello`;
 }
@@ -970,8 +1018,7 @@ function colonnaStile() {
           onclick: () => scegliScena(id) }, nome);
       })));
   const preset = h("section", { classe: "pannello", "aria-label": "Parti da un preset" },
-    h("h2", {}, "Parti da un preset"),
-    h("p", { classe: "tenue piccolo" }, rigaMiniature(presetDi(S.scelte.scena))),
+    h("h2", {}, "Parti da un preset", spiega(rigaMiniature(presetDi(S.scelte.scena)))),
     h("div", { classe: "griglia" }, presetDi(S.scelte.scena).map((p) =>
       tessera(p.nome, S.preset === p.id, () => scegliPreset(p.id), miniatura(p), null,
         p.miniatura ? `render vero del ${p.miniatura.data}` : null))));
@@ -981,8 +1028,7 @@ function colonnaStile() {
   if (S.scelte.scena === "pianta") {
     dettagli.append(
       h("summary", {}, h("h2", {}, "Dettagli del preset"),
-        h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
-        h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
+        h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi())),
       h("div", { classe: "gruppo" }, h("h3", {}, "1 · Che disegno è",
         spiega("Planimetria e planivolumetrico partono da una vista zenitale di Allplan. Nel planivolumetrico le ombre seguono le altezze dei volumi.")),
         tessereAsse("tipo")),
@@ -990,17 +1036,14 @@ function colonnaStile() {
         spiega("Prende il posto del look fotografico e della resa · muri, aperture e impronte restano dove li hai disegnati")),
         chipAsse("look")),
       h("div", { classe: "gruppo" }, h("h3", {}, "3 · Luce e ombre"), tessereAsse("luce")),
-      h("p", { classe: "tenue piccolo" }, "Verde, alberi, persone e auto si aggiungono dopo, sul render, con i pennelli del Ritocca. Le stanze si arredano con Arreda."));
+      nota("Verde, persone e arredi si aggiungono dopo.", "Verde, alberi, persone e auto si aggiungono sul render con il Ritocca. Le stanze si arredano con Arreda."));
     return h("div", { classe: "colonna-stile" }, scena, preset, dettagli);
   }
   dettagli.append(
     h("summary", {}, h("h2", {}, "Dettagli del preset"),
-      h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi()),
-      h("span", { classe: "tenue piccolo" }, "· cambi un pezzo, il resto resta com'è")),
+      h("span", { classe: "tenue piccolo", id: "sintesi" }, sintesi())),
     h("div", { classe: "gruppo" }, h("h3", {}, "1 · Resa"),
-      h("p", { classe: "tenue piccolo" }, resaScelta().spegne.length
-        ? `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}.`
-        : "Miniature illustrative."),
+      resaScelta().spegne.length ? h("p", { classe: "tenue piccolo" }, `${resaScelta().nome} spegne: ${resaScelta().spegne_testo}.`) : null,
       h("div", { classe: "griglia", role: "group", "aria-label": "Resa" }, S.catalogo.rese.map((r) => tessera(r.nome,
         (S.scelte.resa || "foto") === r.id, () => scegliResa(r.id), illustrazioneResa(r.id), null)))),
     h("div", { classe: "gruppo" }, h("h3", {}, "2 · Look fotografico", spiega("Colore, contrasto e grana · l’inquadratura resta quella di Allplan · solo per le rese fotografiche")),
@@ -1043,15 +1086,13 @@ function colonnaInvio() {
     const nota = document.getElementById("nota-prompt");
     if (nota) nota.classList.remove("nascosto");
   });
-  const cosaParte = h("section", { classe: "pannello", "aria-label": "Cosa parte" },
-    h("span", { classe: "etichetta" }, "Cosa parte, in breve"),
-    h("p", { id: "riassunto" }, S.modo === "contesto" && !contestoPerServer()
-      ? "Il prompt si compone quando la foto del luogo e l'area ci sono (passo 1)."
-      : S.composto ? S.composto.riassunto : "…"),
-    !vedePrompt() ? null : h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
+  // Il riassunto delle scelte lo dice gia' «Dettagli del preset»: qui resta
+  // solo il prompt vero, per chi lo vuole vedere (2026-11-12).
+  const cosaParte = !vedePrompt() ? null : h("div", { classe: "sotto-gruppo", "aria-label": "Prompt completo" },
+    h("button", { classe: "btn link", "aria-expanded": String(S.mostraPrompt), onclick: () => { S.mostraPrompt = !S.mostraPrompt; render(); } },
       S.mostraPrompt ? "Nascondi il prompt" : "Avanzate: mostra e modifica il prompt completo"),
     S.mostraPrompt && vedePrompt() ? h("div", { classe: "sotto-gruppo" },
-      h("p", { classe: "tenue piccolo" }, "Testo vero che parte al modello, in inglese. Se lo modifichi, i comandi a sinistra non lo toccano più finché non premi «Ricomponi»."),
+      nota("Il testo che parte al modello, in inglese.", "Se lo modifichi, le scelte a sinistra non lo toccano più finché non premi «Ricomponi dalle scelte»."),
       prompt,
       h("div", { classe: "riga tra" },
         h("span", { classe: "tenue piccolo mono", id: "caratteri" },
@@ -1096,10 +1137,9 @@ function colonnaInvio() {
 
   return h("div", { classe: "colonna-invio" },
     S.modo === "contesto" ? null : h("section", { classe: "pannello", "aria-label": "Materiali" },
-      h("span", { classe: "etichetta" }, "Materiali a parole"),
-      h("p", { classe: "tenue piccolo" }, "Passano al modello come li scrivi, anche in italiano."), materiali,
+      h("span", { classe: "etichetta" }, "Materiali a parole", spiega("Passano al modello come li scrivi, anche in italiano.")), materiali,
       spento("materiali") ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, `Con la resa ${resaScelta().nome} i materiali non partono.`) : null),
-    S.modo === "contesto" ? null : mappa, cosaParte, scelteInvio, pannelloInvio());
+    S.modo === "contesto" ? null : mappa, scelteInvio, pannelloInvio(cosaParte));
 }
 
 // --- materiali di questo progetto -----------------------------------------
@@ -1349,10 +1389,8 @@ function pannelloZone(massimo) {
       ? h("p", { classe: "piccolo" }, h("b", {}, "Clicca sulla vista"), " su ogni materiale da cambiare: ogni clic diventa una riga qui sotto, col suo numero.")
       : S.mat.lazo
       ? h("p", { classe: "piccolo" }, h("b", {}, "Disegna sulla vista"), " il contorno di una superficie tenendo premuto. Quando lasci, il pezzo diventa una riga qui sotto.")
-      : h("p", { classe: "piccolo tenue" }, S.mat.zone.length
-          ? `${S.mat.zone.length} di massimo ${massimo} materiali scelti sulla vista.`
-          : SUL_WEB ? "Indica sulla vista le superfici da cambiare: per ognuna scrivi cosa diventa."
-          : "Questa vista non ha l'elenco dei materiali di Allplan: indica sulla vista le superfici da cambiare."),
+      : S.mat.zone.length ? h("p", { classe: "piccolo tenue" }, `${S.mat.zone.length} di ${massimo}.`)
+      : h("p", { classe: "piccolo tenue" }, "Indica sulla vista le superfici da cambiare."),
     righe, h("div", { classe: "riga" }, comando),
     pieno ? h("p", { classe: "piccolo tenue" }, `Al massimo ${massimo} materiali per invio: gli altri li cambi con un passo dopo.`) : null,
     vuote ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Scrivi cosa diventa ogni materiale, o toglilo: senza testo non parte.") : null);
@@ -1510,12 +1548,12 @@ function pannelloGeometria() {
     } });
   return h("div", { classe: possibile ? "geometria" : "geometria spento" },
     h("label", { classe: "riga-spunta", for: "tieni-geometria" }, spunta,
-      h("b", {}, S.scelte && S.scelte.scena === "pianta" ? "Tieni la geometria · muri e aperture" : "Tieni la geometria"),
-      " ", h("span", { classe: "etichetta-inclusa" }, "Incluso · nessun credito in più")),
+      h("b", {}, "Tieni la geometria"),
+      " ", h("span", { classe: "etichetta-inclusa" }, "Incluso")),
     possibile ? null : h("p", { classe: "tenue piccolo" }, perchéGeometriaSpenta()),
     h("p", { classe: "tenue piccolo" },
-      "AIRENDER calcola sul tuo computer spigoli e profondità della vista e li dà al modello come guida: muri, aperture e volumi restano dove li hai disegnati. ",
-      spiega("Spigoli: dove sono contorni, finestre e porte. Profondità: cosa sta davanti e cosa dietro (chiaro vicino, scuro lontano), per i volumi e le distanze. Le due mappe partono insieme alla vista nello stesso invio, verso lo stesso modello: nessun servizio in più e, coi crediti AIRENDER, nessun credito in più. Aiutano soprattutto nelle viste prospettiche coi colori dei layer; su una pianta o su una vista già chiara il modello tiene bene anche da solo. Vale in Genera, sulla vista: i passi dopo (Cambia, Ritocca, Variante) non la usano, e la loro tenuta la dice la % di spigoli.")),
+      "Muri, aperture e volumi restano dove li hai disegnati.",
+      spiega("AIRENDER calcola sul tuo computer spigoli e profondità della vista e li dà al modello come guida. " + "Spigoli: dove sono contorni, finestre e porte. Profondità: cosa sta davanti e cosa dietro (chiaro vicino, scuro lontano), per i volumi e le distanze. Le due mappe partono insieme alla vista nello stesso invio, verso lo stesso modello: nessun servizio in più e, coi crediti AIRENDER, nessun credito in più. Aiutano soprattutto nelle viste prospettiche coi colori dei layer; su una pianta o su una vista già chiara il modello tiene bene anche da solo. Vale in Genera, sulla vista: i passi dopo (Cambia, Ritocca, Variante) non la usano, e la loro tenuta la dice la % di spigoli.")),
     geometriaGenera() ? statoMappe() : null);
 }
 
@@ -1548,24 +1586,24 @@ async function togliRiferimento() {
 function pannelloRiferimento() {
   const m = modelloScelto();
   const accetta = !!(m && m.piu_immagini);
-  const titolo = h("span", { classe: "etichetta" }, "Immagine di riferimento per lo stile");
+  const titolo = h("span", { classe: "etichetta" }, "Riferimento per lo stile");
   if (S.modo === "contesto") {
     return [titolo, h("p", { classe: "tenue piccolo" },
-      "Con «Fotoinserimento» il riferimento non parte: le due immagini sono già il contesto e la vista, e la luce la dà il contesto.")];
+      "Non serve qui: luce e colori li dà la foto del luogo.")];
   }
   if (!accetta) {
     return [titolo,
-      h("p", { classe: "tenue piccolo" }, `${m ? m.nome : "Questo modello"} riceve una sola immagine per invio: il riferimento si usa con Nano Banana 2.`),
+      h("p", { classe: "tenue piccolo" }, `${m ? m.nome : "Questo modello"} non lo riceve: usa Nano Banana 2.`),
       S.riferimento ? h("div", { classe: "riga" },
         h("span", { classe: "piccolo" }, `Caricato: ${S.riferimento.da || S.riferimento.nome}, non partirebbe.`),
         h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")) : null];
   }
-  const file = h("input", { type: "file", accept: "image/png,image/jpeg", "aria-label": "Carica un'immagine di riferimento per lo stile" });
+  const file = h("input", { type: "file", accept: "image/png,image/jpeg", hidden: true, "aria-label": "Carica un'immagine di riferimento per lo stile" });
   file.addEventListener("change", () => scegliRiferimento(file.files && file.files[0]));
   if (!S.riferimento) {
-    return [titolo,
-      nota("Solo colori, luce e materiali.", "Una foto da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG."),
-      file];
+    return [h("span", { classe: "etichetta" }, "Riferimento per lo stile",
+        spiega("Una foto o un render da cui prendere solo colori, luce e materiali, non la forma. Parte come seconda immagine, insieme alla vista. JPEG o PNG.")),
+      h("div", {}, file, h("button", { classe: "btn piccolo", onclick: () => file.click() }, "+ Carica immagine"))];
   }
   const r = S.riferimento;
   const massimo = S.catalogo.esempi_stile_massimi || 4;
@@ -1578,11 +1616,11 @@ function pannelloRiferimento() {
         h("img", { src: `/file/riferimento/${enc(r.nome)}`, alt: "Immagine di riferimento per lo stile", stile: "max-width:96px;max-height:72px;border-radius:4px" }),
         h("span", { classe: "piccolo" }, `${r.da || r.nome} · ${r.larghezza} × ${r.altezza}`),
         h("button", { classe: "btn", onclick: togliRiferimento }, "Togli")),
-      nota("Solo palette, luce e materiali.", "Il modello prende solo palette, luce e materiali. La ricetta salva l'impronta del file, non l'immagine."),
-      h("span", {}, altro, h("button", { classe: "btn link piccolo", onclick: () => altro.click() }, "+ Un altro esempio (Stile da esempi)"))];
+      h("span", {}, altro, h("button", { classe: "btn link piccolo", onclick: () => altro.click() }, "+ Un altro esempio"),
+        spiega(`Con 2-${massimo} esempi il modello prende quello che hanno in comune.`))];
   }
   return [h("span", { classe: "etichetta" }, "Stile da esempi",
-      spiega(`Da 2 a ${massimo} render con lo stile che vuoi: il modello prende quello che hanno in comune (colori, luce, materiali, taglio fotografico), non gli edifici. Con 15 o più immagini dello stesso stile arriverà «Crea il mio stile».`)),
+      spiega(`Da 2 a ${massimo} render con lo stile che vuoi: il modello prende quello che hanno in comune (colori, luce, materiali, taglio fotografico), non gli edifici. Partono dopo la vista.`)),
     h("div", { classe: "griglia-rif" },
       tutti.map((x, i) => h("div", { classe: "rif" },
         h("img", { src: `/file/riferimento/${enc(x.nome)}`, alt: `Esempio ${i + 1}: ${x.da || x.nome}` }),
@@ -1590,7 +1628,7 @@ function pannelloRiferimento() {
         h("button", { classe: "togli", "aria-label": `Togli l'esempio ${i + 1}`, onclick: () => (i === 0 ? togliRiferimento() : togliEsempio(i - 1)) }, "×"))),
       tutti.length < massimo ? h("button", { classe: "rif rif-nuovo", onclick: () => altro.click() }, `+ Esempio ${tutti.length + 1}`) : null,
       altro),
-    h("p", { classe: "tenue piccolo" }, `Partono ${tutti.length} esempi dopo la vista. Testo per il modello scelto, non ancora provato.`)];
+  ];
 }
 
 // Rif. di oggetti e persone: fino a INSERTI_MASSIMO immagini da mettere
@@ -1633,10 +1671,9 @@ function pannelloInserti(lista, modello, dove, cambiato, bloccato) {
       lista.map((r, i) => miniaturaRif(r, i + 1, bloccato ? null : async () => { lista.splice(i, 1); await cambiato(); })),
       aggiungi, file),
     !accetta ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" },
-      `${modello ? modello.nome : "Questo modello"} riceve una sola immagine per invio: i Rif. si usano con Nano Banana 2.`
+      `${modello ? modello.nome : "Questo modello"} non riceve i Rif.: usa Nano Banana 2.`
       + (lista.length ? ` Con ${lista.length === 1 ? "questo Rif." : "questi Rif."} non manda.` : ""))
-      : lista.length ? h("p", { classe: "tenue piccolo" },
-        `${lista.length === 1 ? "Il Rif. parte" : `I ${lista.length} Rif. partono`} dopo le altre immagini. Citali nel testo: «Rif. 1»${lista.length > 1 ? ", «Rif. 2»" : ""}. Testo per il modello scelto, non ancora provato.`)
+      : lista.length ? h("p", { classe: "tenue piccolo" }, `Citali nel testo: «Rif. 1»${lista.length > 1 ? ", «Rif. 2»" : ""}.`)
       : null,
     errore);
 }
@@ -1720,8 +1757,8 @@ async function cambiaModo(modo) {
 
 function sceltaModo() {
   return h("div", { classe: "scelta-modo", role: "group", "aria-label": "Cosa vuoi fare" },
-    [["vista", "Render della vista", "La vista di Allplan diventa una foto, con lo stile che scegli."],
-     ["contesto", "Fotoinserimento", "Quello che hai in Allplan, edificio o arredo, dentro una foto vera: dall'alto, a volo d'uccello o da terra."]]
+    [["vista", "Render della vista", "La vista diventa una foto."],
+     ["contesto", "Fotoinserimento", "Il progetto dentro una foto vera del luogo."]]
       .map(([id, nome, spiega]) => h("button", { classe: "modo", "aria-pressed": String(S.modo === id), onclick: () => cambiaModo(id) },
         h("b", {}, nome), h("span", { classe: "tenue piccolo" }, spiega))));
 }
@@ -1842,15 +1879,12 @@ function motivoGeneraSpento() {
   return null;
 }
 
-function pannelloInvio() {
+function pannelloInvio(prompt) {
   const d = S.destinazione;
   const spento = motivoGeneraSpento();
   const blocco = h("section", { classe: "pannello", "aria-label": "Invio" });
   if (d) {
-    blocco.append(
-      h("p", { classe: "destinazione" }, "La vista va a ", h("b", {}, d.destinazione),
-        ` (${d.fornitore}, ${d.modello_nome})`, d.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
-      h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, d.costo)));
+    blocco.append(destinazioneBreve("La vista", d));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
     if (d.geometria) blocco.append(h("p", { classe: "destinazione" }, "«Tieni la geometria»: ", d.geometria.destinazione, ". Costo: ", h("b", {}, d.geometria.costo), "."));
@@ -1864,6 +1898,7 @@ function pannelloInvio() {
     h("button", { classe: "btn primario", onclick: genera, disabled: !!spento, id: "genera" },
       S.lavoroAttivo ? "In corso…" : (S.varianti > 1 ? `Genera ${S.varianti} render` : "Genera render"))));
   if (spento) blocco.append(h("p", { classe: "tenue piccolo" }, spento));
+  if (prompt) blocco.append(prompt);
   if (S.secco) {
     const s = S.secco;
     blocco.append(h("div", { classe: "avviso" + (s.problemi.length ? " attenzione" : ""), role: "status" },
@@ -1929,6 +1964,7 @@ function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
   const linea = h("div", {
     classe: "linea", role: "slider", tabindex: "0", "aria-label": "Sposta la linea fra prima e dopo",
     "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(st.x)),
+    title: "Trascina, oppure ← → (con Maiusc il passo è più lungo)",
   }, h("span", { classe: "maniglia", "aria-hidden": "true" }, "⇔"));
   const palco = h("div", { classe: "confronto", stile: `--x:${st.x}%; aspect-ratio:16/9` },
     imgA, imgB, linea,
@@ -1957,8 +1993,8 @@ function primaDopo(st, srcA, nomeA, srcB, nomeB, altB) {
     palco.style.aspectRatio = `${lb} / ${ab}`;
     const ra = imgA.naturalWidth / imgA.naturalHeight, rb = lb / ab;
     const scarto = Math.abs(ra - rb) / rb;
-    nota.textContent = scarto < 0.005
-      ? `${nomeA} riportata a ${lb}×${ab}, la misura del render: stesse proporzioni, gli spigoli si sovrappongono.`
+    // Si dice solo quando conta: proporzioni diverse spostano gli spigoli.
+    nota.textContent = scarto < 0.005 ? ""
       : `${nomeA} (${imgA.naturalWidth}×${imgA.naturalHeight}) stirata a ${lb}×${ab} per sovrapporla: le proporzioni differiscono del ${(scarto * 100).toFixed(1).replace(".", ",")}%, gli spigoli possono non coincidere per questo.`;
   };
   imgA.addEventListener("load", proporzioni);
@@ -2007,8 +2043,8 @@ function confronto(l) {
       "Questa è l'immagine che hai caricato: prima e dopo sono uguali. Il confronto si accende col primo Cambia, Ritocca o Popola, che arriva qui accanto già scelto.") : null,
     palco,
     r.modo === "scorri" ? h("div", { classe: "riga tra" },
-      h("span", { classe: "tenue piccolo" }, "Trascina la linea, oppure tasti ← → (con Maiusc il passo è più lungo)"),
-      h("span", { classe: "mono", id: "valore-linea" }, `${Math.round(r.x)}%`)) : null,
+      h("span"),
+      h("span", { classe: "mono tenue piccolo", id: "valore-linea" }, `${Math.round(r.x)}%`)) : null,
     r.modo === "scorri" ? nota : null);
 }
 
@@ -2063,7 +2099,7 @@ function tenuta(l) {
   return corpoTenuta(l ? l.tenuta : null, l ? l.identificativo : null);
 }
 
-function ricettaPannello(l) {
+function ricettaPannello(l, note) {
   const ric = S.risultato.ricetta;
   if (l.importata) {
     const righe = [["Che cos'è", "L'immagine che hai caricato, così com'è"], ["Servizio", "Nessun invio"], ["Costo", "nessuno: non è partito niente"]];
@@ -2091,8 +2127,10 @@ function ricettaPannello(l) {
   } else {
     righe.push(["Costo", "nessun render: niente da leggere"]);
   }
-  return h("section", { classe: "pannello", "aria-label": "Com'è stato fatto" },
-    h("span", { classe: "etichetta" }, "Com'è stato fatto"),
+  if (note && note.length) righe.push(["Note", h("span", {}, note.map((a) => h("span", { stile: "display:block;margin-bottom:6px" }, a)))]);
+  // Chiuso: i dettagli servono a chi li cerca, non a ogni render (2026-11-12).
+  return h("details", { classe: "pannello dettagli-ricetta", "aria-label": "Com'è stato fatto" },
+    h("summary", {}, h("span", { classe: "etichetta" }, "Com'è stato fatto ›")),
     h("dl", { classe: "ricetta" }, righe.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])));
 }
 
@@ -2402,10 +2440,12 @@ function barraAzioni(l) {
   const da = l.parte_da ? "dall'immagine da cui era nata questa" : tipoVista() ? `dalla ${nomePrima().toLowerCase()}` : "dalla vista Allplan";
   const cosa = l.parte_da ? "la stessa richiesta" : `lo stesso stile (${l.preset_nome})`;
   righe.push(l.importata
-    ? h("p", { classe: "dove" }, "È l'immagine che hai caricato: da qui partono Cambia, Ritocca, Popola, Video e Finale. Ognuno ti dice dove va e quanto costa prima di partire.")
+    ? null
     : h("p", { classe: "dove" },
-      `Variante: un'altra versione di questa immagine. Riparte ${da}, con ${cosa} e lo stesso modello (${l.modello_nome}).`,
-      d ? [" Va a ", h("b", {}, d.destinazione), d.costo ? ` · ${d.costo}` : ""] : null));
+      "Variante",
+      spiega(`Un'altra versione di questa immagine. Riparte ${da}, con ${cosa} e lo stesso modello (${l.modello_nome}).`),
+      d ? [" va a ", h("b", {}, String(d.destinazione).split(" (")[0]), d.costo ? ` · ${d.costo.split(" · ")[0]}` : "",
+        spiega(`Destinazione esatta: ${d.destinazione}.`)] : null));
   if (cambiaAperto(l) && S.scheda === "risultato") righe.push(pannelloNuovoPasso());
   if (az.video) righe.push(videoVeloce(l));
   if (az.porta) righe.push(pannelloPorta(l));
@@ -2755,8 +2795,7 @@ function pannelloFinale(l) {
         onclick: () => { q.tipo = t.id; componiFinale(l); } }, t.nome))),
     nota("Scelta, non provata.", "Foto per i render fotografici; Illustrazione per schizzi, acquerelli e rese non fotografiche. Nessun Finale è ancora stato fatto con il servizio vero: il primo è la prova."),
     c ? h("p", { classe: "piccolo" }, `Da ${c.partenza} a `, h("b", {}, c.uscita), " pixel.") : null,
-    d ? h("p", { classe: "destinazione" }, "Il render va a ", h("b", {}, d.destinazione),
-      d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`) : null,
+    d ? destinazioneBreve("Il render", d) : null,
     d && d.avviso ? h("p", { classe: "tenue piccolo" }, d.avviso) : null,
     q.errore ? avviso("errore", q.errore.fatto, q.errore.cosa_fare) : null,
     h("div", { classe: "azioni" },
@@ -2825,7 +2864,7 @@ function pannelloPorta(l) {
   const testa = [
     h("span", { classe: "etichetta" }, "Ricetta di questa immagine"),
     elencoPassiRicetta(d.passi),
-    h("p", { classe: "piccolo tenue" }, `Modello ${d.modello_nome}. I pennelli e le aree dei ritocchi non si portano: sono disegnati su questa inquadratura, passano a parole.`),
+    nota(`Modello ${d.modello_nome}.`, "I pennelli e le aree dei ritocchi non si portano: sono disegnati su questa inquadratura, passano a parole."),
     salva,
     p.salvata ? h("p", { classe: "piccolo", role: "status" }, p.salvata) : null,
     p.errore ? avviso("errore", p.errore.fatto, p.errore.cosa_fare) : null,
@@ -2905,9 +2944,8 @@ async function scegliRicetta(nome) {
 function pannelloRicette() {
   const q = S.ricette;
   if (!q.elenco.length) {
-    return [h("span", { classe: "etichetta" }, "Le mie ricette"),
-      h("p", { classe: "tenue piccolo" }, "Nessuna ricetta salvata. Sotto un render riuscito apri Ricetta e premi Salva ricetta: qui la rifai sulle viste che catturi dopo."),
-      q.problema ? avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo.") : null];
+    // Vuote non occupano posto: si creano da Risultato › Ricetta › Salva ricetta.
+    return [q.problema ? avviso("errore", q.problema, "Le ricette nuove si salvano in un file nuovo.") : null];
   }
   const scelta = h("select", { "aria-label": "Le mie ricette" },
     h("option", { value: "", selected: !q.scelta }, "Nessuna"),
@@ -3053,9 +3091,7 @@ function schermataRisultato() {
     avvisiTesta.map((a) => avviso("errore", a)),
     h("div", { classe: "layout-risultato" },
       palcoConAzioni(l),
-      h("div", { classe: "lato" }, elencoRender(), tenuta(l), ricettaPannello(l), adesso(l),
-        altriAvvisi.length ? h("section", { classe: "pannello" }, h("span", { classe: "etichetta" }, "Note del motore"),
-          altriAvvisi.map((a) => h("p", { classe: "piccolo tenue" }, a))) : null))];
+      h("div", { classe: "lato" }, elencoRender(), tenuta(l), adesso(l), ricettaPannello(l, altriAvvisi)))];
 }
 
 // --- Ritocca -------------------------------------------------------------------
@@ -3638,8 +3674,7 @@ function schermataRitocca() {
       strumentiRitocco(true, "Spenti: non c'è un render da ritoccare."),
       h("section", { classe: "pannello vuoto-ritocco" },
         h("p", {}, "Prima serve un render. Generane uno da Genera."),
-        h("div", { classe: "azioni" }, h("a", { classe: "btn primario", href: "#genera" }, "Vai a Genera"))),
-      daVerificare()];
+        h("div", { classe: "azioni" }, h("a", { classe: "btn primario", href: "#genera" }, "Vai a Genera")))];
   }
   if (!r.modello) r.modello = modelloVerificato(base.modello);
   const bloccato = ritoccoBloccato();
@@ -3659,7 +3694,8 @@ function schermataRitocca() {
         h("div", { classe: "riga tra" }, h("span", { classe: "piccolo" }, "Allplan e il resto dello Studio restano liberi."), h("button", { classe: "btn", onclick: annulla }, "Annulla"))) : null,
       telaRitocco(base),
       compositoreRitocco(bloccato)),
-    h("div", { classe: "lato" }, pannelloApplica(base, bloccato), daVerificare()))];
+    h("div", { classe: "lato" }, pannelloApplica(base, bloccato),
+      nota("Per un materiale tutto diverso, rifai il render da Genera.", "Il ritocco cambia solo dentro le aree: luce e riflessi fuori non lo seguono.")))];
 }
 
 // --- Passi ---------------------------------------------------------------------
@@ -3966,8 +4002,7 @@ function palcoGriglia(passo, fratelli, titolo, modi) {
 function rigaDestinazione(modello, cosaParte) {
   const d = S.passi.dest[modello];
   if (!d) return h("p", { classe: "tenue piccolo" }, "Leggo la destinazione…");
-  return h("p", { classe: "destinazione" }, `${cosaParte || "La vista"} va a `, h("b", {}, d.destinazione),
-    d.senza_ripiego ? ", senza ripiego su altri servizi" : "", `. Costo: ${d.costo}.`);
+  return destinazioneBreve(cosaParte || "La vista", d);
 }
 
 function sceltaModello(stato, onCambio, dove, piuImmagini) {
@@ -3997,16 +4032,16 @@ function schedeModello(dove, sceltoId, servePiuImmagini, onScegli) {
       h("span", { classe: "corpo-modello" },
         h("span", { classe: "riga-modello" }, h("b", {}, m.nome), h("span", { classe: "tenue piccolo" }, ` · ${m.fornitore}`),
           m.id === S.studio.modello_predefinito ? h("span", { classe: "etichetta-modello" }, "predefinito") : null),
-        h("span", { classe: "piccolo" }, m.spiega),
-        h("span", { classe: "tenue piccolo" }, m.piu_immagini ? "Più immagini per invio" : "Una sola immagine per invio",
-          m.costo && m.costo.startsWith("circa") ? ` · ${m.costo.split(" · ")[0]}` : " · costo non misurato"),
+        aperta ? h("span", { classe: "piccolo" }, m.spiega) : null,
+        h("span", { classe: "tenue piccolo" }, aperta ? (m.piu_immagini ? "Più immagini per invio · " : "Una sola immagine per invio · ") : "",
+          m.costo && m.costo.startsWith("circa") ? m.costo.split(" · ")[0] : "costo non misurato"),
         perche ? h("span", { classe: "piccolo", stile: "color:var(--attenzione)" }, perche) : null));
   };
   if (!aperta) {
     return h("div", { classe: "scelta-modello", role: "radiogroup", "aria-label": "Modello" },
       scelto ? scheda(scelto) : h("p", { classe: "tenue piccolo" }, "Nessun modello scelto."),
       h("button", { classe: "btn link piccolo", onclick: () => { modelliAperti.add(dove); render(); } },
-        `Cambia modello (${tutti.length - (scelto ? 1 : 0)} altri)`));
+        "Cambia modello"));
   }
   const categorie = S.catalogo.categorie_modelli || [];
   return h("div", { classe: "scelta-modello aperta", role: "radiogroup", "aria-label": "Modello" },
@@ -4093,15 +4128,14 @@ function pannelloNuovoPasso() {
   return h("section", { classe: "pannello evidenziato", "aria-label": "Cambia" },
     h("div", { classe: "riga tra" }, h("span", { classe: "etichetta" }, "Cambia tutta l'immagine"),
       h("button", { classe: "btn link", onclick: () => { S.passi.nuovo = null; render(); } }, "Chiudi")),
-    h("p", { classe: "piccolo" }, `Spigoli, arredo e inquadratura restano, cambiano luce e atmosfera. Escono passi nuovi sotto il passo ${da.numero}.`),
+    nota("Cambiano luce e atmosfera; spigoli, arredo e inquadratura restano.", `Ogni scelta è un passo nuovo sotto il passo ${da.numero}, e un invio.`),
     voci.length ? cambia.gruppi.map((g) => {
       const del_gruppo = voci.filter((v) => v.gruppo === g.id);
       return del_gruppo.length ? h("div", { classe: "gruppo-mini", role: "group", "aria-label": g.nome },
         h("span", { classe: "etichetta" }, g.nome),
         h("div", { classe: "miniature-cambia" }, del_gruppo.map((v) => miniaturaCambia(v, n)))) : null;
     }) : h("p", { classe: "tenue piccolo" }, "Per un pezzo d'arredo non ci sono miniature: scrivi cosa cambiare."),
-    voci.length ? h("p", { classe: "tenue piccolo" },
-      `Miniature disegnate, non render: dicono l'idea. Puoi sceglierne fino a ${cambia.massime}; ognuna è un passo e un invio. Alla fine le confronti nella griglia dei Passi.`) : null,
+    voci.length ? nota(`Fino a ${cambia.massime} scelte.`, `Le miniature sono disegni, non render: dicono l'idea. Ognuna è un passo e un invio; alla fine le confronti nella griglia dei Passi.`) : null,
     campo,
     h("p", { classe: "tenue piccolo" }, quante ? "Il testo, se lo scrivi, si aggiunge a ogni scelta." : "Solo una parte? Usa Ritocca."),
     pannelloInserti(n.inserti, S.catalogo.modelli.find((m) => m.id === n.modello), "Cambia", () => { componiNuovoPasso(); render(); }),
@@ -4399,9 +4433,7 @@ function colonnaInvioVideo() {
   const spento = motivoVideoSpento();
   const pieni = v.posti.filter(Boolean).length;
   const invio = h("section", { classe: "pannello", "aria-label": "Invio del video" },
-    h("p", { classe: "destinazione" }, `${pieni === 1 ? "L'immagine va" : pieni ? `Le ${pieni} immagini vanno` : "Le immagini vanno"} a `, h("b", {}, c.destinazione),
-      ` (${c.fornitore}, ${c.modello_nome})`, c.senza_ripiego ? ", senza ripiego su altri servizi." : "."),
-    h("p", { classe: "destinazione" }, "Costo: ", h("b", {}, c.costo)),
+    destinazioneBreve(pieni === 1 ? "L'immagine" : pieni ? `Le ${pieni} immagini` : "Le immagini", c),
   );
   if (!S.studio.coda_attiva) invio.append(avviso("attenzione", "La coda dei lavori non sta girando: il video resterebbe in attesa.", "Chiudi e riapri lo Studio, che la fa partire."));
   invio.append(h("div", { classe: "azioni" },
@@ -4433,7 +4465,7 @@ function colonnaInvioVideo() {
       h("div", { classe: "switch", role: "group", "aria-label": "Risoluzione del video" },
         c.risoluzioni.map((r) => h("button", { classe: "seg", "aria-pressed": String(v.risoluzione === r),
           onclick: () => { v.risoluzione = r; v.secco = null; render(); } }, r))),
-      h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio (per un render d'architettura di solito non serve)"))),
+      h("label", { classe: "riga" }, audio, h("span", { classe: "piccolo" }, "Audio"), spiega("Per un render d'architettura di solito non serve."))),
     invio);
 }
 

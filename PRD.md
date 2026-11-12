@@ -282,6 +282,14 @@ esce con: Riccardo apre lo Studio, spunta «Tieni la geometria» su una vista
 prospettica coi colori dei layer, guarda le due miniature e dice i secondi; poi
 un render con e uno senza, affiancati.
 
+### Testi asciutti e pop-up «?» dello Studio (2026-11-12)
+
+Provato nello Studio vero in Chromium nel container, con un Comfy finto (niente
+rete): Genera, Risultato, Ritocca, Cambia, Video, Licenza. **Mai provato in
+Edge su Windows, nella web app con Pyodide, su touch** (il «?» si apre col
+clic) e con un lettore di schermo. Si esce con: Riccardo apre lo Studio, passa
+sui «?» di Genera e dice se le spiegazioni che servono ci sono ancora.
+
 ### Partenza da un'immagine (2026-11-09)
 
 Foto, render già fatto e schizzo caricati nello Studio, con tre regole nuove

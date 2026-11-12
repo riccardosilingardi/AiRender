@@ -634,7 +634,7 @@ def test_la_pagina_ha_i_testi_degli_stati_di_design_md():
         "Annulla",
         "Vista non adatta",                                        # errore
         "L'invio non è andato.",
-        "Miniature illustrative: rendono l'idea, non sono render del modello",
+        "Le miniature sono disegni: rendono l'idea, non sono render del modello.",
         "Avanzate: mostra e modifica il prompt completo",
         "Ricomponi dalle scelte",
         "Prova a secco",
