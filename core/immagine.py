@@ -173,6 +173,31 @@ def riduci_lato(dati: bytes, lato_massimo: int) -> bytes:
     return uscita.getvalue()
 
 
+def alleggerisci(dati: bytes, massimo_mb: float, lati: tuple[int, ...]) -> bytes | None:
+    """L'immagine sotto `massimo_mb`: prima JPEG alla stessa grandezza, poi lati sempre piu' corti.
+
+    Un render a 5504x3072 in PNG pesa 20 MB; in JPEG, stessi pixel, pochi MB.
+    Si rimpicciolisce solo se il JPEG non basta. None se non e' un'immagine
+    o se neanche il lato piu' corto basta.
+    """
+    try:
+        immagine = _apri(dati).convert("RGB")
+    except FileNonTrovato:
+        return None
+    for lato in (None, *lati):
+        if lato is None:
+            ridotta = immagine
+        else:
+            fattore = min(1.0, lato / max(immagine.size))
+            ridotta = immagine.resize((max(1, round(immagine.width * fattore)),
+                                       max(1, round(immagine.height * fattore))), Image.Resampling.LANCZOS)
+        uscita = io.BytesIO()
+        ridotta.save(uscita, format="JPEG", quality=90)  # numero-non-configurabile: qualita' JPEG senza artefatti visibili
+        if dimensione_mb(uscita.getvalue()) <= massimo_mb:
+            return uscita.getvalue()
+    return None
+
+
 def dimensioni(dati: bytes) -> tuple[int, int]:
     """Larghezza e altezza, senza calcolare le statistiche."""
     immagine = _apri(dati)

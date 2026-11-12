@@ -51,6 +51,31 @@ class RichiestaStudioNonValida(ErroreAirender):
 
 ESTENSIONI_VISTA = (".png", ".jpg", ".jpeg")
 _BYTE_PER_MB = 1024 * 1024  # numero-non-configurabile: definizione di MB
+
+
+def _alleggerisci(dati: bytes, che_cosa: str) -> bytes:
+    """Un'immagine caricata, rimpicciolita se pesa piu' di quello che si manda a Comfy Router.
+
+    Prima lo Studio la rifiutava e chiedeva di ridurla a mano: ora lo fa da
+    solo, fino a STUDIO_CARICAMENTO_MASSIMO_MB. Sotto il limite resta com'e'.
+    """
+    massimo_caricamento = config.STUDIO_CARICAMENTO_MASSIMO_MB
+    if len(dati) > massimo_caricamento * _BYTE_PER_MB:
+        raise RichiestaStudioNonValida(
+            f"{che_cosa} pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, lo Studio ne accetta {massimo_caricamento}.",
+            "Usa un'immagine piu' piccola.",
+        )
+    massimo = config.COMFY_INVIO_MASSIMO_MB
+    if len(dati) <= massimo * _BYTE_PER_MB:
+        return dati
+    ridotti = modulo_immagine.riduci_lato(dati, config.RIFERIMENTO_LATO_RIDOTTO_PX)
+    if len(ridotti) > massimo * _BYTE_PER_MB:
+        raise RichiestaStudioNonValida(
+            f"{che_cosa} pesa ancora {_numero(len(ridotti) / _BYTE_PER_MB, 1)} MB anche dopo la riduzione, "
+            f"ne mandiamo al massimo {massimo}.",
+            "Usa una foto invece di un disegno con molti dettagli, oppure un'immagine piu' piccola.",
+        )
+    return ridotti
 # Esporta per il cliente: dentro la cartella delle viste, accanto ai lavori.
 CARTELLA_ESPORTATI = "esportati"
 SUFFISSO_CAMERA = ".camera.json"
@@ -468,22 +493,17 @@ class Studio:
     def carica_contesto(self, dati: bytes, nome_originale: str = "") -> dict:
         """Salva l'immagine del contesto nella cartella dei contesti, chiamata con la sua impronta.
 
-        Come un riferimento: peso massimo quello che si manda a Comfy Router,
-        solo JPEG o PNG. Lo Studio non scarica immagini da mappe: il contesto
+        Come un riferimento: se pesa troppo si rimpicciolisce, solo JPEG o PNG. Lo Studio non scarica immagini da mappe: il contesto
         lo porta l'utente.
         """
-        massimo = config.COMFY_INVIO_MASSIMO_MB
-        if len(dati) > massimo * _BYTE_PER_MB:
-            raise RichiestaStudioNonValida(
-                f"L'immagine del contesto pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
-                "Riducila o salvala in JPEG, poi caricala di nuovo.",
-            )
         tipo = comfy.tipo_mime(dati)
         if tipo not in ("image/png", "image/jpeg"):
             raise RichiestaStudioNonValida(
                 "L'immagine del contesto dev'essere un JPEG o un PNG.",
                 "Salvala in JPEG o PNG (uno screenshot va bene), poi caricala di nuovo.",
             )
+        dati = _alleggerisci(dati, "L'immagine del contesto")
+        tipo = comfy.tipo_mime(dati)
         larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
         estensione = ".jpg" if tipo == "image/jpeg" else ".png"
         nome = f"ctx-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta, come i riferimenti
@@ -530,21 +550,17 @@ class Studio:
     def carica_riferimento(self, dati: bytes, nome_originale: str = "") -> dict:
         """Salva un'immagine di riferimento nella cartella dei riferimenti, chiamata con la sua impronta.
 
-        Il peso massimo e' quello che si manda a Comfy Router: un riferimento
-        piu' pesante sarebbe rifiutato al momento dell'invio, dopo il clic.
+        Un riferimento piu' pesante di quello che si manda a Comfy Router si
+        rimpicciolisce qui (`_alleggerisci`), invece di essere rifiutato.
         """
-        massimo = config.COMFY_INVIO_MASSIMO_MB
-        if len(dati) > massimo * _BYTE_PER_MB:
-            raise RichiestaStudioNonValida(
-                f"Il riferimento pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
-                "Riducilo o salvalo in JPEG, poi caricalo di nuovo.",
-            )
         tipo = comfy.tipo_mime(dati)
         if tipo not in ("image/png", "image/jpeg"):
             raise RichiestaStudioNonValida(
                 "Il riferimento per lo stile dev'essere un JPEG o un PNG.",
                 "Salvalo in JPEG o PNG, poi caricalo di nuovo.",
             )
+        dati = _alleggerisci(dati, "Il riferimento")
+        tipo = comfy.tipo_mime(dati)
         larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
         estensione = ".jpg" if tipo == "image/jpeg" else ".png"
         nome = f"rif-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta bastano a non confondere due riferimenti
@@ -2376,17 +2392,13 @@ class Studio:
         }
 
     def carica_immagine_video(self, dati: bytes, nome_originale: str = "") -> dict:
-        """Un render caricato per un video: JPEG o PNG, sotto il peso che si manda al servizio."""
-        massimo = config.COMFY_INVIO_MASSIMO_MB
-        if len(dati) > massimo * _BYTE_PER_MB:
-            raise RichiestaStudioNonValida(
-                f"L'immagine pesa {_numero(len(dati) / _BYTE_PER_MB, 1)} MB, ne mandiamo al massimo {massimo}.",
-                "Riducila o salvala in JPEG, poi caricala di nuovo.",
-            )
+        """Un render caricato per un video: JPEG o PNG, rimpicciolito se pesa troppo."""
         tipo = comfy.tipo_mime(dati)
         if tipo not in ("image/png", "image/jpeg"):
             raise RichiestaStudioNonValida("Per il video serve un JPEG o un PNG.",
                                            "Salva il render in JPEG o PNG, poi caricalo di nuovo.")
+        dati = _alleggerisci(dati, "L'immagine")
+        tipo = comfy.tipo_mime(dati)
         larghezza, altezza = modulo_immagine.dimensioni(dati)
         estensione = ".jpg" if tipo == "image/jpeg" else ".png"
         nome = f"vid-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta bastano a non confondere due immagini
