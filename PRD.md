@@ -270,6 +270,16 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### Pennello nuovo del Ritocca (2026-11-12)
+
+Provato con i test (`tests/test_compositore.py`: pittura, gomma, incolla solo
+dove si e' dipinto, Popola) e con lo Studio vero in Chromium nel container,
+provider finto. **Mai provato con un render vero, mai in Edge, mai con penna o
+touch, mai nella web app con Pyodide vero.** Non si sa se il modello capisce
+meglio il contorno di una pittura (bordo irregolare) che un rettangolo. Si esce
+con: Riccardo apre il Ritocca su un render vero, dipinge due tratti in un'area,
+usa la gomma, zooma, applica, e guarda il prima/dopo.
+
 ### «Tieni la geometria» a mappe (2026-11-11)
 
 Provato con i test (`tests/test_mappe.py`), con una prova vera dallo Studio del

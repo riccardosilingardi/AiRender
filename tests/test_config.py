@@ -486,6 +486,15 @@ def test_lo_spessore_iniziale_del_pennello_sta_dentro_i_suoi_limiti():
     assert 0 < sottile <= config.PENNELLO_SPESSORE <= grosso < 1
 
 
+def test_un_area_dipinta_troppo_grande_si_ferma_prima_di_partire():
+    """Caso: PITTURA_PUNTI_MASSIMI non fermato, e una richiesta di megabyte arriva al motore."""
+    from core import aree
+    troppi = [[0.5, 0.5]] * (config.PITTURA_PUNTI_MASSIMI + 1)
+    with pytest.raises(aree.AreaNonValida):
+        aree.Area.da_dizionario({"forma": "pittura", "nota": "x", "operazioni": [
+            {"tipo": "tratto", "spessore": config.PENNELLO_SPESSORE, "punti": troppi}]})
+
+
 # --- proporzioni della vista -------------------------------------------------
 
 

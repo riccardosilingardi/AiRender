@@ -2189,7 +2189,7 @@ class Studio:
             raise modulo_aree.AreaNonValida(
                 "Popola non ha ancora dove: nessun tratto verde.",
                 "Passa il pennello verde dove le vuoi, oppure scegli «Decide il modello».")
-        if not all(isinstance(a, dict) and a.get("forma") == "pennello" and a.get("azione") == modulo_aree.AGGIUNGI
+        if not all(isinstance(a, dict) and a.get("forma") in ("pennello", "pittura") and a.get("azione") == modulo_aree.AGGIUNGI
                    for a in elenco):
             raise modulo_aree.AreaNonValida(
                 "Popola dipinge solo col pennello verde (aggiungi).",
@@ -2211,10 +2211,10 @@ class Studio:
                 "Disegna un rettangolo per ogni stanza da arredare.")
         zone = []
         for numero, area in enumerate(elenco, start=1):
-            if not isinstance(area, dict) or area.get("forma") not in ("rettangolo", "libera"):
+            if not isinstance(area, dict) or area.get("forma") not in ("rettangolo", "libera", "pittura"):
                 raise modulo_aree.AreaNonValida(
-                    f"La zona {numero} non e' un rettangolo ne' una selezione libera.",
-                    "In Arreda le zone si disegnano col rettangolo o con la selezione libera.")
+                    f"La zona {numero} non e' un rettangolo, una selezione libera o un'area dipinta.",
+                    "In Arreda le zone si disegnano col pennello, col lazo o col rettangolo.")
             try:
                 nota = blocchi.nota_arreda(area.get("stanza"), arreda.get("stile"))
             except blocchi.SceltaNonValida as errore:

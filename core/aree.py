@@ -19,6 +19,12 @@ tratto di pennello, aggiungi o togli, e le note si possono scrivere in una
 frase sola che chiama le aree con @1, @2: `da_testo` la divide in una nota
 per area, e la nota di ogni area si vede prima di Applica.
 
+Dal 2026-11-12 (pennello nuovo): un'area puo' essere una «pittura», cioe'
+un elenco di operazioni nell'ordine in cui sono state fatte: tratti di
+pennello, lazi e rettangoli che aggiungono, e colpi di gomma che tolgono.
+Tanti tratti fanno un'area sola, con una @ sola. Il motore la rasterizza
+alla misura del render (core/immagine.py), come fa lo Studio sulla tela.
+
 Qui non c'e' nessun import di Allplan, come in tutto core/.
 """
 
@@ -31,7 +37,10 @@ from dataclasses import dataclass
 from . import blocchi, config, immagine as modulo_immagine
 from .errori import ErroreAirender
 
-FORME = ("rettangolo", "libera", "pennello")
+FORME = ("rettangolo", "libera", "pennello", "pittura")
+# Le operazioni di una pittura: un tratto di pennello (largo `spessore`) o
+# un poligono (lazo o rettangolo), che aggiunge o, con `gomma`, toglie.
+OPERAZIONI = ("tratto", "poligono")
 CAMBIA = "cambia"
 AGGIUNGI = "aggiungi"
 TOGLI = "togli"
@@ -57,11 +66,77 @@ class AreaNonValida(ErroreAirender):
 
 
 @dataclass(frozen=True)
+class Operazione:
+    """Un pezzo di una pittura, in coordinate da 0 a 1: aggiunge, o toglie se e' gomma."""
+
+    tipo: str
+    punti: tuple[tuple[float, float], ...]
+    spessore: float | None = None
+    gomma: bool = False
+
+    def __post_init__(self) -> None:
+        if self.tipo not in OPERAZIONI:
+            raise AreaNonValida(f"\"{self.tipo}\" non e' un pezzo di un'area dipinta.",
+                                "Ridisegna l'area col pennello, il lazo o il rettangolo.")
+        if not isinstance(self.gomma, bool):
+            raise AreaNonValida(f"Un pezzo di un'area dice gomma {self.gomma!r}.", "Ridisegna l'area.")
+        sottile, grosso = config.PENNELLO_SPESSORI
+        if self.tipo == "tratto":
+            if not isinstance(self.spessore, (int, float)) or isinstance(self.spessore, bool) \
+                    or not sottile <= self.spessore <= grosso:
+                raise AreaNonValida(
+                    f"Un tratto di pennello ha uno spessore che non torna: {self.spessore!r}.",
+                    f"Lo spessore va da {sottile} a {grosso} della larghezza del render.",
+                )
+        elif self.spessore is not None:
+            raise AreaNonValida("Solo un tratto di pennello ha uno spessore.", "Ridisegna l'area.")
+        minimo = 1 if self.tipo == "tratto" else 3  # numero-non-configurabile: punti di una forma
+        if len(self.punti) < minimo or not all(
+            len(p) == 2 and all(0 <= c <= 1 for c in p) for p in self.punti
+        ):
+            raise AreaNonValida(
+                f"Un pezzo di un'area dipinta ha punti che non tornano ({len(self.punti)} punti).",
+                "Un tratto ha almeno un punto, un lazo o un rettangolo almeno tre; "
+                "ogni punto e' [x, y] fra 0 e 1.",
+            )
+
+    def in_pixel(self, larghezza: int, altezza: int) -> tuple:
+        """("tratto", punti, raggio, gomma) o ("poligono", punti, gomma), in pixel."""
+        punti = [(x * larghezza, y * altezza) for x, y in self.punti]
+        if self.tipo == "tratto":
+            return ("tratto", punti, float(self.spessore) * larghezza / 2, self.gomma)  # numero-non-configurabile: raggio = meta' spessore
+        return ("poligono", punti, self.gomma)
+
+    @classmethod
+    def da_dizionario(cls, dati: object) -> "Operazione":
+        if not isinstance(dati, dict):
+            raise AreaNonValida("Un pezzo di un'area dipinta non e' un oggetto.", "Ridisegna l'area.")
+        try:
+            punti = tuple(tuple(float(c) for c in p) for p in dati.get("punti") or ())
+        except (TypeError, ValueError):
+            punti = ()
+        spessore = dati.get("spessore")
+        if spessore is not None and (isinstance(spessore, bool) or not isinstance(spessore, (int, float))):
+            raise AreaNonValida(f"Un tratto di pennello ha uno spessore che non e' un numero: {spessore!r}.",
+                                "Ridisegna il tratto.")
+        return cls(str(dati.get("tipo") or ""), punti, spessore, dati.get("gomma", False))
+
+    def a_dizionario(self) -> dict:
+        voce = {"tipo": self.tipo, "punti": [list(p) for p in self.punti]}
+        if self.spessore is not None:
+            voce["spessore"] = self.spessore
+        if self.gomma:
+            voce["gomma"] = True
+        return voce
+
+
+@dataclass(frozen=True)
 class Area:
     """Un'area in coordinate da 0 a 1 sull'immagine.
 
     Un rettangolo ha due punti (due angoli opposti); una selezione libera ne
-    ha almeno tre, nell'ordine del lazo.
+    ha almeno tre, nell'ordine del lazo. Una pittura non ha punti suoi: ha
+    le sue operazioni, almeno una che aggiunge.
     """
 
     forma: str
@@ -74,13 +149,26 @@ class Area:
     azione: str = CAMBIA
     # Solo per il pennello: lo spessore del tratto, in frazione della larghezza.
     spessore: float | None = None
+    # Solo per la pittura: tratti, lazi, rettangoli e gomme, in ordine.
+    operazioni: tuple[Operazione, ...] = ()
 
     def __post_init__(self) -> None:
         if self.forma not in FORME:
             raise AreaNonValida(
                 f"\"{self.forma}\" non e' una forma di area.",
-                "Le forme sono rettangolo, selezione libera e pennello.",
+                "Le forme sono rettangolo, selezione libera, pennello e area dipinta.",
             )
+        if self.forma == "pittura":
+            if not any(not o.gomma for o in self.operazioni):
+                raise AreaNonValida("Un'area dipinta e' vuota: c'e' solo la gomma.",
+                                    "Dipingi l'area, oppure eliminala.")
+            punti = sum(len(o.punti) for o in self.operazioni)
+            if punti > config.PITTURA_PUNTI_MASSIMI:
+                raise AreaNonValida(
+                    f"Un'area dipinta ha {punti} punti, piu' di {config.PITTURA_PUNTI_MASSIMI}.",
+                    "Dividila in due aree, oppure usa il lazo per le parti grandi.")
+        elif self.operazioni:
+            raise AreaNonValida("Solo un'area dipinta ha tratti e gomme.", "Ridisegna l'area.")
         if self.azione not in AZIONI:
             raise AreaNonValida(
                 f"\"{self.azione}\" non e' un'azione di un'area.",
@@ -99,7 +187,7 @@ class Area:
                 "Solo un tratto di pennello ha uno spessore.",
                 "Togli lo spessore dall'area, oppure disegnala col pennello.",
             )
-        minimo = {"rettangolo": 2, "libera": 3, "pennello": 1}[self.forma]  # numero-non-configurabile: punti di una forma
+        minimo = {"rettangolo": 2, "libera": 3, "pennello": 1, "pittura": 0}[self.forma]  # numero-non-configurabile: punti di una forma
         if len(self.punti) < minimo or not all(
             len(p) == 2 and all(0 <= c <= 1 for c in p) for p in self.punti
         ):
@@ -127,7 +215,15 @@ class Area:
             return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
         if self.forma == "pennello":
             return contorno_tratto(punti, float(self.spessore) * larghezza / 2)  # numero-non-configurabile: raggio = meta' spessore
+        if self.forma == "pittura":
+            raise AreaNonValida("Un'area dipinta non e' un poligono solo.", "Usa pezzi_in_pixel.")
         return punti
+
+    def pezzi_in_pixel(self, larghezza: int, altezza: int) -> list:
+        """L'area come la vuole core/immagine.py: un poligono, o i pezzi di una pittura."""
+        if self.forma == "pittura":
+            return [o.in_pixel(larghezza, altezza) for o in self.operazioni]
+        return self.in_pixel(larghezza, altezza)
 
     @classmethod
     def da_dizionario(cls, dati: object) -> "Area":
@@ -145,8 +241,12 @@ class Area:
         if spessore is not None and (isinstance(spessore, bool) or not isinstance(spessore, (int, float))):
             raise AreaNonValida(f"Un tratto di pennello ha uno spessore che non e' un numero: {spessore!r}.",
                                 "Ridisegna il tratto.")
+        operazioni = dati.get("operazioni") or ()
+        if not isinstance(operazioni, (list, tuple)):
+            raise AreaNonValida("Un'area dipinta ha i tratti in una forma che non torna.", "Ridisegna l'area.")
         return cls(str(dati.get("forma") or ""), punti, str(dati.get("nota") or ""), inserto,
-                   str(dati.get("azione") or CAMBIA), spessore)
+                   str(dati.get("azione") or CAMBIA), spessore,
+                   tuple(Operazione.da_dizionario(o) for o in operazioni))
 
     def a_dizionario(self) -> dict:
         voce = {"forma": self.forma, "punti": [list(p) for p in self.punti], "nota": self.nota}
@@ -156,6 +256,8 @@ class Area:
             voce["azione"] = self.azione
         if self.spessore is not None:
             voce["spessore"] = self.spessore
+        if self.operazioni:
+            voce["operazioni"] = [o.a_dizionario() for o in self.operazioni]
         return voce
 
 
@@ -309,9 +411,10 @@ def controlla_modo(modo: object) -> str:
     return str(modo)
 
 
-def poligoni(aree: tuple[Area, ...], dimensioni_immagine: tuple[int, int]) -> list[list[tuple[float, float]]]:
+def poligoni(aree: tuple[Area, ...], dimensioni_immagine: tuple[int, int]) -> list[list]:
+    """Ogni area in pixel: un poligono, o i pezzi di una pittura (core/immagine.py li sa leggere)."""
     larghezza, altezza = dimensioni_immagine
-    return [a.in_pixel(larghezza, altezza) for a in aree]
+    return [a.pezzi_in_pixel(larghezza, altezza) for a in aree]
 
 
 def prompt(modo: str, aree: tuple[Area, ...]) -> str:
