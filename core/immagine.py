@@ -353,12 +353,61 @@ def _centro(punti: list[Punto]) -> Punto:
     return sum(x for x, _ in punti) / len(punti), sum(y for _, y in punti) / len(punti)
 
 
-def disegna_aree(dati: bytes, aree: list[list[Punto]]) -> bytes:
+def _e_pittura(area: list) -> bool:
+    """Un'area dipinta (core/aree.py, forma «pittura») e' un elenco di pezzi, non di punti."""
+    return bool(area) and isinstance(area[0], tuple) and isinstance(area[0][0], str)
+
+
+def _dipingi(disegno: ImageDraw.ImageDraw, pezzo: tuple, pieno: int, vuoto: int, allarga: int = 0) -> None:
+    """Un pezzo di una pittura: un tratto a punte tonde o un poligono; la gomma dipinge `vuoto`.
+
+    Un tratto si disegna come linea spessa piu' un cerchio su ogni punto,
+    come il pennello dello Studio (lineCap e lineJoin tondi): uno scarabocchio
+    che si incrocia resta pieno, cosa che il contorno di un tratto non fa.
+    """
+    if pezzo[0] == "tratto":
+        _tipo, punti, raggio, gomma = pezzo
+        raggio = raggio + (0 if gomma else allarga)
+        colore = vuoto if gomma else pieno
+        if len(punti) > 1:
+            disegno.line(punti, fill=colore, width=max(1, round(2 * raggio)))
+        for x, y in punti:
+            disegno.ellipse((x - raggio, y - raggio, x + raggio, y + raggio), fill=colore)
+        return
+    _tipo, punti, gomma = pezzo
+    colore = vuoto if gomma else pieno
+    disegno.polygon(punti, fill=colore)
+    if allarga > 0 and not gomma:
+        disegno.line([*punti, punti[0]], fill=colore, width=allarga * 2, joint="curve")
+
+
+def _maschera_pittura(dimensioni_immagine: tuple[int, int], pezzi: list, allarga: int = 0) -> Image.Image:
+    """Bianco dove la pittura c'e', nell'ordine dei pezzi: la gomma toglie quello che c'era prima.
+
+    `allarga` allarga di tanti pixel i pezzi che aggiungono (per il margine
+    dell'incolla e la fascia esclusa dalla misura); la gomma resta com'e'.
+    """
+    maschera = Image.new("L", dimensioni_immagine, 0)
+    disegno = ImageDraw.Draw(maschera)
+    for pezzo in pezzi:
+        _dipingi(disegno, pezzo, _PIENO, 0, allarga)
+    return maschera
+
+
+def _primo_punto(area: list) -> Punto:
+    if _e_pittura(area):
+        pieno = next((p for p in area if not p[-1]), area[0])
+        return pieno[1][0]
+    return area[0]
+
+
+def disegna_aree(dati: bytes, aree: list) -> bytes:
     """L'immagine con il contorno di ogni area e il suo numero (1, 2, ...) in un cerchio.
 
     Le aree sono poligoni in pixel dell'immagine: un rettangolo ha quattro
     punti, una selezione libera quanti ne ha il lazo. E' il modo (a) del piano
-    aree: il modello vede dove intervenire, il testo dice cosa fare.
+    aree: il modello vede dove intervenire, il testo dice cosa fare. Un'area
+    dipinta (pezzi di pittura) ha per contorno il bordo della sua maschera.
     """
     tela = _apri(dati).convert("RGB")
     disegno = ImageDraw.Draw(tela)
@@ -366,14 +415,27 @@ def disegna_aree(dati: bytes, aree: list[list[Punto]]) -> bytes:
     raggio = spessore * 3  # numero-non-configurabile: il cerchio del numero segue lo spessore
     carattere = _carattere(raggio)
     for numero, punti in enumerate(aree, start=1):
-        disegno.line([*punti, punti[0]], fill=_MAGENTA, width=spessore, joint="curve")
-        x, y = punti[0]
+        if _e_pittura(punti):
+            dentro = _maschera_pittura(tela.size, punti)
+            fuori = _allarga(dentro, spessore)
+            bordo = ImageChops.subtract(fuori, dentro)
+            tela.paste(_MAGENTA, (0, 0), bordo)
+        else:
+            disegno.line([*punti, punti[0]], fill=_MAGENTA, width=spessore, joint="curve")
+        x, y = _primo_punto(punti)
         disegno.ellipse((x - raggio, y - raggio, x + raggio, y + raggio), fill=_MAGENTA)
         disegno.text((x, y), str(numero), fill="white", font=carattere, anchor="mm")
     return _png(tela)
 
 
-def maschera_aree(dimensioni_immagine: tuple[int, int], aree: list[list[Punto]]) -> bytes:
+def _allarga(maschera: Image.Image, pixel: int) -> Image.Image:
+    """La maschera allargata di circa `pixel` in ogni direzione (sfocatura a scatola, poi soglia)."""
+    if pixel <= 0:
+        return maschera
+    return maschera.filter(ImageFilter.BoxBlur(pixel)).point(lambda v: _PIENO if v > 0 else 0)
+
+
+def maschera_aree(dimensioni_immagine: tuple[int, int], aree: list) -> bytes:
     """La maschera delle aree: nero fuori, bianco dentro, il numero dell'area in nero al centro.
 
     E' il modo (b) del piano aree, mandata come immagine in piu' dopo la vista.
@@ -382,23 +444,36 @@ def maschera_aree(dimensioni_immagine: tuple[int, int], aree: list[list[Punto]])
     disegno = ImageDraw.Draw(maschera)
     carattere = _carattere(config.CONTORNO_AREE_PX * 4)  # numero-non-configurabile: leggibile dentro l'area
     for numero, punti in enumerate(aree, start=1):
+        if _e_pittura(punti):
+            dentro = _maschera_pittura(dimensioni_immagine, punti)
+            maschera.paste("white", (0, 0), dentro)
+            scatola = dentro.getbbox()
+            if scatola:
+                centro = ((scatola[0] + scatola[2]) / 2, (scatola[1] + scatola[3]) / 2)  # numero-non-configurabile: il centro della scatola
+                disegno.text(centro, str(numero), fill="black", font=carattere, anchor="mm")
+            continue
         disegno.polygon(punti, fill="white")
         disegno.text(_centro(punti), str(numero), fill="black", font=carattere, anchor="mm")
     return _png(maschera)
 
 
-def _dentro_aree(dimensioni_immagine: tuple[int, int], aree: list[list[Punto]], bordo: int) -> Image.Image:
+def _dentro_aree(dimensioni_immagine: tuple[int, int], aree: list, bordo: int) -> Image.Image:
     """Bianco dove stanno le aree, piu' una fascia di `bordo` px intorno."""
     dentro = Image.new("L", dimensioni_immagine, 0)
     disegno = ImageDraw.Draw(dentro)
     for punti in aree:
+        if _e_pittura(punti):
+            # Prima la pittura com'e' (la gomma toglie), poi la fascia intorno a quello che resta.
+            dentro = ImageChops.lighter(dentro, _allarga(_maschera_pittura(dimensioni_immagine, punti), bordo))
+            disegno = ImageDraw.Draw(dentro)
+            continue
         disegno.polygon(punti, fill=_PIENO)
         if bordo > 0:
             disegno.line([*punti, punti[0]], fill=_PIENO, width=bordo * 2, joint="curve")
     return dentro
 
 
-def differenza_fuori_dalle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto]]) -> dict:
+def differenza_fuori_dalle_aree(prima: bytes, dopo: bytes, aree: list) -> dict:
     """Quanto e' cambiata l'immagine fuori dalle aree: la domanda del piano aree.
 
     Restituisce la differenza media (0-255) e la quota di pixel cambiati oltre
@@ -430,7 +505,7 @@ def differenza_fuori_dalle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto
     }
 
 
-def incolla_nelle_aree(prima: bytes, dopo: bytes, aree: list[list[Punto]]) -> bytes:
+def incolla_nelle_aree(prima: bytes, dopo: bytes, aree: list) -> bytes:
     """Il ritocco messo sull'immagine di prima: cambia solo dentro le aree.
 
     `dopo` e' quello che ha mandato il modello, che di solito ridisegna tutta

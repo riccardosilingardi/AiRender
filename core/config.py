@@ -686,6 +686,20 @@ PENNELLO_SPESSORE = _registra(Costante(
     ),
 ))
 
+PITTURA_PUNTI_MASSIMI = _registra(Costante(
+    nome="PITTURA_PUNTI_MASSIMI",
+    valore=20000,
+    origine=SCELTA,
+    ragione=(
+        "Studio · Ritocca, pennello nuovo (2026-11-12): quanti punti puo' "
+        "avere un'area dipinta, sommando tutti i suoi tratti, lazi, "
+        "rettangoli e colpi di gomma. Lo Studio tiene un punto ogni pochi "
+        "pixel di movimento: 20000 sono decine di tratti lunghi, e la "
+        "richiesta resta sotto il mezzo megabyte. Serve solo a fermare una "
+        "richiesta assurda, non e' un giudizio sul risultato."
+    ),
+))
+
 PENNELLO_SPESSORI = _registra(Costante(
     nome="PENNELLO_SPESSORI",
     valore=(0.01, 0.15),
