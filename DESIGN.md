@@ -210,7 +210,8 @@ vista con colori neutri.»
     con cosa fare; una riga senza «diventa» lo dice e non parte.
   - *Pieno:* le righe con il campione, «N di massimo M materiali scelti sulla
     vista».
-- **Cosa parte, in breve**: il riassunto delle scelte in italiano.
+- ~~**Cosa parte, in breve**~~: tolto il 2026-11-12, ripeteva la riga di
+  «Dettagli del preset». Il link al prompt completo sta in fondo all'Invio.
 - **Avanzate: mostra e modifica il prompt completo**: il testo vero che parte
   al modello, in inglese, modificabile, con il numero di caratteri. Se l'utente
   lo modifica, i comandi a sinistra non lo toccano più finché non preme
@@ -277,7 +278,8 @@ decisione che questa schermata deve far prendere.
   spigoli persi). Se non si è potuta fare: «Non misurata» e il perché, mai un
   numero. Render fatti prima della misura: «Non misurata», il perché e il
   pulsante **Misura ora**.
-- **Com'è stato fatto** (la ricetta): stile, modello, le parole dell'utente,
+- **Com'è stato fatto** (la ricetta, chiusa per default dal 2026-11-12, con
+  dentro le note del motore): stile, modello, le parole dell'utente,
   intorno, servizio («Comfy Router, senza ripiego»), costo, seme («salvato, il
   modello non lo usa» quando è così), percorso del render e della ricetta.
 - **Sotto l'immagine** (dal 2026-11-02): **Ritocca · Variante · Video**, vedi
@@ -391,7 +393,9 @@ il 2026-10-30».
   la destinazione e il costo di **un** invio (regola 5).
 - Il risultato è **un passo nuovo nell'albero** (Studio · Passi), figlio del
   render su cui si sono disegnate le aree.
-- **Da verificare prima**, scritto a schermo finché vale: se il modello
+- ~~**Da verificare prima**~~ tolto dallo schermo il 2026-11-12 (erano note
+  per noi, restano nel PRD); a schermo resta una riga: «Per un materiale tutto
+  diverso, rifai il render da Genera», col perché nel «?». Era: se il modello
   rispetta le aree e lascia uguale il resto (piano «aree» del banco); che la
   selezione libera diventa una maschera, e un riempimento con maschera non
   ricalcola riflessi e luce di rimbalzo (trappola di `CLAUDE.md`: per un
@@ -1220,7 +1224,7 @@ sotto il riferimento per lo stile caricato: «+ Un altro esempio (Stile da
 esempi)». Con due o più immagini il riquadro diventa **Stile da esempi**: una
 fila «Esempio 1 … 4» (`ESEMPI_STILE_MASSIMO`, scelta) con × e «+ Esempio N»,
 il «?» che dice cosa si prende (colori, luce, materiali, taglio fotografico) e
-che con 15 o più immagini arriverà «Crea il mio stile» (LoRA). Togliere
+(la promessa «Crea il mio stile», LoRA, tolta il 2026-11-12: non è costruita). Togliere
 l'esempio 1 fa diventare riferimento il 2. Il conteggio «Partono N immagini: la
 vista, M esempi di stile…» compare prima dell'invio. Gli esempi entrano nella
 ricetta per impronta, come il riferimento. Salvarli come preset è il passo dopo.
@@ -1335,6 +1339,30 @@ della palette restano fino alla PR 2.
   controllo lo ha; chi non lo vuole legge il riassunto in italiano.
 - Scartata: anteprima in tempo reale mentre si scrive il prompt — costa una
   chiamata a ogni tasto e il pubblico paga a consumo.
+
+## Testi asciutti e pop-up «?», 2026-11-12
+
+Richiesta di Riccardo del 2026-11-12: «semplifica o togli notevolmente il
+testo inutile, se serve spiega in un pop-up». Regola da qui in poi:
+
+- **A schermo resta solo quello che serve per decidere o per agire**: il nome
+  della cosa, la scelta, il servizio dove va l'invio e il costo (regola 5),
+  gli errori. Il perché, i dati tecnici e le avvertenze vanno nel «?».
+- **Il «?» apre un pop-up vero** (al passaggio del mouse, col Tab o con un
+  clic sul touch; Esc lo chiude), non il tooltip lento del browser.
+- **La destinazione si scrive sempre allo stesso modo**: «La vista va a
+  **Comfy Router → Google** · Nano Banana 2 (?) · **circa 17 crediti per
+  immagine** (?)». L'indirizzo esatto e «senza ripiego» nel primo «?», la data
+  della misura del costo nel secondo. Vale per Genera, Cambia, Ritocca,
+  Finale, Video.
+- **Niente pannelli che ripetono**: «Cosa parte, in breve» tolto; «Com'è
+  stato fatto» chiuso; «Note del motore» dentro «Com'è stato fatto»; le
+  ricette vuote non occupano posto; la scheda del modello chiusa dice nome e
+  costo, il «perché» si legge aprendo la lista.
+- **Niente promesse di funzioni che non ci sono** (LoRA).
+- Il prima/dopo resta com'era, ovunque.
+
+Schermate: `docs/ui/studio-testi/` (prima e dopo, app vera con provider finto).
 
 ## Verifiche di accessibilità
 
