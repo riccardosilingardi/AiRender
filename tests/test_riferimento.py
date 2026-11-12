@@ -7,6 +7,7 @@ come lo schema vero di Comfy.
 from __future__ import annotations
 
 import io
+import os
 import json
 from pathlib import Path
 
@@ -84,10 +85,26 @@ def test_un_riferimento_troppo_pesante_o_che_non_e_un_immagine_si_rifiuta(cartel
     with pytest.raises(RichiestaStudioNonValida) as errore:
         studio.carica_riferimento(b"GIF89a niente")
     assert "JPEG o un PNG" in errore.value.fatto
-    monkeypatch.setattr(config, "COMFY_INVIO_MASSIMO_MB", 0)
+    monkeypatch.setattr(config, "STUDIO_CARICAMENTO_MASSIMO_MB", 0)
     with pytest.raises(RichiestaStudioNonValida) as errore:
         studio.carica_riferimento(_jpeg())
-    assert "ne mandiamo al massimo 0" in errore.value.fatto
+    assert "lo Studio ne accetta 0" in errore.value.fatto
+
+
+def test_un_riferimento_pesante_si_rimpicciolisce_invece_di_essere_rifiutato(cartella, chiamate, monkeypatch):
+    """Caso del 2026-11-12: un riferimento da 20,5 MB rifiutato con «Riducilo o salvalo in JPEG»."""
+    studio = _studio(cartella, chiamate)
+    rumore = Image.frombytes("RGB", (600, 400), os.urandom(600 * 400 * 3))
+    uscita = io.BytesIO()
+    rumore.save(uscita, format="PNG")
+    pesante = uscita.getvalue()
+    monkeypatch.setattr(config, "COMFY_INVIO_MASSIMO_MB", len(pesante) / 2 / (1024 * 1024))
+    monkeypatch.setattr(config, "RIFERIMENTO_LATO_RIDOTTO_PX", 300)
+    caricato = studio.carica_riferimento(pesante, "foto.png")
+    salvato = studio.percorso_riferimento(caricato["nome"]).read_bytes()
+    assert len(salvato) < len(pesante) / 2
+    assert caricato["nome"].endswith(".jpg")
+    assert (caricato["larghezza"], caricato["altezza"]) == (300, 200)
 
 
 def test_un_nome_di_riferimento_non_e_mai_un_percorso(cartella, chiamate):
