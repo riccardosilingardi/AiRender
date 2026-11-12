@@ -30,7 +30,7 @@ Pillow, la libreria per le immagini, è già dentro il pacchetto: **non** serve
 *Install Python Package*. Python e PowerShell non servono.
 
 Da annotare: Allplan ha chiesto qualcosa? Ha dato errori? Nel Plugin Manager
-compare AIRENDER 1.0.14?
+compare AIRENDER 1.0.15?
 
 ## 2. Apri la palette
 
@@ -62,6 +62,16 @@ trovato.
 Se il PC è in una rete aziendale con proxy o firewall, devono essere aperti
 `airender-server.netlify.app` e `gkiqhntwhxtmuqjkvybs.supabase.co`.
 
+## 5. Solo col piano Studio: «Tieni la geometria»
+
+1. Accendi **Tieni la geometria** e genera di nuovo.
+2. La prima volta lo Studio scarica il modello della profondità (circa
+   50 MB, Depth Anything V2 Small): ci vuole un minuto, poi resta nella cache
+   di Edge. Le mappe si calcolano sul PC e partono solo insieme alla vista, verso Nano Banana.
+3. Con proxy o firewall servono anche `cdn.jsdelivr.net` e `huggingface.co`
+   (i file del modello arrivano dai suoi server `*.hf.co`). Se sono chiusi, annota il
+   messaggio che compare.
+
 ## Cosa rimandare
 
 - Screenshot della palette dopo **Cattura vista**.
@@ -71,10 +81,11 @@ Se il PC è in una rete aziendale con proxy o firewall, devono essere aperti
 
 ## Cosa non è mai stato provato
 
-- Il drag & drop del pacchetto 1.0.14 con Pillow dentro: Pillow è stato
+- Il drag & drop del pacchetto 1.0.15 con Pillow dentro: Pillow è stato
   provato solo installato dall'SDK.
 - Lo Studio su un PC senza Python di sistema. La palette prova prima il Python
   di Allplan. Se Allplan non ne ha uno che si possa lanciare fuori da Allplan,
   oggi serve Python da python.org e poi `py -m pip install pillow`: è
   l'attrito che resta, e questa prova serve a scoprirlo.
 - Se Allplan installa da solo le librerie elencate in `requirements.in`.
+- Il download del modello della profondità dietro un firewall aziendale.
