@@ -10,11 +10,13 @@ from ..errori import ProviderSconosciuto
 from .airender import ProviderAirender
 from .base import Provider, RichiestaGenerazione, RichiestaRegione, Risultato
 from .comfy import ProviderComfy
+from .fal import ProviderFal
 from .magnific import ProviderMagnific
 
 REGISTRO: dict[str, type[Provider]] = {
     ProviderAirender.nome: ProviderAirender,
     ProviderComfy.nome: ProviderComfy,
+    ProviderFal.nome: ProviderFal,
     ProviderMagnific.nome: ProviderMagnific,
 }
 
@@ -64,6 +66,7 @@ __all__ = [
     "Risultato",
     "ProviderAirender",
     "ProviderComfy",
+    "ProviderFal",
     "ProviderMagnific",
     "REGISTRO",
     "PREDEFINITO",

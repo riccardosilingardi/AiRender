@@ -906,10 +906,15 @@ def metti_in_coda(
             f"{modello} riceve una sola immagine per invio: «Fotoinserimento» ne manda due.",
             "Scegli Nano Banana 2.",
         )
-    if mappe and not crea_provider(provider).accetta_piu_immagini(modello):
+    if mappe and not crea_provider(provider).accetta_mappe(modello):
         raise LavoroNonValido(
             f"{modello} riceve una sola immagine per invio: le mappe di «Tieni la geometria» non partirebbero.",
             "Scegli Nano Banana 2, oppure togli la spunta.",
+        )
+    if not mappe and crea_provider(provider).vuole_mappe(modello):
+        raise LavoroNonValido(
+            f"{modello} parte solo con le mappe di «Tieni la geometria»: senza, non tiene la geometria.",
+            "Spunta «Tieni la geometria», oppure scegli Nano Banana 2.",
         )
     if riferimento is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(

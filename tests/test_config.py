@@ -767,3 +767,21 @@ def test_punto_di_vista_trascina_minimo_scarta_un_clic_ma_non_una_stanza_piccola
 def test_punto_di_vista_allplan_resta_spento_finche_la_sonda_non_risponde():
     """Caso: «In Allplan» si accende senza che PythonParts sappia mettere la camera (PUNTO_DI_VISTA_ALLPLAN)."""
     assert config.PUNTO_DI_VISTA_ALLPLAN is False
+
+
+def test_fal_ricetta_geometria_rigida_resta_quella_della_prova_del_15_novembre():
+    """Caso: si ritocca un peso di FLUX «Geometria rigida» e la tenuta misurata (96-98 %) non vale piu'."""
+    assert config.FAL_FORZA_IMG2IMG == 0.6  # numero-non-configurabile: valore della prova del 2026-11-15
+    assert config.FAL_PASSI == 28 and config.FAL_GUIDA == 3.5  # numero-non-configurabile: idem
+    assert (config.FAL_CONTROLLO_SPIGOLI, config.FAL_CONTROLLO_PROFONDITA, config.FAL_CONTROLLO_FINE) == (0.5, 0.4, 0.8)  # numero-non-configurabile: idem
+    for nome in ("FAL_FORZA_IMG2IMG", "FAL_PASSI", "FAL_GUIDA", "FAL_CONTROLLO_SPIGOLI",
+                 "FAL_CONTROLLO_PROFONDITA", "FAL_CONTROLLO_FINE", "FAL_LATO_PX"):
+        assert config.costante(nome).origine == config.SCELTA, nome
+
+
+def test_fal_lato_e_multiplo_danno_una_misura_che_flux_accetta_e_un_costo_dal_listino():
+    """Caso: una misura non multipla di 16 fa scivolare le mappe rispetto alla vista."""
+    assert config.FAL_LATO_PX % config.FAL_MULTIPLO_PX == 0
+    assert config.costante("FAL_MULTIPLO_PX").origine == config.VINCOLO
+    assert config.costante("FAL_DOLLARI_PER_MP").origine == config.VINCOLO
+    assert "listino" in config.costante("FAL_DOLLARI_PER_MP").ragione

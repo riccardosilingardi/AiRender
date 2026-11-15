@@ -122,6 +122,14 @@ class Provider(ABC):
         """Se il modello riceve immagini dopo la vista nello stesso invio (riferimento, maschera)."""
         return False
 
+    def accetta_mappe(self, modello: str) -> bool:
+        """Se il modello riceve le mappe di «Tieni la geometria» (spigoli e profondita') dopo la vista."""
+        return self.accetta_piu_immagini(modello)
+
+    def vuole_mappe(self, modello: str) -> bool:
+        """Se il modello parte solo con le mappe: FLUX «Geometria rigida» senza mappe non ha senso."""
+        return False
+
     def avviso_piu_immagini(self, modello: str) -> str | None:
         """Cosa sapere prima di mandare piu' di un'immagine, che non ferma l'invio. None se niente."""
         return None

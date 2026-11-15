@@ -1417,3 +1417,110 @@ PUNTO_DI_VISTA_ALLPLAN = _registra(Costante(
         "Finche' non risponde, lo Studio mostra «In Allplan» in grigio."
     ),
 ))
+
+# --- FLUX «Geometria rigida» su fal.ai (2026-11-15) ----------------------------
+# Solo per l'uso personale di Riccardo, con la sua chiave FAL_KEY: non passa
+# dai crediti AIRENDER e non e' in vendita. La ricetta e' quella della prova
+# del 2026-11-15 (thread «Provare lo stile MIR con FLUX su fal»): FLUX.1 dev
+# img2img dalla vista + ControlNet Union Pro con spigoli e profondita'. Sulle
+# due viste di prova ha ritrovato il 96-98 % degli spigoli dello scatto Allplan
+# (tolleranza 2 px), contro il 79-95 % di Nano Banana 2: un render per vista,
+# quindi ogni valore qui sotto resta una SCELTA, non una misura ripetuta.
+
+FAL_LATO_PX = _registra(Costante(
+    nome="FAL_LATO_PX",
+    valore=1536,
+    origine=SCELTA,
+    ragione=(
+        "Lato lungo, in pixel, del render FLUX su fal: e' la misura della prova del "
+        "2026-11-15 (viste a 1536 px). fal fa pagare a megapixel, quindi piu' grande "
+        "costa di piu'; piu' piccolo perde i dettagli sottili (montanti, lamelle)."
+    ),
+    unita=" px",
+))
+
+FAL_MULTIPLO_PX = _registra(Costante(
+    nome="FAL_MULTIPLO_PX",
+    valore=16,
+    origine=VINCOLO,
+    ragione=(
+        "Larghezza e altezza del render FLUX si arrotondano a multipli di 16: FLUX "
+        "lavora su blocchi latenti di 16 pixel, e una misura diversa viene tagliata "
+        "o riscalata dal servizio, e le mappe non combaciano piu' con la vista."
+    ),
+    unita=" px",
+))
+
+FAL_FORZA_IMG2IMG = _registra(Costante(
+    nome="FAL_FORZA_IMG2IMG",
+    valore=0.6,
+    origine=SCELTA,
+    ragione=(
+        "Quanto FLUX ridisegna la vista (0 = la lascia com'e', 1 = la rifa' da zero). "
+        "0,6 e' la ricetta della prova del 2026-11-15 che ha tenuto il 96-98 % degli "
+        "spigoli; con 0,75-0,85 la prova del 2026-11-14 inventava parti. Una parte dei "
+        "pixel della vista resta: e' anche per questo che la geometria tiene."
+    ),
+))
+
+FAL_PASSI = _registra(Costante(
+    nome="FAL_PASSI",
+    valore=28,
+    origine=SCELTA,
+    ragione=(
+        "Passi di FLUX.1 dev: 28 e' il valore predefinito di fal e quello della prova "
+        "del 2026-11-15. Di piu' allunga il lavoro senza una differenza vista."
+    ),
+))
+
+FAL_GUIDA = _registra(Costante(
+    nome="FAL_GUIDA",
+    valore=3.5,
+    origine=SCELTA,
+    ragione=(
+        "Guidance di FLUX.1 dev (quanto segue il prompt): 3,5 e' il predefinito di fal "
+        "e il valore della prova del 2026-11-15."
+    ),
+))
+
+FAL_CONTROLLO_SPIGOLI = _registra(Costante(
+    nome="FAL_CONTROLLO_SPIGOLI",
+    valore=0.5,
+    origine=SCELTA,
+    ragione=(
+        "Peso della mappa degli spigoli (modo canny) nel ControlNet Union Pro. 0,5 come "
+        "nella prova del 2026-11-15; piu' alto rischia di disegnare le linee della mappa."
+    ),
+))
+
+FAL_CONTROLLO_PROFONDITA = _registra(Costante(
+    nome="FAL_CONTROLLO_PROFONDITA",
+    valore=0.4,
+    origine=SCELTA,
+    ragione=(
+        "Peso della mappa di profondita' (modo depth) nel ControlNet Union Pro. 0,4 come "
+        "nella prova del 2026-11-15: tiene volumi e distanze senza appiattire la luce."
+    ),
+))
+
+FAL_CONTROLLO_FINE = _registra(Costante(
+    nome="FAL_CONTROLLO_FINE",
+    valore=0.8,
+    origine=SCELTA,
+    ragione=(
+        "Il ControlNet guida i primi 80 passi su 100 e lascia gli ultimi liberi per "
+        "materiali e luce. Valore della prova del 2026-11-15."
+    ),
+))
+
+FAL_DOLLARI_PER_MP = _registra(Costante(
+    nome="FAL_DOLLARI_PER_MP",
+    valore=0.075,
+    origine=VINCOLO,
+    ragione=(
+        "Prezzo di listino di fal-ai/flux-general/image-to-image, in dollari per "
+        "megapixel del render, letto dal listino fal il 2026-11-15. Lo decide fal e "
+        "puo' cambiare: lo Studio lo scrive come listino, non come costo misurato."
+    ),
+    unita=" $/MP",
+))
