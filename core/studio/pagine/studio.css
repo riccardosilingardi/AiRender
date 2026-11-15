@@ -391,13 +391,60 @@ select { min-height: 34px; padding: 0 10px; }
 .layout-ritocca { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 .layout-ritocca .palco, .layout-ritocca .lato { flex: none; }
 @media (max-width: 1100px) { .layout-ritocca { grid-template-columns: minmax(0, 1fr); } }
-.strumenti-ritocco { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.strumenti-ritocco { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; justify-content: space-between; }
 .tela-ritocco {
-  position: relative; display: block; border: 1px solid var(--bordo); border-radius: 12px;
-  background: var(--pannello); touch-action: none; user-select: none; cursor: crosshair;
+  position: relative; display: block; border: 1px solid var(--bordo); border-radius: 12px; overflow: hidden;
+  background: #0B0F17; touch-action: none; user-select: none; cursor: crosshair;
 }
 .tela-ritocco.bloccata { cursor: default; }
-.tela-ritocco > img { display: block; width: 100%; height: auto; border-radius: 12px; }
+/* Pennello nuovo (2026-11-12): immagine, pittura e numeri si ingrandiscono insieme. */
+.palco-tela { position: relative; transform-origin: 0 0; }
+.palco-tela > img { display: block; width: 100%; height: auto; }
+.palco-tela > canvas.pittura { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tela-ritocco[data-strumento="pennello"], .tela-ritocco[data-strumento="gomma"] { cursor: none; }
+.tela-ritocco.bloccata, .tela-ritocco.sposta { cursor: grab; }
+.tela-ritocco.bloccata { cursor: default; }
+.tela-ritocco.sposta.premuto { cursor: grabbing; }
+.cerchio-pennello {
+  position: absolute; display: none; pointer-events: none; border-radius: 50%; transform: translate(-50%, -50%);
+  border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(0, 0, 0, .35);
+}
+.cerchio-pennello.gomma { border-style: dashed; }
+.barra-tela {
+  position: absolute; left: 10px; top: 10px; right: 10px; width: max-content; max-width: calc(100% - 20px); z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 5px; border-radius: 10px;
+  background: rgba(11, 15, 23, .86); color: #F3F4F6; cursor: default;
+}
+.barra-tela button {
+  font: inherit; font-size: 12.5px; color: #F3F4F6; background: transparent; border: 0; border-radius: 7px;
+  padding: 5px 8px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+}
+.barra-tela button:hover:not(:disabled) { background: rgba(255, 255, 255, .12); }
+.barra-tela button[aria-pressed="true"] { background: #fff; color: #0B1220; }
+.barra-tela button:disabled { opacity: .4; cursor: default; }
+.barra-tela kbd { font-family: var(--mono, monospace); font-size: 10.5px; opacity: .65; }
+@media (max-width: 1600px) { .barra-tela kbd, .barra-tela .nome-spessore { display: none; } }
+.barra-tela .separatore { width: 1px; align-self: stretch; margin: 2px 4px; background: rgba(255, 255, 255, .2); }
+.barra-tela .spessore { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 0 6px; }
+.barra-tela .spessore.spento { opacity: .45; }
+.barra-tela .spessore input { width: 84px; accent-color: #fff; }
+.zoom-tela {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 8px; background: rgba(11, 15, 23, .86); color: #F3F4F6; font-size: 12px; cursor: default;
+}
+.zoom-tela button { font: inherit; color: #F3F4F6; background: transparent; border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+.zoom-tela button:hover { background: rgba(255, 255, 255, .12); }
+.zoom-tela .zoom-valore { min-width: 3.5em; text-align: center; }
+.suggerimento-tela {
+  position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  padding: 8px 14px; border-radius: 8px; background: rgba(11, 15, 23, .86); color: #F3F4F6; font-size: 13px; pointer-events: none;
+}
+.elenco-aree li { border: 1px solid var(--bordo); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.elenco-aree li.scelta { border-color: var(--accento); box-shadow: inset 0 0 0 1px var(--accento); }
+.azione-area .seg { font-size: 12px; padding: 2px 8px; }
+.azione-area .seg.cambia[aria-pressed="true"] { background: #F4D35E; color: #2A2410; }
+.azione-area .seg.aggiungi[aria-pressed="true"] { background: #5CC28B; color: #0B1220; }
+.azione-area .seg.togli[aria-pressed="true"] { background: #F07B6B; color: #0B1220; }
 .aree-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .contorno-area {
   fill: rgba(232, 177, 74, .14); stroke: #F4D35E; stroke-width: 2.5px; vector-effect: non-scaling-stroke;

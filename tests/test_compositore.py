@@ -156,3 +156,63 @@ def test_lo_studio_dice_lo_spessore_iniziale_e_i_limiti_del_pennello(cartella, c
     stato = _studio(cartella, chiamate).stato_studio()
     assert stato["ritocco"]["pennello"] == config.PENNELLO_SPESSORE
     assert stato["ritocco"]["pennelli"] == list(config.PENNELLO_SPESSORI)
+
+
+# --- pennello nuovo (2026-11-12): un'area dipinta, tanti tratti e la gomma ------
+
+# Due tratti e un lazo nella stessa area, poi la gomma su un pezzo del primo tratto.
+PITTURA = {"forma": "pittura", "azione": "aggiungi", "operazioni": [
+    {"tipo": "tratto", "spessore": 0.05, "punti": [[0.1, 0.7], [0.4, 0.7]]},
+    {"tipo": "tratto", "spessore": 0.05, "punti": [[0.6, 0.7], [0.8, 0.7]]},
+    {"tipo": "poligono", "punti": [[0.6, 0.1], [0.9, 0.1], [0.9, 0.4], [0.6, 0.4]]},
+    {"tipo": "tratto", "spessore": 0.15, "gomma": True, "punti": [[0.25, 0.7]]},
+]}
+
+
+def test_tanti_tratti_fanno_un_area_sola_con_una_nota_sola():
+    note = modulo_aree.da_testo("metti persone in @1", [PITTURA])
+    assert len(note) == 1 and note[0]["nota"] == "metti persone in quest'area"
+
+
+def test_un_area_dipinta_resta_uguale_nel_file_del_lavoro():
+    area = modulo_aree.Area.da_dizionario({**PITTURA, "nota": "persone"})
+    assert modulo_aree.Area.da_dizionario(area.a_dizionario()) == area
+    assert area.a_dizionario()["operazioni"][3]["gomma"] is True
+
+
+@pytest.mark.parametrize("cambio", [
+    {"operazioni": []},
+    {"operazioni": [{"tipo": "tratto", "spessore": 0.05, "gomma": True, "punti": [[0.5, 0.5]]}]},
+    {"operazioni": [{"tipo": "poligono", "punti": [[0.1, 0.1], [0.2, 0.2]]}]},
+    {"operazioni": [{"tipo": "tratto", "spessore": 0.9, "punti": [[0.5, 0.5]]}]},
+    {"operazioni": [{"tipo": "spruzzo", "punti": [[0.5, 0.5]]}]},
+])
+def test_un_area_dipinta_vuota_o_con_pezzi_sbagliati_si_rifiuta(cambio):
+    with pytest.raises(modulo_aree.AreaNonValida):
+        modulo_aree.Area.da_dizionario({**PITTURA, "nota": "x", **cambio})
+
+
+def test_la_pittura_cambia_solo_dove_si_e_dipinto_e_non_dove_e_passata_la_gomma(base, cartella):
+    studio, coda, uno = base
+    rit = _ritocca(studio, uno, aree=[PITTURA], testo="persone che passeggiano")
+    coda.esegui_uno()
+    studio.passi(VISTA)
+    albero = modulo_passi.Albero.leggi(cartella / VISTA)
+    partenza, render = albero.passo(uno)["render"], albero.passo(rit)["render"]
+    stato = leggi_stato(cartella, rit)
+    # Il render finto e' 320 x 200. Primo tratto: x 32-128 a y 140, la gomma
+    # (raggio 24 px) ne toglie il pezzo intorno a x 80. Il margine dell'incolla
+    # (RITOCCO_INCOLLA_MARGINE_PX) restringe il buco della gomma: il centro resta fuori.
+    for x, y in ((36, 140), (220, 140), (240, 50)):  # tratto 1, tratto 2, lazo
+        assert _pixel(render, x, y) == _pixel(stato["modello_intero"], x, y)
+        assert _pixel(render, x, y) != _pixel(partenza, x, y)
+    assert _pixel(render, 80, 140) == _pixel(partenza, 80, 140)  # gomma
+    assert _pixel(render, 160, 30) == _pixel(partenza, 160, 30)  # fuori
+    assert stato["fuori_aree"]["incollato"] is True
+
+
+def test_popola_e_arreda_accettano_un_area_dipinta(base):
+    studio, _coda, uno = base
+    composto = studio.componi_ritocco({"vista": VISTA, "da": uno, "aree": [PITTURA],
+                                       "popola": {"cosa": "persone", "quante": "poche", "come": "movimento"}})
+    assert composto["note"] == 1

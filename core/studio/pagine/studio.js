@@ -71,7 +71,7 @@ const S = {
   // Studio · Ritocca: il passo il cui render si ritocca, lo strumento, le
   // aree con le loro note (coordinate da 0 a 1), il lavoro mandato e,
   // finito, il passo nato. Il modello e le destinazioni sono quelli dei Passi.
-  ritocca: { da: null, strumento: "rettangolo", aree: [], testo: "", spessore: null, modello: null, composto: null, errore: null,
+  ritocca: { da: null, strumento: "pennello", aree: [], attiva: -1, storia: [], futuro: [], zoom: 1, ox: 0, oy: 0, nascosta: false, azione: "cambia", testo: "", spessore: null, modello: null, composto: null, errore: null,
              inviato: null, esito: null, x: 50, popola: null, arreda: null },
   // Punto di vista dalla pianta: da quale immagine (un passo, o "0" la vista),
   // dove sta la camera e verso dove guarda (da 0 a 1), tipo, stile, modello.
@@ -3102,7 +3102,7 @@ async function prontoRitocca() {
 function cambiaBaseRitocco(id) {
   const r = S.ritocca;
   if (r.da === id) return;
-  r.da = id; r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.esito = null;
+  r.da = id; r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.esito = null; r.attiva = -1; r.storia = []; r.futuro = []; r.zoom = 1; r.ox = 0; r.oy = 0;
   render();
 }
 
@@ -3120,7 +3120,7 @@ function insertiRitocco() { return S.ritocca.aree.filter((a) => a.rif).map((a) =
 function areePerIlServer() {
   let numero = 0;
   return S.ritocca.aree.map((a) => {
-    const area = { forma: a.forma, punti: a.punti };
+    const area = a.forma === "pittura" ? { forma: "pittura", operazioni: a.operazioni } : { forma: a.forma, punti: a.punti };
     if (a.azione && a.azione !== "cambia") area.azione = a.azione;
     if (a.forma === "pennello") area.spessore = a.spessore;
     if (a.rif) area.inserto = ++numero;
@@ -3177,8 +3177,8 @@ function corpoRitocco() {
 function motivoApplicaRitoccoSpento() {
   const r = S.ritocca;
   if (S.lavoroAttivo) return "Un lavoro è in corso: Applica si accende quando finisce, così un doppio clic non si paga due volte.";
-  if (!r.aree.length && r.arreda) return "Disegna un rettangolo su ogni stanza da arredare, poi scegli che stanza è.";
-  if (!r.aree.length) return r.popola ? "Passa il pennello verde dove le vuoi." : "Disegna un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
+  if (!r.aree.length && r.arreda) return "Dipingi una zona per ogni stanza da arredare, poi scegli che stanza è.";
+  if (!r.aree.length) return r.popola ? "Passa il pennello verde dove le vuoi." : "Dipingi un'area sul render, poi scrivi cosa cambiare chiamandola @1.";
   if (testoServe() && !r.testo.trim()) return "Scrivi cosa cambiare, e chiama le aree con @1, @2.";
   if (r.errore) return r.errore.cosa_fare || r.errore.fatto;
   if (!r.composto) return "Preparo il testo che parte…";
@@ -3206,7 +3206,7 @@ function componiRitocco() {
 function etichettaApplica() {
   const n = S.ritocca.aree.length;
   if (S.ritocca.arreda) return n ? `Arreda · ${n === 1 ? "1 zona" : `${n} zone`}` : "Arreda";
-  if (S.ritocca.popola) return n ? `Applica Popola · ${n === 1 ? "1 tratto" : `${n} tratti`}` : "Applica Popola";
+  if (S.ritocca.popola) return n ? `Applica Popola · ${n === 1 ? "1 area" : `${n} aree`}` : "Applica Popola";
   return n ? `Applica il ritocco · ${n === 1 ? "1 area" : `${n} aree`}` : "Applica il ritocco";
 }
 
@@ -3232,7 +3232,8 @@ function disegnaApplicaRitocco() {
 }
 
 // Una @N nel testo, dove sta il cursore (o in fondo), con uno spazio prima e dopo.
-function inserisciMenzione(numero) {
+// Dalla tela (`fuoco` false) il cursore resta sull'immagine: i tasti B, E, N continuano a valere.
+function inserisciMenzione(numero, fuoco = true) {
   const r = S.ritocca;
   const campo = document.getElementById("testo-ritocco");
   const parola = `@${numero}`;
@@ -3243,7 +3244,7 @@ function inserisciMenzione(numero) {
   r.testo = prima + pezzo + dopo;
   if (campo) {
     campo.value = r.testo;
-    campo.focus();
+    if (fuoco) campo.focus();
     const dove = prima.length + pezzo.length;
     campo.setSelectionRange(dove, dove);
   }
@@ -3269,146 +3270,357 @@ function togliArea(i) {
   componiRitocco();
 }
 
-// Il contorno di un tratto di pennello, come core/aree.py contorno_tratto:
-// in pixel, per non deformarlo su un render non quadrato.
-const PUNTI_MEZZO_CERCHIO = 8;
-function contornoTratto(punti, raggio) {
-  const t = [punti[0]];
-  for (const p of punti.slice(1)) if (Math.hypot(p[0] - t[t.length - 1][0], p[1] - t[t.length - 1][1]) > 1e-6) t.push(p);
-  if (t.length === 1) {
-    const n = 2 * PUNTI_MEZZO_CERCHIO;
-    return Array.from({ length: n }, (_x, i) => [t[0][0] + raggio * Math.cos(2 * Math.PI * i / n), t[0][1] + raggio * Math.sin(2 * Math.PI * i / n)]);
-  }
-  const normale = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; };
-  const normali = t.map((_p, i) => {
-    const prima = i > 0 ? normale(t[i - 1], t[i]) : null;
-    const dopo = i < t.length - 1 ? normale(t[i], t[i + 1]) : null;
-    const [nx, ny] = prima && dopo ? [(prima[0] + dopo[0]) / 2, (prima[1] + dopo[1]) / 2] : (prima || dopo);
-    const l = Math.hypot(nx, ny) || 1;
-    return [nx / l, ny / l];
-  });
-  const mezzo = (c, v) => {
-    const a = Math.atan2(v[1], v[0]);
-    return Array.from({ length: PUNTI_MEZZO_CERCHIO - 1 }, (_x, k) => {
-      const ang = a + Math.PI / 2 - Math.PI * (k + 1) / PUNTI_MEZZO_CERCHIO;
-      return [c[0] + raggio * Math.cos(ang), c[1] + raggio * Math.sin(ang)];
-    });
-  };
-  const sinistra = t.map((p, i) => [p[0] + normali[i][0] * raggio, p[1] + normali[i][1] * raggio]);
-  const destra = t.map((p, i) => [p[0] - normali[i][0] * raggio, p[1] - normali[i][1] * raggio]);
-  const ultimo = normali[normali.length - 1];
-  return [...sinistra, ...mezzo(t[t.length - 1], [ultimo[1], -ultimo[0]]), ...destra.reverse(), ...mezzo(t[0], [-normali[0][1], normali[0][0]])];
-}
+// --- La tela del Ritocca (pennello nuovo, 2026-11-12) ---------------------------
+// Un'area e' una «pittura»: un elenco di operazioni nell'ordine in cui sono
+// fatte (tratto di pennello, lazo o rettangolo; con `gomma` tolgono). Tanti
+// tratti fanno un'area sola, finche' non si sceglie «Nuova area». Il motore
+// rasterizza le stesse operazioni alla misura del render (core/aree.py,
+// core/immagine.py), cosi' quello che parte e' quello che si vede.
 
-// Il contorno di un tratto in coordinate da 0 a 1, dall'immagine com'e' davvero.
-function contornoNormalizzato(punti, spessore, img) {
-  const w = img.naturalWidth || 1000, hh = img.naturalHeight || 1000;
-  return contornoTratto(punti.map(([x, y]) => [x * w, y * hh]), spessore * w / 2).map(([x, y]) => [x / w, y / hh]);
-}
+const COLORI_AZIONE = { cambia: "#F4D35E", aggiungi: "#5CC28B", togli: "#F07B6B" };
+const NOMI_AZIONE = { cambia: "Cambia", aggiungi: "Aggiungi", togli: "Togli" };
+const ZOOM_MASSIMO = 6;
+// Un punto di un tratto entra solo se dista almeno questo (in pixel dello
+// schermo) dal precedente: abbastanza fitto per una curva liscia, pochi punti.
+const PASSO_TRATTO_PX = 3;
 
 function puntiSvg(a) {
   if (a.forma === "rettangolo") {
     const [[x0, y0], [x1, y1]] = a.punti;
     return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   }
-  if (a.forma === "pennello") return a.contorno || a.punti;
   return a.punti;
 }
 function attributoPunti(punti) { return punti.map(([x, y]) => `${(x * 1000).toFixed(1)},${(y * 1000).toFixed(1)}`).join(" "); }
 
-const NOMI_AREA = { rettangolo: "rettangolo", libera: "selezione libera", aggiungi: "pennello aggiungi", togli: "pennello togli" };
-function nomeArea(a) { return a.forma === "pennello" ? NOMI_AREA[a.azione] : NOMI_AREA[a.forma]; }
+const NOMI_AREA = { rettangolo: "rettangolo", libera: "selezione libera", aggiungi: "pennello aggiungi", togli: "pennello togli", pittura: "area dipinta" };
+function nomeArea(a) { return a.forma === "pennello" ? NOMI_AREA[a.azione] : NOMI_AREA[a.forma] || "area"; }
 function spessorePennello() {
   const r = S.ritocca;
   if (!r.spessore) r.spessore = (S.studio && S.studio.ritocco && S.studio.ritocco.pennello) || 0.04;
   return r.spessore;
 }
+function azioneNuova() {
+  const r = S.ritocca;
+  return r.popola ? "aggiungi" : r.arreda ? "cambia" : (r.azione || "cambia");
+}
+const areaPiena = (a) => (a.operazioni || []).some((o) => !o.gomma);
+
+// Annulla e Ripeti: copie di aree, area scelta e testo (sono solo punti, leggere).
+function fotoRitocco() { const r = S.ritocca; return JSON.stringify({ aree: r.aree, attiva: r.attiva, testo: r.testo }); }
+function registraRitocco() {
+  const r = S.ritocca;
+  r.storia = [...(r.storia || []), fotoRitocco()].slice(-100);
+  r.futuro = [];
+}
+function ripristinaRitocco(foto) {
+  const r = S.ritocca, o = JSON.parse(foto);
+  r.aree = o.aree; r.attiva = o.attiva; r.testo = o.testo; r.composto = null;
+  render(); componiRitocco();
+}
+function annullaRitocco() {
+  const r = S.ritocca;
+  if (!(r.storia || []).length || ritoccoBloccato()) return;
+  r.futuro = [...(r.futuro || []), fotoRitocco()];
+  ripristinaRitocco(r.storia.pop());
+}
+function ripetiRitocco() {
+  const r = S.ritocca;
+  if (!(r.futuro || []).length || ritoccoBloccato()) return;
+  r.storia = [...(r.storia || []), fotoRitocco()];
+  ripristinaRitocco(r.futuro.pop());
+}
+function nuovaAreaRitocco() {
+  const r = S.ritocca;
+  // L'area nasce al primo tratto: «Nuova area» dice solo che il prossimo non va in quella scelta.
+  r.attiva = -1;
+  render();
+}
+
+// Disegna le operazioni di un'area su un contesto, in nero pieno: la gomma toglie.
+function disegnaOperazione(g, o, w, hh) {
+  g.globalCompositeOperation = o.gomma ? "destination-out" : "source-over";
+  g.fillStyle = g.strokeStyle = "#000";
+  const pts = o.punti.map(([x, y]) => [x * w, y * hh]);
+  g.beginPath();
+  if (o.tipo === "tratto") {
+    const largo = o.spessore * w;
+    if (pts.length === 1) { g.arc(pts[0][0], pts[0][1], largo / 2, 0, 2 * Math.PI); g.fill(); }
+    else {
+      g.lineWidth = largo; g.lineCap = "round"; g.lineJoin = "round";
+      g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.stroke();
+    }
+  } else {
+    g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fill();
+  }
+  g.globalCompositeOperation = "source-over";
+}
+
+// Tutte le aree sulla tela, ognuna del colore della sua azione, trasparente:
+// i tratti che si sovrappongono non si scuriscono (si colora la maschera intera).
+function disegnaPittura(tela, aree, attiva, inCorso) {
+  const g = tela.getContext("2d"), w = tela.width, hh = tela.height;
+  g.clearRect(0, 0, w, hh);
+  const una = document.createElement("canvas"); una.width = w; una.height = hh;
+  const u = una.getContext("2d");
+  aree.forEach((a, i) => {
+    u.globalCompositeOperation = "source-over"; u.clearRect(0, 0, w, hh);
+    for (const o of a.operazioni || []) disegnaOperazione(u, o, w, hh);
+    if (inCorso && inCorso.area === i) for (const o of inCorso.operazioni) disegnaOperazione(u, o, w, hh);
+    u.globalCompositeOperation = "source-in"; u.fillStyle = COLORI_AZIONE[a.azione || "cambia"]; u.fillRect(0, 0, w, hh);
+    g.globalAlpha = i === attiva ? 0.55 : 0.35;
+    g.drawImage(una, 0, 0);
+  });
+  g.globalAlpha = 1;
+}
+
+function primoPuntoArea(a) {
+  if (a.forma !== "pittura") return puntiSvg(a)[0];
+  const o = (a.operazioni || []).find((x) => !x.gomma) || a.operazioni[0];
+  return o.punti[0];
+}
 
 function telaRitocco(base) {
   const r = S.ritocca;
   const bloccato = ritoccoBloccato();
+  if (r.attiva === undefined || r.attiva >= r.aree.length) r.attiva = r.aree.length - 1;
   const img = h("img", { src: `/file/render/${base.identificativo}`, alt: `Render del passo ${base.numero}`, draggable: "false" });
-  // L'SVG si scrive come testo: il parser HTML lo mette da solo nel suo
-  // spazio dei nomi, e i punti sono solo numeri.
-  const contenitore = h("div");
-  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${
-    r.aree.map((a) => `<polygon class="contorno-area ${a.azione || "cambia"}" points="${attributoPunti(puntiSvg(a))}"></polygon>`).join("")
-  }<polyline class="contorno-area in-corso" points=""></polyline><polygon class="contorno-area in-corso tratto" points=""></polygon></svg>`;
-  const disegno = contenitore.firstElementChild;
-  const traccia = disegno.querySelector("polyline");
-  const pennellata = disegno.querySelector("polygon.tratto");
-  const numeri = r.aree.map((a, i) => {
-    const [x, y] = a.forma === "pennello" ? a.punti[0] : puntiSvg(a)[0];
+  const pittura = h("canvas", { classe: "pittura", "aria-hidden": "true" });
+  const anteprima = h("canvas", { classe: "pittura anteprima", "aria-hidden": "true" });
+  const numeri = r.nascosta ? [] : r.aree.map((a, i) => {
+    const [x, y] = primoPuntoArea(a);
     return h("span", { classe: `numero-area ${a.azione || "cambia"}`, stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1));
   });
+  const palco = h("div", { classe: "palco-tela" }, img, pittura, anteprima, ...numeri);
+  const cerchio = h("div", { classe: "cerchio-pennello", "aria-hidden": "true" });
+  const vuota = !r.aree.length && !bloccato
+    ? h("div", { classe: "suggerimento-tela" }, r.popola ? "Passa il pennello dove le vuoi. Più tratti fanno una sola area."
+      : r.arreda ? "Dipingi o disegna la prima stanza. Per la stanza dopo, «Nuova area»."
+        : "Dipingi sopra quello che vuoi cambiare. Più tratti fanno una sola area.") : null;
   const tela = h("div", { classe: `tela-ritocco${bloccato ? " bloccata" : ""}`, "data-strumento": r.strumento },
-    img, disegno, ...numeri);
+    palco, cerchio, bloccato ? null : barraTela(), vuota, zoomTela());
+  const zoom = () => r.zoom || 1;
+  const applicaVista = () => {
+    const b = tela.getBoundingClientRect();
+    const z = zoom();
+    r.ox = Math.min(0, Math.max(b.width - b.width * z, r.ox || 0));
+    r.oy = Math.min(0, Math.max(b.height - b.height * z, r.oy || 0));
+    palco.style.transform = `matrix(${z}, 0, 0, ${z}, ${r.ox}, ${r.oy})`;  // ingrandimento e spostamento
+    numeri.forEach((n) => { n.style.transform = `translate(-50%, -50%) matrix(${1 / z}, 0, 0, ${1 / z}, 0, 0)`; });
+    const val = tela.querySelector(".zoom-valore");
+    if (val) val.textContent = `${Math.round(z * 100)}%`;
+  };
+  const prepara = () => {
+    // La tela della pittura ha la misura dell'immagine (al massimo 2000 px di lato): i tratti sono netti anche con lo zoom.
+    const scala = Math.min(1, 2000 / Math.max(img.naturalWidth || 1000, img.naturalHeight || 1000));
+    for (const c of [pittura, anteprima]) { c.width = Math.round((img.naturalWidth || 1000) * scala); c.height = Math.round((img.naturalHeight || 1000) * scala); }
+    if (!r.nascosta) disegnaPittura(pittura, r.aree, r.attiva);
+    applicaVista();
+  };
+  if (img.complete && img.naturalWidth) setTimeout(prepara); else img.addEventListener("load", prepara);
   if (bloccato) return tela;
 
-  // Il disegno: rettangolo da un angolo all'altro, lazo che si chiude da solo
-  // al rilascio, o tratto di pennello (aggiungi o togli) largo `spessore`.
-  let tratto = null;
-  const pennello = r.strumento === "aggiungi" || r.strumento === "togli";
   const punto = (ev) => {
-    const b = img.getBoundingClientRect();
+    const b = pittura.getBoundingClientRect();
     return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
   };
+  const pennello = () => r.strumento === "pennello" || r.strumento === "gomma";
+  const mostraCerchio = (ev) => {
+    const vedi = ev && pennello() && !TASTI_TELA.spazio;
+    cerchio.style.display = vedi ? "block" : "none";
+    if (!vedi) return;
+    const b = pittura.getBoundingClientRect(), t = tela.getBoundingClientRect();
+    const d = spessorePennello() * b.width;
+    cerchio.style.width = cerchio.style.height = `${d}px`;
+    cerchio.style.left = `${ev.clientX - t.left}px`; cerchio.style.top = `${ev.clientY - t.top}px`;
+    cerchio.classList.toggle("gomma", r.strumento === "gomma" || TASTI_TELA.alt);
+  };
+  TASTI_TELA.aggiornaCerchio = () => mostraCerchio(TASTI_TELA.ultimo);
+  TASTI_TELA.applicaVista = applicaVista;
+
+  let gesto = null;
   tela.addEventListener("pointerdown", (ev) => {
-    if (ev.button !== 0) return;
+    if (ev.button !== 0 || ev.target.closest(".barra-tela, .zoom-tela")) return;
     ev.preventDefault();
     tela.setPointerCapture(ev.pointerId);
-    tratto = { inizio: punto(ev), punti: [punto(ev)] };
-    if (pennello) pennellata.setAttribute("points", attributoPunti(contornoNormalizzato(tratto.punti, spessorePennello(), img)));
+    if (TASTI_TELA.spazio) { gesto = { tipo: "sposta", x: ev.clientX, y: ev.clientY, ox: r.ox || 0, oy: r.oy || 0 }; tela.classList.add("premuto"); return; }
+    const gomma = r.strumento === "gomma" || TASTI_TELA.alt;
+    const area = r.attiva >= 0 && r.attiva < r.aree.length ? r.attiva : -1;
+    if (gomma && area < 0) return;  // la gomma lavora sull'area scelta: senza area non c'e' niente da togliere
+    const p = punto(ev);
+    gesto = pennello()
+      ? { tipo: "tratto", area, op: { tipo: "tratto", spessore: spessorePennello(), punti: [p], ...(gomma ? { gomma: true } : {}) }, schermo: [ev.clientX, ev.clientY] }
+      : { tipo: r.strumento, area, inizio: p, punti: [p], gomma, schermo: [ev.clientX, ev.clientY] };
+    disegnaGesto();
   });
   tela.addEventListener("pointermove", (ev) => {
-    if (!tratto || !tela.hasPointerCapture(ev.pointerId)) return;
+    TASTI_TELA.ultimo = { clientX: ev.clientX, clientY: ev.clientY };
+    mostraCerchio(ev);
+    if (!gesto || !tela.hasPointerCapture(ev.pointerId)) return;
+    if (gesto.tipo === "sposta") { r.ox = gesto.ox + ev.clientX - gesto.x; r.oy = gesto.oy + ev.clientY - gesto.y; applicaVista(); return; }
     const p = punto(ev);
-    if (r.strumento === "rettangolo") {
-      tratto.punti = [tratto.inizio, p];
-      traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: tratto.punti })) + " " + attributoPunti([tratto.inizio]));
+    if (gesto.tipo === "rettangolo") { gesto.punti = [gesto.inizio, p]; disegnaGesto(); return; }
+    if (Math.hypot(ev.clientX - gesto.schermo[0], ev.clientY - gesto.schermo[1]) < PASSO_TRATTO_PX) return;
+    gesto.schermo = [ev.clientX, ev.clientY];
+    (gesto.op ? gesto.op.punti : gesto.punti).push(p);
+    disegnaGesto();
+  });
+  tela.addEventListener("pointerleave", () => { TASTI_TELA.ultimo = null; mostraCerchio(null); });
+  const operazioneDelGesto = (g) => {
+    if (g.tipo === "tratto") return g.op;
+    if (g.tipo === "lazo" && g.punti.length >= 3) {
+      const xs = g.punti.map((q) => q[0]), ys = g.punti.map((q) => q[1]);
+      if (Math.max(...xs) - Math.min(...xs) < AREA_MINIMA || Math.max(...ys) - Math.min(...ys) < AREA_MINIMA) return null;
+      return { tipo: "poligono", punti: g.punti, ...(g.gomma ? { gomma: true } : {}) };
+    }
+    if (g.tipo === "rettangolo" && g.punti.length === 2) {
+      const [[ax, ay], [bx, by]] = g.punti;
+      if (Math.abs(bx - ax) < AREA_MINIMA || Math.abs(by - ay) < AREA_MINIMA) return null;
+      return { tipo: "poligono", punti: [[ax, ay], [bx, ay], [bx, by], [ax, by]], ...(g.gomma ? { gomma: true } : {}) };
+    }
+    return null;
+  };
+  const disegnaGesto = () => {
+    const op = operazioneDelGesto(gesto) || (gesto.tipo !== "tratto" ? null : gesto.op);
+    const g = anteprima.getContext("2d");
+    g.clearRect(0, 0, anteprima.width, anteprima.height);
+    if (gesto.tipo === "tratto") {
+      // Il tratto in corso: sulla tela della pittura, ridisegnata con l'operazione in piu'.
+      const area = gesto.area >= 0 ? gesto.area : r.aree.length;
+      const aree = gesto.area >= 0 ? r.aree : [...r.aree, { forma: "pittura", azione: azioneNuova(), operazioni: [] }];
+      disegnaPittura(pittura, aree, area, { area, operazioni: [op] });
       return;
     }
-    const ultimo = tratto.punti[tratto.punti.length - 1];
-    if (Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]) < LAZO_PASSO_MINIMO) return;
-    tratto.punti.push(p);
-    if (pennello) pennellata.setAttribute("points", attributoPunti(contornoNormalizzato(tratto.punti, spessorePennello(), img)));
-    else traccia.setAttribute("points", attributoPunti(tratto.punti));
-  });
+    const pts = (gesto.tipo === "rettangolo" && gesto.punti.length === 2)
+      ? operazioneDelGesto(gesto)?.punti || gesto.punti : gesto.punti;
+    const w = anteprima.width, hh = anteprima.height;
+    g.save(); g.setLineDash([8, 6]); g.lineWidth = 2 * w / anteprima.getBoundingClientRect().width; g.strokeStyle = "#fff";
+    g.beginPath(); g.moveTo(pts[0][0] * w, pts[0][1] * hh); for (const q of pts.slice(1)) g.lineTo(q[0] * w, q[1] * hh); g.closePath(); g.stroke(); g.restore();
+  };
   const chiudi = () => {
-    if (!tratto) return;
-    const t = tratto; tratto = null;
-    traccia.setAttribute("points", "");
-    pennellata.setAttribute("points", "");
-    let area = null;
-    if (r.strumento === "rettangolo" && t.punti.length === 2) {
-      const [[ax, ay], [bx, by]] = t.punti;
-      if (Math.abs(bx - ax) >= AREA_MINIMA && Math.abs(by - ay) >= AREA_MINIMA) {
-        area = { forma: "rettangolo", punti: [[Math.min(ax, bx), Math.min(ay, by)], [Math.max(ax, bx), Math.max(ay, by)]] };
-      }
-    } else if (r.strumento === "libera" && t.punti.length >= 3) {
-      const xs = t.punti.map((p) => p[0]), ys = t.punti.map((p) => p[1]);
-      if (Math.max(...xs) - Math.min(...xs) >= AREA_MINIMA && Math.max(...ys) - Math.min(...ys) >= AREA_MINIMA) {
-        area = { forma: "libera", punti: t.punti };
-      }
-    } else if (pennello) {
-      // Anche un clic e' un tratto: un cerchio largo quanto il pennello.
-      area = { forma: "pennello", azione: r.strumento, spessore: spessorePennello(), punti: t.punti };
+    if (!gesto) return;
+    const g = gesto; gesto = null;
+    tela.classList.remove("premuto");
+    anteprima.getContext("2d").clearRect(0, 0, anteprima.width, anteprima.height);
+    if (g.tipo === "sposta") return;
+    const op = operazioneDelGesto(g);
+    if (!op) { disegnaPittura(pittura, r.aree, r.attiva); return; }
+    op.punti = op.punti.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
+    registraRitocco();
+    let nuova = false;
+    if (g.area < 0) {
+      if (op.gomma) { r.storia.pop(); return; }
+      const area = { forma: "pittura", azione: azioneNuova(), operazioni: [] };
+      if (r.arreda) area.stanza = "soggiorno";
+      r.aree.push(area);
+      r.attiva = r.aree.length - 1;
+      nuova = true;
     }
-    if (!area) return;
-    area.punti = area.punti.map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
-    if (area.forma === "pennello") area.contorno = contornoNormalizzato(area.punti, area.spessore, img);
-    if (!area.azione) area.azione = "cambia";
-    if (r.arreda) area.stanza = "soggiorno";
-    r.aree.push(area);
+    r.aree[r.attiva].operazioni.push(op);
     r.composto = null;
     r.esito = null;
     render();
-    // L'area nuova entra nel testo come @N, dove si scrive. In Popola non c'e' testo.
-    if (r.popola || r.arreda) componiRitocco(); else inserisciMenzione(r.aree.length);
+    // L'area nuova entra nel testo come @N, dove si scrive. In Popola e Arreda non c'e' testo.
+    if (nuova && !r.popola && !r.arreda) inserisciMenzione(r.aree.length, false); else componiRitocco();
   };
   tela.addEventListener("pointerup", chiudi);
-  tela.addEventListener("pointercancel", () => { tratto = null; traccia.setAttribute("points", ""); pennellata.setAttribute("points", ""); });
+  tela.addEventListener("pointercancel", () => { gesto = null; disegnaPittura(pittura, r.aree, r.attiva); });
+  tela.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const b = tela.getBoundingClientRect();
+    zoomTela.a(zoom() * (ev.deltaY < 0 ? 1.15 : 1 / 1.15), ev.clientX - b.left, ev.clientY - b.top);
+  }, { passive: false });
   return tela;
+}
+
+// Lo zoom: rotella sul punto, bottoni, «Adatta» (0). Spostamento con spazio + trascina.
+function zoomTela() {
+  const r = S.ritocca;
+  return h("div", { classe: "zoom-tela", "aria-label": "Zoom" },
+    h("button", { title: "Rimpicciolisci", "aria-label": "Rimpicciolisci", onclick: () => zoomTela.a((r.zoom || 1) / 1.5) }, "−"),
+    h("span", { classe: "zoom-valore mono" }, `${Math.round((r.zoom || 1) * 100)}%`),
+    h("button", { title: "Ingrandisci", "aria-label": "Ingrandisci", onclick: () => zoomTela.a((r.zoom || 1) * 1.5) }, "+"),
+    h("button", { title: "Adatta l'immagine alla tela (0)", onclick: () => { r.zoom = 1; r.ox = r.oy = 0; TASTI_TELA.applicaVista && TASTI_TELA.applicaVista(); } }, "Adatta"));
+}
+zoomTela.a = (nuovo, cx, cy) => {
+  const r = S.ritocca;
+  const tela = document.querySelector(".tela-ritocco");
+  if (!tela) return;
+  const b = tela.getBoundingClientRect();
+  if (cx === undefined) { cx = b.width / 2; cy = b.height / 2; }
+  const z = r.zoom || 1, n = Math.max(1, Math.min(ZOOM_MASSIMO, nuovo));
+  r.ox = cx - (cx - (r.ox || 0)) * n / z; r.oy = cy - (cy - (r.oy || 0)) * n / z; r.zoom = n;
+  if (TASTI_TELA.applicaVista) TASTI_TELA.applicaVista();
+  if (TASTI_TELA.aggiornaCerchio) TASTI_TELA.aggiornaCerchio();
+};
+
+// I tasti della tela: valgono solo con Ritocca aperto e fuori dai campi di testo.
+const TASTI_TELA = { spazio: false, alt: false, ultimo: null, aggiornaCerchio: null, applicaVista: null };
+function tastiTelaAttivi(ev) {
+  return location.hash === "#ritocca" && !!document.querySelector(".tela-ritocco:not(.bloccata)")
+    && !(ev.target && ev.target.closest && ev.target.closest("input, textarea, select"));
+}
+document.addEventListener("keydown", (ev) => {
+  if (!tastiTelaAttivi(ev)) return;
+  const r = S.ritocca, k = ev.key.toLowerCase();
+  if ((ev.ctrlKey || ev.metaKey) && k === "z") { ev.preventDefault(); if (ev.shiftKey) ripetiRitocco(); else annullaRitocco(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && k === "y") { ev.preventDefault(); ripetiRitocco(); return; }
+  if (ev.ctrlKey || ev.metaKey) return;
+  if (ev.key === " ") {
+    ev.preventDefault();
+    if (!TASTI_TELA.spazio) { TASTI_TELA.spazio = true; document.querySelector(".tela-ritocco").classList.add("sposta"); TASTI_TELA.aggiornaCerchio && TASTI_TELA.aggiornaCerchio(); }
+    return;
+  }
+  if (ev.key === "Alt") { ev.preventDefault(); TASTI_TELA.alt = true; TASTI_TELA.aggiornaCerchio && TASTI_TELA.aggiornaCerchio(); return; }
+  const strumenti = { b: "pennello", e: "gomma", l: "lazo", r: "rettangolo" };
+  if (strumenti[k]) { r.strumento = strumenti[k]; render(); return; }
+  if (k === "n") { nuovaAreaRitocco(); return; }
+  if (k === "h") { r.nascosta = !r.nascosta; render(); return; }
+  if (k === "0") { r.zoom = 1; r.ox = r.oy = 0; TASTI_TELA.applicaVista && TASTI_TELA.applicaVista(); return; }
+  if (ev.key === "[" || ev.key === "]") {
+    const [sottile, grosso] = (S.studio && S.studio.ritocco && S.studio.ritocco.pennelli) || [0.01, 0.15];
+    r.spessore = Math.min(grosso, Math.max(sottile, spessorePennello() * (ev.key === "]" ? 1.2 : 1 / 1.2)));
+    const c = document.getElementById("spessore-pennello");
+    if (c) c.value = String(r.spessore);
+    TASTI_TELA.aggiornaCerchio && TASTI_TELA.aggiornaCerchio();
+  }
+});
+document.addEventListener("keyup", (ev) => {
+  if (ev.key === " " && TASTI_TELA.spazio) {
+    TASTI_TELA.spazio = false;
+    const t = document.querySelector(".tela-ritocco"); if (t) t.classList.remove("sposta", "premuto");
+    TASTI_TELA.aggiornaCerchio && TASTI_TELA.aggiornaCerchio();
+  }
+  if (ev.key === "Alt") { TASTI_TELA.alt = false; TASTI_TELA.aggiornaCerchio && TASTI_TELA.aggiornaCerchio(); }
+});
+window.addEventListener("blur", () => { TASTI_TELA.spazio = false; TASTI_TELA.alt = false; });
+
+// La barra sopra l'immagine: strumenti, spessore, Annulla, Ripeti, Nascondi, Nuova area.
+function barraTela() {
+  const r = S.ritocca;
+  const voci = [["pennello", "Pennello", "B", "Pennello: dipingi sull'area scelta. Più tratti fanno una sola area."],
+    ["gomma", "Gomma", "E", "Gomma: cancella un pezzo dell'area scelta. Con il pennello, tieni premuto Alt."],
+    ["lazo", "Lazo", "L", "Lazo: disegna un contorno tenendo premuto, si riempie quando lasci."],
+    ["rettangolo", "Rettangolo", "R", "Rettangolo: trascina da un angolo all'altro."]];
+  const [sottile, grosso] = (S.studio && S.studio.ritocco && S.studio.ritocco.pennelli) || [0.01, 0.15];
+  const cursore = h("input", { type: "range", id: "spessore-pennello", min: String(sottile), max: String(grosso), step: "0.002",
+    value: String(spessorePennello()), "aria-label": "Spessore del pennello e della gomma" });
+  cursore.addEventListener("input", () => { r.spessore = Number(cursore.value); });
+  const pennello = r.strumento === "pennello" || r.strumento === "gomma";
+  return h("div", { classe: "barra-tela", role: "toolbar", "aria-label": "Strumenti" },
+    voci.map(([id, nome, tasto, aiuto]) => h("button", {
+      classe: `strumento-${id}`, "aria-pressed": String(r.strumento === id), title: `${aiuto} (${tasto})`,
+      onclick: () => { r.strumento = id; render(); },
+    }, nome, h("kbd", {}, tasto))),
+    h("span", { classe: "separatore" }),
+    h("label", { classe: `spessore${pennello ? "" : " spento"}`, title: "Spessore del pennello e della gomma. Tasti [ e ]." }, h("span", { classe: "nome-spessore" }, "Spessore"), cursore),
+    h("span", { classe: "separatore" }),
+    h("button", { onclick: annullaRitocco, disabled: !(r.storia || []).length || null, title: "Annulla (Ctrl+Z)" }, "Annulla"),
+    h("button", { onclick: ripetiRitocco, disabled: !(r.futuro || []).length || null, title: "Ripeti (Ctrl+Y)" }, "Ripeti"),
+    h("button", { "aria-pressed": String(!!r.nascosta), title: "Nasconde la pittura per vedere il render sotto (H)",
+      onclick: () => { r.nascosta = !r.nascosta; render(); } }, r.nascosta ? "Mostra" : "Nascondi", h("kbd", {}, "H")),
+    h("button", { onclick: nuovaAreaRitocco, title: "Il prossimo tratto fa un'area nuova, con la sua @ (N)",
+      "aria-pressed": String(r.attiva === -1 && r.aree.length > 0) }, "+ Nuova area", h("kbd", {}, "N")));
 }
 
 // Il compositore: una frase sola, le aree chiamate con @1, @2. Sotto, un
@@ -3420,18 +3632,18 @@ function compositoreRitocco(bloccato) {
     return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Arreda per zone" },
       h("div", { classe: "riga tra" },
         h("span", {}, h("b", {}, "Arreda per zone")),
-        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.arreda = null; r.aree = []; r.composto = null; r.strumento = "rettangolo"; render(); } }, "Esci da Arreda")),
+        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.arreda = null; r.aree = []; r.composto = null; r.strumento = "pennello"; r.storia = []; r.futuro = []; r.attiva = -1; render(); } }, "Esci da Arreda")),
       h("div", { classe: "switch", role: "group", "aria-label": "Stile dell'arredo" },
         stili.map((x) => h("button", { classe: "seg", "aria-pressed": String(r.arreda.stile === x.id), disabled: bloccato || null,
           onclick: () => { r.arreda.stile = x.id; componiRitocco(); render(); } }, x.nome))),
-      h("span", { classe: "tenue piccolo" }, "Un rettangolo o una selezione libera per stanza, poi a destra dici che stanza è. Muri, porte e finestre restano come sono; fuori dalle zone la pianta resta quella di prima."));
+      h("span", { classe: "tenue piccolo" }, "Una zona per stanza (pennello, lazo o rettangolo; «Nuova area» per la stanza dopo), poi a destra dici che stanza è. Muri, porte e finestre restano come sono; fuori dalle zone la pianta resta quella di prima."));
   }
   if (r.popola) {
     return h("section", { classe: "pannello compositore-ritocco", "aria-label": "Popola" },
       h("div", { classe: "riga tra" },
         h("span", {}, h("b", {}, `Popola · ${r.popola.nome}`)),
-        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.popola = null; r.aree = []; r.composto = null; r.strumento = "rettangolo"; render(); } }, "Esci da Popola")),
-      h("span", { classe: "tenue piccolo" }, "Passa il pennello verde dove le vuoi. Ogni tratto prende la stessa frase; fuori dal verde l'immagine resta quella di prima."));
+        bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { r.popola = null; r.aree = []; r.composto = null; r.strumento = "pennello"; r.storia = []; r.futuro = []; r.attiva = -1; render(); } }, "Esci da Popola")),
+      h("span", { classe: "tenue piccolo" }, "Passa il pennello verde dove le vuoi: più tratti fanno una sola area, la gomma toglie un pezzo. Fuori dal verde l'immagine resta quella di prima."));
   }
   const campo = h("textarea", {
     id: "testo-ritocco", rows: "2", classe: "compositore", "aria-label": "Cosa cambiare, con le aree chiamate @1, @2",
@@ -3448,47 +3660,49 @@ function compositoreRitocco(bloccato) {
         title: `Mette @${i + 1} nel testo: ${nomeArea(a)}`, onclick: () => inserisciMenzione(i + 1),
       }, `@${i + 1}`)),
       h("span", { classe: "tenue piccolo" }, r.aree.length
-        ? "Ogni pezzo della frase va alle aree che chiama. Un tratto «togli» che il testo non chiama toglie e basta."
+        ? "Ogni pezzo della frase va alle aree che chiama. Un'area «Togli» che il testo non chiama toglie e basta."
         : "Disegna un'area: entra nel testo come @1.")));
 }
 
+// Sopra la tela: com'e' fatto lo strumento scelto, o perche' e' tutto spento.
 function strumentiRitocco(spenti, ragione) {
   const r = S.ritocca;
-  const voci = [["rettangolo", "Rettangolo"], ["libera", "Selezione libera"], ["aggiungi", "Pennello aggiungi"], ["togli", "Pennello togli"]];
   const aiuti = {
-    rettangolo: "Rettangolo: trascina da un angolo all'altro. L'area entra nel testo come @N.",
-    libera: "Selezione libera, come il lazo di Photoshop: disegna il contorno tenendo premuto; quando lasci si chiude da sola.",
-    aggiungi: "Pennello aggiungi (verde): dipingi dove va una cosa nuova, come persone, alberi o un'auto.",
-    togli: "Pennello togli (rosso): dipingi sopra quello che deve sparire. Il modello ricostruisce quello che sta dietro.",
+    pennello: "Pennello: dipingi sull'area scelta. Più tratti fanno una sola area; per una cosa diversa, «Nuova area».",
+    gomma: "Gomma: cancella un pezzo dell'area scelta, non tutta l'area.",
+    lazo: "Lazo, come in Photoshop: disegna il contorno tenendo premuto; quando lasci si riempie. Con Alt toglie.",
+    rettangolo: "Rettangolo: trascina da un angolo all'altro. Con Alt toglie.",
   };
-  const pennello = r.strumento === "aggiungi" || r.strumento === "togli";
-  const [sottile, grosso] = (S.studio && S.studio.ritocco && S.studio.ritocco.pennelli) || [0.01, 0.15];
-  const cursore = h("input", { type: "range", min: String(sottile), max: String(grosso), step: "0.005", value: String(spessorePennello()),
-    "aria-label": "Spessore del pennello", disabled: spenti || null });
-  cursore.addEventListener("input", () => { r.spessore = Number(cursore.value); });
   return h("div", { classe: "strumenti-ritocco" },
-    h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
-      voci.map(([id, nome]) => h("button", {
-        classe: `seg strumento-${id}`, "aria-pressed": String(r.strumento === id), disabled: spenti || (r.popola && id !== "aggiungi") || (r.arreda && id !== "rettangolo" && id !== "libera") || null,
-        title: r.popola && id !== "aggiungi" ? "In Popola si dipinge solo col pennello verde."
-          : r.arreda && id !== "rettangolo" && id !== "libera" ? "In Arreda una zona è un rettangolo o una selezione libera." : null,
-        onclick: () => { r.strumento = id; render(); },
-      }, nome)),
-      h("button", { classe: "seg", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto())),
-    pennello ? h("label", { classe: "riga piccolo spessore" }, "Spessore", cursore) : null,
-    h("span", { classe: "tenue piccolo" }, spenti ? ragione : aiuti[r.strumento]));
+    h("span", { classe: "tenue piccolo" }, spenti ? ragione : aiuti[r.strumento] || aiuti.pennello),
+    spenti ? null : h("span", { classe: "tenue piccolo" }, "Rotella: zoom · Spazio + trascina: sposta · [ ]: spessore · Ctrl+Z: annulla"),
+    h("button", { classe: "btn piccolo", disabled: true, title: "Arriva con la mappa materiali di Allplan" }, "Clicca una superficie", presto()));
 }
 
 function elencoAree(bloccato) {
   const r = S.ritocca;
   if (!r.aree.length) {
-    return h("p", { classe: "tenue piccolo" }, "Qui ritrovi le aree, con la parte del testo che va a ognuna e il suo Rif.");
+    return h("p", { classe: "tenue piccolo" }, r.arreda ? "Qui ritrovi le zone, con la loro stanza."
+      : "Qui ritrovi le aree, con la parte del testo che va a ognuna e il suo Rif.");
   }
   const note = r.composto ? r.composto.note_aree || [] : [];
-  return h("ol", { classe: "elenco-note" }, r.aree.map((a, i) => h("li", {},
+  const scegliAzione = !r.popola && !r.arreda;
+  return h("ol", { classe: "elenco-note elenco-aree" }, r.aree.map((a, i) => h("li", {
+    classe: i === r.attiva ? "scelta" : null,
+    onclick: (ev) => { if (bloccato || ev.target.closest("button, select, input, a")) return; r.attiva = i; render(); },
+    title: bloccato ? null : "Clicca per dipingere su quest'area",
+  },
     h("div", { classe: "riga tra" },
-      h("span", { classe: "piccolo" }, h("b", { classe: `numero-elenco ${a.azione || "cambia"}` }, String(i + 1)), ` ${nomeArea(a)}`),
-      bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => togliArea(i) }, "Togli")),
+      h("span", { classe: "piccolo riga" }, h("b", { classe: `numero-elenco ${a.azione || "cambia"}` }, String(i + 1)),
+        scegliAzione && a.forma === "pittura" && bloccato ? ` ${NOMI_AZIONE[a.azione || "cambia"]}`
+        : scegliAzione && a.forma === "pittura"
+          ? h("span", { classe: "switch azione-area", role: "group", "aria-label": `Cosa fare nell'area ${i + 1}` },
+            ["cambia", "aggiungi", "togli"].map((x) => h("button", {
+              classe: `seg ${x}`, "aria-pressed": String((a.azione || "cambia") === x), disabled: bloccato || null,
+              onclick: () => { registraRitocco(); a.azione = x; r.attiva = i; r.azione = x; r.composto = null; render(); componiRitocco(); },
+            }, NOMI_AZIONE[x])))
+          : ` ${nomeArea(a)}`),
+      bloccato ? null : h("button", { classe: "btn link piccolo", onclick: () => { registraRitocco(); togliArea(i); } }, "Elimina")),
     r.arreda ? sceltaStanza(a, bloccato) : null,
     h("span", { classe: "piccolo tenue", id: `nota-area-${i}` }, note[i] ? `«${note[i]}»` : r.arreda ? "La frase della stanza compare qui." : "La sua parte del testo compare qui."),
     bottoneImmagineNota(a, i, bloccato))));
@@ -3509,7 +3723,7 @@ function daVerificare() {
     h("ol", { classe: "piccolo elenco-verifiche" },
       h("li", {}, "Fuori dalle aree resta il render di prima: lo Studio incolla il risultato solo nelle aree. Da vedere su un ritocco vero: che il bordo sfumato non si noti."),
       h("li", {}, `Le aree partono come ${modo.modo_nome}`, modo.origine === "SCELTA" ? ": scelta provvisoria, la fissa il piano «aree»." : "."),
-      h("li", {}, "Pennelli aggiungi e togli: le parole che li spiegano al modello non sono ancora state provate su un render vero."),
+      h("li", {}, "Aree «Aggiungi» e «Togli»: le parole che le spiegano al modello non sono ancora state provate su un render vero."),
       h("li", {}, "Luce e riflessi fuori dalle aree non seguono il ritocco: per un cambio di materiale grande conviene rifare il render da Genera.")));
 }
 
@@ -3557,7 +3771,7 @@ async function fineRitocco(ora) {
     // Il prossimo ritocco parte da qui, dall'ultima immagine: non da quella
     // di prima, che non ha ancora quello che questo ritocco ha messo.
     r.da = ora.identificativo;
-    r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.popola = null; r.arreda = null;
+    r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.popola = null; r.arreda = null; r.attiva = -1; r.storia = []; r.futuro = []; r.zoom = 1; r.ox = 0; r.oy = 0;
   } else {
     r.errore = { fatto: ora.stato === "annullato" ? "Il ritocco è stato annullato." : (ora.fatto || "Il ritocco non è riuscito."),
       cosa_fare: ora.stato === "annullato" ? "Aree e testo sono rimasti: puoi applicarli di nuovo." : `${ora.cosa_fare || ""} Aree e testo sono rimasti come erano: Applica li rimanda.`.trim() };
@@ -3612,11 +3826,10 @@ function pannelloFuoriAree(passo) {
 // e' un rettangolo o una selezione libera con la sua stanza.
 function ritoccaDa(passo, popola, arreda) {
   const r = S.ritocca;
-  if (r.da !== passo.identificativo || popola || r.popola || arreda || r.arreda) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; }
+  if (r.da !== passo.identificativo || popola || r.popola || arreda || r.arreda) { r.aree = []; r.testo = ""; r.composto = null; r.errore = null; r.attiva = -1; r.storia = []; r.futuro = []; r.zoom = 1; r.ox = 0; r.oy = 0; }
   r.popola = popola || null;
   r.arreda = arreda || null;
-  if (popola) r.strumento = "aggiungi";
-  if (arreda) r.strumento = "rettangolo";
+  if (popola || arreda) r.strumento = "pennello";
   r.da = passo.identificativo; r.esito = null;
   location.hash = "#ritocca";
 }
@@ -4159,7 +4372,7 @@ function ricettaPasso(passo) {
     ["Data", data(passo.creato_il)],
     ["Blocchi", passo.versione_blocchi || "—"],
     ["Aree", passo.aree && passo.aree.length
-      ? h("span", {}, passo.aree.map((a, i) => `${i + 1} · ${a.forma === "rettangolo" ? "rettangolo" : "selezione libera"}: ${a.nota}`).join(" — "),
+      ? h("span", {}, passo.aree.map((a, i) => `${i + 1} · ${nomeArea(a)}: ${a.nota}`).join(" — "),
         passo.modo_aree_nome ? h("span", { classe: "tenue" }, ` (mandate come ${passo.modo_aree_nome})`) : null)
       : "nessuna"],
   ];

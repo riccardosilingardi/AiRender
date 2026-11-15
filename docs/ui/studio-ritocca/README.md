@@ -28,3 +28,20 @@ L'albero che ne è uscito è `esempio-ritocco.passi.json`.
 | 57 | errore: invio non riuscito, aree e note restano come erano, Applica le rimanda |
 | 58 | Passi: il ritocco è il passo 2, figlio dell'1, con aree, modo e misura nella ricetta |
 | 59 | pieno, tema chiaro |
+
+## Pennello nuovo, 2026-11-12 (`60`-`67`, JPEG)
+
+Stesso metodo (Studio vero, provider finto, mouse vero di Playwright), a
+1440×900. Il render è una foto d'esempio; il «ritocco» la scurisce, e lo
+Studio la incolla solo nelle aree.
+
+| File | Stato |
+|---|---|
+| 60 | vuoto: un render, nessuna area, la tela dice cosa fare |
+| 61 | mentre dipingi: due tratti, un'area sola (@1), cerchio del pennello |
+| 62 | pieno: Cambia (due tratti), Aggiungi con la gomma, Togli col lazo |
+| 63 | zoom al 231% |
+| 64 | errore: l'area 1 non è nel testo, Applica fermo con la ragione |
+| 65 | in corso: aree e testo bloccati, striscia con Annulla |
+| 66 | risultato: prima/dopo, fuori dalle aree com'era prima |
+| 67 | Popola · Dipingo io: due tratti verdi, un'area |

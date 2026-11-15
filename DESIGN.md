@@ -485,6 +485,47 @@ usa la stessa pagina, quindi cambia insieme. Screenshot con un provider finto:
   (la selezione libera dei materiali c'è già in Genera) e «Popola» con
   «Decide il modello»; vengono col PR di Cambia e Popola.
 
+### Ritocca col pennello nuovo, costruita il 2026-11-12
+
+Riccardo (2026-11-12): «il pennello come UX non è ottimale». Prototipo
+approvato lo stesso giorno («Sì, tutto in un PR»). Codice in `core/aree.py`
+(`Operazione`, forma «pittura»), `core/immagine.py` (la pittura si
+rasterizza: tratti a punte tonde, poligoni, gomma), `core/studio/pagine/studio.js`
+(la tela), `studio.css`. La web app usa la stessa pagina. Screenshot con un
+provider finto: `docs/ui/studio-ritocca/60-…67-*.jpg`; tutte le schermate dello
+Studio nel canvas in `/mnt/project-files/mockup/studio-tutte-le-schermate-2026-11-12/`.
+Cosa cambia rispetto al compositore:
+
+- **Un'area è una pittura.** Pennello, lazo e rettangolo dipingono tutti
+  sull'**area scelta**; più tratti fanno un'area sola, con una @ sola. Per
+  una cosa diversa, **+ Nuova area** (tasto N): il tratto dopo apre l'area
+  nuova, che entra nel testo come @N senza togliere il cursore dalla tela.
+- **La pittura è piena e trasparente**, del colore dell'azione (giallo
+  Cambia, verde Aggiungi, rosso Togli); l'area scelta è più coperta delle
+  altre. Il contorno disegnato per il modello è il bordo della pittura.
+- **Gomma** (E, o Alt tenuto col pennello; Alt col lazo e col rettangolo):
+  toglie un pezzo dell'area scelta, non l'area intera. Il margine
+  dell'incolla (`RITOCCO_INCOLLA_MARGINE_PX`) restringe i buchi della gomma.
+- **Annulla e Ripeti** (Ctrl+Z, Ctrl+Y), anche per Elimina e per il cambio
+  di azione.
+- **Il cerchio del pennello** segue il mouse alla misura vera; spessore col
+  cursore o con [ e ].
+- **Zoom** con la rotella sul punto, bottoni − + e **Adatta** (0); spazio +
+  trascina per spostarsi. Fino a 600%.
+- **Un pennello solo**: Cambia, Aggiungi o Togli si sceglie per area,
+  nell'elenco a destra (clic sulla riga = l'area su cui si dipinge).
+- **Strumenti sopra l'immagine**, in una barra scura; **Nascondi** (H) per
+  vedere il render sotto. «Clicca una superficie» resta grigia, sopra la tela.
+- **Popola · Dipingo io**: pennello e gomma, tutto verde, i tratti fanno
+  un'area («Applica Popola · 1 area»). **Arreda per zone**: una zona per
+  stanza con qualunque strumento, «Nuova area» per la stanza dopo.
+- **Restano uguali**: la frase con le @, destinazione e costo prima di
+  Applica, il risultato col **prima/dopo**, la misura fuori dalle aree.
+- **Limite**: `PITTURA_PUNTI_MASSIMI` punti per area (SCELTA), solo contro
+  le richieste assurde.
+- **Non verificato**: mai provato con un render vero né in Edge; mai provato
+  con penna o touch (gli eventi sono pointer, dovrebbero valere).
+
 ## Studio v1, costruito il 2026-10-28
 
 Codice in `core/studio/`, screenshot di ogni stato (anche a 1280×800) in
@@ -1147,7 +1188,7 @@ immaginata dalla pianta», anche in Passi.
 
 Quattro stati. **Vuoto**: in Punto di vista, «Clicca sulla pianta dove stai»
 accanto a Rendi grigio; trascinamento troppo corto, «Trascina un po' più in
-là»; in Arreda senza zone, «Disegna un rettangolo su ogni stanza da arredare».
+là»; in Arreda senza zone, «Dipingi una zona per ogni stanza da arredare» (dal 2026-11-12).
 **In corso**: il lavoro si segue come gli altri passi. **Errore**: il messaggio
 del motore sopra Rendi o Applica; punto, zone e stanze restano. **Pieno**: un
 passo nuovo sotto la pianta, col prima/dopo.
