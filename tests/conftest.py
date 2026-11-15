@@ -17,7 +17,7 @@ import urllib.request
 import pytest
 from PIL import Image, ImageDraw
 
-from core.provider import comfy, magnific
+from core.provider import comfy, fal, magnific
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def niente_rete(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def niente_chiave_nell_ambiente(monkeypatch, tmp_path_factory):
-    for nome in magnific.VARIABILI_CHIAVE + comfy.VARIABILI_CHIAVE + ("AIRENDER_LICENZA", "AIRENDER_SERVER"):
+    for nome in magnific.VARIABILI_CHIAVE + comfy.VARIABILI_CHIAVE + fal.VARIABILI_CHIAVE + ("AIRENDER_LICENZA", "AIRENDER_SERVER"):
         monkeypatch.delenv(nome, raising=False)
     # Il codice licenza incollato sta nella cartella dell'utente: i test ne
     # usano una vuota, mai quella vera.

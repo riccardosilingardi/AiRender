@@ -755,3 +755,30 @@ def regola(dati: bytes, tabelle: tuple[list[int], list[int], list[int]], saturaz
     else:
         immagine.save(uscita, format="PNG")
     return uscita.getvalue()
+
+
+def misura_multipla(dati: bytes, lato_massimo: int, multiplo: int) -> tuple[int, int]:
+    """La misura (larghezza, altezza) con lo stesso rapporto, lato lungo portato a `lato_massimo`, multipla di `multiplo`.
+
+    Anche ingrandendo: una vista piccola sale alla misura del render, cosi'
+    il costo e il dettaglio non dipendono da come e' stata salvata.
+    """
+    larghezza, altezza = dimensioni(dati)
+    fattore = lato_massimo / max(larghezza, altezza)
+    return (max(multiplo, round(larghezza * fattore / multiplo) * multiplo),
+            max(multiplo, round(altezza * fattore / multiplo) * multiplo))
+
+
+def a_misura(dati: bytes, misura: tuple[int, int], formato: str = "PNG") -> bytes:
+    """L'immagine portata esattamente a `misura` (pochi pixel di stiramento al massimo), senza metadati.
+
+    Serve quando vista e mappe devono combaciare pixel per pixel (FLUX con
+    ControlNet): stessa misura per tutte, nello stesso modo.
+    """
+    immagine = _apri(dati).convert("RGB").resize(misura, Image.Resampling.LANCZOS)
+    uscita = io.BytesIO()
+    if formato == "JPEG":
+        immagine.save(uscita, format="JPEG", quality=95)  # numero-non-configurabile: qualita' JPEG alta per la vista di partenza
+    else:
+        immagine.save(uscita, format="PNG", optimize=True)
+    return uscita.getvalue()

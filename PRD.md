@@ -1435,6 +1435,20 @@ poggiano su cose non ancora provate:
   grigio, scrivere i materiali a parole e confrontare.
 - **La nuova schermata si capisce** — solo a video, sul PC di Riccardo.
 
+- **FLUX «Geometria rigida» su fal (2026-11-15, `core/provider/fal.py`)** — mai
+  un invio vero da questo file. La ricetta (img2img 0,6, ControlNet Union Pro con
+  spigoli 0,5 e profondità 0,4 fino all'80 %, 28 passi, guidance 3,5) è quella
+  della prova del 15/11 passata da `fal_client`; qui il trasporto è urllib con la
+  coda di fal (`queue.fal.run`, `Authorization: Key`), le immagini come data URI
+  e `sync_mode`. Non verificati: che fal accetti tre data URI da 1536 px nello
+  stesso corpo, che `X-Fal-Store-IO: 0` valga sulla coda, che il prompt dei
+  blocchi (scritto per Nano Banana, «image 1») vada bene a FLUX, che le mappe
+  calcolate nel browser diano la stessa tenuta di quelle della prova, il costo
+  vero (lo Studio scrive il listino, 0,075 $/MP). Solo uso personale: FLUX.1 dev
+  ha licenza non commerciale e fal §6(e)(ix) chiede un'autorizzazione scritta
+  per le app integrate. Verifica: un render dallo Studio sul PC di Riccardo con
+  `FAL_KEY`, e la % di spigoli contro Nano Banana 2 sulla stessa vista.
+
 ### Usciti da questa sezione, con la loro verifica
 
 - **Il motore stesso fa un invio vero** — verificato il 2026-10-27 sul PC di

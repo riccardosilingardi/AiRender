@@ -1103,7 +1103,11 @@ function colonnaInvio() {
 
   const modelli = schedeModello("genera", S.modello,
     S.modo === "contesto" || !!S.riferimento || immaginiMateriali() > 0 || S.inserti.length > 0,
-    async (id) => { S.modello = id; S.secco = null; await caricaDestinazione(); render(); });
+    async (id) => {
+      S.modello = id; S.secco = null;
+      if (modelloVuoleMappe() && S.modo !== "contesto" && !S.geometria) { S.geometria = true; calcolaMappe(); }
+      await caricaDestinazione(); aggiornaComposto(true); render();
+    });
 
   const qualita = h("div", { classe: "switch", role: "group", "aria-label": "Qualità" },
     asse("qualita").voci.map((v) => h("button", {
@@ -1418,7 +1422,10 @@ function geometriaCoiCrediti() {
   const s = S.licenza && S.licenza.presente && S.licenza.saldo;
   return !!(s && s.funzioni && s.funzioni.tieni_geometria);
 }
-function geometriaPossibile() { return usaComfy() || geometriaCoiCrediti(); }
+// FLUX «Geometria rigida» (solo per chi ha la chiave fal su questo PC) parte
+// solo con le mappe: con lui la spunta c'e' sempre, qualunque piano.
+function modelloVuoleMappe() { const m = modelloScelto(); return !!(m && m.vuole_mappe); }
+function geometriaPossibile() { return usaComfy() || geometriaCoiCrediti() || modelloVuoleMappe(); }
 function perchéGeometriaSpenta() {
   const s = S.licenza && S.licenza.presente && S.licenza.saldo;
   if (s) return `Il piano ${nomePiano(s)} non comprende «Tieni la geometria»: è nel piano Studio.`;
@@ -1870,6 +1877,7 @@ function motivoGeneraSpento() {
   if (S.contesto && !S.contesto.area) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio.";
   if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
   if (S.modo !== "contesto" && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
+  if (S.destinazione.mappe_obbligatorie) return S.destinazione.mappe_obbligatorie;
   if (geometriaGenera() && S.destinazione.mappe_non_accettate) return S.destinazione.mappe_non_accettate;
   if (geometriaGenera() && !mappePronte()) {
     const m = S.mappe[S.vista];
@@ -1886,6 +1894,8 @@ function pannelloInvio(prompt) {
   if (d) {
     blocco.append(destinazioneBreve("La vista", d));
     if (d.cosa_manca) blocco.append(avviso("errore", `Attenzione: ${d.cosa_manca}`, "Scegli Nano Banana 2, il modello predefinito."));
+    // FLUX «Geometria rigida»: dove vanno le immagini e di chi è il conto, prima del clic (regola 5).
+    if (d.personale && d.avviso) blocco.append(avviso("attenzione", d.avviso, "Nano Banana 2 resta il predefinito: torna lì per i render dei clienti."));
     blocco.append(h("p", { classe: "destinazione" }, d.cosa_parte));
     if (d.geometria) blocco.append(h("p", { classe: "destinazione" }, "«Tieni la geometria»: ", d.geometria.destinazione, ". Costo: ", h("b", {}, d.geometria.costo), "."));
   }
@@ -4231,7 +4241,8 @@ function sceltaModello(stato, onCambio, dove, piuImmagini) {
 const modelliAperti = new Set();
 function schedeModello(dove, sceltoId, servePiuImmagini, onScegli) {
   const aperta = modelliAperti.has(dove);
-  const tutti = S.catalogo.modelli;
+  // FLUX «Geometria rigida» rifà tutto dalla vista con le sue mappe: solo in Genera.
+  const tutti = S.catalogo.modelli.filter((m) => dove === "genera" || !m.vuole_mappe);
   const scelto = tutti.find((m) => m.id === sceltoId);
   const scheda = (m) => {
     const perche = !m.verificato ? "Questo modello non è ancora disponibile per l'invio."

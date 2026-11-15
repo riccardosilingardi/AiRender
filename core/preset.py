@@ -26,6 +26,8 @@ MODELLI_PREDEFINITI = {
     "airender": "vertexai/gemini-3.1-flash-image",
     "comfy": "vertexai/gemini-3.1-flash-image",
     "magnific": "realism",
+    # FLUX «Geometria rigida» su fal (2026-11-15): solo uso personale, con FAL_KEY.
+    "fal": "fal-ai/flux-general/image-to-image",
 }
 
 # v2 (2026-10-21): oltre al prompt, il preset sceglie il modello di Comfy Router.

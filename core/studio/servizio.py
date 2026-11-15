@@ -39,7 +39,7 @@ from ..errori import ErroreAirender, FileNonTrovato
 from ..idoneita import valuta, valuta_immagine
 from ..preset import MODELLI_PREDEFINITI
 from .. import mappe as modulo_mappe
-from ..provider import comfy
+from ..provider import comfy, fal
 from ..provider.base import Provider
 from ..ricetta import Ricetta, impronta
 from . import miniature as modulo_miniature
@@ -116,6 +116,9 @@ CATEGORIE_MODELLI = (
     ("consigliati", "Consigliati", "I modelli con cui lo Studio è stato provato di più."),
     ("alternative", "Altri modelli", "Altri modelli che ricevono più immagini: utili per un secondo parere sullo stesso render."),
     ("una_immagine", "Una sola immagine", "Ricevono solo la vista o il render: niente riferimenti, foto dei materiali o Rif."),
+    ("personale", "Solo per te · fal.ai",
+     "Compare solo su un PC con la chiave fal (FAL_KEY). Passa dal tuo conto fal negli Stati Uniti, non dai "
+     "crediti AIRENDER, e FLUX.1 dev ha una licenza non commerciale: per il tuo uso, non per i clienti."),
 )
 
 # L'ordine qui non e' quello a schermo: lo Studio li mostra per categoria.
@@ -138,6 +141,27 @@ MODELLI = (
     Modello("byteplus/seedream-5-0-260128", "Seedream 5.0", "ByteDance",
             categoria="alternative", spiega="Fotorealismo marcato, fino a 4K."),
 )
+# FLUX «Geometria rigida» su fal (2026-11-15): solo per l'uso personale di
+# Riccardo. Non sta in MODELLI: lo Studio lo mostra solo se sul PC c'e'
+# FAL_KEY, e lo manda sempre a fal, qualunque servizio sia scelto per gli altri.
+MODELLO_GEOMETRIA_RIGIDA = Modello(
+    fal.MODELLO, "FLUX.1 dev · Geometria rigida", "Black Forest Labs, su fal.ai",
+    categoria="personale",
+    spiega="Tiene spigoli e volumi più di Nano Banana 2 (96-98 % contro 79-95 % in una prova), "
+           "inventa meno il contesto. Parte solo con «Tieni la geometria».",
+)
+
+
+def modelli_visibili() -> tuple[Modello, ...]:
+    """I modelli fra cui si sceglie: FLUX «Geometria rigida» solo con la chiave fal su questo PC."""
+    return (*MODELLI, MODELLO_GEOMETRIA_RIGIDA) if fal.chiave_da_ambiente() else MODELLI
+
+
+def tutti_i_modelli() -> tuple[Modello, ...]:
+    """Per riconoscere un modello gia' usato (storico, ricette), anche se oggi non si sceglie."""
+    return (*MODELLI, MODELLO_GEOMETRIA_RIGIDA)
+
+
 # «Finale»: non e' un modello di render, non sta fra le schede. Costo «a
 # misura e ingrandimento» secondo il Router, nessuna stima prima dell'invio.
 MODELLO_FINALE = Modello(comfy.MODELLO_FINALE, "Magnific Precision V2", "Freepik",
@@ -645,7 +669,7 @@ class Studio:
                 "predefinito": config.FINALE_INGRANDIMENTO_PREDEFINITO,
                 "tipi": [{"id": k, "nome": v} for k, v in NOMI_TIPI_FINALE.items()],
             },
-            "modelli": [self._modello_dict(m) for m in MODELLI],
+            "modelli": [self._modello_dict(m) for m in modelli_visibili()],
             "categorie_modelli": [{"id": c, "nome": n, "spiega": s} for c, n, s in CATEGORIE_MODELLI],
             "modelli_non_provati": list(MODELLI_NON_PROVATI),
             "risoluzioni": [
@@ -777,7 +801,7 @@ class Studio:
     # --- destinazione e costo --------------------------------------------
 
     def _modello(self, identificativo: str) -> Modello:
-        for modello in (*MODELLI, MODELLO_FINALE):
+        for modello in (*tutti_i_modelli(), MODELLO_FINALE):
             if modello.identificativo == identificativo:
                 return modello
         raise RichiestaStudioNonValida(
@@ -785,8 +809,12 @@ class Studio:
             "Scegli Nano Banana 2 o FLUX.1 Kontext Pro.",
         )
 
+    def provider_per(self, identificativo: str) -> str:
+        """Il servizio a cui va un modello: FLUX «Geometria rigida» sempre a fal, gli altri a quello scelto."""
+        return fal.ProviderFal.nome if identificativo in fal.MODELLI else self.provider
+
     def _modello_dict(self, modello: Modello) -> dict:
-        motore = self._crea_provider(self.provider)
+        motore = self._crea_provider(self.provider_per(modello.identificativo))
         return {
             "id": modello.identificativo,
             "nome": modello.nome,
@@ -794,6 +822,8 @@ class Studio:
             "categoria": modello.categoria,
             "spiega": modello.spiega,
             "costo": testo_costo(modello, 1),
+            "personale": modello.identificativo in fal.MODELLI,
+            "vuole_mappe": motore.vuole_mappe(modello.identificativo),
             "verificato": motore.cosa_manca(modello.identificativo) is None,
             "piu_immagini": motore.accetta_piu_immagini(modello.identificativo),
         }
@@ -821,7 +851,8 @@ class Studio:
             degli_esempi = max(0, int(esempi or 0)) if riferimento else 0
         except (TypeError, ValueError):
             degli_esempi = 0
-        motore = self._crea_provider(self.provider)
+        servizio = self.provider_per(modello.identificativo)
+        motore = self._crea_provider(servizio)
         # Anche "airender" passa dal Router, e il server forza il fallback spento.
         senza_ripiego = isinstance(motore, comfy.ProviderComfy) and comfy.FALLBACK == "false"
         return {
@@ -830,6 +861,7 @@ class Studio:
             "fornitore": modello.fornitore,
             "destinazione": motore.destinazione_per(modello.identificativo),
             "senza_ripiego": senza_ripiego,
+            "personale": servizio == fal.ProviderFal.nome,
             "varianti": quante,
             "costo": testo_costo(modello, quante),
             "costo_misurato": modello.costo_crediti is not None,
@@ -860,12 +892,15 @@ class Studio:
                 if dei_rif and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "avviso_riferimento": (motore.avviso_piu_immagini(modello.identificativo)
                                    if (riferimento or contesto or dei_materiali or dei_rif) else None),
-            "geometria": ({**_GEOMETRIA, "costo": _GEOMETRIA["costo_airender" if self.provider == "airender" else "costo"]}
+            "geometria": ({**_GEOMETRIA, "costo": _GEOMETRIA[_CHIAVE_COSTO_GEOMETRIA.get(servizio, "costo")]}
                           if geometria and not contesto else None),
             "mappe_non_accettate": (
                 f"{modello.nome} riceve una sola immagine per invio: le mappe di «Tieni la geometria» "
                 "non partirebbero. Scegli Nano Banana 2."
-                if geometria and not contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
+                if geometria and not contesto and not motore.accetta_mappe(modello.identificativo) else None),
+            "mappe_obbligatorie": (
+                f"{modello.nome} parte solo con «Tieni la geometria»: spunta la casella qui sopra."
+                if motore.vuole_mappe(modello.identificativo) and (contesto or not geometria) else None),
         }
 
     # --- prova a secco e invio -------------------------------------------
@@ -893,7 +928,7 @@ class Studio:
             problemi.append({"fatto": descrizione["fatto"], "cosa_fare": descrizione["cosa_fare"]})
         else:
             try:
-                motore = self._crea_provider(self.provider)
+                motore = self._crea_provider(self.provider_per(destinazione["modello"]))
                 motore.controlla_prima_dell_invio(destinazione["modello"], modulo_immagine.leggi(vista))
             except ErroreAirender as errore:
                 problemi.append(_errore_dict(errore))
@@ -1099,6 +1134,9 @@ class Studio:
                 f"partirebbe verso {destinazione['destinazione']}. Non ho inviato niente.",
                 "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.",
             )
+        if destinazione.get("mappe_obbligatorie"):
+            raise RichiestaStudioNonValida(f"Non mando: {destinazione['mappe_obbligatorie']}",
+                                           "Spunta «Tieni la geometria», oppure scegli Nano Banana 2.")
         if destinazione.get("mappe_non_accettate"):
             raise RichiestaStudioNonValida(f"Non mando: {destinazione['mappe_non_accettate']}",
                                            "Scegli Nano Banana 2, oppure togli la spunta «Tieni la geometria».")
@@ -1130,7 +1168,7 @@ class Studio:
             modulo_coda.metti_in_coda(
                 self.cartella, vista, scelte,
                 preset=preset,
-                provider=self.provider,
+                provider=self.provider_per(destinazione["modello"]),
                 modello=destinazione["modello"],
                 prompt_a_mano=prompt_a_mano,
                 parte_da=parte_da,
@@ -1290,7 +1328,7 @@ class Studio:
         """Quello che la pagina mostra prima del clic: da dove viene e cosa porta."""
         ricetta = self.ricetta_da_portare(identificativo)
         lavoro, origine = ricetta["lavoro"], ricetta["origine"]
-        modello = next((m for m in MODELLI if m.identificativo == lavoro.modello), None)
+        modello = next((m for m in tutti_i_modelli() if m.identificativo == lavoro.modello), None)
         preset = blocchi.PRESET_STILE.get(origine.preset or "")
         return {
             "modello": lavoro.modello,
@@ -1462,7 +1500,7 @@ class Studio:
             secondi = max(0, int((self._adesso() - creato).total_seconds()))
         except ValueError:
             secondi = None
-        modello = next((m for m in (*MODELLI, MODELLO_FINALE) if m.identificativo == dati.get("modello")), None)
+        modello = next((m for m in (*tutti_i_modelli(), MODELLO_FINALE) if m.identificativo == dati.get("modello")), None)
         preset = blocchi.PRESET_STILE.get(dati.get("preset") or "")
         render = self._render(identificativo, stato)
         importata = bool(stato.get("importata"))
@@ -2704,6 +2742,13 @@ def numero_varianti(valore: object) -> int:
 
 def testo_costo(modello: Modello, varianti: int = 1) -> str:
     """Il costo da scrivere prima di Genera: per uno, o N volte uno, mai un numero non misurato."""
+    if modello.identificativo in fal.MODELLI:
+        # Una vista 3:2 al lato del render: la stima piu' comune, dal listino.
+        lato = config.FAL_LATO_PX
+        uno = fal.costo_stimato((lato, round(lato * 2 / 3)))  # numero-non-configurabile: rapporto 3:2
+        totale = f"circa {_numero(uno * varianti)} $" + (f" per {varianti} render" if varianti > 1 else " per render")
+        return (f"{totale} sul tuo conto fal · listino fal {_numero(config.FAL_DOLLARI_PER_MP, 3)} $ per megapixel, "  # numero-non-configurabile: millesimi del listino
+                f"vista 3:2 a {lato} px; non misurato da AIRENDER")
     if modello.costo_crediti is None:
         return "non misurato: nessuna generazione con questo modello ha copiato i crediti"
     data = f"misurato il {modello.costo_misurato_il}"
@@ -2775,8 +2820,14 @@ _GEOMETRIA = {
     # una volta il 2026-11-11, Nano Banana 2 a 1K, 17,49 crediti con le mappe
     # contro 17,19 senza (la stessa vista, lo stesso preset).
     "costo_airender": "incluso: nessun credito in più",
+    # Con FLUX su fal le mappe vanno nel ControlNet; fal fa pagare i megapixel
+    # del render (listino), non le immagini in ingresso.
+    "costo_fal": "nessun costo in più secondo il listino fal, che conta i megapixel del render",
     "costo": "circa 0,3 crediti Comfy in più per render (misurato una volta, a 1K)",
 }
+
+
+_CHIAVE_COSTO_GEOMETRIA = {"airender": "costo_airender", "fal": "costo_fal"}
 
 
 def _con_le_mappe(cosa_parte: str, geometria: bool) -> str:
