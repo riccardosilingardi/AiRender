@@ -572,8 +572,8 @@ class ProviderComfy(Provider):
 
     def _genera(self, richiesta: RichiestaGenerazione, avvisi_in_piu: list[str]) -> Risultato:
         self._assicura_chiave()
-        for dati in (richiesta.immagine, *richiesta.immagini_in_piu):
-            self._assicura_peso(dati)
+        richiesta, alleggerite = self._alleggerisci_richiesta(richiesta)
+        avvisi_in_piu = [*avvisi_in_piu, *alleggerite]
         schema = self._schema(richiesta.modello)
         if richiesta.immagini_in_piu and not schema.piu_immagini:
             raise ErroreProvider(
@@ -873,14 +873,43 @@ class ProviderComfy(Provider):
                 "tua macchina e non entra mai nel plugin.",
             )
 
-    def _assicura_peso(self, dati: bytes) -> None:
-        peso = modulo_immagine.dimensione_mb(dati)
-        if peso > config.COMFY_INVIO_MASSIMO_MB:
+    def _limite_mb(self) -> float:
+        return config.COMFY_INVIO_MASSIMO_MB
+
+    def _alleggerita(self, dati: bytes) -> bytes:
+        """L'immagine come parte: intera se sta nel limite, altrimenti in JPEG e, se serve, piu' piccola."""
+        limite = self._limite_mb()
+        if modulo_immagine.dimensione_mb(dati) <= limite:
+            return dati
+        leggera = modulo_immagine.alleggerisci(dati, limite, config.VISTA_LATI_ALLEGGERITA_PX)
+        if leggera is None:
             raise ErroreProvider(
-                f"La vista di partenza pesa {peso:.1f} MB e ne mandiamo al massimo "
-                f"{config.COMFY_INVIO_MASSIMO_MB} a {self.destinazione}.",
+                f"La vista di partenza pesa {modulo_immagine.dimensione_mb(dati):.1f} MB, anche in JPEG "
+                f"e rimpicciolita non scende sotto i {limite} MB che mandiamo a {self.destinazione}.",
                 "Salva di nuovo la vista da Allplan a una risoluzione piu' bassa.",
             )
+        return leggera
+
+    def _assicura_peso(self, dati: bytes) -> None:
+        self._alleggerita(dati)
+
+    def _alleggerisci_richiesta(self, richiesta: RichiestaGenerazione) -> tuple[RichiestaGenerazione, list[str]]:
+        """Vista e immagini in piu' sotto il limite del servizio, dicendo quali sono state alleggerite."""
+        avvisi = []
+        vista = self._alleggerita(richiesta.immagine)
+        if vista is not richiesta.immagine:
+            larghezza, altezza = modulo_immagine.dimensioni(vista)
+            avvisi.append(
+                f"La vista di partenza pesava {modulo_immagine.dimensione_mb(richiesta.immagine):.1f} MB, "
+                f"oltre i {self._limite_mb()} MB che mandiamo a {self.destinazione}: e' partita in JPEG a "
+                f"{larghezza}x{altezza}."
+            )
+        extra = tuple(self._alleggerita(d) for d in richiesta.immagini_in_piu)
+        if any(a is not b for a, b in zip(extra, richiesta.immagini_in_piu)):
+            avvisi.append("Un'immagine in piu' (riferimento, maschera o mappa) pesava troppo: e' partita in JPEG.")
+        if not avvisi:
+            return richiesta, []
+        return replace(richiesta, immagine=vista, immagini_in_piu=extra), avvisi
 
 
 def _senza_immagine(corpo: object, dati: bytes, nome: str = "vista") -> object:

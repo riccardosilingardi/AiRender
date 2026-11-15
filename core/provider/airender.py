@@ -79,19 +79,13 @@ class ProviderAirender(ProviderComfy):
                 f"dei prezzi ({modulo_licenza.server()}).",
             )
 
-    def _assicura_peso(self, dati: bytes) -> None:
-        peso = modulo_immagine.dimensione_mb(dati)
-        if peso > config.SERVER_INVIO_MASSIMO_MB:
-            raise ErroreProvider(
-                f"La vista di partenza pesa {peso:.1f} MB e il server AIRENDER ne "
-                f"riceve al massimo {config.SERVER_INVIO_MASSIMO_MB}.",
-                "Salva di nuovo la vista da Allplan a una risoluzione piu' bassa "
-                "(1920x1080 basta per un render a 2K).",
-            )
+    def _limite_mb(self) -> float:
+        return config.SERVER_INVIO_MASSIMO_MB
 
     def _genera(self, richiesta: RichiestaGenerazione, avvisi_in_piu: list[str]):
+        richiesta, alleggerite = self._alleggerisci_richiesta(richiesta)
         richiesta, avviso = self._sta_nel_server(richiesta)
-        return super()._genera(richiesta, avvisi_in_piu=[*avvisi_in_piu, *([avviso] if avviso else [])])
+        return super()._genera(richiesta, avvisi_in_piu=[*avvisi_in_piu, *alleggerite, *([avviso] if avviso else [])])
 
     def _sta_nel_server(self, richiesta: RichiestaGenerazione) -> tuple[RichiestaGenerazione, str | None]:
         """Vista e immagini in piu' devono stare insieme sotto il limite del server.

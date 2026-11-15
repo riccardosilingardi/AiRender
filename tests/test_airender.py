@@ -183,7 +183,7 @@ def _base64_inviato(trasporto) -> int:
 
 def test_riferimenti_troppo_pesanti_insieme_si_rimpiccioliscono_e_la_vista_resta_intera():
     vista = _rumore(500, 1)
-    riferimenti = (_rumore(1200, 2), _rumore(1200, 3))
+    riferimenti = (_rumore(1100, 2), _rumore(1100, 3))
     assert sum(len(d) for d in (vista, *riferimenti)) * 4 / 3 / 2**20 > config.SERVER_CORPO_MASSIMO_MB
     trasporto = TrasportoComfyFinto([router_in_coda(), router_stato("COMPLETED"), _risultato_gemini()])
     risultato = _provider(trasporto).genera(_richiesta(

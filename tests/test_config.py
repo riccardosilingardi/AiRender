@@ -269,6 +269,25 @@ def test_comfy_invio_massimo_mb_ferma_la_vista_troppo_pesante_prima_di_spedirla(
     assert "risoluzione piu' bassa" in errore.value.cosa_fare
 
 
+def test_una_vista_pesante_ma_vera_parte_in_jpeg_invece_di_essere_rifiutata(monkeypatch, modello_verificato):
+    """Caso del 2026-11-12: Ritocca su un render 5504x3072 da 20,5 MB fermato con «salva di nuovo la vista»."""
+    import os
+
+    rumore = Image.frombytes("RGB", (800, 500), os.urandom(800 * 500 * 3))
+    uscita = io.BytesIO()
+    rumore.save(uscita, format="PNG")
+    pesante = uscita.getvalue()
+    monkeypatch.setattr(config, "COMFY_INVIO_MASSIMO_MB", immagine.dimensione_mb(pesante) * 0.9)
+    provider = provider_comfy(TrasportoComfyFinto())
+    provider.controlla_prima_dell_invio(modello_verificato, pesante)  # non solleva piu'
+    leggera, avvisi = provider._alleggerisci_richiesta(_richiesta(pesante, modello=modello_verificato))  # pylint: disable=protected-access
+    assert immagine.dimensione_mb(leggera.immagine) <= config.COMFY_INVIO_MASSIMO_MB
+    assert leggera.immagine[:3] == b"\xff\xd8\xff"
+    assert avvisi and "JPEG" in avvisi[0]
+    leggera_uguale, nessuno = provider._alleggerisci_richiesta(_richiesta(vista_shaded(64, 64), modello=modello_verificato))  # pylint: disable=protected-access
+    assert nessuno == [] and leggera_uguale.immagine == vista_shaded(64, 64)
+
+
 def test_risoluzione_predefinita_e_quella_che_parte_davvero():
     """Caso: chiedere 4k a ogni miniatura triplica il conto dell'utente."""
     trasporto = TrasportoFinto([
@@ -411,6 +430,21 @@ def test_corpo_del_server_sta_sotto_i_6_mb_di_netlify_e_la_riduzione_scende():
     lati = config.SERVER_RIDUZIONE_LATI_PX
     assert list(lati) == sorted(lati, reverse=True) and lati[-1] >= 512
     assert config.costante("SERVER_RIDUZIONE_LATI_PX").origine == config.SCELTA
+
+
+def test_vista_lati_alleggerita_scende_e_resta_sopra_un_render_a_2k():
+    """Caso: Ritocca su un render 5504x3072 da 20,5 MB rifiutato invece di partire in JPEG."""
+    lati = config.VISTA_LATI_ALLEGGERITA_PX
+    assert list(lati) == sorted(lati, reverse=True) and lati[-1] >= 2048
+    assert config.costante("VISTA_LATI_ALLEGGERITA_PX").origine == config.SCELTA
+
+
+def test_riferimento_lato_ridotto_tiene_i_dettagli_e_sta_sopra_la_riduzione_del_server():
+    """Caso: un riferimento da 20 MB rimpicciolito troppo perde il materiale che doveva mostrare."""
+    assert config.RIFERIMENTO_LATO_RIDOTTO_PX >= max(config.SERVER_RIDUZIONE_LATI_PX)
+    assert config.costante("RIFERIMENTO_LATO_RIDOTTO_PX").origine == config.SCELTA
+
+
 def test_inserti_massimo_ferma_un_quinto_rif_ed_e_scelto():
     """Caso: partono cinque oggetti in un invio e il modello li confonde, o un'area punta a un Rif. che non esiste."""
     from core.aree import Area, AreaNonValida

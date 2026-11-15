@@ -463,6 +463,34 @@ STUDIO_CARICAMENTO_MASSIMO_MB = _registra(Costante(
     unita=" MB",
 ))
 
+VISTA_LATI_ALLEGGERITA_PX = _registra(Costante(
+    nome="VISTA_LATI_ALLEGGERITA_PX",
+    valore=(4096, 3072, 2048),
+    origine=SCELTA,
+    ragione=(
+        "Una vista o un render di partenza piu' pesante del limite del servizio "
+        "(COMFY_INVIO_MASSIMO_MB, SERVER_INVIO_MASSIMO_MB) non si rifiuta: parte "
+        "in JPEG con gli stessi pixel e, solo se non basta, col lato lungo a "
+        "questi gradini. Caso del 2026-11-12: Ritocca su un render 5504x3072 "
+        "da 20,5 MB rifiutato. 2048 px restano sopra un render a 2K."
+    ),
+    unita=" px",
+))
+
+RIFERIMENTO_LATO_RIDOTTO_PX = _registra(Costante(
+    nome="RIFERIMENTO_LATO_RIDOTTO_PX",
+    valore=2048,
+    origine=SCELTA,
+    ragione=(
+        "Un riferimento o un contesto piu' pesante di COMFY_INVIO_MASSIMO_MB "
+        "non si rifiuta: lo Studio lo rimpicciolisce a questo lato lungo (una "
+        "foto diventa JPEG) e lo tiene. 2048 px portano tutto quello che il "
+        "modello legge di uno stile o di un materiale; Riccardo, 2026-11-12: "
+        "il messaggio «Riducilo o salvalo in JPEG» non va bene."
+    ),
+    unita=" px",
+))
+
 VARIANTI_MASSIME = _registra(Costante(
     nome="VARIANTI_MASSIME",
     valore=4,
