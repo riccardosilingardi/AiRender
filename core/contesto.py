@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import aree as modulo_aree, blocchi, config, immagine as modulo_immagine
+from . import aree as modulo_aree, blocchi, config, immagine as modulo_immagine, velina as modulo_velina
 from .errori import ErroreAirender, FileNonTrovato
 
 CARTELLA_CONTESTI = "contesti"
@@ -61,11 +61,15 @@ class Contesto:
 
     file: str
     # Un rettangolo, due angoli opposti in coordinate da 0 a 1 sul contesto.
-    area: tuple[tuple[float, float], tuple[float, float]]
+    # Con una velina che dice gia' dove va l'edificio (schizzo, posto o
+    # aggancio) il rettangolo e' facoltativo: allora e' None.
+    area: tuple[tuple[float, float], tuple[float, float]] | None
     inquadratura: str = config.CONTESTO_INQUADRATURA_PREDEFINITA
     pulisci_mappa: bool = False
     luogo: str = ""
-    _area: modulo_aree.Area = field(init=False, repr=False, compare=False)
+    # La carta da forno con lo schizzo e gli edifici da inserire (core/velina.py).
+    velina: modulo_velina.Velina | None = None
+    _area: modulo_aree.Area | None = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not self.file:
@@ -73,19 +77,27 @@ class Contesto:
                 "Manca l'immagine del contesto.",
                 "Carica l'immagine del luogo in «Fotoinserimento».",
             )
-        try:
-            area = modulo_aree.Area("rettangolo", tuple(tuple(p) for p in self.area), NOTA_AREA)
-        except modulo_aree.AreaNonValida:
-            raise ContestoNonValido(
-                "L'area dove va l'edificio non e' un rettangolo sul contesto.",
-                "Disegna un rettangolo sull'immagine del contesto, trascinando da un angolo all'altro.",
-            ) from None
-        (x0, y0), (x1, y1) = area.punti
-        if x0 == x1 or y0 == y1:
-            raise ContestoNonValido(
-                "L'area dove va l'edificio e' una linea, non un rettangolo.",
-                "Disegna di nuovo l'area, trascinando da un angolo all'altro.",
-            )
+        area = None
+        if self.area is None:
+            if not (self.velina and self.velina.dice_dove):
+                raise ContestoNonValido(
+                    "Non so dove va l'edificio: manca il rettangolo e la velina non lo dice.",
+                    "Trascina un rettangolo sulla foto, oppure segna il posto sulla velina.",
+                )
+        else:
+            try:
+                area = modulo_aree.Area("rettangolo", tuple(tuple(p) for p in self.area), NOTA_AREA)
+            except modulo_aree.AreaNonValida:
+                raise ContestoNonValido(
+                    "L'area dove va l'edificio non e' un rettangolo sul contesto.",
+                    "Disegna un rettangolo sull'immagine del contesto, trascinando da un angolo all'altro.",
+                ) from None
+            (x0, y0), (x1, y1) = area.punti
+            if x0 == x1 or y0 == y1:
+                raise ContestoNonValido(
+                    "L'area dove va l'edificio e' una linea, non un rettangolo.",
+                    "Disegna di nuovo l'area, trascinando da un angolo all'altro.",
+                )
         try:
             blocchi.controlla_inquadratura(self.inquadratura)
         except blocchi.SceltaNonValida as errore:
@@ -103,31 +115,64 @@ class Contesto:
                 "Scrivi solo indirizzo o coordinate, per esempio «Via Rontano, Reggio Emilia, 44.5214, 10.6990».",
             )
         object.__setattr__(self, "luogo", luogo)
-        object.__setattr__(self, "area", area.punti)
+        object.__setattr__(self, "area", area.punti if area else None)
         object.__setattr__(self, "_area", area)
 
-    def prompt(self, materiali: str = "") -> str:
-        return blocchi.componi_contesto(
-            self.inquadratura, pulisci_mappa=self.pulisci_mappa, luogo=self.luogo, materiali=materiali)
+    @property
+    def oggetti(self) -> int:
+        """Quante viste di Allplan partono: una senza velina."""
+        return len(self.velina.oggetti) if self.velina else 1
 
-    def prepara(self, dati_contesto: bytes) -> bytes:
-        """Il contesto con il contorno magenta numerato dell'area: e' la prima immagine che parte."""
+    def quante_immagini(self) -> int:
+        """Il luogo, la velina se c'e' qualcosa da leggere, una vista per edificio."""
+        return self.velina.quante_immagini() if self.velina else 2
+
+    def prompt(self, materiali: str = "") -> str:
+        velina = self.velina
+        return blocchi.componi_contesto(
+            self.inquadratura, pulisci_mappa=self.pulisci_mappa, luogo=self.luogo, materiali=materiali,
+            area=self._area is not None,
+            velina=(blocchi.DettagliVelina(
+                schizzo=velina.colori_usati, posti=velina.lettere_posti,
+                agganciati=velina.lettere_agganciate, edifici=len(velina.oggetti),
+                parte=velina.parte_la_velina) if velina else None))
+
+    def prepara(self, dati_contesto: bytes, viste: tuple[bytes, ...] = ()) -> bytes:
+        """La prima immagine che parte: il luogo pulito, con gli edifici agganciati e il contorno magenta dell'area."""
+        if self.velina and self.velina.lettere_agganciate:
+            dati_contesto = modulo_velina.aggancia(dati_contesto, viste, self.velina)
+        if self._area is None:
+            return dati_contesto
         dimensioni = modulo_immagine.dimensioni(dati_contesto)
         return modulo_immagine.disegna_aree(dati_contesto, modulo_aree.poligoni((self._area,), dimensioni))
 
+    def in_piu(self, dati_contesto: bytes, viste: tuple[bytes, ...]) -> tuple[bytes, ...]:
+        """Le immagini dopo il luogo: la velina con lo schizzo (se c'e'), poi una vista per edificio."""
+        if self.velina and self.velina.parte_la_velina:
+            return (modulo_velina.disegna(dati_contesto, self.velina), *viste)
+        return tuple(viste)
+
     def misura(self, dati_contesto: bytes, render: bytes) -> dict | None:
-        """Quanto e' cambiato il contesto fuori dall'area. None con «pulisci la mappa»: li' cambia apposta."""
-        if self.pulisci_mappa:
+        """Quanto e' cambiato il contesto fuori dall'area.
+
+        None con «pulisci la mappa», senza rettangolo, o con uno schizzo o un
+        aggancio: li' il luogo cambia apposta anche fuori, e il numero sarebbe
+        falso (regola 3).
+        """
+        if self.pulisci_mappa or self._area is None:
+            return None
+        if self.velina and (self.velina.ha_schizzo or self.velina.lettere_agganciate):
             return None
         return modulo_aree.misura(dati_contesto, render, (self._area,))
 
     def a_dizionario(self) -> dict:
         return {
             "file": self.file,
-            "area": [list(p) for p in self.area],
+            "area": [list(p) for p in self.area] if self.area else None,
             "inquadratura": self.inquadratura,
             "pulisci_mappa": self.pulisci_mappa,
             "luogo": self.luogo,
+            **({"velina": self.velina.a_dizionario()} if self.velina else {}),
         }
 
     @classmethod
@@ -135,16 +180,24 @@ class Contesto:
         if not isinstance(dati, dict):
             raise ContestoNonValido(
                 "Il contesto non e' un oggetto.",
-                "Il contesto e' {file, area, inquadratura, pulisci_mappa, luogo}.",
+                "Il contesto e' {file, area, inquadratura, pulisci_mappa, luogo, velina}.",
             )
+        velina = None
+        if dati.get("velina"):
+            try:
+                velina = modulo_velina.Velina.da_dizionario(dati.get("velina"))
+            except modulo_velina.VelinaNonValida as errore:
+                raise ContestoNonValido(errore.fatto, errore.cosa_fare) from None
         try:
             area = tuple(tuple(float(c) for c in p) for p in dati.get("area") or ())
         except (TypeError, ValueError):
             area = ()
-        if len(area) != 2:
+        if not area and velina is not None and velina.dice_dove:
+            area = None  # type: ignore[assignment]
+        elif len(area) != 2:
             raise ContestoNonValido(
                 "Manca l'area dove va l'edificio.",
-                "Disegna un rettangolo sull'immagine del contesto.",
+                "Disegna un rettangolo sull'immagine del contesto, oppure segna il posto sulla velina.",
             )
         return cls(
             file=str(dati.get("file") or ""),
@@ -152,4 +205,5 @@ class Contesto:
             inquadratura=str(dati.get("inquadratura") or config.CONTESTO_INQUADRATURA_PREDEFINITA),
             pulisci_mappa=bool(dati.get("pulisci_mappa")),
             luogo=str(dati.get("luogo") or ""),
+            velina=velina,
         )

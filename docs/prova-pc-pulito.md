@@ -30,7 +30,7 @@ Pillow, la libreria per le immagini, è già dentro il pacchetto: **non** serve
 *Install Python Package*. Python e PowerShell non servono.
 
 Da annotare: Allplan ha chiesto qualcosa? Ha dato errori? Nel Plugin Manager
-compare AIRENDER 1.0.16?
+compare AIRENDER 1.0.17?
 
 ## 2. Apri la palette
 

@@ -526,7 +526,36 @@ select { min-height: 34px; padding: 0 10px; }
 .carica-luogo:hover { border-color: var(--accento); }
 .carica-luogo b { color: var(--accento); font-size: 15px; }
 .miniatura-vista { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; background: var(--pannello-2); }
-.tela-contesto { margin: 4px 0; }
+.tela-contesto { margin: 4px 0; display: flex; justify-content: center; }
+/* La foto intera, mai tagliata: stretta o larga, la tela prende la sua forma
+   e i segni stanno sopra la foto, non sopra le bande (2026-11-23, vista
+   aerea di Google stretta vista tagliata da Riccardo). */
+.palco-contesto { position: relative; width: fit-content; max-width: 100%; }
+.palco-contesto > img { display: block; max-width: 100%; max-height: 72vh; width: auto; height: auto; }
+.palco-contesto > canvas.pittura, .carta-velina { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.carta-velina { transition: opacity .15s; }
+.posto-velina {
+  position: absolute; transform: translate(-50%, -50%); width: 30px; height: 30px; border-radius: 50%;
+  background: #141414; color: #fff; border: 2px solid #fff; display: grid; place-items: center;
+  font-weight: 700; font-size: 15px; pointer-events: none;
+}
+.punto-aggancio {
+  position: absolute; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%;
+  background: #2F6FED; color: #fff; border: 2px solid #fff; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; pointer-events: none; opacity: .65;
+}
+.punto-aggancio.attivo { opacity: 1; }
+.quadro-aggancio { fill: rgba(47, 111, 237, .12); stroke: #2F6FED; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.ritaglio { fill: rgba(92, 194, 139, .35); stroke: #5CC28B; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.ritaglio.togli { fill: rgba(11, 15, 23, .55); stroke: #F07B6B; }
+.strumenti-velina { display: flex; flex-direction: column; gap: 6px; }
+.strumenti-velina .switch { flex-wrap: wrap; }
+.strumenti-velina input[type="range"] { width: 90px; }
+.campione-velina { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.tela-vista { display: flex; flex-direction: column; gap: 6px; }
+.tela-vista .palco-contesto > img { max-height: 40vh; }
+.tela-ritocco[data-strumento="posto"], .tela-ritocco[data-strumento="punti"] { cursor: copy; }
+.confronto-aggancio { margin-top: 6px; }
 .link-file { color: var(--accento); cursor: pointer; text-decoration: underline; }
 .come-link { background: none; border: 0; padding: 0; font: inherit; }
 .riga.grigio { opacity: .6; }

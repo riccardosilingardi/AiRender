@@ -37,7 +37,7 @@ from .lessico import controlla_etichetta
 
 # Cambia ogni volta che cambia il testo di un blocco o la composizione di un
 # preset: senza, una ricetta non dice con quali parole e' stata fatta.
-VERSIONE = "bozza-17"
+VERSIONE = "bozza-18"
 
 ESTERNO = "esterno"
 INTERNO = "interno"
@@ -1426,17 +1426,101 @@ def frase_luogo(luogo: str) -> str:
     return f"The site is at {testo}." if testo else ""
 
 
+# --- velina del fotoinserimento (bozza 18, 2026-11-23) -----------------------
+
+# La carta da forno di Riccardo (thread «Aggiungere la velina al
+# fotoinserimento»): la foto pulita resta la prima immagine, la seconda e' la
+# stessa foto sbiadita con lo schizzo, poi una vista per edificio (A, B, ...).
+# I colori li disegna core/velina.py: rosso, verde, nero. Nessun testo provato
+# con il modello.
+VELINA_COLORI = {
+    "cambia": "red marks show what to change or remove in the site",
+    "verde": "green marks show new trees, hedges and planting to add, drawn with their outline and size",
+    "profilo": "black lines show the outlines and footprints of the new buildings",
+}
+
+
+@dataclass(frozen=True)
+class DettagliVelina:
+    """Cosa c'e' sulla velina, quanto basta al prompt: colori usati, lettere dei posti e degli agganci."""
+
+    schizzo: tuple[str, ...] = ()
+    posti: tuple[str, ...] = ()
+    agganciati: tuple[str, ...] = ()
+    edifici: int = 1
+    parte: bool = False
+
+
+def _elenco_lettere(lettere: tuple[str, ...]) -> str:
+    return lettere[0] if len(lettere) == 1 else ", ".join(lettere[:-1]) + " and " + lettere[-1]
+
+
+def _regola_velina(v: DettagliVelina, area: bool) -> str:
+    """La regola dell'inserimento con la velina: le immagini numerate, cosa dice lo schizzo, cosa resta."""
+    prima_vista = 3 if v.parte else 2  # numero-non-configurabile: l'ordine delle immagini, luogo e velina prima delle viste
+    lettere = "ABCD"[:v.edifici]
+    if v.edifici == 1:
+        viste = f"Image {prima_vista} is a view of the new building designed for this site."
+    else:
+        viste = (f"Images {prima_vista} to {prima_vista + v.edifici - 1} are views of the new buildings "
+                 "designed for this site: " + ", ".join(
+                     f"image {prima_vista + i} is building {l}" for i, l in enumerate(lettere)) + ".")
+    pezzi = ["Photo insertion. Image 1 is the real site, a clean photograph: it sets the camera, the light "
+             "and the look of the result."]
+    if v.agganciati:
+        chi = "building" if len(v.agganciati) == 1 else "buildings"
+        pezzi.append(
+            f"In image 1 {chi} {_elenco_lettere(v.agganciati)} {'is' if len(v.agganciati) == 1 else 'are'} already "
+            "placed as a rough, flat CAD montage: keep that position, footprint, size and orientation exactly, "
+            "and turn it into a real photographed building.")
+    if v.parte:
+        pezzi.append("Image 2 is the same site seen through a sheet of tracing paper with my hand-drawn "
+                     "instructions on it; it is a guide only, never copy its washed-out look.")
+        segni = [VELINA_COLORI[c] for c in v.schizzo]
+        if v.posti:
+            segni.append("a black circle with a letter marks where the building with that letter stands")
+        if segni:
+            pezzi.append("On the tracing paper " + "; ".join(segni) + ". Follow these marks.")
+    pezzi.append(viste)
+    if area:
+        pezzi.append("The numbered magenta outline in image 1 is the area for the new "
+                     + ("building" if v.edifici == 1 else "buildings") + "; remove it from the result.")
+    pezzi.append(
+        "Place " + ("the building" if v.edifici == 1 else "each building") + " into the site. Adapt "
+        "perspective, scale and orientation to the site, so it stands on the ground at a believable size "
+        "next to the roads, trees and buildings around it. Keep each building's shape, proportions and "
+        "openings as designed; do not redesign it. The building views are untextured CAD views: their flat "
+        "greys and colours are not materials, so give the buildings real, photographed building materials, "
+        "glass that reflects the site, and real weathering. Match the light, sun direction, shadows, colour, "
+        "haze and grain of image 1, so the buildings look photographed together with it. The result is a "
+        "clean photograph: no tracing paper, no marks, no lines, no letters, no outlines.")
+    return " ".join(pezzi)
+
+
+CONTESTO_FUORI_VELINA = Blocco(
+    "contesto-fuori-velina",
+    "Fuori da edifici e schizzo il luogo resta com'e'",
+    "Apart from the new buildings and what the marks ask to change, keep the site of image 1 exactly as it is.",
+)
+
+
 def componi_contesto(inquadratura: str, *, pulisci_mappa: bool = False,
-                     luogo: str = "", materiali: str = "") -> str:
+                     luogo: str = "", materiali: str = "", area: bool = True,
+                     velina: DettagliVelina | None = None) -> str:
     """Il prompt di «Inserisci nel contesto»: regola, inquadratura, luogo, materiali, fuori dall'area, cosa evitare.
 
     Con «pulisci la mappa» il contesto non resta identico fuori dall'area:
     diventa una foto, e la frase del fuori intatto lascia il posto a quella
-    della pulizia (direbbero due cose opposte).
+    della pulizia (direbbero due cose opposte). Con la velina la regola conta
+    le immagini (luogo, velina, edifici) e dice cosa vuol dire ogni colore.
     """
-    pezzi = [CONTESTO_REGOLA.testo, INQUADRATURE[controlla_inquadratura(inquadratura)].testo]
+    regola = _regola_velina(velina, area) if velina else CONTESTO_REGOLA.testo
+    pezzi = [regola, INQUADRATURE[controlla_inquadratura(inquadratura)].testo]
     pezzi += [p for p in (frase_luogo(luogo), frase_materiali(materiali)) if p]
-    pezzi.append(CONTESTO_PULISCI_MAPPA.testo if pulisci_mappa else CONTESTO_FUORI_INTATTO.testo)
+    if pulisci_mappa:
+        pezzi.append(CONTESTO_PULISCI_MAPPA.testo)
+    else:
+        pezzi.append(CONTESTO_FUORI_VELINA.testo if velina else CONTESTO_FUORI_INTATTO.testo)
     pezzi.append(COSA_EVITARE.testo)
     return " ".join(pezzi)
 

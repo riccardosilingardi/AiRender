@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
-from .. import contesto as modulo_contesto
+from .. import contesto as modulo_contesto, velina as modulo_velina
 from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import partenza as modulo_partenza
@@ -567,9 +567,16 @@ class Studio:
             )
         percorso = self.percorso_contesto(str(voce.get("nome") or ""))
         try:
-            return modulo_contesto.Contesto.da_dizionario({**voce, "file": str(percorso)})
+            contesto = modulo_contesto.Contesto.da_dizionario({**voce, "file": str(percorso)})
         except modulo_contesto.ContestoNonValido as errore:
             raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        velina = contesto.velina
+        if velina is None or len(velina.oggetti) == 1:
+            return contesto
+        # Gli edifici in piu' arrivano come nomi di viste della cartella: qui
+        # diventano i loro file, e un nome che non e' una vista si rifiuta.
+        viste = tuple(str(self.percorso_vista(o.vista)) for o in velina.oggetti[1:])
+        return replace(contesto, velina=velina.con_viste(viste))
 
     def carica_riferimento(self, dati: bytes, nome_originale: str = "") -> dict:
         """Salva un'immagine di riferimento nella cartella dei riferimenti, chiamata con la sua impronta.
@@ -684,6 +691,17 @@ class Studio:
                 # finche' una chiamata vera non dice che il Router lo lascia
                 # passare (scripts/sonda_comfy.py --ricerca-web).
                 "ricerca_web_verificata": False,
+                # La velina (core/velina.py): carta da forno, colori dello
+                # schizzo e quanti edifici entrano. Valori SCELTI, non misurati.
+                "velina": {
+                    "opacita": config.VELINA_OPACITA,
+                    "opacita_massima": config.VELINA_OPACITA_MASSIMA,
+                    "edifici_massimi": config.CONTESTO_OGGETTI_MASSIMO,
+                    "carta": "#%02x%02x%02x" % modulo_velina.CARTA,
+                    "colori": [{"id": c, "nome": modulo_velina.NOMI_COLORI[c],
+                                "rgb": "#%02x%02x%02x" % modulo_velina.RGB[c]} for c in modulo_velina.COLORI],
+                    "lettere": modulo_velina.LETTERE,
+                },
             },
         }
 
@@ -829,7 +847,7 @@ class Studio:
         }
 
     def destinazione(self, identificativo_modello: str, varianti: object = 1,
-                     riferimento: bool = False, contesto: bool = False,
+                     riferimento: bool = False, contesto: object = False,
                      materiali_immagini: object = 0, inserti: object = 0, esempi: object = 0,
                      geometria: bool = False) -> dict:
         """Dove va la vista e quanto costa, da mostrare prima di Genera (regola 5).
@@ -839,6 +857,10 @@ class Studio:
         """
         modello = self._modello(identificativo_modello)
         quante = numero_varianti(varianti)
+        # Il contesto arriva come vero/falso (senza velina) o come i dettagli
+        # della velina: quante immagini partono dipende da lei.
+        velina = _DettagliContesto.da(contesto)
+        contesto = velina is not None
         try:
             dei_materiali = max(0, int(materiali_immagini or 0))
         except (TypeError, ValueError):
@@ -868,14 +890,17 @@ class Studio:
             "cosa_manca": motore.cosa_manca(modello.identificativo),
             "avviso": motore.avviso(modello.identificativo),
             # Regola 5: quante immagini partono, detto prima del clic.
-            "immagini": ((2 if (riferimento or contesto) else 1) + degli_esempi + dei_materiali + dei_rif
+            "immagini": ((velina.immagini if velina else 2 if riferimento else 1)
+                         + degli_esempi + dei_materiali + dei_rif
                          + (len(modulo_mappe.MAPPE) if geometria and not contesto else 0)),
             "inserti": dei_rif,
             "esempi": degli_esempi,
-            "cosa_parte": _con_le_mappe(_cosa_parte(riferimento, contesto, dei_materiali, dei_rif, degli_esempi),
+            "cosa_parte": _con_le_mappe(_cosa_parte(riferimento, velina or False, dei_materiali, dei_rif,
+                                                    degli_esempi),
                                         geometria and not contesto),
             "contesto_non_accettato": (
-                f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda due. "
+                f"{modello.nome} riceve una sola immagine per invio: «Fotoinserimento» ne manda "
+                f"{velina.immagini if velina else 2}. "
                 "Scegli Nano Banana 2."
                 if contesto and not motore.accetta_piu_immagini(modello.identificativo) else None),
             "riferimento_non_accettato": (
@@ -916,7 +941,8 @@ class Studio:
         esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
         geometria = self._geometria_scelta(dati, contesto)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None, contesto=contesto is not None,
+                                         riferimento=riferimento is not None,
+                                         contesto=_DettagliContesto.di(contesto),
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
                                          inserti=len(inserti), esempi=len(esempi), geometria=geometria)
         prompt = _prompt_genera(_prompt_a_mano(dati), scelte, contesto,
@@ -988,7 +1014,8 @@ class Studio:
         esempi = self._esempi_scelti(dati, contesto is not None, riferimento)
         geometria = self._geometria_scelta(dati, contesto)
         destinazione = self.destinazione(str(dati.get("modello") or ""), dati.get("varianti", 1),
-                                         riferimento=riferimento is not None, contesto=contesto is not None,
+                                         riferimento=riferimento is not None,
+                                         contesto=_DettagliContesto.di(contesto),
                                          materiali_immagini=modulo_materiali.quante_immagini(cambi),
                                          inserti=len(inserti), esempi=len(esempi), geometria=geometria)
         return self._metti_in_coda(
@@ -1415,7 +1442,7 @@ class Studio:
         inserti = tuple(Path(i) for i in lavoro.inserti)
         esempi = tuple(Path(e) for e in lavoro.esempi)
         destinazione = self.destinazione(lavoro.modello, riferimento=riferimento is not None,
-                                         contesto=lavoro.contesto is not None,
+                                         contesto=_DettagliContesto.di(lavoro.contesto),
                                          inserti=len(inserti) + int(lavoro.punto_di_vista is not None),
                                          esempi=len(esempi))
         return self._metti_in_coda(
@@ -1672,6 +1699,33 @@ class Studio:
             "regolazioni": regolazione.descrizione(),
             "peso_mb": round(len(contenuto) / _BYTE_PER_MB, 1),
         }
+
+    def anteprima_contesto(self, dati: dict) -> dict:
+        """Le immagini del Fotoinserimento come partirebbero: la foto pulita (con aggancio e area) e la velina.
+
+        Tutto qui, sul computer: nessuna immagine parte. Serve al confronto
+        prima/dopo dello Studio, foto com'e' contro foto con gli edifici
+        agganciati, e a far vedere la velina che legge il modello.
+        """
+        contesto = self._contesto_scelto(dati)
+        if contesto is None:
+            raise RichiestaStudioNonValida("Manca la foto del luogo.", "Caricala in «Fotoinserimento».")
+        vista = self.percorso_vista(str(dati.get("vista") or ""))
+        viste = (modulo_immagine.leggi(vista), *(
+            modulo_immagine.leggi(modulo_coda.controlla_vista_in_piu(vista, Path(o.vista)))
+            for o in (contesto.velina.oggetti[1:] if contesto.velina else ())))
+        luogo = Path(contesto.file).read_bytes()
+        try:
+            pulita = contesto.prepara(luogo, viste)
+        except modulo_velina.VelinaNonValida as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        in_piu = contesto.in_piu(luogo, viste)
+        velina = in_piu[0] if contesto.velina and contesto.velina.parte_la_velina else None
+
+        def url(png: bytes) -> str:
+            return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+        return {"pulita": url(pulita), "velina": url(velina) if velina else None,
+                "immagini": contesto.quante_immagini()}
 
     def anteprima_regola(self, identificativo: str, dati: dict) -> dict:
         """Il render scelto con le regolazioni, piccolo, per vederlo mentre si muovono i cursori.
@@ -2847,7 +2901,48 @@ _MODELLO_RIAGGANCIA_VECCHIO = "riaggancia"
 _NOMI_CONTROLLI_VECCHI = {"spigoli": "Spigoli", "profondita": "Profondità", "linee": "Linee dritte"}
 
 
-def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: int = 0, esempi: int = 0) -> str:
+@dataclass(frozen=True)
+class _DettagliContesto:
+    """Cosa serve per dire quante immagini partono col Fotoinserimento (regola 5)."""
+
+    area: bool = True
+    velina: bool = False  # parte anche la foto sotto la velina con lo schizzo
+    edifici: int = 1
+    agganciati: int = 0
+
+    @property
+    def immagini(self) -> int:
+        return 1 + int(self.velina) + self.edifici
+
+    @classmethod
+    def di(cls, contesto: "modulo_contesto.Contesto | None") -> "_DettagliContesto | None":
+        if contesto is None:
+            return None
+        velina = contesto.velina
+        if velina is None:
+            return cls()
+        return cls(area=contesto.area is not None, velina=velina.parte_la_velina,
+                   edifici=len(velina.oggetti), agganciati=len(velina.lettere_agganciate))
+
+    @classmethod
+    def da(cls, valore: object) -> "_DettagliContesto | None":
+        """Da vero/falso, da un _DettagliContesto o dalla domanda della pagina (dizionario)."""
+        if isinstance(valore, cls):
+            return valore
+        if isinstance(valore, dict):
+            def numero(chiave: str, predefinito: int) -> int:
+                try:
+                    return int(valore.get(chiave, predefinito))
+                except (TypeError, ValueError):
+                    return predefinito
+            edifici = min(max(numero("edifici", 1), 1), config.CONTESTO_OGGETTI_MASSIMO)
+            return cls(area=bool(valore.get("area", True)), velina=bool(valore.get("velina")),
+                       edifici=edifici, agganciati=min(max(numero("agganciati", 0), 0), edifici))
+        return cls() if valore else None
+
+
+def _cosa_parte(riferimento: bool, contesto: "_DettagliContesto | bool", materiali: int = 0, inserti: int = 0,
+                esempi: int = 0) -> str:
     """Quante immagini partono e quali, nelle stesse parole ogni volta (regola 5)."""
     if esempi and riferimento:
         pezzi = ["la vista", f"{1 + esempi} esempi di stile"]
@@ -2873,11 +2968,30 @@ def _cosa_parte(riferimento: bool, contesto: bool, materiali: int = 0, inserti: 
         return (f"Partono {quante} immagini: {prima}, poi {immagini} dei materiali da cambiare "
                 "(campioni dei materiali e foto di riferimento).")
     if contesto:
-        return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
-                "poi la vista.")
+        dettagli = contesto if isinstance(contesto, _DettagliContesto) else _DettagliContesto()
+        if dettagli == _DettagliContesto():
+            return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
+                    "poi la vista.")
+        pulito = ["prima la foto del luogo pulita"]
+        if dettagli.area:
+            pulito.append("con l'area segnata in magenta")
+        if dettagli.agganciati:
+            pulito.append("con l'edificio agganciato già montato" if dettagli.agganciati == 1
+                          else "con gli edifici agganciati già montati")
+        pezzi = [" ".join(pulito[:1]) + (", " + " e ".join(pulito[1:]) if pulito[1:] else "")]
+        if dettagli.velina:
+            pezzi.append("poi la stessa foto sotto la velina con lo schizzo")
+        pezzi.append("poi la vista" if dettagli.edifici == 1
+                     else "poi le viste degli edifici " + _elenco_lettere(dettagli.edifici))
+        return f"Partono {dettagli.immagini} immagini: " + ", ".join(pezzi) + "."
     if riferimento:
         return "Partono due immagini: la vista e il riferimento per lo stile."
     return "Parte una immagine: la vista."
+
+
+def _elenco_lettere(quanti: int) -> str:
+    lettere = list(modulo_velina.LETTERE[:quanti])
+    return ", ".join(lettere[:-1]) + " e " + lettere[-1] if len(lettere) > 1 else "".join(lettere)
 
 
 def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") -> str:
@@ -2887,8 +3001,18 @@ def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") 
                  else "materiali: li sceglie il modello")
     if contesto.luogo:
         pezzi.append(f"luogo: {contesto.luogo}")
-    pezzi.append("lo screenshot diventa una foto" if contesto.pulisci_mappa
-                 else "fuori dall'area il contesto resta com'è")
+    velina = contesto.velina
+    if velina is not None:
+        if velina.ha_schizzo:
+            pezzi.append("velina: " + ", ".join(modulo_velina.NOMI_COLORI[c].lower() for c in velina.colori_usati))
+        if len(velina.oggetti) > 1:
+            pezzi.append(f"{len(velina.oggetti)} edifici")
+        if velina.lettere_agganciate:
+            pezzi.append("agganciati con 4 punti: " + ", ".join(velina.lettere_agganciate))
+    if contesto.pulisci_mappa:
+        pezzi.append("lo screenshot diventa una foto")
+    elif contesto.area is not None and not (velina and velina.ha_schizzo):
+        pezzi.append("fuori dall'area il contesto resta com'è")
     return " · ".join(pezzi)
 
 

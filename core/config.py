@@ -640,6 +640,43 @@ CONTESTO_LUOGO_MASSIMO = _registra(Costante(
     unita=" caratteri",
 ))
 
+VELINA_OPACITA = _registra(Costante(
+    nome="VELINA_OPACITA",
+    valore=0.55,
+    origine=SCELTA,
+    ragione=(
+        "Fotoinserimento, velina (2026-11-23): quanto la carta da forno "
+        "sbiadisce la foto del luogo, da 0 (foto com'e') a 1 (bianco). A 0,55 "
+        "la foto si riconosce ancora e lo schizzo rosso, verde e nero si legge "
+        "sopra. Giudizio dal prototipo del 2026-11-20, mai provato con il "
+        "modello; l'utente lo cambia col cursore."
+    ),
+))
+
+VELINA_OPACITA_MASSIMA = _registra(Costante(
+    nome="VELINA_OPACITA_MASSIMA",
+    valore=0.85,
+    origine=SCELTA,
+    ragione=(
+        "Fotoinserimento, velina: oltre l'85% la foto sotto la carta quasi "
+        "non si vede, e il modello non capirebbe piu' a cosa si riferisce lo "
+        "schizzo. Giudizio del 2026-11-23."
+    ),
+))
+
+CONTESTO_OGGETTI_MASSIMO = _registra(Costante(
+    nome="CONTESTO_OGGETTI_MASSIMO",
+    valore=4,
+    origine=SCELTA,
+    ragione=(
+        "Fotoinserimento: quante viste di Allplan (edifici A, B, C, D) "
+        "partono al massimo in un invio. Stessa ragione di INSERTI_MASSIMO: "
+        "Nano Banana accetta fino a 14 immagini, ma con piu' di quattro "
+        "oggetti diversi il modello li confonde piu' facilmente. Ad Arceto "
+        "(2026-11-15) gli edifici erano tre. Mai provato con il modello."
+    ),
+))
+
 # --- Banco di prova ----------------------------------------------------------
 
 DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(
