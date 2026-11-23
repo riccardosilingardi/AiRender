@@ -1397,13 +1397,17 @@ class Coda:
             self.recupera_abbandonati()
             # I video (Studio · Video) li fa questa stessa coda, quando non ha
             # immagini da fare: un solo processo parla col servizio.
-            from . import video as modulo_video  # pylint: disable=import-outside-toplevel
+            # Cosi' anche «Prepara la foto» del Fotoinserimento.
+            from . import prepara_foto as modulo_prepara, video as modulo_video  # pylint: disable=import-outside-toplevel
 
             video = modulo_video.CodaVideo(self.radice, self._crea_provider, self._dire)
             video.recupera_abbandonati()
+            preparazioni = modulo_prepara.CodaPreparazioni(self.radice, self._crea_provider, self._dire)
+            preparazioni.recupera_abbandonati()
             fatti = 0
             while True:
-                if self.esegui_uno() is not None or video.esegui_uno() is not None:
+                if (self.esegui_uno() is not None or preparazioni.esegui_uno() is not None
+                        or video.esegui_uno() is not None):
                     fatti += 1
                     continue
                 if una_volta:

@@ -677,6 +677,31 @@ CONTESTO_OGGETTI_MASSIMO = _registra(Costante(
     ),
 ))
 
+PREPARA_FOTO_RISOLUZIONE = _registra(Costante(
+    nome="PREPARA_FOTO_RISOLUZIONE",
+    valore="2k",
+    origine=SCELTA,
+    ragione=(
+        "«Prepara la foto» (Fotoinserimento, 2026-11-23): a che grandezza "
+        "Nano Banana 2 rifa pulito lo screenshot. 2K costa come 1K coi "
+        "crediti AIRENDER (pesi: 2K = 1) e lascia a Magnific un'immagine "
+        "gia' leggibile da ingrandire; 4K costerebbe il doppio per dettaglio "
+        "che poi Magnific aggiunge comunque. Giudizio, nessuna prova fatta."
+    ),
+))
+
+PREPARA_FOTO_INGRANDIMENTO = _registra(Costante(
+    nome="PREPARA_FOTO_INGRANDIMENTO",
+    valore=2,
+    origine=SCELTA,
+    ragione=(
+        "«Prepara la foto»: di quante volte Magnific (lo stesso di «Finale») "
+        "ingrandisce la foto pulita. Da 2K a circa 5K sul lato lungo: basta "
+        "per una tavola e il file resta sotto il limite d'invio in JPEG. Il "
+        "piu' piccolo di FINALE_INGRANDIMENTI, che costa meno. Giudizio."
+    ),
+))
+
 # --- Banco di prova ----------------------------------------------------------
 
 DIFFERENZA_PIXEL_SOGLIA = _registra(Costante(

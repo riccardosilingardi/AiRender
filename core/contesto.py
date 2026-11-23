@@ -18,11 +18,13 @@ Qui non c'e' nessun import di Allplan, come in tutto core/.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aree as modulo_aree, blocchi, config, immagine as modulo_immagine, velina as modulo_velina
 from .errori import ErroreAirender, FileNonTrovato
+from .ricetta import impronta
 
 CARTELLA_CONTESTI = "contesti"
 
@@ -37,6 +39,21 @@ class ContestoNonValido(ErroreAirender):
 
 def cartella_contesti(radice: Path) -> Path:
     return Path(radice) / CARTELLA_CONTESTI
+
+
+def salva(radice: Path, dati: bytes) -> str:
+    """Salva un'immagine del luogo fra i contesti, chiamata con la sua impronta, e ne da' il nome."""
+    tipo = "png" if dati.startswith(b"\x89PNG") else "jpg"
+    nome = f"ctx-{impronta(dati)[:16]}.{tipo}"  # numero-non-configurabile: 64 bit di impronta, come i riferimenti
+    cartella = cartella_contesti(radice)
+    cartella.mkdir(parents=True, exist_ok=True)
+    percorso = cartella / nome
+    if not percorso.exists():
+        # Come coda.scrivi_atomico, che qui non si importa (coda importa contesto).
+        temporaneo = percorso.with_name(f".{nome}.tmp")
+        temporaneo.write_bytes(dati)
+        os.replace(temporaneo, percorso)
+    return nome
 
 
 def controlla_file(radice: Path, file: Path) -> Path:

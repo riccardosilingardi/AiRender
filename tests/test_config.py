@@ -837,3 +837,11 @@ def test_la_velina_sbiadisce_senza_coprire_e_gli_edifici_stanno_nelle_lettere():
     assert 1 <= config.CONTESTO_OGGETTI_MASSIMO <= len(velina.LETTERE)
     for nome in ("VELINA_OPACITA", "VELINA_OPACITA_MASSIMA", "CONTESTO_OGGETTI_MASSIMO"):
         assert config.costante(nome).origine == config.SCELTA
+
+
+def test_prepara_la_foto_chiede_una_grandezza_e_un_ingrandimento_che_esistono():
+    """Caso: PREPARA_FOTO_RISOLUZIONE fuori da 1k/2k/4k o PREPARA_FOTO_INGRANDIMENTO che Magnific non fa da «Finale»."""
+    assert config.PREPARA_FOTO_RISOLUZIONE in ("1k", "2k", "4k")
+    assert config.PREPARA_FOTO_INGRANDIMENTO in config.FINALE_INGRANDIMENTI
+    for nome in ("PREPARA_FOTO_RISOLUZIONE", "PREPARA_FOTO_INGRANDIMENTO"):
+        assert config.costante(nome).origine == config.SCELTA

@@ -270,6 +270,19 @@ per PR (regola di `CLAUDE.md`).
 **Sezione permanente.** Creduto ma non provato. Si esce solo con una verifica, e
 la verifica si nomina qui.
 
+### «Prepara la foto» del Fotoinserimento (2026-11-23)
+
+Provato con i test (`tests/test_prepara_foto.py`: pulizia poi ingrandimento,
+foto salvata fra i contesti, pulizia tenuta se l'ingrandimento fallisce,
+destinazione mostrata) e con lo Studio vero in Chromium nel container,
+provider finto che rimanda la foto ritoccata in locale. **Mai mandata a Nano
+Banana 2 o Magnific davvero.** Non si sa se Nano Banana 2 tiene strade ed
+edifici al loro posto (al Fotoinserimento di Arceto abbassava la camera), ne'
+quanto costa l'ingrandimento. Coi crediti AIRENDER l'ingrandimento non parte
+(il server inoltra solo corpi Gemini): lo Studio lo spegne e lo dice. Si esce
+con: Riccardo prepara uno screenshot di Google Earth, guarda il prima/dopo e
+dice se le strade combaciano.
+
 ### Pennello nuovo del Ritocca (2026-11-12)
 
 Provato con i test (`tests/test_compositore.py`: pittura, gomma, incolla solo

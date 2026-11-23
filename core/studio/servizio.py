@@ -25,6 +25,7 @@ from typing import Callable
 
 from .. import aree as modulo_aree, blocchi, config, coda as modulo_coda, immagine as modulo_immagine
 from .. import contesto as modulo_contesto, velina as modulo_velina
+from .. import prepara_foto as modulo_prepara
 from .. import licenza as modulo_licenza
 from .. import materiali as modulo_materiali
 from .. import partenza as modulo_partenza
@@ -527,14 +528,8 @@ class Studio:
                 "Salvala in JPEG o PNG (uno screenshot va bene), poi caricala di nuovo.",
             )
         dati = _alleggerisci(dati, "L'immagine del contesto")
-        tipo = comfy.tipo_mime(dati)
         larghezza, altezza = modulo_immagine.dimensioni(dati)  # solleva se non si legge
-        estensione = ".jpg" if tipo == "image/jpeg" else ".png"
-        nome = f"ctx-{impronta(dati)[:16]}{estensione}"  # numero-non-configurabile: 64 bit di impronta, come i riferimenti
-        cartella = modulo_contesto.cartella_contesti(self.cartella)
-        cartella.mkdir(parents=True, exist_ok=True)
-        if not (cartella / nome).exists():
-            modulo_coda.scrivi_atomico(cartella / nome, dati)
+        nome = modulo_contesto.salva(self.cartella, dati)
         return {"nome": nome, "da": nome_originale, "larghezza": larghezza,
                 "altezza": altezza, "impronta": impronta(dati)}
 
@@ -2457,6 +2452,79 @@ class Studio:
             parte_da=passo["identificativo"], partenza=render,
             finale=finale,
         )
+
+    # --- Prepara la foto (Fotoinserimento) --------------------------------
+
+    def _preparazione(self, dati: dict) -> tuple[Path, str, str, dict, dict]:
+        """Foto, inquadratura, prompt e le due destinazioni: pulizia (Nano Banana 2) e ingrandimento (Magnific)."""
+        percorso = self.percorso_contesto(str(dati.get("nome") or ""))
+        inquadratura = str(dati.get("inquadratura") or config.CONTESTO_INQUADRATURA_PREDEFINITA)
+        try:
+            prompt = modulo_prepara.prompt(inquadratura)
+        except modulo_prepara.PreparazioneNonValida as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        return (percorso, inquadratura, prompt, self.destinazione(modulo_prepara.MODELLO_PULIZIA),
+                self.destinazione(MODELLO_FINALE.identificativo))
+
+    def componi_preparazione(self, dati: dict) -> dict:
+        """Cosa fa «Prepara la foto», prima del clic: dove va, quanto costa, cosa la fermerebbe (regola 5)."""
+        percorso, _inquadratura, prompt, pulizia, ingrandimento = self._preparazione(dati)
+        larghezza, altezza = modulo_immagine.dimensioni(percorso.read_bytes())
+
+        def voce(destinazione: dict) -> dict:
+            return {k: destinazione[k] for k in ("modello_nome", "fornitore", "destinazione", "costo",
+                                                  "cosa_manca", "senza_ripiego")}
+        return {
+            "prompt": prompt,
+            "partenza": f"{larghezza} × {altezza}",
+            "risoluzione": config.PREPARA_FOTO_RISOLUZIONE.upper(),
+            "volte": config.PREPARA_FOTO_INGRANDIMENTO,
+            "pulizia": voce(pulizia),
+            "ingrandimento": voce(ingrandimento),
+            "coda_attiva": self._coda_attiva(),
+        }
+
+    def invia_preparazione(self, dati: dict) -> dict:
+        """Mette in coda «Prepara la foto». Solo se le destinazioni sono quelle che la pagina ha mostrato (regola 5)."""
+        percorso, inquadratura, _prompt, pulizia, ingrandimento = self._preparazione(dati)
+        ingrandisci = bool(dati.get("ingrandisci"))
+        mostrate = [(dati.get("destinazione_mostrata"), pulizia)]
+        if ingrandisci:
+            mostrate.append((dati.get("destinazione_ingrandimento_mostrata"), ingrandimento))
+        for mostrata, destinazione in mostrate:
+            if mostrata != destinazione["destinazione"]:
+                raise RichiestaStudioNonValida(
+                    f"La pagina ha mostrato come destinazione {mostrata!r}, ma la foto partirebbe verso "
+                    f"{destinazione['destinazione']}. Non ho inviato niente.",
+                    "Ricarica lo Studio: la destinazione si rilegge e si mostra di nuovo.")
+            if destinazione["cosa_manca"]:
+                raise RichiestaStudioNonValida(
+                    f"Non mando: {destinazione['cosa_manca']}",
+                    "Togli la spunta «Ingrandisci», oppure usa il servizio che lo fa." if destinazione is ingrandimento
+                    else "Controlla la chiave o la licenza nella scheda Licenza.")
+        try:
+            preparazione = modulo_prepara.metti_in_coda(
+                self.cartella, percorso, inquadratura,
+                provider=self.provider_per(modulo_prepara.MODELLO_PULIZIA),
+                destinazione=pulizia["destinazione"],
+                destinazione_ingrandimento=ingrandimento["destinazione"] if ingrandisci else "",
+                ingrandimento=config.PREPARA_FOTO_INGRANDIMENTO if ingrandisci else 0)
+        except modulo_prepara.PreparazioneNonValida as errore:
+            raise RichiestaStudioNonValida(errore.fatto, errore.cosa_fare) from None
+        return {"identificativo": preparazione.identificativo, "coda_attiva": self._coda_attiva()}
+
+    def stato_preparazione(self, identificativo: str) -> dict:
+        stato = modulo_prepara.leggi_stato(self.cartella, identificativo)
+        if stato is None:
+            raise RichiestaStudioNonValida("Questa preparazione della foto non esiste.",
+                                           "Rifai «Prepara la foto».")
+        return stato
+
+    def annulla_preparazione(self, identificativo: str) -> dict:
+        if modulo_prepara.annulla(self.cartella, identificativo):
+            return {"annullato": True}
+        raise RichiestaStudioNonValida("La foto è già partita: il servizio la prepara comunque.",
+                                       "Aspetta che finisca; il costo è già preso.")
 
     # --- cartella --------------------------------------------------------
 
