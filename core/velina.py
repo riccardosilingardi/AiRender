@@ -1,29 +1,20 @@
-"""La velina del Fotoinserimento: carta da forno sopra la foto del luogo.
+"""La velina del Fotoinserimento: dove vanno gli edifici e lo schizzo sopra la foto.
 
-Richiesta di Riccardo del 2026-11-20, approvata il 2026-11-23 (thread
-«Aggiungere la velina al fotoinserimento»). Sopra la foto si stende uno strato
-chiaro che la sbiadisce, e ci si schizza a mano libera:
+Richiesta di Riccardo del 2026-11-20, rifatta il 2026-11-23 dopo la sua prima
+prova («UX pessima»):
 
-- rosso: cosa cambiare o togliere nel luogo;
-- verde: alberi, siepi e verde nuovi, col loro profilo;
-- nero: profili e sagome degli edifici nuovi.
+- ogni edificio (A, B, ...) e' una vista di Allplan e ha un **perimetro**:
+  l'impronta alla base disegnata sulla foto, vertice per vertice, sia su una
+  foto zenitale sia su una aerea o da terra. Sostituisce il rettangolo, il
+  «posto» e i 4 punti dell'aggancio;
+- la **velina** e' facoltativa: una carta da forno che sbiadisce la foto, su
+  cui si schizza a mano libera in rosso (cosa cambiare o togliere), verde
+  (alberi e verde nuovi) e nero (profili).
 
-Gli oggetti da inserire sono una o piu' viste di Allplan (edificio A, B, ...).
-Ognuno puo' avere un posto, una lettera cerchiata sulla velina, e puo' essere
-«agganciato» con 4 punti: 4 angoli a terra sulla foto e gli stessi 4 sulla
-vista. Con l'aggancio AIRENDER deforma la vista sulla foto prima dell'invio
-(omografia), cosi' il modello riceve l'edificio gia' al suo posto. I punti sono
-facoltativi: senza, il modello piazza l'edificio come ha sempre fatto.
-
-Cosa parte, nell'ordine: (1) la foto del luogo pulita, senza velina, con gli
-edifici agganciati gia' montati; (2) la stessa foto sotto la velina con lo
-schizzo, se c'e' uno schizzo o un posto; (3...) una vista per oggetto. La
-foto pulita va per prima: il realismo del risultato viene da li', e la velina
-e' solo un foglio di istruzioni.
-
-L'omografia e' esatta sul piano del terreno (i 4 punti) e approssimata per
-quello che sta piu' in alto: tetti e facciate tornano bene solo se la vista
-di Allplan e' presa da un punto simile alla foto. Lo Studio lo dice.
+Cosa parte, nell'ordine: (1) la foto pulita con il perimetro magenta di ogni
+edificio e la sua lettera, come il contorno numerato che ha funzionato ad
+Arceto; (2) la stessa foto sotto la velina con lo schizzo, solo se c'e' uno
+schizzo; (3...) una vista per edificio.
 
 Le coordinate sono frazioni dell'immagine, da 0 a 1, con l'origine in alto a
 sinistra. Qui non c'e' nessun import di Allplan, come in tutto core/.
@@ -45,76 +36,63 @@ CAMBIA = "cambia"
 VERDE = "verde"
 PROFILO = "profilo"
 COLORI = (CAMBIA, VERDE, PROFILO)
-# I colori dello schizzo, uguali nello Studio (studio.js, COLORI_VELINA): il
-# prompt li nomina, quindi devono restare rosso, verde e nero.
-RGB = {CAMBIA: (214, 50, 43), VERDE: (47, 138, 58), PROFILO: (20, 20, 20)}  # numero-non-configurabile: i colori che il prompt nomina (rosso, verde, nero), uguali in studio.js
+# I colori dello schizzo, uguali nello Studio (studio.js li legge dal
+# catalogo): il prompt li nomina, quindi devono restare rosso, verde e nero.
+RGB = {CAMBIA: (214, 50, 43), VERDE: (47, 138, 58), PROFILO: (20, 20, 20)}  # numero-non-configurabile: i colori che il prompt nomina (rosso, verde, nero)
 # Come l'interfaccia chiama ogni colore, sempre con le stesse parole.
 NOMI_COLORI = {CAMBIA: "Cambia o togli", VERDE: "Alberi e verde", PROFILO: "Profili"}
 # Il colore della carta da forno.
 CARTA = (247, 244, 236)  # numero-non-configurabile: il colore della carta da forno, solo aspetto
 LETTERE = "ABCD"
+PERIMETRO_MINIMO = 3  # numero-non-configurabile: un perimetro ha almeno tre vertici
 
 
 class VelinaNonValida(ErroreAirender):
-    """Una velina che non si puo' mandare: tratti, oggetti o punti che non tornano."""
+    """Una velina che non si puo' mandare: tratti, edifici o perimetri che non tornano."""
 
 
 def _punto(p: object, che_cosa: str) -> Punto:
     try:
         x, y = (float(c) for c in p)  # type: ignore[union-attr]
     except (TypeError, ValueError):
-        raise VelinaNonValida(f"{che_cosa}: un punto non e' [x, y].", "Rimetti il punto sull'immagine.") from None
+        raise VelinaNonValida(f"{che_cosa}: un vertice non e' [x, y].", "Ridisegna il perimetro.") from None
     if not (0 <= x <= 1 and 0 <= y <= 1):
-        raise VelinaNonValida(f"{che_cosa}: un punto sta fuori dall'immagine.", "Rimetti il punto sull'immagine.")
+        raise VelinaNonValida(f"{che_cosa}: un vertice sta fuori dalla foto.", "Ridisegna il perimetro.")
     return (x, y)
 
 
-def _quattro(punti: object, che_cosa: str) -> tuple[Punto, ...] | None:
-    if punti in (None, [], ()):
+def _area(punti: tuple[Punto, ...]) -> float:
+    """L'area del poligono (formula del laccio), in frazione della foto."""
+    n = len(punti)
+    return abs(sum(punti[i][0] * punti[(i + 1) % n][1] - punti[(i + 1) % n][0] * punti[i][1]
+                   for i in range(n))) / 2
+
+
+def _perimetro(voce: object, lettera: str) -> tuple[Punto, ...] | None:
+    if voce in (None, [], ()):
         return None
-    if not isinstance(punti, (list, tuple)) or len(punti) != 4:  # numero-non-configurabile: l'aggancio e' un quadrilatero: 4 punti per definizione
-        raise VelinaNonValida(f"{che_cosa}: servono esattamente 4 punti, nell'ordine 1, 2, 3, 4.",
-                              "Metti i 4 punti sugli angoli a terra dell'edificio.")
-    return tuple(_punto(p, che_cosa) for p in punti)
-
-
-def quadrilatero_valido(punti: tuple[Punto, ...]) -> bool:
-    """4 punti che fanno un quadrilatero convesso, nell'ordine: niente tre in fila, niente lati incrociati."""
-    segno = 0
-    for i in range(4):  # numero-non-configurabile: i 4 lati del quadrilatero
-        (ax, ay), (bx, by), (cx, cy) = punti[i], punti[(i + 1) % 4], punti[(i + 2) % 4]  # numero-non-configurabile: i 4 vertici del quadrilatero
-        z = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
-        if abs(z) < 1e-4:  # numero-non-configurabile: tre punti quasi in fila, in frazioni dell'immagine
-            return False
-        s = 1 if z > 0 else -1
-        if segno and s != segno:
-            return False
-        segno = s
-    return True
-
-
-def _operazioni(voci: object, che_cosa: str) -> tuple[modulo_aree.Operazione, ...]:
-    if not voci:
-        return ()
-    if not isinstance(voci, list):
-        raise VelinaNonValida(f"{che_cosa} non e' un elenco di tratti.", "Ridisegna.")
-    try:
-        return tuple(modulo_aree.Operazione.da_dizionario(v) for v in voci)
-    except modulo_aree.AreaNonValida as errore:
-        raise VelinaNonValida(f"{che_cosa}: {errore.fatto}", errore.cosa_fare) from None
+    che_cosa = f"Il perimetro dell'edificio {lettera}"
+    if not isinstance(voce, (list, tuple)) or len(voce) < PERIMETRO_MINIMO:
+        raise VelinaNonValida(f"{che_cosa} ha meno di {PERIMETRO_MINIMO} vertici.",
+                              "Clicca almeno tre angoli alla base dell'edificio, poi doppio clic per chiudere.")
+    punti = tuple(_punto(p, che_cosa) for p in voce)
+    if _area(punti) < config.PERIMETRO_AREA_MINIMA:
+        raise VelinaNonValida(f"{che_cosa} e' troppo piccolo o e' una linea.",
+                              "Ridisegnalo sugli angoli alla base dell'edificio.")
+    return punti
 
 
 @dataclass(frozen=True)
 class Tratto:
-    """Un pezzo dello schizzo: un'operazione di pennello (core/aree.py) con il suo colore."""
+    """Un tratto di matita sulla velina: il colore e la pennellata (come nel Ritocca)."""
 
     colore: str
     operazione: modulo_aree.Operazione
 
     def __post_init__(self) -> None:
         if self.colore not in COLORI:
-            raise VelinaNonValida(f"\"{self.colore}\" non e' un colore della velina.",
-                                  "Usa rosso (cambia), verde (alberi) o nero (profili).")
+            raise VelinaNonValida(f"Lo schizzo ha un colore che non conosco: \"{self.colore}\".",
+                                  "Usa le matite della velina: rosso, verde o nero.")
 
     def a_dizionario(self) -> dict:
         return {"colore": self.colore, **self.operazione.a_dizionario()}
@@ -122,67 +100,27 @@ class Tratto:
 
 @dataclass(frozen=True)
 class Oggetto:
-    """Una vista da inserire. `vista` vuota = la vista del lavoro; le altre sono file della cartella delle viste."""
+    """Un edificio da inserire. `vista` vuota = la vista del lavoro; le altre sono file della cartella delle viste."""
 
     vista: str = ""
-    posto: Punto | None = None
-    punti_luogo: tuple[Punto, ...] | None = None
-    punti_vista: tuple[Punto, ...] | None = None
-    # Cosa della vista si incolla con l'aggancio: una pittura come quella del
-    # Ritocca. Senza, si incollerebbe anche lo sfondo e il terreno della vista.
-    ritaglio: tuple[modulo_aree.Operazione, ...] = ()
-
-    def __post_init__(self) -> None:
-        if bool(self.punti_luogo) != bool(self.punti_vista):
-            raise VelinaNonValida(
-                "L'aggancio ha i 4 punti solo su una delle due immagini.",
-                "Metti gli stessi 4 punti sia sulla foto sia sulla vista, oppure togli l'aggancio.",
-            )
-        if self.punti_luogo:
-            for punti, dove in ((self.punti_luogo, "sulla foto"), (self.punti_vista, "sulla vista")):
-                if not quadrilatero_valido(punti):  # type: ignore[arg-type]
-                    raise VelinaNonValida(
-                        f"I 4 punti {dove} non fanno un quadrilatero: tre sono quasi in fila, o i lati si incrociano.",
-                        "Mettili in ordine 1, 2, 3, 4 attorno all'impronta dell'edificio, a terra.",
-                    )
-            if not any(not o.gomma for o in self.ritaglio):
-                raise VelinaNonValida(
-                    "L'aggancio non sa cosa incollare: manca il ritaglio dell'edificio sulla vista.",
-                    "Ripassa l'edificio col pennello «Ritaglia» sulla vista, oppure togli l'aggancio.",
-                )
-
-    @property
-    def agganciato(self) -> bool:
-        return bool(self.punti_luogo)
+    perimetro: tuple[Punto, ...] | None = None
 
     def a_dizionario(self) -> dict:
         voce: dict = {"vista": self.vista}
-        if self.posto:
-            voce["posto"] = list(self.posto)
-        if self.agganciato:
-            voce["punti_luogo"] = [list(p) for p in self.punti_luogo]  # type: ignore[union-attr]
-            voce["punti_vista"] = [list(p) for p in self.punti_vista]  # type: ignore[union-attr]
-        if self.ritaglio:
-            voce["ritaglio"] = [o.a_dizionario() for o in self.ritaglio]
+        if self.perimetro:
+            voce["perimetro"] = [list(p) for p in self.perimetro]
         return voce
 
     @classmethod
-    def da_dizionario(cls, dati: object) -> "Oggetto":
+    def da_dizionario(cls, dati: object, lettera: str = "A") -> "Oggetto":
         if not isinstance(dati, dict):
-            raise VelinaNonValida("Un oggetto da inserire non e' un oggetto.", "Ricarica lo Studio.")
-        posto = dati.get("posto")
-        return cls(
-            vista=str(dati.get("vista") or ""),
-            posto=_punto(posto, "Il posto dell'edificio") if posto else None,
-            punti_luogo=_quattro(dati.get("punti_luogo"), "L'aggancio sulla foto"),
-            punti_vista=_quattro(dati.get("punti_vista"), "L'aggancio sulla vista"),
-            ritaglio=_operazioni(dati.get("ritaglio"), "Il ritaglio dell'edificio"),
-        )
+            raise VelinaNonValida("Un edificio da inserire non e' un oggetto.", "Ricarica lo Studio.")
+        return cls(vista=str(dati.get("vista") or ""), perimetro=_perimetro(dati.get("perimetro"), lettera))
 
 
 @dataclass(frozen=True)
 class Velina:
-    """Lo schizzo sulla carta da forno e gli oggetti da inserire (il primo e' la vista del lavoro)."""
+    """Lo schizzo sulla carta da forno e gli edifici da inserire (il primo e' la vista del lavoro)."""
 
     tratti: tuple[Tratto, ...] = ()
     opacita: float = config.VELINA_OPACITA
@@ -204,8 +142,14 @@ class Velina:
             raise VelinaNonValida("Il primo edificio dev'essere la vista scelta.", "Ricarica lo Studio.")
         if any(not o.vista for o in self.oggetti[1:]):
             raise VelinaNonValida("Un edificio in piu' non dice da che vista viene.", "Scegli di nuovo la vista.")
-        punti = sum(len(t.operazione.punti) for t in self.tratti) \
-            + sum(len(op.punti) for o in self.oggetti for op in o.ritaglio)
+        if len(self.oggetti) > 1:
+            senza = [LETTERE[i] for i, o in enumerate(self.oggetti) if not o.perimetro]
+            if senza:
+                raise VelinaNonValida(
+                    "Non so dove va l'edificio " + ", ".join(senza) + ": manca il suo perimetro.",
+                    "Disegna il perimetro alla base di ogni edificio, oppure togli quello che non serve.",
+                )
+        punti = sum(len(t.operazione.punti) for t in self.tratti)
         if punti > config.PITTURA_PUNTI_MASSIMI:
             raise VelinaNonValida(
                 f"Lo schizzo ha {punti} punti: ne entrano al massimo {config.PITTURA_PUNTI_MASSIMI}.",
@@ -219,22 +163,22 @@ class Velina:
         return any(not t.operazione.gomma for t in self.tratti)
 
     @property
-    def lettere_posti(self) -> tuple[str, ...]:
-        return tuple(LETTERE[i] for i, o in enumerate(self.oggetti) if o.posto)
+    def lettere(self) -> tuple[str, ...]:
+        return tuple(LETTERE[i] for i in range(len(self.oggetti)))
 
     @property
-    def lettere_agganciate(self) -> tuple[str, ...]:
-        return tuple(LETTERE[i] for i, o in enumerate(self.oggetti) if o.agganciato)
+    def ha_perimetri(self) -> bool:
+        return any(o.perimetro for o in self.oggetti)
 
     @property
     def parte_la_velina(self) -> bool:
-        """La seconda immagine parte solo se c'e' qualcosa da leggere sopra: tratti o posti."""
-        return self.ha_schizzo or bool(self.lettere_posti)
+        """La seconda immagine parte solo se c'e' qualcosa da leggere sopra: lo schizzo."""
+        return self.ha_schizzo
 
     @property
     def dice_dove(self) -> bool:
-        """Lo schizzo, un posto o un aggancio dicono gia' dove va: il rettangolo diventa facoltativo."""
-        return self.parte_la_velina or bool(self.lettere_agganciate)
+        """I perimetri dicono dove vanno gli edifici: allora il rettangolo non serve."""
+        return all(o.perimetro for o in self.oggetti)
 
     @property
     def colori_usati(self) -> tuple[str, ...]:
@@ -264,19 +208,22 @@ class Velina:
         for voce in voci:
             if not isinstance(voce, dict):
                 raise VelinaNonValida("Un tratto dello schizzo non e' un oggetto.", "Ridisegna.")
-            operazione = _operazioni([{k: v for k, v in voce.items() if k != "colore"}], "Lo schizzo")[0]
+            try:
+                operazione = modulo_aree.Operazione.da_dizionario({k: v for k, v in voce.items() if k != "colore"})
+            except modulo_aree.AreaNonValida as errore:
+                raise VelinaNonValida(f"Lo schizzo: {errore.fatto}", errore.cosa_fare) from None
             tratti.append(Tratto(str(voce.get("colore") or ""), operazione))
         oggetti = dati.get("oggetti") or [{}]
-        if not isinstance(oggetti, list):
-            raise VelinaNonValida("Gli edifici da inserire non sono un elenco.", "Ricarica lo Studio.")
+        if not isinstance(oggetti, list) or len(oggetti) > len(LETTERE):
+            raise VelinaNonValida("Gli edifici da inserire non sono un elenco valido.", "Ricarica lo Studio.")
         opacita = dati.get("opacita", config.VELINA_OPACITA)
         return cls(tratti=tuple(tratti), opacita=opacita,
-                   oggetti=tuple(Oggetto.da_dizionario(o) for o in oggetti))
+                   oggetti=tuple(Oggetto.da_dizionario(o, LETTERE[i]) for i, o in enumerate(oggetti)))
 
     def con_viste(self, viste: tuple[str, ...]) -> "Velina":
         """La stessa velina con i file delle viste in piu' al posto dei nomi (il primo resta vuoto)."""
         oggetti = (self.oggetti[0],) + tuple(
-            Oggetto(v, o.posto, o.punti_luogo, o.punti_vista, o.ritaglio) for o, v in zip(self.oggetti[1:], viste))
+            Oggetto(v, o.perimetro) for o, v in zip(self.oggetti[1:], viste))
         return Velina(self.tratti, self.opacita, oggetti)
 
 
@@ -294,88 +241,34 @@ def _png(immagine: Image.Image) -> bytes:
     return uscita.getvalue()
 
 
+def perimetri(luogo: bytes, velina: Velina) -> bytes:
+    """La foto pulita con il perimetro magenta di ogni edificio e la sua lettera: la prima immagine che parte."""
+    if not velina.ha_perimetri:
+        return luogo
+    larghezza, altezza = modulo_immagine.dimensioni(luogo)
+    poligoni, lettere = [], []
+    for lettera, oggetto in zip(velina.lettere, velina.oggetti):
+        if oggetto.perimetro:
+            poligoni.append([(x * larghezza, y * altezza) for x, y in oggetto.perimetro])
+            lettere.append(lettera)
+    return modulo_immagine.disegna_aree(luogo, poligoni, lettere)
+
+
 def disegna(luogo: bytes, velina: Velina) -> bytes:
-    """La foto sotto la carta da forno, con lo schizzo e le lettere dei posti: la seconda immagine che parte.
+    """La foto sotto la carta da forno con lo schizzo: la seconda immagine che parte.
 
     I tratti si dipingono in ordine su uno strato trasparente: la gomma toglie
-    quello che c'era sotto, di qualunque colore, come fa lo Studio.
+    quello che c'era sotto, come nel Ritocca.
     """
     foto = _apri(luogo)
-    larghezza, altezza = foto.size
     carta = Image.new("RGB", foto.size, CARTA)
-    base = Image.blend(foto, carta, float(velina.opacita))
+    sotto = Image.blend(foto, carta, velina.opacita)
     strato = Image.new("RGBA", foto.size, (0, 0, 0, 0))
     disegno = ImageDraw.Draw(strato)
+    larghezza, altezza = foto.size
     for tratto in velina.tratti:
         pezzo = tratto.operazione.in_pixel(larghezza, altezza)
         modulo_immagine._dipingi(disegno, pezzo, (*RGB[tratto.colore], 255), (0, 0, 0, 0))  # numero-non-configurabile: alfa pieno
-    base = base.convert("RGBA")
-    base.alpha_composite(strato)
-    raggio = max(12, round(min(larghezza, altezza) * 0.03))  # numero-non-configurabile: lettera leggibile, 3% del lato corto
-    disegno = ImageDraw.Draw(base)
-    carattere = modulo_immagine._carattere(round(raggio * 1.3))  # numero-non-configurabile: la lettera un po' piu' grande del raggio, solo aspetto
-    for i, oggetto in enumerate(velina.oggetti):
-        if not oggetto.posto:
-            continue
-        x, y = oggetto.posto[0] * larghezza, oggetto.posto[1] * altezza
-        disegno.ellipse((x - raggio, y - raggio, x + raggio, y + raggio), fill=(*RGB[PROFILO], 255),  # numero-non-configurabile: bianco e alfa pieno
-                        outline=(255, 255, 255, 255), width=max(2, raggio // 6))  # numero-non-configurabile: bordo bianco, solo aspetto
-        disegno.text((x, y), LETTERE[i], fill=(255, 255, 255, 255), font=carattere, anchor="mm")  # numero-non-configurabile: bianco e alfa pieno
-    return _png(base.convert("RGB"))
-
-
-def _risolvi(matrice: list[list[float]], termini: list[float]) -> list[float] | None:
-    """Gauss con pivot parziale, in Python puro: gira uguale nel plugin e nel browser (Pyodide)."""
-    n = len(termini)
-    righe = [r[:] + [termini[i]] for i, r in enumerate(matrice)]
-    for c in range(n):
-        p = max(range(c, n), key=lambda r: abs(righe[r][c]))
-        righe[c], righe[p] = righe[p], righe[c]
-        if abs(righe[c][c]) < 1e-12:  # numero-non-configurabile: sistema singolare, punti allineati
-            return None
-        for r in range(n):
-            if r != c:
-                f = righe[r][c] / righe[c][c]
-                righe[r] = [a - f * b for a, b in zip(righe[r], righe[c])]
-    return [righe[i][n] / righe[i][i] for i in range(n)]
-
-
-def omografia(da: list[Punto], a: list[Punto]) -> tuple[float, ...] | None:
-    """Gli 8 coefficienti che portano i 4 punti `da` sui 4 punti `a` (come vuole Image.transform PERSPECTIVE).
-
-    Pillow chiede, per ogni pixel dell'uscita, dove leggere nell'ingresso:
-    quindi `da` sono i punti sull'uscita (la foto) e `a` quelli sull'ingresso (la vista).
-    """
-    matrice, termini = [], []
-    for (x, y), (u, v) in zip(da, a):
-        matrice.append([x, y, 1, 0, 0, 0, -u * x, -u * y])
-        termini.append(u)
-        matrice.append([0, 0, 0, x, y, 1, -v * x, -v * y])
-        termini.append(v)
-    soluzione = _risolvi(matrice, termini)
-    return tuple(soluzione) if soluzione else None
-
-
-def aggancia(luogo: bytes, viste: tuple[bytes, ...], velina: Velina) -> bytes:
-    """La foto con gli edifici agganciati gia' montati, prima dal piu' lontano. Senza aggancio, la foto com'e'."""
-    if not velina.lettere_agganciate:
-        return luogo
-    foto = _apri(luogo)
-    larghezza, altezza = foto.size
-    ordine = sorted((i for i, o in enumerate(velina.oggetti) if o.agganciato),
-                    key=lambda i: max(y for _, y in velina.oggetti[i].punti_luogo))  # type: ignore[union-attr]
-    for indice in ordine:
-        oggetto = velina.oggetti[indice]
-        vista = _apri(viste[indice])
-        lv, av = vista.size
-        coeff = omografia([(x * larghezza, y * altezza) for x, y in oggetto.punti_luogo],  # type: ignore[union-attr]
-                          [(x * lv, y * av) for x, y in oggetto.punti_vista])  # type: ignore[union-attr]
-        if coeff is None:
-            raise VelinaNonValida("I 4 punti dell'aggancio sono allineati: non so dove mettere l'edificio.",
-                                  "Rimetti i punti agli angoli a terra dell'edificio.")
-        maschera = modulo_immagine._maschera_pittura(
-            (lv, av), [op.in_pixel(lv, av) for op in oggetto.ritaglio])
-        deformata = vista.transform(foto.size, Image.Transform.PERSPECTIVE, coeff, Image.Resampling.BICUBIC)
-        maschera = maschera.transform(foto.size, Image.Transform.PERSPECTIVE, coeff, Image.Resampling.BILINEAR)
-        foto.paste(deformata, (0, 0), maschera)
-    return _png(foto)
+    sotto = sotto.convert("RGBA")
+    sotto.alpha_composite(strato)
+    return _png(sotto.convert("RGB"))

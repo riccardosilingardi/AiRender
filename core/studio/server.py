@@ -20,7 +20,7 @@ Rotte:
     GET  /api/viste/<nome>/render          i lavori nati da quella vista
     GET  /api/viste/<nome>/passi           l'albero dei passi della vista
     GET  /api/viste/<nome>/materiali       i materiali del progetto letti dalla palette con la vista
-    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1[&velina=1&edifici=<n>&agganciati=<n>&area=0]&inserti=<n>   dove va la vista, quante immagini, quanto costa
+    GET  /api/destinazione?modello=<id>&varianti=<n>&riferimento=1&contesto=1[&velina=1&edifici=<n>&perimetri=1&area=0]&inserti=<n>   dove va la vista, quante immagini, quanto costa
     GET  /api/lavori/<id>                  stato di un lavoro
     GET  /api/lavori/<id>/ricetta          la ricetta del render
     GET  /file/vista/<nome>                l'immagine della vista
@@ -196,7 +196,7 @@ class _Gestore(BaseHTTPRequestHandler):
                                                    "area": (domanda.get("area") or ["1"])[0] == "1",
                                                    "velina": (domanda.get("velina") or ["0"])[0] == "1",
                                                    "edifici": (domanda.get("edifici") or ["1"])[0],
-                                                   "agganciati": (domanda.get("agganciati") or ["0"])[0],
+                                                   "perimetri": (domanda.get("perimetri") or ["0"])[0] == "1",
                                                } if (domanda.get("contesto") or ["0"])[0] == "1" else False),
                                                materiali_immagini=(domanda.get("materiali") or ["0"])[0],
                                                inserti=(domanda.get("inserti") or ["0"])[0],

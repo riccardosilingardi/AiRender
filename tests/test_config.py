@@ -845,3 +845,9 @@ def test_prepara_la_foto_chiede_una_grandezza_e_un_ingrandimento_che_esistono():
     assert config.PREPARA_FOTO_INGRANDIMENTO in config.FINALE_INGRANDIMENTI
     for nome in ("PREPARA_FOTO_RISOLUZIONE", "PREPARA_FOTO_INGRANDIMENTO"):
         assert config.costante(nome).origine == config.SCELTA
+
+
+def test_il_perimetro_minimo_e_un_edificio_piccolo_ma_vero():
+    """Caso: PERIMETRO_AREA_MINIMA a 0 lascia partire tre clic in fila; troppo alta rifiuta una casa lontana."""
+    assert 0 < config.PERIMETRO_AREA_MINIMA <= 0.002  # numero-non-configurabile: 0,2% della foto, limite del test
+    assert config.costante("PERIMETRO_AREA_MINIMA").origine == config.SCELTA

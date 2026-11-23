@@ -1222,7 +1222,7 @@ class Coda:
         if lavoro.contesto:
             luogo = modulo_contesto.controlla_file(self.radice, Path(lavoro.contesto.file)).read_bytes()
             modulo_immagine.misura(luogo)  # solleva se non e' un'immagine
-            # Prima il contesto pulito (con l'area e gli edifici agganciati),
+            # Prima il contesto pulito (coi perimetri magenta o l'area),
             # poi la velina se c'e' uno schizzo, poi una vista per edificio:
             # il rapporto del render segue la prima immagine, e il render e'
             # il contesto.

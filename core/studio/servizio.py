@@ -1696,11 +1696,10 @@ class Studio:
         }
 
     def anteprima_contesto(self, dati: dict) -> dict:
-        """Le immagini del Fotoinserimento come partirebbero: la foto pulita (con aggancio e area) e la velina.
+        """Le immagini del Fotoinserimento come partirebbero: la foto coi perimetri (o l'area) e la velina.
 
-        Tutto qui, sul computer: nessuna immagine parte. Serve al confronto
-        prima/dopo dello Studio, foto com'e' contro foto con gli edifici
-        agganciati, e a far vedere la velina che legge il modello.
+        Tutto qui, sul computer: nessuna immagine parte. Serve a far vedere
+        cosa legge il modello: i perimetri magenta con le lettere e la velina.
         """
         contesto = self._contesto_scelto(dati)
         if contesto is None:
@@ -2976,7 +2975,7 @@ class _DettagliContesto:
     area: bool = True
     velina: bool = False  # parte anche la foto sotto la velina con lo schizzo
     edifici: int = 1
-    agganciati: int = 0
+    perimetri: bool = False  # ogni edificio ha il suo perimetro alla base, in magenta
 
     @property
     def immagini(self) -> int:
@@ -2990,7 +2989,7 @@ class _DettagliContesto:
         if velina is None:
             return cls()
         return cls(area=contesto.area is not None, velina=velina.parte_la_velina,
-                   edifici=len(velina.oggetti), agganciati=len(velina.lettere_agganciate))
+                   edifici=len(velina.oggetti), perimetri=velina.ha_perimetri)
 
     @classmethod
     def da(cls, valore: object) -> "_DettagliContesto | None":
@@ -3005,7 +3004,7 @@ class _DettagliContesto:
                     return predefinito
             edifici = min(max(numero("edifici", 1), 1), config.CONTESTO_OGGETTI_MASSIMO)
             return cls(area=bool(valore.get("area", True)), velina=bool(valore.get("velina")),
-                       edifici=edifici, agganciati=min(max(numero("agganciati", 0), 0), edifici))
+                       edifici=edifici, perimetri=bool(valore.get("perimetri")))
         return cls() if valore else None
 
 
@@ -3041,11 +3040,11 @@ def _cosa_parte(riferimento: bool, contesto: "_DettagliContesto | bool", materia
             return ("Partono due immagini: prima il contesto con l'area segnata in magenta, "
                     "poi la vista.")
         pulito = ["prima la foto del luogo pulita"]
-        if dettagli.area:
+        if dettagli.perimetri:
+            pulito.append("con il perimetro alla base segnato in magenta" if dettagli.edifici == 1
+                          else "con i perimetri alla base segnati in magenta")
+        elif dettagli.area:
             pulito.append("con l'area segnata in magenta")
-        if dettagli.agganciati:
-            pulito.append("con l'edificio agganciato già montato" if dettagli.agganciati == 1
-                          else "con gli edifici agganciati già montati")
         pezzi = [" ".join(pulito[:1]) + (", " + " e ".join(pulito[1:]) if pulito[1:] else "")]
         if dettagli.velina:
             pezzi.append("poi la stessa foto sotto la velina con lo schizzo")
@@ -3075,8 +3074,8 @@ def riassunto_contesto(contesto: modulo_contesto.Contesto, materiali: str = "") 
             pezzi.append("velina: " + ", ".join(modulo_velina.NOMI_COLORI[c].lower() for c in velina.colori_usati))
         if len(velina.oggetti) > 1:
             pezzi.append(f"{len(velina.oggetti)} edifici")
-        if velina.lettere_agganciate:
-            pezzi.append("agganciati con 4 punti: " + ", ".join(velina.lettere_agganciate))
+        if velina.ha_perimetri:
+            pezzi.append("perimetro alla base: " + ", ".join(velina.lettere))
     if contesto.pulisci_mappa:
         pezzi.append("lo screenshot diventa una foto")
     elif contesto.area is not None and not (velina and velina.ha_schizzo):

@@ -19,8 +19,8 @@ from core.velina import Oggetto, Tratto, Velina, VelinaNonValida
 from core.aree import Operazione
 from test_contesto import NANO, ProviderConDueImmagini, _contesto, _jpeg, _richiesta, _studio, cartella, chiamate  # noqa: F401
 
-QUADRO = [[0.2, 0.5], [0.6, 0.5], [0.65, 0.85], [0.15, 0.85]]
-VISTA = [[0.1, 0.3], [0.9, 0.3], [0.9, 0.9], [0.1, 0.9]]
+PERIMETRO = [[0.2, 0.5], [0.6, 0.5], [0.65, 0.85], [0.15, 0.85]]
+PERIMETRO_B = [[0.7, 0.2], [0.9, 0.2], [0.9, 0.4], [0.7, 0.4]]
 PENNELLATA = {"tipo": "tratto", "spessore": 0.05, "punti": [[0.2, 0.2], [0.8, 0.8]], "gomma": False}
 
 
@@ -36,52 +36,38 @@ def _apri(dati: bytes) -> Image.Image:
     return Image.open(io.BytesIO(dati)).convert("RGB")
 
 
-# --- omografia --------------------------------------------------------------
-
-
-def test_l_omografia_porta_i_4_punti_della_foto_sui_4_della_vista():
-    """Caso: i coefficienti girati al contrario mettono l'edificio fuori posto (Pillow vuole uscita -> ingresso)."""
-    da = [(10, 20), (200, 30), (220, 180), (5, 160)]
-    a = [(0, 0), (100, 0), (100, 80), (0, 80)]
-    a0, b0, c0, d0, e0, f0, g0, h0 = modulo_velina.omografia(da, a)
-    for (x, y), (u, v) in zip(da, a):
-        w = g0 * x + h0 * y + 1
-        assert abs((a0 * x + b0 * y + c0) / w - u) < 1e-6
-        assert abs((d0 * x + e0 * y + f0) / w - v) < 1e-6
-
-
-def test_punti_allineati_non_fanno_un_quadrilatero():
-    assert not modulo_velina.quadrilatero_valido(((0, 0), (0.5, 0), (1, 0), (0.5, 0.5)))
-    assert not modulo_velina.quadrilatero_valido(((0, 0), (1, 1), (1, 0), (0, 1)))  # lati incrociati
-    assert modulo_velina.quadrilatero_valido(tuple(tuple(p) for p in QUADRO))
-
-
 # --- regole ----------------------------------------------------------------
 
 
 def test_la_velina_va_e_torna_dal_dizionario():
     velina = Velina.da_dizionario(_velina(oggetti=[
-        {"vista": "", "posto": [0.4, 0.6]},
-        {"vista": "vista-2.png", "punti_luogo": QUADRO, "punti_vista": VISTA, "ritaglio": [PENNELLATA]}]))
+        {"vista": "", "perimetro": PERIMETRO}, {"vista": "vista-2.png", "perimetro": PERIMETRO_B}]))
     assert Velina.da_dizionario(velina.a_dizionario()) == velina
-    assert velina.lettere_posti == ("A",) and velina.lettere_agganciate == ("B",)
+    assert velina.lettere == ("A", "B") and velina.ha_perimetri and velina.dice_dove
     assert velina.quante_immagini() == 4
 
 
-def test_un_aggancio_senza_ritaglio_si_rifiuta():
-    """Caso: senza ritaglio si incollerebbe sulla foto anche il cielo e il prato verde della vista Allplan."""
-    with pytest.raises(VelinaNonValida, match="ritaglio"):
-        Oggetto(punti_luogo=tuple(map(tuple, QUADRO)), punti_vista=tuple(map(tuple, VISTA)))
+def test_un_perimetro_con_due_vertici_si_rifiuta():
+    """Caso: un doppio clic sbagliato chiude una linea, e il modello non sa dove sta la base."""
+    with pytest.raises(VelinaNonValida, match="meno di 3 vertici"):
+        Oggetto.da_dizionario({"perimetro": PERIMETRO[:2]})
 
 
-def test_i_punti_su_una_sola_immagine_si_rifiutano():
-    with pytest.raises(VelinaNonValida, match="una delle due"):
-        Oggetto.da_dizionario({"punti_luogo": QUADRO})
+def test_un_perimetro_schiacciato_su_una_linea_si_rifiuta():
+    """Caso PERIMETRO_AREA_MINIMA: tre clic sulla stessa riga fanno un perimetro senza area."""
+    with pytest.raises(VelinaNonValida, match="troppo piccolo"):
+        Oggetto.da_dizionario({"perimetro": [[0.1, 0.5], [0.5, 0.5], [0.9, 0.5]]})
 
 
-def test_tre_punti_non_bastano():
-    with pytest.raises(VelinaNonValida, match="esattamente 4"):
-        Oggetto.da_dizionario({"punti_luogo": QUADRO[:3], "punti_vista": VISTA[:3]})
+def test_un_vertice_fuori_dalla_foto_si_rifiuta():
+    with pytest.raises(VelinaNonValida, match="fuori dalla foto"):
+        Oggetto.da_dizionario({"perimetro": [[0.1, 0.1], [1.2, 0.1], [0.5, 0.6]]})
+
+
+def test_con_piu_edifici_ognuno_vuole_il_suo_perimetro():
+    """Caso: l'edificio B parte senza perimetro e il modello lo mette dove capita."""
+    with pytest.raises(VelinaNonValida, match="edificio B"):
+        Velina.da_dizionario(_velina(oggetti=[{"vista": "", "perimetro": PERIMETRO}, {"vista": "b.png"}]))
 
 
 def test_un_colore_che_il_prompt_non_nomina_si_rifiuta():
@@ -108,11 +94,12 @@ def test_il_primo_edificio_e_sempre_la_vista_del_lavoro():
         Velina.da_dizionario(_velina(oggetti=[{"vista": "altra.png"}]))
 
 
-def test_senza_rettangolo_basta_che_la_velina_dica_dove():
-    """Caso: con lo schizzo o il posto si doveva disegnare per forza anche il rettangolo."""
-    assert Contesto.da_dizionario({"file": "x.png", "velina": _velina()}).area is None
-    with pytest.raises(ContestoNonValido, match="Non so dove|Manca l'area"):
-        Contesto.da_dizionario({"file": "x.png", "velina": _velina(tratti=[])})
+def test_il_perimetro_basta_a_dire_dove_va_senza_rettangolo():
+    """Caso: col perimetro si doveva disegnare per forza anche il rettangolo; lo schizzo da solo non dice dove."""
+    velina = _velina(oggetti=[{"vista": "", "perimetro": PERIMETRO}])
+    assert Contesto.da_dizionario({"file": "x.png", "velina": velina}).area is None
+    with pytest.raises(ContestoNonValido, match="perimetro"):
+        Contesto.da_dizionario({"file": "x.png", "velina": _velina()})
 
 
 def test_senza_velina_il_prompt_e_quello_di_prima():
@@ -123,55 +110,74 @@ def test_senza_velina_il_prompt_e_quello_di_prima():
 
 def test_il_prompt_numera_le_immagini_e_dice_i_colori_usati():
     velina = Velina.da_dizionario(_velina(tratti=[_tratto("verde")], oggetti=[
-        {"vista": "", "posto": [0.4, 0.6]}, {"vista": "b.png"}]))
+        {"vista": "", "perimetro": PERIMETRO}, {"vista": "b.png", "perimetro": PERIMETRO_B}]))
     testo = Contesto("x.png", None, inquadratura="terra", velina=velina).prompt()
+    assert "each magenta outline with a letter is the footprint at ground level" in testo
     assert "Image 2 is the same site seen through a sheet of tracing paper" in testo
     assert "green marks" in testo and "red marks" not in testo
     assert "image 3 is building A, image 4 is building B" in testo
-    assert "no tracing paper, no marks" in testo
+    assert "remove every outline and letter, and show no tracing paper and no marks" in testo
     assert blocchi.INQUADRATURE["terra"].testo in testo
-    assert "magenta" not in testo
 
 
-def test_con_schizzo_la_misura_fuori_area_non_si_fa():
-    """Caso: lo schizzo chiede di cambiare il luogo, e un numero «fuori area» sarebbe falso (regola 3)."""
+def test_un_edificio_col_perimetro_e_senza_schizzo_manda_due_immagini():
+    """Caso: la velina vuota parte lo stesso e il modello copia il suo aspetto slavato."""
+    velina = Velina.da_dizionario({"oggetti": [{"vista": "", "perimetro": PERIMETRO}]})
+    contesto = Contesto("x.png", None, velina=velina)
+    testo = contesto.prompt()
+    assert "the magenta outline marked A is the footprint of the new building" in testo
+    assert "tracing paper" not in testo and "Image 2 is a view of the new building" in testo
+    assert contesto.quante_immagini() == 2
+
+
+def test_con_schizzo_o_perimetri_la_misura_fuori_area_non_si_fa():
+    """Caso: lo schizzo cambia il luogo apposta, e il perimetro e' solo la base: l'edificio sale sopra di lui.
+    Un numero «fuori area» sarebbe falso (regola 3)."""
     contesto = Contesto("x.png", ((0.3, 0.4), (0.6, 0.8)), velina=Velina.da_dizionario(_velina()))
     assert contesto.misura(_jpeg(), _jpeg()) is None
+    col_perimetro = Contesto("x.png", None, velina=Velina.da_dizionario({"oggetti": [{"vista": "", "perimetro": PERIMETRO}]}))
+    assert col_perimetro.misura(_jpeg(), _jpeg()) is None
 
 
 # --- disegno -----------------------------------------------------------------
 
 
-def test_la_velina_sbiadisce_la_foto_e_ci_mette_lo_schizzo_e_la_lettera():
+def test_la_velina_sbiadisce_la_foto_e_ci_mette_lo_schizzo():
     foto = _jpeg(400, 300, (20, 20, 20))
-    velina = Velina.da_dizionario(_velina(oggetti=[{"vista": "", "posto": [0.9, 0.1]}]))
-    disegnata = _apri(modulo_velina.disegna(foto, velina))
+    disegnata = _apri(modulo_velina.disegna(foto, Velina.da_dizionario(_velina())))
     assert disegnata.size == (400, 300)
-    r, g, b = disegnata.getpixel((10, 290))  # lontano da tratto e lettera: solo carta sopra la foto
+    r, g, b = disegnata.getpixel((10, 290))  # lontano dal tratto: solo carta sopra la foto
     assert r > 100 and abs(r - b) < 30
     assert disegnata.getpixel((200, 150))[0] > 150 > disegnata.getpixel((200, 150))[1]  # il tratto rosso
-    assert disegnata.getpixel((360, 30)) != disegnata.getpixel((10, 290))  # il cerchio della lettera
 
 
-def test_l_aggancio_monta_solo_il_ritaglio_e_solo_dentro_i_4_punti():
+def test_la_gomma_toglie_lo_schizzo_anche_nell_immagine_che_parte():
+    """Caso: Riccardo, 2026-11-23, «gomma non funziona»: a schermo cancella, ma il modello vede ancora il segno."""
+    foto = _jpeg(400, 300, (20, 20, 20))
+    gomma = {"colore": "profilo", "tipo": "tratto", "spessore": 0.12, "punti": [[0.5, 0.5]], "gomma": True}
+    con_gomma = _apri(modulo_velina.disegna(foto, Velina.da_dizionario(_velina(tratti=[_tratto(), gomma]))))
+    senza = _apri(modulo_velina.disegna(foto, Velina.da_dizionario(_velina(tratti=[]))))
+    assert con_gomma.getpixel((200, 150)) == senza.getpixel((200, 150))  # al centro il rosso non c'e' piu'
+    assert con_gomma.getpixel((100, 75))[0] > 150 > con_gomma.getpixel((100, 75))[1]  # fuori dalla gomma resta
+
+
+def test_il_perimetro_parte_magenta_con_la_lettera_sulla_foto_pulita():
     foto = _jpeg(400, 300, (40, 120, 200))
-    vista = io.BytesIO()
-    Image.new("RGB", (200, 200), (250, 250, 250)).save(vista, "PNG")
-    ritaglio = {"tipo": "poligono", "punti": [[0, 0], [1, 0], [1, 1], [0, 1]], "gomma": False}
-    velina = Velina.da_dizionario({"oggetti": [{"vista": "", "punti_luogo": QUADRO, "punti_vista": VISTA,
-                                                "ritaglio": [ritaglio]}]})
-    montata = _apri(modulo_velina.aggancia(foto, (vista.getvalue(),), velina))
-    assert montata.getpixel((160, 205))[0] > 200  # dentro i 4 punti: la vista bianca
-    assert montata.getpixel((20, 20))[2] > 150 and montata.getpixel((20, 20))[0] < 100  # fuori: la foto
-    assert modulo_velina.aggancia(foto, (vista.getvalue(),), Velina()) == foto
+    velina = Velina.da_dizionario({"oggetti": [{"vista": "", "perimetro": PERIMETRO}]})
+    segnata = _apri(modulo_velina.perimetri(foto, velina))
+    assert segnata.size == (400, 300)
+    r, g, b = segnata.getpixel((int(0.2 * 400), int(0.5 * 300)))  # un vertice
+    assert r > 200 and b > 200 and g < 100
+    assert segnata.getpixel((20, 20)) == _apri(foto).getpixel((20, 20))  # lontano: la foto com'e'
+    assert modulo_velina.perimetri(foto, Velina()) == foto
 
 
 # --- coda e Studio ------------------------------------------------------------
 
 
 def _richiesta_velina(studio, nome, velina, **altro):
-    dettagli = {"area": False, "velina": True, "edifici": len(velina["oggetti"]),
-                "agganciati": sum(1 for o in velina["oggetti"] if o.get("punti_luogo"))}
+    dettagli = {"area": False, "velina": any(not t.get("gomma") for t in velina.get("tratti", [])),
+                "edifici": len(velina["oggetti"]), "perimetri": any(o.get("perimetro") for o in velina["oggetti"])}
     richiesta = _richiesta(studio, _contesto(nome, area=None, velina=velina), **altro)
     richiesta["destinazione_mostrata"] = studio.destinazione(NANO, contesto=dettagli)["destinazione"]
     return richiesta
@@ -183,13 +189,15 @@ def test_due_edifici_partono_nell_ordine_foto_pulita_velina_viste(cartella, chia
     studio = _studio(cartella, chiamate)
     foto = _jpeg()
     nome = studio.carica_contesto(foto)["nome"]
-    velina = _velina(oggetti=[{"vista": "", "posto": [0.3, 0.6]}, {"vista": "vista-2.png", "posto": [0.7, 0.6]}])
+    velina = _velina(oggetti=[{"vista": "", "perimetro": PERIMETRO}, {"vista": "vista-2.png", "perimetro": PERIMETRO_B}])
     risposta = studio.invia(_richiesta_velina(studio, nome, velina))
     lavoro = json.loads((cartella / "lavori" / "in-attesa" / f"{risposta['identificativo']}.json").read_text("utf-8"))
     assert lavoro["contesto"]["velina"]["oggetti"][1]["vista"] == str(cartella / "vista-2.png")
     Coda(cartella, crea_provider=lambda _n: ProviderConDueImmagini(chiamate), dire=lambda _t: None).esegui_uno()
     (richiesta,) = chiamate
-    assert _apri(richiesta.immagine).tobytes() == _apri(foto).tobytes()  # la foto pulita, senza contorno
+    pulita = _apri(richiesta.immagine)
+    assert pulita.size == (400, 300) and pulita.tobytes() != _apri(foto).tobytes()  # la foto coi perimetri
+    assert pulita.getpixel((20, 20)) == _apri(foto).getpixel((20, 20))  # fuori dai perimetri resta com'e'
     seconda, *viste = richiesta.immagini_in_piu
     assert _apri(seconda).size == (400, 300) and seconda != richiesta.immagine
     assert viste == [(cartella / "vista-1.png").read_bytes(), (cartella / "vista-2.png").read_bytes()]
@@ -200,10 +208,10 @@ def test_due_edifici_partono_nell_ordine_foto_pulita_velina_viste(cartella, chia
 def test_la_destinazione_conta_le_immagini_della_velina(cartella, chiamate):
     """Caso: lo Studio annuncia due immagini e ne partono quattro (regola 5)."""
     studio = _studio(cartella, chiamate)
-    dest = studio.destinazione(NANO, contesto={"area": False, "velina": True, "edifici": 2, "agganciati": 1})
+    dest = studio.destinazione(NANO, contesto={"area": False, "velina": True, "edifici": 2, "perimetri": True})
     assert dest["immagini"] == 4
     assert dest["cosa_parte"].startswith("Partono 4 immagini: prima la foto del luogo pulita, "
-                                         "con l'edificio agganciato già montato")
+                                         "con i perimetri alla base segnati in magenta")
     assert "velina" in dest["cosa_parte"] and "edifici A e B" in dest["cosa_parte"]
     assert studio.destinazione(NANO, contesto=True)["immagini"] == 2
 
@@ -211,7 +219,7 @@ def test_la_destinazione_conta_le_immagini_della_velina(cartella, chiamate):
 def test_un_edificio_in_piu_che_non_e_una_vista_si_rifiuta(cartella, chiamate):
     studio = _studio(cartella, chiamate)
     nome = studio.carica_contesto(_jpeg())["nome"]
-    velina = _velina(oggetti=[{"vista": ""}, {"vista": "../segreto.png"}])
+    velina = _velina(oggetti=[{"vista": "", "perimetro": PERIMETRO}, {"vista": "../segreto.png", "perimetro": PERIMETRO_B}])
     with pytest.raises(Exception, match="non e' il nome di una vista"):
         studio.invia(_richiesta_velina(studio, nome, velina))
 
@@ -220,7 +228,7 @@ def test_una_vista_in_piu_sparita_ferma_il_lavoro_prima_di_partire(cartella, chi
     (cartella / "vista-2.png").write_bytes(vista_shaded(500, 400))
     studio = _studio(cartella, chiamate)
     nome = studio.carica_contesto(_jpeg())["nome"]
-    risposta = studio.invia(_richiesta_velina(studio, nome, _velina(oggetti=[{"vista": ""}, {"vista": "vista-2.png"}])))
+    risposta = studio.invia(_richiesta_velina(studio, nome, _velina(oggetti=[{"vista": "", "perimetro": PERIMETRO}, {"vista": "vista-2.png", "perimetro": PERIMETRO_B}])))
     (cartella / "vista-2.png").unlink()
     Coda(cartella, crea_provider=lambda _n: ProviderConDueImmagini(chiamate), dire=lambda _t: None).esegui_uno()
     assert not chiamate
@@ -236,11 +244,10 @@ def test_una_vista_in_piu_fuori_dalla_cartella_si_rifiuta_anche_nella_coda(carte
 
 
 def test_l_anteprima_mostra_la_foto_che_parte_senza_mandare_niente(cartella, chiamate):
-    """Caso: il prima/dopo dell'aggancio fa partire un render, o mostra una foto diversa da quella che parte."""
+    """Caso: il prima/dopo del passo 4 fa partire un render, o mostra una foto diversa da quella che parte."""
     studio = _studio(cartella, chiamate)
     nome = studio.carica_contesto(_jpeg())["nome"]
-    ritaglio = {"tipo": "poligono", "punti": [[0, 0], [1, 0], [1, 1], [0, 1]], "gomma": False}
-    velina = {"oggetti": [{"vista": "", "punti_luogo": QUADRO, "punti_vista": VISTA, "ritaglio": [ritaglio]}]}
+    velina = {"oggetti": [{"vista": "", "perimetro": PERIMETRO}]}
     risposta = studio.anteprima_contesto({"vista": "vista-1.png", "contesto": _contesto(nome, area=None, velina=velina)})
     assert risposta["pulita"].startswith("data:image/png;base64,") and risposta["velina"] is None
     assert risposta["immagini"] == 2

@@ -664,6 +664,18 @@ VELINA_OPACITA_MASSIMA = _registra(Costante(
     ),
 ))
 
+PERIMETRO_AREA_MINIMA = _registra(Costante(
+    nome="PERIMETRO_AREA_MINIMA",
+    valore=0.0005,
+    origine=SCELTA,
+    ragione=(
+        "Fotoinserimento: l'area minima del perimetro di un edificio, in "
+        "frazione della foto (0,05 %). Sotto e' un doppio clic sbagliato o "
+        "tre vertici quasi in fila, non un'impronta: si rifiuta invece di "
+        "mandare un contorno che il modello non vede."
+    ),
+))
+
 CONTESTO_OGGETTI_MASSIMO = _registra(Costante(
     nome="CONTESTO_OGGETTI_MASSIMO",
     valore=4,
