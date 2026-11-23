@@ -137,6 +137,7 @@ class Ponte:
         self.studio.esporta = esporta_e_scarica
         self.coda = modulo_coda.Coda(self.cartella)
         self._video = None
+        self._preparazioni = None
         self._recuperati = False
 
     # --- le richieste della pagina -----------------------------------------
@@ -203,6 +204,7 @@ class Ponte:
         alla volta: il worker resta libero fra un giro e l'altro.
         """
         # pylint: disable=import-outside-toplevel
+        from core import prepara_foto as modulo_prepara
         from core import video as modulo_video
         from core import provider as registro
 
@@ -210,8 +212,12 @@ class Ponte:
             self.coda.recupera_abbandonati()
             self._video = modulo_video.CodaVideo(self.cartella, registro.crea, self.coda._dire)  # pylint: disable=protected-access
             self._video.recupera_abbandonati()
+            self._preparazioni = modulo_prepara.CodaPreparazioni(self.cartella, registro.crea, self.coda._dire)  # pylint: disable=protected-access
+            self._preparazioni.recupera_abbandonati()
             self._recuperati = True
         fatto = self.coda.esegui_uno()
+        if fatto is None:
+            fatto = self._preparazioni.esegui_uno()
         if fatto is None:
             fatto = self._video.esegui_uno()
         return fatto

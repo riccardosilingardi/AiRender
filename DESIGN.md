@@ -726,6 +726,32 @@ la foto la porta l'utente. Screenshot in `docs/ui/studio-contesto/` (65–68).
 - Tornando a «Render della vista» la foto e l'area restano da parte e
   tornano quando si rientra.
 
+### Prepara la foto, aggiunta il 2026-11-23
+
+Richiesta di Riccardo (2026-11-23): uno screenshot di Google va prima pulito e
+portato in alta risoluzione, poi velina e aggancio si fanno su quella foto. Per
+una foto da drone o da terra di solito non serve. È un riquadro tratteggiato
+nel passo 1, sopra gli strumenti della velina.
+
+- **Vuoto:** «Prepara la foto · facoltativo», una riga su quando serve (Google
+  Earth o Maps; con Da terra, Street View), «Meglio farlo prima di disegnare»,
+  pulsante «Prepara la foto…».
+- **Prima del clic:** «Parte 1 immagine, la foto (misure). Torna della stessa
+  forma», dove va la pulizia (Nano Banana 2) col costo, la spunta «Poi
+  ingrandiscila 2 volte» e dove va l'ingrandimento (Magnific) col costo. Se il
+  servizio non fa l'ingrandimento la spunta è spenta con la ragione. Prepara,
+  Chiudi.
+- **In corso:** «In coda» (con Annulla), «Pulizia della foto con Nano Banana
+  2…», «Ingrandimento con Magnific…».
+- **Errore:** il fatto e cosa fare, Riprova. Se la pulizia riesce e
+  l'ingrandimento no, la foto pulita c'è lo stesso con un avviso.
+- **Pieno:** prima/dopo con lo slider (originale contro preparata), le misure,
+  «Controlla che strade ed edifici siano rimasti al loro posto», «Usa la foto
+  preparata» e «Tieni l'originale». Usandola: «Stai usando la foto preparata»
+  con «Torna all'originale»; rettangolo, velina e punti restano; se c'è un
+  aggancio, «Ricontrolla i 4 punti». La spunta «È uno screenshot con scritte e
+  icone» sparisce: la foto è già pulita.
+
 ## Rese non fotografiche, costruite il 2026-10-31
 
 Le tessere della sezione 1 · Resa di Studio · Genera, e il menu Resa della

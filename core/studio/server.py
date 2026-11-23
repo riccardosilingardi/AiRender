@@ -55,6 +55,10 @@ Rotte:
     POST /api/punto/componi                il prompt del punto di vista dalla pianta, prima di Rendi
     POST /api/punto/invia                  il punto di vista: pianta + punto rosso, un passo nuovo
     POST /api/contesti/anteprima           {vista, contesto}: la foto pulita e la velina come partirebbero (niente parte)
+    POST /api/contesti/prepara/componi     {nome, inquadratura}: «Prepara la foto», dove va e quanto costa (niente parte)
+    POST /api/contesti/prepara             {nome, inquadratura, ingrandisci, destinazione_mostrata, ...}: mette in coda
+    GET  /api/contesti/prepara/<id>        a che punto e' «Prepara la foto»
+    POST /api/contesti/prepara/<id>/annulla  toglie «Prepara la foto» ancora in coda
     POST /api/finale/componi               cosa fa «Finale» su un render: misura d'uscita, destinazione
     POST /api/finale/invia                 «Finale»: il render ingrandito, un passo nuovo
     POST /api/apri-cartella                apre viste, render, esportati o video nel sistema
@@ -216,6 +220,8 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._file(studio.percorso_contesto(nome))
             case ["file", "materiale", nome]:
                 self._file(studio.percorso_anteprima_materiale(nome))
+            case ["api", "contesti", "prepara", identificativo]:
+                self._json(studio.stato_preparazione(identificativo))
             case ["api", "video", "catalogo"]:
                 self._json(studio.catalogo_video())
             case ["api", "video"]:
@@ -266,6 +272,12 @@ class _Gestore(BaseHTTPRequestHandler):
                 self._json(studio.carica_contesto(self._corpo(), self.headers.get("X-Nome-File", "")))
             case ["api", "contesti", "anteprima"]:
                 self._json(studio.anteprima_contesto(self._corpo_json()))
+            case ["api", "contesti", "prepara", "componi"]:
+                self._json(studio.componi_preparazione(self._corpo_json()))
+            case ["api", "contesti", "prepara"]:
+                self._json(studio.invia_preparazione(self._corpo_json()))
+            case ["api", "contesti", "prepara", identificativo, "annulla"]:
+                self._json(studio.annulla_preparazione(identificativo))
             case ["api", "lavori", identificativo, "annulla"]:
                 self._json(studio.annulla(identificativo))
             case ["api", "miei-preset"]:
