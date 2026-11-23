@@ -828,3 +828,12 @@ def test_fal_lato_e_multiplo_danno_una_misura_che_flux_accetta_e_un_costo_dal_li
     assert config.costante("FAL_MULTIPLO_PX").origine == config.VINCOLO
     assert config.costante("FAL_DOLLARI_PER_MP").origine == config.VINCOLO
     assert "listino" in config.costante("FAL_DOLLARI_PER_MP").ragione
+
+
+def test_la_velina_sbiadisce_senza_coprire_e_gli_edifici_stanno_nelle_lettere():
+    """Caso: VELINA_OPACITA sopra VELINA_OPACITA_MASSIMA o la carta piena nasconde la foto; CONTESTO_OGGETTI_MASSIMO oltre le lettere A-D."""
+    from core import velina
+    assert 0 < config.VELINA_OPACITA <= config.VELINA_OPACITA_MASSIMA < 1
+    assert 1 <= config.CONTESTO_OGGETTI_MASSIMO <= len(velina.LETTERE)
+    for nome in ("VELINA_OPACITA", "VELINA_OPACITA_MASSIMA", "CONTESTO_OGGETTI_MASSIMO"):
+        assert config.costante(nome).origine == config.SCELTA

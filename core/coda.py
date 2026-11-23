@@ -135,6 +135,22 @@ def controlla_riferimento(radice: Path, riferimento: Path) -> Path:
         )
     return percorso
 
+def controlla_vista_in_piu(vista: Path, altra: Path) -> Path:
+    """Un edificio in piu' del Fotoinserimento: un'altra vista della stessa cartella, che c'e'."""
+    percorso = Path(altra).resolve()
+    if percorso.parent != Path(vista).resolve().parent or percorso.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+        raise LavoroNonValido(
+            f"L'edificio in piu' {percorso.name} non e' una vista della cartella delle viste.",
+            "Sceglilo di nuovo dall'elenco delle viste in «Fotoinserimento».",
+        )
+    if not percorso.is_file():
+        raise FileNonTrovato(
+            f"La vista {percorso.name} di un edificio in piu' non c'e' piu'. Non ho inviato niente.",
+            "Catturala di nuovo dalla palette, oppure togli quell'edificio.",
+        )
+    return percorso
+
+
 # Gli stati, nelle parole che lo Studio e la palette mostrano.
 IN_CODA = "in coda"
 FATTO = "fatto"
@@ -787,8 +803,13 @@ def metti_in_coda(
                 "Togli il riferimento per lo stile, oppure togli il contesto.",
             )
         file_contesto = modulo_contesto.controlla_file(radice, Path(contesto.file))
+        velina = contesto.velina
+        if velina is not None and len(velina.oggetti) > 1:
+            velina = velina.con_viste(tuple(
+                str(controlla_vista_in_piu(Path(vista), Path(o.vista))) for o in velina.oggetti[1:]))
         contesto = modulo_contesto.Contesto(
-            str(file_contesto), contesto.area, contesto.inquadratura, contesto.pulisci_mappa, contesto.luogo)
+            str(file_contesto), contesto.area, contesto.inquadratura, contesto.pulisci_mappa, contesto.luogo,
+            velina)
     if materiali:
         if partenza or aree or contesto is not None:
             raise LavoroNonValido(
@@ -903,7 +924,7 @@ def metti_in_coda(
         )
     if contesto is not None and not crea_provider(provider).accetta_piu_immagini(modello):
         raise LavoroNonValido(
-            f"{modello} riceve una sola immagine per invio: «Fotoinserimento» ne manda due.",
+            f"{modello} riceve una sola immagine per invio: «Fotoinserimento» ne manda {contesto.quante_immagini()}.",
             "Scegli Nano Banana 2.",
         )
     if mappe and not crea_provider(provider).accetta_mappe(modello):
@@ -1201,9 +1222,14 @@ class Coda:
         if lavoro.contesto:
             luogo = modulo_contesto.controlla_file(self.radice, Path(lavoro.contesto.file)).read_bytes()
             modulo_immagine.misura(luogo)  # solleva se non e' un'immagine
-            # Prima il contesto con l'area, poi la vista: il rapporto del
-            # render segue la prima immagine, e il render e' il contesto.
-            ingresso, in_piu = lavoro.contesto.prepara(luogo), (dati,)
+            # Prima il contesto pulito (con l'area e gli edifici agganciati),
+            # poi la velina se c'e' uno schizzo, poi una vista per edificio:
+            # il rapporto del render segue la prima immagine, e il render e'
+            # il contesto.
+            viste = (dati, *(modulo_immagine.leggi(controlla_vista_in_piu(Path(lavoro.vista), Path(o.vista)))
+                             for o in (lavoro.contesto.velina.oggetti[1:] if lavoro.contesto.velina else ())))
+            ingresso = lavoro.contesto.prepara(luogo, viste)
+            in_piu = lavoro.contesto.in_piu(luogo, viste)
             motore.controlla_prima_dell_invio(lavoro.modello, ingresso)
         if lavoro.punto_di_vista:
             # La seconda immagine: la stessa pianta col punto e il cono rossi.

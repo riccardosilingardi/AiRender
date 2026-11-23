@@ -529,7 +529,7 @@ async function caricaVista(nome) {
 }
 
 async function caricaDestinazione() {
-  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}&esempi=${esempiGenera().length}&geometria=${geometriaGenera() ? 1 : 0}`); } catch (e) { S.errore = e; }
+  try { S.destinazione = await get(`/api/destinazione?modello=${enc(S.modello)}&varianti=${S.varianti}&riferimento=${S.riferimento && S.modo !== "contesto" ? 1 : 0}&contesto=${S.modo === "contesto" ? 1 : 0}${S.modo === "contesto" ? dettagliVelina(S.contesto) : ""}&materiali=${immaginiMateriali()}&inserti=${insertiGenera().length}&esempi=${esempiGenera().length}&geometria=${geometriaGenera() ? 1 : 0}`); } catch (e) { S.errore = e; }
 }
 
 async function caricaRender() {
@@ -1692,8 +1692,12 @@ function pannelloInserti(lista, modello, dove, cambiato, bloccato) {
 // non scarica immagini da mappe.
 function contestoPerServer() {
   const c = S.contesto;
-  if (!c || !c.area) return null;
-  return { nome: c.nome, area: c.area, inquadratura: c.inquadratura, pulisci_mappa: c.pulisci, luogo: c.luogo };
+  if (!c) return null;
+  const velina = velinaPerServer(c.velina);
+  // Senza rettangolo parte solo se la velina dice gia' dove (schizzo, posto o aggancio).
+  if (!c.area && !(velina && velinaDiceDove(c.velina))) return null;
+  return { nome: c.nome, area: c.area, inquadratura: c.inquadratura, pulisci_mappa: c.pulisci, luogo: c.luogo,
+           ...(velina ? { velina } : {}) };
 }
 async function dopoCambioContesto() {
   S.secco = null; S.promptAMano = null;
@@ -1714,43 +1718,332 @@ async function scegliContesto(file) {
 async function togliContesto() { S.contesto = null; await dopoCambioContesto(); }
 function cambiaContesto(campo, valore) { S.contesto = { ...S.contesto, [campo]: valore }; dopoCambioContesto(); }
 
-function telaContesto() {
-  const c = S.contesto;
-  const img = h("img", { src: `/file/contesto/${enc(c.nome)}`, alt: "Immagine del contesto", draggable: "false" });
-  const contenitore = h("div");
-  const rett = c.area ? `<polygon class="contorno-area" points="${attributoPunti(puntiSvg({ forma: "rettangolo", punti: c.area }))}"></polygon>` : "";
-  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${rett}<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
-  const disegno = contenitore.firstElementChild;
-  const traccia = disegno.querySelector("polyline");
-  const numero = c.area ? h("span", { classe: "numero-area", stile: `left:${c.area[0][0] * 100}%;top:${c.area[0][1] * 100}%`, "aria-hidden": "true" }, "1") : null;
-  const tela = h("div", { classe: "tela-ritocco tela-contesto", "data-strumento": "rettangolo" }, img, disegno, numero);
-  let inizio = null;
-  const punto = (ev) => {
-    const b = img.getBoundingClientRect();
-    return [Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height))];
+// La velina (2026-11-23): sopra la foto del luogo si stende una carta da
+// forno che la sbiadisce, e ci si schizza a mano: rosso cambia o togli, verde
+// alberi e verde nuovi, nero profili. Ogni edificio (A, B, ...) e' una vista
+// di Allplan; puo' avere un posto (la sua lettera sulla velina) e un aggancio
+// con 4 punti a terra, sulla foto e sulla vista. Tutto facoltativo: senza
+// niente, il modello piazza l'edificio come ha sempre fatto. Partono: la foto
+// pulita (con gli agganciati gia' montati), la velina se c'e' uno schizzo o un
+// posto, una vista per edificio (core/velina.py). Uguale per zenitale, volo e terra.
+function catVelina() { return S.catalogo.contesto.velina; }
+function velinaNuova() {
+  return { mostra: true, opacita: catVelina().opacita, tratti: [], oggetti: [oggettoNuovo("")] };
+}
+function oggettoNuovo(vista) { return { vista, posto: null, punti_luogo: [], punti_vista: [], ritaglio: [], aggancia: false }; }
+function velinaDi(c) {
+  if (!c.velina) c.velina = velinaNuova();
+  const A = c.velina.oggetti[0];
+  // La vista A e' quella scelta: se cambia, i suoi punti e il ritaglio non valgono piu'.
+  if (A._di !== undefined && A._di !== S.vista) { A.punti_vista = []; A.ritaglio = []; }
+  A._di = S.vista;
+  return c.velina;
+}
+const UI_VELINA = { strumento: "rettangolo", attivo: 0, spessore: 0.012, aggancio: null, strumentoVista: "punti" };
+function lettera(i) { return catVelina().lettere[i]; }
+function agganciato(o) { return o.aggancia && o.punti_luogo.length === 4 && o.punti_vista.length === 4 && o.ritaglio.some((r) => !r.gomma); }
+function velinaHaSchizzo(v) { return v.tratti.some((t) => !t.gomma); }
+function velinaParte(v) { return velinaHaSchizzo(v) || v.oggetti.some((o) => o.posto); }
+function velinaDiceDove(v) { return velinaParte(v) || v.oggetti.some(agganciato); }
+function velinaInUso(v) { return !!v && (velinaParte(v) || v.oggetti.length > 1 || v.oggetti.some(agganciato)); }
+// Un aggancio a meta' (punti mancanti, niente ritaglio) non parte: lo si dice.
+function agganciMancanti(v) {
+  return v.oggetti.map((o, i) => [o, i]).filter(([o]) => o.aggancia && !agganciato(o)).map(([, i]) => lettera(i));
+}
+
+function velinaPerServer(v) {
+  if (!velinaInUso(v)) return null;
+  return {
+    opacita: v.opacita,
+    tratti: v.tratti.map((t) => ({ colore: t.colore, tipo: "tratto", spessore: t.spessore, punti: t.punti, ...(t.gomma ? { gomma: true } : {}) })),
+    oggetti: v.oggetti.map((o) => ({
+      vista: o.vista, ...(o.posto ? { posto: o.posto } : {}),
+      ...(agganciato(o) ? { punti_luogo: o.punti_luogo, punti_vista: o.punti_vista, ritaglio: o.ritaglio } : {}),
+    })),
   };
-  tela.addEventListener("pointerdown", (ev) => {
+}
+function dettagliVelina(c) {
+  const v = c && c.velina;
+  if (!velinaInUso(v)) return "";
+  return `&area=${c.area ? 1 : 0}&velina=${velinaParte(v) ? 1 : 0}&edifici=${v.oggetti.length}&agganciati=${v.oggetti.filter(agganciato).length}`;
+}
+
+// Le coordinate da 0 a 1 sull'immagine, dal puntatore.
+function puntoSu(el, ev) {
+  const b = el.getBoundingClientRect();
+  return [Number(Math.min(1, Math.max(0, (ev.clientX - b.left) / b.width)).toFixed(4)),
+          Number(Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height)).toFixed(4))];
+}
+// Lo schizzo sulla tela: ogni tratto del suo colore, la gomma toglie.
+function disegnaSchizzo(tela, tratti) {
+  const g = tela.getContext("2d"), w = tela.width, hh = tela.height;
+  g.clearRect(0, 0, w, hh);
+  const colori = Object.fromEntries(catVelina().colori.map((c) => [c.id, c.rgb]));
+  for (const t of tratti) {
+    g.globalCompositeOperation = t.gomma ? "destination-out" : "source-over";
+    g.strokeStyle = g.fillStyle = colori[t.colore] || "#000";
+    const pts = t.punti.map(([x, y]) => [x * w, y * hh]);
+    g.lineWidth = t.spessore * w; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath();
+    if (pts.length === 1) { g.arc(pts[0][0], pts[0][1], g.lineWidth / 2, 0, 2 * Math.PI); g.fill(); }
+    else { g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.stroke(); }
+  }
+  g.globalCompositeOperation = "source-over";
+}
+function svgQuadro(punti, classe) {
+  if (!punti.length) return "";
+  const chiuso = punti.length === 4 ? "polygon" : "polyline";
+  return `<${chiuso} class="${classe}" points="${attributoPunti(punti)}"></${chiuso}>`;
+}
+function maniglie(punti, classe) {
+  return punti.map(([x, y], i) => h("span", { classe: `punto-aggancio ${classe}`, stile: `left:${x * 100}%;top:${y * 100}%`, "aria-hidden": "true" }, String(i + 1)));
+}
+// Il punto vicino al puntatore (per spostarlo), entro 2,5% del lato.
+function puntoVicino(punti, p) {
+  let migliore = -1, d = 0.025;
+  punti.forEach(([x, y], i) => { const q = Math.hypot(x - p[0], y - p[1]); if (q < d) { d = q; migliore = i; } });
+  return migliore;
+}
+
+function dopoVelina() { S.secco = null; S.anteprimaContesto = null; dopoCambioContesto(); }
+
+// La tela grande del passo 1: la foto, la carta, lo schizzo, il rettangolo, i posti, i punti.
+function telaContesto() {
+  const c = S.contesto, v = velinaDi(c), u = UI_VELINA;
+  const img = h("img", { src: `/file/contesto/${enc(c.nome)}`, alt: "Foto del luogo", draggable: "false" });
+  const carta = h("div", { classe: "carta-velina", stile: `background:${catVelina().carta};opacity:${v.mostra ? v.opacita : 0}`, "aria-hidden": "true" });
+  const schizzo = h("canvas", { classe: "pittura", "aria-hidden": "true" });
+  const contenitore = h("div");
+  const quadri = v.oggetti.map((o) => svgQuadro(o.punti_luogo, "quadro-aggancio")).join("");
+  const rett = c.area ? `<polygon class="contorno-area" points="${attributoPunti(puntiSvg({ forma: "rettangolo", punti: c.area }))}"></polygon>` : "";
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${rett}${quadri}<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline.in-corso");
+  const numero = c.area ? h("span", { classe: "numero-area", stile: `left:${c.area[0][0] * 100}%;top:${c.area[0][1] * 100}%`, "aria-hidden": "true" }, "1") : null;
+  const posti = v.mostra ? v.oggetti.map((o, i) => o.posto
+    ? h("span", { classe: "posto-velina", stile: `left:${o.posto[0] * 100}%;top:${o.posto[1] * 100}%`, "aria-hidden": "true" }, lettera(i)) : null) : [];
+  const punti = v.oggetti.flatMap((o, i) => (i === u.attivo || o.aggancia) ? maniglie(o.punti_luogo, i === u.attivo ? "attivo" : "") : []);
+  const palco = h("div", { classe: "palco-contesto" }, img, carta, schizzo, disegno, numero, ...posti, ...punti);
+  const tela = h("div", { classe: "tela-ritocco tela-contesto", "data-strumento": u.strumento }, palco);
+  const prepara = () => {
+    const scala = Math.min(1, 2000 / Math.max(img.naturalWidth || 1000, img.naturalHeight || 1000));
+    schizzo.width = Math.round((img.naturalWidth || 1000) * scala); schizzo.height = Math.round((img.naturalHeight || 1000) * scala);
+    if (v.mostra) disegnaSchizzo(schizzo, v.tratti);
+  };
+  if (img.complete && img.naturalWidth) setTimeout(prepara); else img.addEventListener("load", prepara);
+
+  let gesto = null;
+  const colore = ["cambia", "verde", "profilo"].includes(u.strumento);
+  palco.addEventListener("pointerdown", (ev) => {
     if (ev.button !== 0) return;
     ev.preventDefault();
-    tela.setPointerCapture(ev.pointerId);
-    inizio = punto(ev);
+    palco.setPointerCapture(ev.pointerId);
+    const p = puntoSu(img, ev);
+    const o = v.oggetti[u.attivo];
+    if (u.strumento === "posto") { o.posto = p; dopoVelina(); return; }
+    if (u.strumento === "punti") {
+      const vicino = puntoVicino(o.punti_luogo, p);
+      if (vicino >= 0) gesto = { tipo: "sposta", indice: vicino };
+      else if (o.punti_luogo.length < 4) { o.punti_luogo.push(p); o.aggancia = true; dopoVelina(); }
+      return;
+    }
+    if (colore || u.strumento === "gomma") {
+      if (!v.mostra) { v.mostra = true; }
+      gesto = { tipo: "tratto", t: { colore: colore ? u.strumento : "profilo", spessore: u.strumento === "gomma" ? Math.max(u.spessore * 2, 0.03) : u.spessore, punti: [p], gomma: u.strumento === "gomma" }, schermo: [ev.clientX, ev.clientY] };
+      v.tratti.push(gesto.t); disegnaSchizzo(schizzo, v.tratti);
+      return;
+    }
+    gesto = { tipo: "rettangolo", inizio: p };
   });
-  tela.addEventListener("pointermove", (ev) => {
-    if (!inizio || !tela.hasPointerCapture(ev.pointerId)) return;
-    traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: [inizio, punto(ev)] })) + " " + attributoPunti([inizio]));
+  palco.addEventListener("pointermove", (ev) => {
+    if (!gesto || !palco.hasPointerCapture(ev.pointerId)) return;
+    const p = puntoSu(img, ev);
+    if (gesto.tipo === "sposta") {
+      v.oggetti[u.attivo].punti_luogo[gesto.indice] = p;
+      const m = palco.querySelectorAll(".punto-aggancio.attivo")[gesto.indice];
+      if (m) { m.style.left = `${p[0] * 100}%`; m.style.top = `${p[1] * 100}%`; }
+      return;
+    }
+    if (gesto.tipo === "tratto") {
+      if (Math.hypot(ev.clientX - gesto.schermo[0], ev.clientY - gesto.schermo[1]) < PASSO_TRATTO_PX) return;
+      gesto.schermo = [ev.clientX, ev.clientY];
+      gesto.t.punti.push(p); disegnaSchizzo(schizzo, v.tratti);
+      return;
+    }
+    traccia.setAttribute("points", attributoPunti(puntiSvg({ forma: "rettangolo", punti: [gesto.inizio, p] })) + " " + attributoPunti([gesto.inizio]));
   });
-  tela.addEventListener("pointerup", (ev) => {
-    if (!inizio) return;
-    const [ax, ay] = inizio, [bx, by] = punto(ev);
-    inizio = null;
+  const fine = (ev) => {
+    if (!gesto) return;
+    const g = gesto; gesto = null;
+    if (g.tipo === "sposta" || g.tipo === "tratto") { dopoVelina(); return; }
     traccia.setAttribute("points", "");
+    if (ev.type === "pointercancel") return;
+    const [ax, ay] = g.inizio, [bx, by] = puntoSu(img, ev);
     if (Math.abs(bx - ax) < AREA_MINIMA || Math.abs(by - ay) < AREA_MINIMA) return;
-    const area = [[Math.min(ax, bx), Math.min(ay, by)], [Math.max(ax, bx), Math.max(ay, by)]]
-      .map(([x, y]) => [Number(x.toFixed(4)), Number(y.toFixed(4))]);
-    cambiaContesto("area", area);
-  });
-  tela.addEventListener("pointercancel", () => { inizio = null; traccia.setAttribute("points", ""); });
+    cambiaContesto("area", [[Math.min(ax, bx), Math.min(ay, by)], [Math.max(ax, bx), Math.max(ay, by)]]);
+  };
+  palco.addEventListener("pointerup", fine);
+  palco.addEventListener("pointercancel", fine);
   return tela;
+}
+
+// Gli strumenti sopra la foto: il rettangolo di sempre, la velina, i posti, i punti.
+function strumentiVelina() {
+  const c = S.contesto, v = velinaDi(c), u = UI_VELINA;
+  const scegli = (id) => { u.strumento = id; if (["cambia", "verde", "profilo", "gomma"].includes(id)) v.mostra = true; render(); };
+  const bottone = (id, nome, titolo, campione) => h("button", { classe: "seg", "aria-pressed": String(u.strumento === id), title: titolo, onclick: () => scegli(id) },
+    campione ? h("span", { classe: "campione-velina", stile: `background:${campione}`, "aria-hidden": "true" }) : null, nome);
+  const colori = catVelina().colori;
+  const opacita = h("input", { type: "range", min: "0.2", max: String(catVelina().opacita_massima), step: "0.05", value: String(v.opacita), "aria-label": "Quanto copre la velina" });
+  opacita.addEventListener("input", () => { v.opacita = Number(opacita.value); const carta = document.querySelector(".carta-velina"); if (carta && v.mostra) carta.style.opacity = v.opacita; });
+  opacita.addEventListener("change", () => dopoVelina());
+  const spessore = h("input", { type: "range", min: "0.01", max: "0.06", step: "0.002", value: String(u.spessore), "aria-label": "Spessore della matita" });
+  spessore.addEventListener("input", () => { u.spessore = Number(spessore.value); });
+  const lettere = v.oggetti.length > 1 ? ` dell'edificio ${lettera(u.attivo)}` : "";
+  return h("div", { classe: "strumenti-velina" },
+    h("div", { classe: "switch", role: "group", "aria-label": "Strumento" },
+      bottone("rettangolo", "Rettangolo", "Trascina dove va l'edificio (facoltativo se la velina lo dice già)"),
+      ...colori.map((k) => bottone(k.id, k.nome, `Matita: ${k.nome.toLowerCase()}`, k.rgb)),
+      bottone("gomma", "Gomma", "Cancella lo schizzo"),
+      bottone("posto", `Posto${lettere}`, "Un clic dove va l'edificio: sulla velina compare la sua lettera"),
+      bottone("punti", `4 punti${lettere}`, "Gli angoli a terra dell'edificio, in ordine 1-2-3-4: poi gli stessi sulla vista")),
+    h("div", { classe: "riga piccolo" },
+      h("label", { classe: "riga" }, h("input", { type: "checkbox", checked: v.mostra, onchange: (ev) => { v.mostra = ev.target.checked; render(); } }), "Velina"),
+      h("span", { classe: "tenue" }, "copre"), opacita,
+      h("span", { classe: "tenue" }, "matita"), spessore,
+      h("button", { classe: "btn piccolo", disabled: !v.tratti.length, onclick: () => { v.tratti.pop(); dopoVelina(); } }, "Annulla tratto"),
+      h("button", { classe: "btn piccolo", disabled: !v.tratti.length, onclick: () => { v.tratti = []; dopoVelina(); } }, "Svuota velina"),
+      c.area ? h("button", { classe: "btn piccolo", onclick: () => cambiaContesto("area", null) }, "Togli rettangolo") : null));
+}
+
+// Cosa la velina dice al modello, in parole: lo stesso che legge il prompt.
+function legendaVelina() {
+  const c = S.contesto, v = velinaDi(c);
+  const pezzi = [];
+  if (velinaHaSchizzo(v)) pezzi.push("schizzo: " + catVelina().colori.filter((k) => v.tratti.some((t) => !t.gomma && t.colore === k.id)).map((k) => k.nome.toLowerCase()).join(", "));
+  const posti = v.oggetti.map((o, i) => o.posto ? lettera(i) : null).filter(Boolean);
+  if (posti.length) pezzi.push("posti: " + posti.join(", "));
+  const agg = v.oggetti.map((o, i) => agganciato(o) ? lettera(i) : null).filter(Boolean);
+  if (agg.length) pezzi.push("agganciati: " + agg.join(", "));
+  const mancano = agganciMancanti(v);
+  return h("p", { classe: "tenue piccolo" },
+    pezzi.length ? `Sulla velina: ${pezzi.join(" · ")}. ` : "La velina è vuota: puoi schizzare, segnare il posto o non usarla affatto. ",
+    "Il modello riceve prima la foto pulita, poi la velina: nel risultato carta e segni non ci sono.",
+    mancano.length ? h("span", { stile: "color:var(--attenzione)" }, ` Aggancio di ${mancano.join(", ")} incompleto: servono 4 punti sulla foto, 4 sulla vista e il ritaglio.`) : null);
+}
+
+// Il passo 3: gli edifici da Allplan, uno per vista, con l'aggancio facoltativo.
+function sezioneEdifici(inq) {
+  const c = S.contesto, u = UI_VELINA;
+  const v = c ? velinaDi(c) : null;
+  const massimi = catVelina().edifici_massimi;
+  if (!v) {
+    return [S.vista ? h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(S.vista)}`, alt: `Vista di Allplan ${S.vista}` })
+      : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."), h("p", { classe: "piccolo" }, VISTA_PER_INQUADRATURA[inq])];
+  }
+  if (u.attivo >= v.oggetti.length) u.attivo = 0;
+  const nomeVista = (i) => i === 0 ? S.vista : v.oggetti[i].vista;
+  const schede = h("div", { classe: "switch", role: "tablist", "aria-label": "Edifici" },
+    v.oggetti.map((o, i) => h("button", { classe: "seg", role: "tab", "aria-selected": String(i === u.attivo), "aria-pressed": String(i === u.attivo),
+      onclick: () => { u.attivo = i; render(); } }, `Edificio ${lettera(i)}`)),
+    v.oggetti.length < massimi && S.studio.viste.length > 1
+      ? h("button", { classe: "seg", onclick: () => { u.sceltaEdificio = !u.sceltaEdificio; render(); } }, "+ Edificio") : null);
+  const scelta = u.sceltaEdificio ? h("div", { classe: "elenco-viste" },
+    S.studio.viste.filter((x) => x.nome !== S.vista && !v.oggetti.some((o) => o.vista === x.nome)).map((x) => h("button", {
+      onclick: () => { v.oggetti.push(oggettoNuovo(x.nome)); u.attivo = v.oggetti.length - 1; u.sceltaEdificio = false; dopoVelina(); },
+    }, x.nome))) : null;
+  const o = v.oggetti[u.attivo];
+  const nome = nomeVista(u.attivo);
+  const aggancia = h("input", { type: "checkbox", checked: o.aggancia, disabled: !nome });
+  aggancia.addEventListener("change", () => { o.aggancia = aggancia.checked; if (o.aggancia) UI_VELINA.strumento = "punti"; dopoVelina(); });
+  return [schede, scelta,
+    nome ? (o.aggancia ? telaVista(o, nome) : h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(nome)}`, alt: `Vista di Allplan ${nome}` }))
+      : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."),
+    h("p", { classe: "tenue piccolo" }, nome || "",
+      u.attivo > 0 ? [" · ", h("button", { classe: "link-file come-link", onclick: () => { v.oggetti.splice(u.attivo, 1); u.attivo = 0; dopoVelina(); } }, "togli questo edificio")] : null),
+    h("p", { classe: "piccolo" }, VISTA_PER_INQUADRATURA[inq]),
+    h("label", { classe: "riga" }, aggancia, h("span", { classe: "piccolo" }, "Aggancia con 4 punti (facoltativo)",
+      spiega("Se nella foto vedi gli angoli a terra: metti 4 punti sulla foto (strumento «4 punti») e gli stessi 4, nello stesso ordine, sulla vista; poi ripassa l'edificio col «Ritaglia». AIRENDER lo deforma sulla foto prima dell'invio: è esatto a terra, approssimato più in alto, quindi la vista va presa da un punto simile alla foto."))),
+    u.attivo === 0 ? h("div", { classe: "riga" },
+      h("button", { classe: "btn", onclick: () => { S.mostraViste = !S.mostraViste; render(); }, "aria-expanded": String(S.mostraViste) }, "Usa un'altra vista…")) : null,
+    u.attivo === 0 && S.mostraViste ? pannelloViste() : null];
+}
+
+// La vista di un edificio, per l'aggancio: i 4 punti e il ritaglio (un lazo, piu' lazi si sommano).
+function telaVista(o, nome) {
+  const u = UI_VELINA;
+  const img = h("img", { src: `/file/vista/${enc(nome)}`, alt: `Vista di Allplan ${nome}`, draggable: "false" });
+  const contenitore = h("div");
+  const ritagli = o.ritaglio.map((r) => `<polygon class="${r.gomma ? "ritaglio togli" : "ritaglio"}" points="${attributoPunti(r.punti)}"></polygon>`).join("");
+  contenitore.innerHTML = `<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="aree-svg" aria-hidden="true">${ritagli}${svgQuadro(o.punti_vista, "quadro-aggancio")}<polyline class="contorno-area in-corso" points=""></polyline></svg>`;
+  const disegno = contenitore.firstElementChild;
+  const traccia = disegno.querySelector("polyline.in-corso");
+  const palco = h("div", { classe: "palco-contesto" }, img, disegno, ...maniglie(o.punti_vista, "attivo"));
+  let gesto = null;
+  palco.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault(); palco.setPointerCapture(ev.pointerId);
+    const p = puntoSu(img, ev);
+    if (u.strumentoVista === "punti") {
+      const vicino = puntoVicino(o.punti_vista, p);
+      if (vicino >= 0) gesto = { tipo: "sposta", indice: vicino };
+      else if (o.punti_vista.length < 4) { o.punti_vista.push(p); dopoVelina(); }
+      return;
+    }
+    gesto = { tipo: "lazo", punti: [p], gomma: u.strumentoVista === "togli", schermo: [ev.clientX, ev.clientY] };
+  });
+  palco.addEventListener("pointermove", (ev) => {
+    if (!gesto || !palco.hasPointerCapture(ev.pointerId)) return;
+    const p = puntoSu(img, ev);
+    if (gesto.tipo === "sposta") {
+      o.punti_vista[gesto.indice] = p;
+      const m = palco.querySelectorAll(".punto-aggancio")[gesto.indice];
+      if (m) { m.style.left = `${p[0] * 100}%`; m.style.top = `${p[1] * 100}%`; }
+      return;
+    }
+    if (Math.hypot(ev.clientX - gesto.schermo[0], ev.clientY - gesto.schermo[1]) < PASSO_TRATTO_PX) return;
+    gesto.schermo = [ev.clientX, ev.clientY];
+    gesto.punti.push(p);
+    traccia.setAttribute("points", attributoPunti(gesto.punti));
+  });
+  const fine = () => {
+    if (!gesto) return;
+    const g = gesto; gesto = null;
+    if (g.tipo === "lazo" && g.punti.length >= 3) o.ritaglio.push({ tipo: "poligono", punti: g.punti, ...(g.gomma ? { gomma: true } : {}) });
+    dopoVelina();
+  };
+  palco.addEventListener("pointerup", fine);
+  palco.addEventListener("pointercancel", fine);
+  const bottone = (id, nome, titolo) => h("button", { classe: "seg", "aria-pressed": String(u.strumentoVista === id), title: titolo, onclick: () => { u.strumentoVista = id; render(); } }, nome);
+  return h("div", { classe: "tela-vista" },
+    h("div", { classe: "switch", role: "group", "aria-label": "Strumento sulla vista" },
+      bottone("punti", `4 punti (${o.punti_vista.length}/4)`, "Gli stessi angoli a terra della foto, nello stesso ordine"),
+      bottone("ritaglia", "Ritaglia", "Gira col mouse attorno all'edificio: solo quello si incolla sulla foto"),
+      bottone("togli", "Togli dal ritaglio", "Gira attorno a quello che non va incollato")),
+    h("div", { classe: "tela-ritocco tela-contesto", "data-strumento": u.strumentoVista }, palco),
+    h("p", { classe: "tenue piccolo" }, `Sulla foto: ${o.punti_luogo.length}/4 punti · ritaglio: ${o.ritaglio.some((r) => !r.gomma) ? "fatto" : "da fare"} · `,
+      h("button", { classe: "link-file come-link", onclick: () => { o.punti_vista = []; o.punti_luogo = []; o.ritaglio = []; dopoVelina(); } }, "ricomincia l'aggancio")));
+}
+
+// Prima/dopo dell'aggancio: la foto com'è contro la foto che parte, con gli edifici gia' montati.
+function confrontoAggancio() {
+  const c = S.contesto, v = c && c.velina;
+  if (!v || !v.oggetti.some(agganciato)) return null;
+  if (!S.anteprimaContesto) {
+    return h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: caricaAnteprimaContesto }, "Vedi prima/dopo dell'aggancio"),
+      h("span", { classe: "tenue piccolo" }, "Calcolato qui sul computer: non parte niente."));
+  }
+  if (!S.confrontoAggancio) S.confrontoAggancio = { x: 50 };
+  const { palco, nota: avviso } = primaDopo(S.confrontoAggancio, `/file/contesto/${enc(c.nome)}`, "Foto", S.anteprimaContesto.pulita, "Con l'aggancio", "Foto con gli edifici agganciati");
+  // Una foto stretta non diventa alta tre schermi: larga quanto serve a stare in 70vh.
+  palco.style.width = `min(100%, calc(70vh * ${(c.larghezza / c.altezza).toFixed(4)}))`;
+  palco.style.margin = "0 auto";
+  return h("div", { classe: "confronto-aggancio" }, palco, avviso);
+}
+async function caricaAnteprimaContesto() {
+  try { S.anteprimaContesto = await post("/api/contesti/anteprima", { vista: S.vista, contesto: contestoPerServer() }); S.errore = null; }
+  catch (e) { S.errore = e; }
+  render();
 }
 
 // Il modo di Genera: render della vista o inserimento in una foto del luogo.
@@ -1793,11 +2086,14 @@ function sezioneContesto() {
 
   // 1 · la foto del luogo, grande: e' dove si disegna.
   const uno = c
-    ? passo(1, "Segna dove va", !!c.area,
-        h("p", { classe: c.area ? "tenue piccolo" : "piccolo invito" }, c.area
-          ? "Fatto. Per cambiare l'area trascina di nuovo. Fuori dal rettangolo la foto deve restare com'è."
-          : "Trascina sulla foto un rettangolo, da un angolo all'altro, dove deve stare quello che viene da Allplan."),
+    ? passo(1, "Segna dove va", !!contestoPerServer(),
+        h("p", { classe: contestoPerServer() ? "tenue piccolo" : "piccolo invito" }, contestoPerServer()
+          ? "Fatto. Puoi cambiare il rettangolo, schizzare sulla velina o segnare i posti degli edifici."
+          : "Trascina un rettangolo dove deve stare l'edificio, oppure schizza sulla velina o segna il suo posto."),
+        strumentiVelina(),
         telaContesto(),
+        legendaVelina(),
+        confrontoAggancio(),
         h("p", { classe: "tenue piccolo" }, `${c.da || c.nome} · ${c.larghezza} × ${c.altezza} · `,
           h("label", { classe: "link-file" }, "cambia foto", h("span", { classe: "nascosto" }, file)),
           " · ", h("button", { classe: "link-file come-link", onclick: togliContesto }, "togli")))
@@ -1824,13 +2120,14 @@ function sezioneContesto() {
 
   // 3 · l'edificio: la vista di Allplan, con la camera giusta.
   const tre = passo(3, "Da Allplan", !!(S.vista && S.descrizione && S.descrizione.idonea),
-    S.vista
-      ? h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(S.vista)}`, alt: `Vista di Allplan ${S.vista}` })
-      : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."),
-    h("p", { classe: "piccolo" }, VISTA_PER_INQUADRATURA[inq]),
-    h("div", { classe: "riga" },
-      h("button", { classe: "btn", onclick: () => { S.mostraViste = !S.mostraViste; render(); }, "aria-expanded": String(S.mostraViste) }, "Usa un'altra vista…")),
-    S.mostraViste ? pannelloViste() : null);
+    ...(c ? sezioneEdifici(inq) : [
+      S.vista
+        ? h("img", { classe: "miniatura-vista", src: `/file/vista/${enc(S.vista)}`, alt: `Vista di Allplan ${S.vista}` })
+        : h("p", { classe: "piccolo" }, "Nessuna vista ancora: catturala dalla palette."),
+      h("p", { classe: "piccolo" }, VISTA_PER_INQUADRATURA[inq]),
+      h("div", { classe: "riga" },
+        h("button", { classe: "btn", onclick: () => { S.mostraViste = !S.mostraViste; render(); }, "aria-expanded": String(S.mostraViste) }, "Usa un'altra vista…")),
+      S.mostraViste ? pannelloViste() : null]));
 
   return h("section", { classe: "pannello sezione-contesto", "aria-label": "Fotoinserimento" },
     h("div", { classe: "griglia-contesto" }, uno, h("div", { classe: "passi-destra" }, due, tre)));
@@ -1874,7 +2171,9 @@ function motivoGeneraSpento() {
   if (m && !m.verificato) return "Lo schema di questo modello non è verificato: l'invio si fermerebbe prima di partire.";
   if (!S.destinazione) return "Sto leggendo la destinazione.";
   if (S.modo === "contesto" && !S.contesto) return "Passo 1: carica la foto del luogo.";
-  if (S.contesto && !S.contesto.area) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio.";
+  if (S.contesto && !contestoPerServer()) return "Passo 1: trascina sulla foto il rettangolo dove va l'edificio, oppure schizza sulla velina o segna il posto.";
+  if (S.contesto && S.contesto.velina && agganciMancanti(S.contesto.velina).length)
+    return `Aggancio di ${agganciMancanti(S.contesto.velina).join(", ")} incompleto: finiscilo (4 punti sulla foto, 4 sulla vista, ritaglio) o togli la spunta.`;
   if (S.destinazione.contesto_non_accettato) return S.destinazione.contesto_non_accettato;
   if (S.modo !== "contesto" && S.destinazione.riferimento_non_accettato) return S.destinazione.riferimento_non_accettato;
   if (S.destinazione.mappe_obbligatorie) return S.destinazione.mappe_obbligatorie;

@@ -1,4 +1,4 @@
-# Blocchi di stile — bozza 17 (2026-11-10)
+# Blocchi di stile — bozza 18 (2026-11-23)
 
 Riscritti dalla prompt library di Riccardo (Notion, da Visoid) con la skill architectural-prompt-enhancer: un blocco = un asse solo. **Nessun blocco è stato provato con il modello.** Testo per il modello in inglese, nomi per l'utente in italiano.
 
@@ -523,3 +523,15 @@ Stili:
 - `giorno` Giorno, luce naturale: «Professional architectural photograph, natural daylight, soft shadows, true-to-life materials and colours.»
 - `caldo` Pomeriggio caldo: «Warm late-afternoon sunlight raking in through the windows, long soft shadows, golden tones, editorial interior photograph.»
 - `sera` Sera, luci accese: «Evening, warm 3000 K lamps switched on, dark blue sky outside, cosy contrast, editorial photograph.»
+
+## Fotoinserimento con la velina, bozza 18 (2026-11-23)
+
+Cosa cambia dalla bozza 17: nel Fotoinserimento si può stendere una **velina**, una carta da forno che sbiadisce la foto e su cui si schizza a mano (rosso cambia o togli, verde alberi e verde nuovi, nero profili), si segna con una lettera cerchiata dove va ogni edificio (fino a 4, A–D, una vista Allplan ciascuno) e, se si hanno, si agganciano 4 punti a terra. Senza velina il prompt è quello della bozza 10, parola per parola. Con la velina partono: (1) la foto **pulita**, con gli edifici agganciati già montati; (2) la stessa foto sotto la velina, solo se c'è uno schizzo o un posto; (3…) una vista per edificio. La foto pulita va per prima perché il realismo viene da lì e il rapporto del render segue la prima immagine. Il rettangolo magenta diventa facoltativo. Vale uguale per Zenitale, Volo d'uccello e Da terra. **Nessun testo è provato con il modello.**
+
+| Id | Nome | Testo |
+|---|---|---|
+| `contesto-fuori-velina` | Fuori da edifici e schizzo il luogo resta com'e' | Apart from the new buildings and what the marks ask to change, keep the site of image 1 exactly as it is. |
+
+Esempio completo (da terra, schizzo con i tre colori, due edifici, A agganciato, nessun rettangolo):
+
+> Photo insertion. Image 1 is the real site, a clean photograph: it sets the camera, the light and the look of the result. In image 1 building A is already placed as a rough, flat CAD montage: keep that position, footprint, size and orientation exactly, and turn it into a real photographed building. Image 2 is the same site seen through a sheet of tracing paper with my hand-drawn instructions on it; it is a guide only, never copy its washed-out look. On the tracing paper red marks show what to change or remove in the site; green marks show new trees, hedges and planting to add, drawn with their outline and size; black lines show the outlines and footprints of the new buildings; a black circle with a letter marks where the building with that letter stands. Follow these marks. Images 3 to 4 are views of the new buildings designed for this site: image 3 is building A, image 4 is building B. Place each building into the site. Adapt perspective, scale and orientation to the site, so it stands on the ground at a believable size next to the roads, trees and buildings around it. Keep each building's shape, proportions and openings as designed; do not redesign it. The building views are untextured CAD views: their flat greys and colours are not materials, so give the buildings real, photographed building materials, glass that reflects the site, and real weathering. Match the light, sun direction, shadows, colour, haze and grain of image 1, so the buildings look photographed together with it. The result is a clean photograph: no tracing paper, no marks, no lines, no letters, no outlines. The site image is a photograph taken from the ground at eye level: show the building as the same camera would see it, from the same eye height, with the same perspective, vanishing points and lens; size it against the cars, people, doors and trees in the photo; let objects in front of the outline, such as trees, poles or cars, stay in front of the building. Apart from the new buildings and what the marks ask to change, keep the site of image 1 exactly as it is. Avoid: CGI or plastic look, HDR, oversharpening, clipped highlights, crushed blacks, heavy grain, artificial detail.
