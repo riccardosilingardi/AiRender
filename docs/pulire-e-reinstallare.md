@@ -1,7 +1,7 @@
 # Rifare la prova sul PC con le versioni vecchie (Allplan 2027)
 
 Per la prova come cliente **non serve lo ZIP del repository**: si usa solo
-`AIRENDER-2027.allep` (versione 1.0.17, con la velina del Fotoinserimento). Lo ZIP serve
+`AIRENDER-2027.allep` (versione 1.0.18, con «Prepara la foto» del Fotoinserimento). Lo ZIP serve
 solo per l'installazione da sviluppatore (in fondo).
 
 ## 1. Chiudi tutto
@@ -80,7 +80,7 @@ if (Test-Path "$env:APPDATA\AIRENDER") { Rename-Item "$env:APPDATA\AIRENDER" "AI
 
 Segui `prova-pc-pulito.md` dal passo 0: controlla l'impronta con
 `Get-FileHash`, trascina l'.allep in Allplan, riavvia, nel Plugin Manager deve
-comparire **AIRENDER 1.0.17**. In `avvio.txt` la riga «Pillow scelto» dice se
+comparire **AIRENDER 1.0.18**. In `avvio.txt` la riga «Pillow scelto» dice se
 usa il Pillow del pacchetto o quello di Allplan.
 
 ## In alternativa: da sviluppatore, dallo ZIP

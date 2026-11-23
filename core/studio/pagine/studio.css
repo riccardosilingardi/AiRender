@@ -556,6 +556,8 @@ select { min-height: 34px; padding: 0 10px; }
 .tela-vista .palco-contesto > img { max-height: 40vh; }
 .tela-ritocco[data-strumento="posto"], .tela-ritocco[data-strumento="punti"] { cursor: copy; }
 .confronto-aggancio { margin-top: 6px; }
+.prepara-foto { border: 1px dashed var(--bordo-forte); border-radius: 8px; padding: 8px 12px; margin: 6px 0; }
+.prepara-foto h4 { margin: 0 0 4px; font-size: 14px; }
 .link-file { color: var(--accento); cursor: pointer; text-decoration: underline; }
 .come-link { background: none; border: 0; padding: 0; font: inherit; }
 .riga.grigio { opacity: .6; }

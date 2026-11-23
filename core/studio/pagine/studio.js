@@ -48,6 +48,9 @@ const S = {
   // contesto resta da parte in contestoTenuto e torna quando si rientra.
   modo: "vista",
   contestoTenuto: null,
+  // «Prepara la foto» del Fotoinserimento (boxPreparaFoto). Con la foto
+  // preparata in uso, contesto.originale tiene la foto di prima.
+  prepara: null,
   // «Da un'immagine»: il pannello per caricare una foto, un render gia' fatto
   // o uno schizzo (DESIGN.md, Studio · Da un'immagine). tipo e cosa sono le
   // due scelte prima del file. tieni: la regola scelta in Genera per
@@ -1709,13 +1712,14 @@ async function scegliContesto(file) {
   if (!file) return;
   try {
     const caricato = await post("/api/contesti", file, { "Content-Type": "application/octet-stream", "X-Nome-File": encodeURIComponent(file.name) });
+    S.prepara = null;
     S.contesto = { ...caricato, area: null, inquadratura: S.catalogo.contesto.predefinita, pulisci: false, luogo: "",
                    ...(S.contesto ? { inquadratura: S.contesto.inquadratura, pulisci: S.contesto.pulisci, luogo: S.contesto.luogo } : {}) };
     S.errore = null;
   } catch (e) { S.errore = e; }
   await dopoCambioContesto();
 }
-async function togliContesto() { S.contesto = null; await dopoCambioContesto(); }
+async function togliContesto() { S.contesto = null; S.prepara = null; await dopoCambioContesto(); }
 function cambiaContesto(campo, valore) { S.contesto = { ...S.contesto, [campo]: valore }; dopoCambioContesto(); }
 
 // La velina (2026-11-23): sopra la foto del luogo si stende una carta da
@@ -2046,6 +2050,125 @@ async function caricaAnteprimaContesto() {
   render();
 }
 
+// «Prepara la foto» (2026-11-23): passo facoltativo, prima di velina e
+// aggancio, per uno screenshot di Google. Nano Banana 2 toglie scritte e icone
+// e rende fotografico il 3D senza spostare niente, poi Magnific (quello di
+// «Finale») la ingrandisce. La foto torna della stessa forma: rettangolo,
+// schizzo e punti restano dove sono. Si vede in prima/dopo e si sceglie quale
+// usare (core/prepara_foto.py). Stato in S.prepara: { aperto, composto,
+// ingrandisci, id, voce, confronto }.
+const IN_CORSO_PREPARA = { "in coda": "In coda: parte appena la coda è libera.", pulizia: "Pulizia della foto con Nano Banana 2…", ingrandimento: "Ingrandimento con Magnific…" };
+async function apriPreparaFoto() {
+  const c = S.contesto;
+  try {
+    const composto = await post("/api/contesti/prepara/componi", { nome: c.nome, inquadratura: c.inquadratura });
+    S.prepara = { aperto: true, composto, ingrandisci: !composto.ingrandimento.cosa_manca, confronto: { x: 50 } };
+    S.errore = null;
+  } catch (e) { S.errore = e; }
+  render();
+}
+async function mandaPreparaFoto() {
+  const c = S.contesto, p = S.prepara, k = p.composto;
+  try {
+    const esito = await post("/api/contesti/prepara", {
+      nome: c.nome, inquadratura: c.inquadratura, ingrandisci: p.ingrandisci,
+      destinazione_mostrata: k.pulizia.destinazione,
+      destinazione_ingrandimento_mostrata: p.ingrandisci ? k.ingrandimento.destinazione : null });
+    S.prepara = { ...p, aperto: false, id: esito.identificativo, voce: { stato: "in coda" }, coda_attiva: esito.coda_attiva };
+    S.errore = null;
+    seguiPreparaFoto(esito.identificativo);
+  } catch (e) { S.errore = e; }
+  render();
+}
+async function seguiPreparaFoto(id) {
+  if (!S.prepara || S.prepara.id !== id) return;
+  try { S.prepara.voce = await get(`/api/contesti/prepara/${enc(id)}`); } catch (e) { S.errore = e; render(); return; }
+  render();
+  if (IN_CORSO_PREPARA[S.prepara.voce.stato]) setTimeout(() => seguiPreparaFoto(id), 2000);
+}
+async function annullaPreparaFoto() {
+  const p = S.prepara;
+  try { await post(`/api/contesti/prepara/${enc(p.id)}/annulla`, {}); S.prepara = null; S.errore = null; }
+  catch (e) { S.errore = e; }
+  render();
+}
+// La foto preparata prende il posto dell'originale; rettangolo, velina e
+// punti restano (la forma e' la stessa). «Torna all'originale» la rimette.
+function usaFotoPreparata() {
+  const c = S.contesto, v = S.prepara.voce;
+  S.contesto = { ...c, nome: v.preparata, larghezza: v.larghezza, altezza: v.altezza, pulisci: false,
+                 originale: c.originale || { nome: c.nome, larghezza: c.larghezza, altezza: c.altezza } };
+  S.prepara = null; S.anteprimaContesto = null;
+  dopoCambioContesto();
+}
+function tornaAllOriginale() {
+  const c = S.contesto;
+  S.contesto = { ...c, ...c.originale, originale: null };
+  S.prepara = null; S.anteprimaContesto = null;
+  dopoCambioContesto();
+}
+function boxPreparaFoto() {
+  const c = S.contesto, p = S.prepara;
+  const titolo = h("h4", {}, "Prepara la foto", h("span", { classe: "tenue piccolo" }, " · facoltativo"));
+  if (c.originale && !p) {
+    return h("div", { classe: "prepara-foto" },
+      h("p", { classe: "piccolo" }, h("b", {}, "Stai usando la foto preparata. "),
+        `Originale ${c.originale.larghezza} × ${c.originale.altezza}, preparata ${c.larghezza} × ${c.altezza}. `,
+        h("button", { classe: "link-file come-link", onclick: tornaAllOriginale }, "Torna all'originale")),
+      c.velina && c.velina.oggetti.some((o) => o.aggancia)
+        ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Ricontrolla i 4 punti sulla foto: la foto è rifatta e uno spigolo può essersi spostato di poco.") : null);
+  }
+  if (!p) {
+    return h("div", { classe: "prepara-foto" }, titolo,
+      h("p", { classe: "tenue piccolo" }, c.inquadratura === "terra"
+        ? "Per uno screenshot di Street View: toglie scritte e icone, rende la foto pulita e la ingrandisce. Per una foto scattata da te non serve."
+        : "Per uno screenshot di Google Earth o Maps: toglie scritte e icone, rende fotografico il 3D e la ingrandisce. Per una foto da drone di solito non serve."),
+      h("p", { classe: "tenue piccolo" }, "Meglio farlo prima di disegnare: poi velina e punti li metti sulla foto pronta."),
+      h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: apriPreparaFoto }, "Prepara la foto…")));
+  }
+  if (p.aperto) {
+    const k = p.composto, ing = k.ingrandimento;
+    const spunta = h("input", { type: "checkbox", checked: p.ingrandisci, disabled: !!ing.cosa_manca });
+    spunta.addEventListener("change", () => { S.prepara.ingrandisci = spunta.checked; render(); });
+    return h("div", { classe: "prepara-foto" }, titolo,
+      h("p", { classe: "piccolo" }, `Parte 1 immagine, la foto (${k.partenza}). Torna della stessa forma: niente si sposta.`),
+      destinazioneBreve("1 · La pulizia", k.pulizia),
+      h("label", { classe: "riga" }, spunta, h("span", { classe: "piccolo" }, `Poi ingrandiscila ${k.volte} volte, con più dettaglio`)),
+      ing.cosa_manca ? h("p", { classe: "tenue piccolo" }, `Ingrandimento spento: ${ing.cosa_manca}`)
+        : p.ingrandisci ? destinazioneBreve("2 · L'ingrandimento", ing) : null,
+      k.coda_attiva ? null : avviso("attenzione", "La coda dei lavori non sta girando: la foto resterebbe in attesa.", "Chiudi e riapri lo Studio."),
+      k.pulizia.cosa_manca ? avviso("errore", `Non parte: ${k.pulizia.cosa_manca}`, "Controlla la scheda Licenza.") : null,
+      h("div", { classe: "riga" },
+        h("button", { classe: "btn primario", onclick: mandaPreparaFoto, disabled: !!k.pulizia.cosa_manca }, "Prepara"),
+        h("button", { classe: "btn", onclick: () => { S.prepara = null; render(); } }, "Chiudi")));
+  }
+  const v = p.voce || {};
+  if (IN_CORSO_PREPARA[v.stato]) {
+    return h("div", { classe: "prepara-foto" }, titolo,
+      h("p", { classe: "piccolo", role: "status" }, IN_CORSO_PREPARA[v.stato]),
+      v.stato === "in coda" ? h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: annullaPreparaFoto }, "Annulla")) : null);
+  }
+  if (v.stato === "fatto") {
+    const { palco, nota: avvisoProporzioni } = primaDopo(p.confronto, `/file/contesto/${enc(c.nome)}`, "Prima",
+      `/file/contesto/${enc(v.preparata)}`, "Preparata", "Foto preparata");
+    palco.style.width = `min(100%, calc(70vh * ${(c.larghezza / c.altezza).toFixed(4)}))`;
+    palco.style.margin = "0 auto";
+    return h("div", { classe: "prepara-foto" }, titolo,
+      h("div", { classe: "confronto-aggancio" }, palco, avvisoProporzioni),
+      h("p", { classe: "tenue piccolo" }, `Prima ${c.larghezza} × ${c.altezza}, preparata ${v.larghezza} × ${v.altezza}. `,
+        "Controlla nel prima/dopo che strade ed edifici siano rimasti al loro posto."),
+      v.avviso ? avviso("attenzione", v.avviso, "Puoi usarla com'è, o rifarla più tardi.") : null,
+      h("div", { classe: "riga" },
+        h("button", { classe: "btn primario", onclick: usaFotoPreparata }, "Usa la foto preparata"),
+        h("button", { classe: "btn", onclick: () => { S.prepara = null; render(); } }, "Tieni l'originale")));
+  }
+  return h("div", { classe: "prepara-foto" }, titolo,
+    v.stato === "annullato" ? h("p", { classe: "piccolo" }, v.fatto || "Annullata: non è partito niente.")
+      : avviso("errore", v.fatto || "La preparazione non è andata.", v.cosa_fare),
+    h("div", { classe: "riga" }, h("button", { classe: "btn", onclick: apriPreparaFoto }, "Riprova"),
+      h("button", { classe: "btn", onclick: () => { S.prepara = null; render(); } }, "Chiudi")));
+}
+
 // Il modo di Genera: render della vista o inserimento in una foto del luogo.
 async function cambiaModo(modo) {
   if (modo === S.modo) return;
@@ -2090,6 +2213,7 @@ function sezioneContesto() {
         h("p", { classe: contestoPerServer() ? "tenue piccolo" : "piccolo invito" }, contestoPerServer()
           ? "Fatto. Puoi cambiare il rettangolo, schizzare sulla velina o segnare i posti degli edifici."
           : "Trascina un rettangolo dove deve stare l'edificio, oppure schizza sulla velina o segna il suo posto."),
+        boxPreparaFoto(),
         strumentiVelina(),
         telaContesto(),
         legendaVelina(),
@@ -2157,7 +2281,7 @@ function colonnaContesto() {
       h("span", { classe: "etichetta" }, "Materiali a parole", spiega("La vista di Allplan è grigia: senza materiali il modello li sceglie da solo. Scrivili come vuoi, anche in italiano.")),
       materiali,
       h("span", { classe: "etichetta" }, "Dove si trova", spiega("Indirizzo o coordinate: aiutano il modello a capire il posto. Entrano nel prompt come li scrivi.")), luogo,
-      terra ? null : h("label", { classe: "riga" }, pulisci,
+      terra || (c && c.originale) ? null : h("label", { classe: "riga" }, pulisci,
         h("span", { classe: "piccolo" }, "È uno screenshot con scritte e icone (Google Earth, Maps): toglile e rendilo una foto aerea")),
       c && c.pulisci ? h("p", { classe: "piccolo", stile: "color:var(--attenzione)" }, "Così cambia anche fuori dall'area: la misura «fuori dall'area» non si fa.") : null),
     nota("Luce e cielo dalla foto.", "Qui preset e stile non servono: luce, cielo e colore li prende dalla foto del luogo. Per scegliere lo stile torna a «Render della vista»."));
