@@ -78,8 +78,8 @@ class Contesto:
 
     file: str
     # Un rettangolo, due angoli opposti in coordinate da 0 a 1 sul contesto.
-    # Con una velina che dice gia' dove va l'edificio (schizzo, posto o
-    # aggancio) il rettangolo e' facoltativo: allora e' None.
+    # Con una velina che dice gia' dove va ogni edificio (il perimetro alla
+    # base) il rettangolo non serve: allora e' None. Resta per i lavori vecchi.
     area: tuple[tuple[float, float], tuple[float, float]] | None
     inquadratura: str = config.CONTESTO_INQUADRATURA_PREDEFINITA
     pulisci_mappa: bool = False
@@ -98,8 +98,8 @@ class Contesto:
         if self.area is None:
             if not (self.velina and self.velina.dice_dove):
                 raise ContestoNonValido(
-                    "Non so dove va l'edificio: manca il rettangolo e la velina non lo dice.",
-                    "Trascina un rettangolo sulla foto, oppure segna il posto sulla velina.",
+                    "Non so dove va l'edificio: manca il suo perimetro.",
+                    "Disegna sulla foto il perimetro alla base dell'edificio.",
                 )
         else:
             try:
@@ -150,14 +150,13 @@ class Contesto:
             self.inquadratura, pulisci_mappa=self.pulisci_mappa, luogo=self.luogo, materiali=materiali,
             area=self._area is not None,
             velina=(blocchi.DettagliVelina(
-                schizzo=velina.colori_usati, posti=velina.lettere_posti,
-                agganciati=velina.lettere_agganciate, edifici=len(velina.oggetti),
-                parte=velina.parte_la_velina) if velina else None))
+                schizzo=velina.colori_usati, edifici=len(velina.oggetti),
+                perimetri=velina.ha_perimetri, parte=velina.parte_la_velina) if velina else None))
 
-    def prepara(self, dati_contesto: bytes, viste: tuple[bytes, ...] = ()) -> bytes:
-        """La prima immagine che parte: il luogo pulito, con gli edifici agganciati e il contorno magenta dell'area."""
-        if self.velina and self.velina.lettere_agganciate:
-            dati_contesto = modulo_velina.aggancia(dati_contesto, viste, self.velina)
+    def prepara(self, dati_contesto: bytes, viste: tuple[bytes, ...] = ()) -> bytes:  # noqa: ARG002
+        """La prima immagine che parte: il luogo pulito, col perimetro magenta di ogni edificio o l'area."""
+        if self.velina and self.velina.ha_perimetri:
+            return modulo_velina.perimetri(dati_contesto, self.velina)
         if self._area is None:
             return dati_contesto
         dimensioni = modulo_immagine.dimensioni(dati_contesto)
@@ -170,15 +169,15 @@ class Contesto:
         return tuple(viste)
 
     def misura(self, dati_contesto: bytes, render: bytes) -> dict | None:
-        """Quanto e' cambiato il contesto fuori dall'area.
+        """Quanto e' cambiato il contesto fuori dal rettangolo.
 
-        None con «pulisci la mappa», senza rettangolo, o con uno schizzo o un
-        aggancio: li' il luogo cambia apposta anche fuori, e il numero sarebbe
-        falso (regola 3).
+        None con «pulisci la mappa», con uno schizzo o coi perimetri: con lo
+        schizzo il luogo cambia apposta anche fuori, e un perimetro e' solo la
+        base, l'edificio sale sopra di lui. Il numero sarebbe falso (regola 3).
         """
         if self.pulisci_mappa or self._area is None:
             return None
-        if self.velina and (self.velina.ha_schizzo or self.velina.lettere_agganciate):
+        if self.velina and (self.velina.ha_schizzo or self.velina.ha_perimetri):
             return None
         return modulo_aree.misura(dati_contesto, render, (self._area,))
 
@@ -214,7 +213,7 @@ class Contesto:
         elif len(area) != 2:
             raise ContestoNonValido(
                 "Manca l'area dove va l'edificio.",
-                "Disegna un rettangolo sull'immagine del contesto, oppure segna il posto sulla velina.",
+                "Disegna sulla foto il perimetro alla base dell'edificio.",
             )
         return cls(
             file=str(dati.get("file") or ""),

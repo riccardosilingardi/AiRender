@@ -534,27 +534,52 @@ select { min-height: 34px; padding: 0 10px; }
 .palco-contesto > img { display: block; max-width: 100%; max-height: 72vh; width: auto; height: auto; }
 .palco-contesto > canvas.pittura, .carta-velina { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .carta-velina { transition: opacity .15s; }
-.posto-velina {
-  position: absolute; transform: translate(-50%, -50%); width: 30px; height: 30px; border-radius: 50%;
-  background: #141414; color: #fff; border: 2px solid #fff; display: grid; place-items: center;
-  font-weight: 700; font-size: 15px; pointer-events: none;
+/* Fotoinserimento in 4 passi (2026-11-23): un perimetro alla base per
+   edificio, magenta come quello che parte, con la lettera al centro. */
+.barra-passi { list-style: none; margin: 0 0 14px; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.passo-tab {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--bordo-forte); background: var(--pannello-2); color: var(--testo); font: inherit; font-size: 13px; cursor: pointer;
 }
-.punto-aggancio {
-  position: absolute; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%;
-  background: #2F6FED; color: #fff; border: 2px solid #fff; display: grid; place-items: center;
-  font-size: 11px; font-weight: 700; pointer-events: none; opacity: .65;
+.passo-tab[aria-current="step"] { border-color: var(--accento); box-shadow: inset 0 0 0 1px var(--accento); font-weight: 600; }
+.passo-tab:disabled { opacity: .5; cursor: default; }
+.numero-passo.fatto { background: var(--ok); }
+.avanti-indietro { margin-top: 8px; flex-wrap: wrap; }
+.colonna-tela { display: flex; flex-direction: column; gap: 8px; }
+.perimetro { fill: rgba(255, 0, 255, .16); stroke: #FF00FF; stroke-width: 2.5px; vector-effect: non-scaling-stroke; stroke-linejoin: round; opacity: .7; }
+.perimetro.attivo { opacity: 1; fill: rgba(255, 0, 255, .24); }
+.perimetro.aperto { fill: none; stroke-dasharray: 6 4; }
+.perimetro.elastico { fill: none; stroke-dasharray: 3 4; opacity: .8; }
+.sbiadito .perimetro { fill: none; opacity: .55; stroke-dasharray: 5 5; }
+.lettera-perimetro {
+  position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%;
+  background: #FF00FF; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
 }
-.punto-aggancio.attivo { opacity: 1; }
-.quadro-aggancio { fill: rgba(47, 111, 237, .12); stroke: #2F6FED; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.ritaglio { fill: rgba(92, 194, 139, .35); stroke: #5CC28B; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.ritaglio.togli { fill: rgba(11, 15, 23, .55); stroke: #F07B6B; }
+.vertice {
+  position: absolute; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2.5px solid #FF00FF; pointer-events: none; box-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+.vertice.primo { width: 20px; height: 20px; background: #FF00FF; }
+.vertice.scelto { background: #F4D35E; border-color: #2A2410; width: 18px; height: 18px; }
+.tela-ritocco[data-strumento="perimetro"] { cursor: crosshair; }
+.tela-ritocco[data-strumento="sposta"] { cursor: default; }
+.tela-ritocco[data-strumento="matita"], .tela-ritocco[data-strumento="gomma"] { cursor: crosshair; }
+.vista-edificio { display: flex; flex-direction: column; gap: 6px; }
+.griglia-viste { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 320px; overflow: auto; }
+.vista-scelta {
+  display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 1px solid var(--bordo); border-radius: 8px;
+  background: var(--pannello-2); color: var(--testo); font: inherit; cursor: pointer; text-align: left;
+}
+.vista-scelta:hover { border-color: var(--accento); }
+.vista-scelta img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: var(--pannello); }
+.vista-scelta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.passo-velina { display: flex; flex-direction: column; gap: 8px; }
+.riepilogo-contesto { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .strumenti-velina { display: flex; flex-direction: column; gap: 6px; }
 .strumenti-velina .switch { flex-wrap: wrap; }
 .strumenti-velina input[type="range"] { width: 90px; }
 .campione-velina { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-.tela-vista { display: flex; flex-direction: column; gap: 6px; }
-.tela-vista .palco-contesto > img { max-height: 40vh; }
-.tela-ritocco[data-strumento="posto"], .tela-ritocco[data-strumento="punti"] { cursor: copy; }
 .confronto-aggancio { margin-top: 6px; }
 .prepara-foto { border: 1px dashed var(--bordo-forte); border-radius: 8px; padding: 8px 12px; margin: 6px 0; }
 .prepara-foto h4 { margin: 0 0 4px; font-size: 14px; }

@@ -426,7 +426,7 @@ def _primo_punto(area: list) -> Punto:
     return area[0]
 
 
-def disegna_aree(dati: bytes, aree: list) -> bytes:
+def disegna_aree(dati: bytes, aree: list, etichette: list[str] | None = None) -> bytes:
     """L'immagine con il contorno di ogni area e il suo numero (1, 2, ...) in un cerchio.
 
     Le aree sono poligoni in pixel dell'immagine: un rettangolo ha quattro
@@ -449,7 +449,8 @@ def disegna_aree(dati: bytes, aree: list) -> bytes:
             disegno.line([*punti, punti[0]], fill=_MAGENTA, width=spessore, joint="curve")
         x, y = _primo_punto(punti)
         disegno.ellipse((x - raggio, y - raggio, x + raggio, y + raggio), fill=_MAGENTA)
-        disegno.text((x, y), str(numero), fill="white", font=carattere, anchor="mm")
+        testo = etichette[numero - 1] if etichette else str(numero)
+        disegno.text((x, y), testo, fill="white", font=carattere, anchor="mm")
     return _png(tela)
 
 
